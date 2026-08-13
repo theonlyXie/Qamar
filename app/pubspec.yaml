@@ -1,0 +1,47 @@
+name: qamar
+description: Qamar — AI Health OS. Personal nutritionist in your pocket.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State management — one app-wide store mirrors the prototype's single
+  # Component class; Provider keeps that mapping literal and avoids codegen.
+  provider: ^6.1.2
+
+  # Design system fonts (Cormorant Garamond, Noto Sans Arabic, Inter),
+  # same families the prototype loads from Google Fonts.
+  google_fonts: ^6.2.1
+
+  # Backend integration surface. Disabled by default (see lib/services/config.dart);
+  # the app runs fully on local in-memory state until real keys are supplied.
+  supabase_flutter: ^2.5.11
+
+  # Native camera capture for the InBody scan screen.
+  image_picker: ^1.1.2
+
+  # Store billing for the Qamar+ subscription once real product IDs exist.
+  in_app_purchase: ^3.2.0
+
+  intl: ^0.19.0
+  http: ^1.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/qamar_orb.png
+    - assets/images/qamar_orb_sm.png
+    - assets/images/su_coin.png
