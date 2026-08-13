@@ -5,28 +5,34 @@ Design prototype exported at the repo root (see `../README.md` and
 `../chats/` for the design intent this was built from), built out per
 `project/spec_mvp.txt`'s platform choice: **Flutter, Supabase backend**.
 
-## First-time setup (required — read this before `flutter run`)
+## Setup
 
-This app was written by hand in a sandbox with **no Flutter SDK installed**,
-so `lib/` and `pubspec.yaml` exist but the native `ios/`, `android/`, `web/`,
-etc. platform folders that `flutter create` normally generates do **not**.
-Before anything will run:
+The `android/`, `ios/`, and `web/` platform folders are committed (generated
+by `flutter create`, which did not touch `lib/`). To run:
 
 ```bash
 cd app
-flutter create --platforms=ios,android .   # generates the missing platform folders
-                                            # without touching lib/ or pubspec.yaml
 flutter pub get
 flutter run
 ```
 
-If `flutter create .` prompts about overwriting `pubspec.yaml` or `lib/`,
-say no / keep existing — you only want the platform scaffolding it's missing.
+Verified against **Flutter 3.47.0 / Dart 3.13.0**: `flutter analyze` is
+error-free, `flutter test` passes, and both `flutter build web` and
+`flutter build apk --debug` succeed.
 
-Camera/mic/photo-library usage strings (`NSCameraUsageDescription` etc. on
-iOS, permissions in `AndroidManifest.xml`) aren't set yet either, since those
-files don't exist until the step above runs. Add them once you wire the
-scan screen to a real camera (see "What's stubbed" below).
+Camera/mic/photo-library usage strings (`NSCameraUsageDescription` on iOS,
+permissions in `AndroidManifest.xml`) are **not** set yet — the generated
+manifests are stock. Add them when you wire the scan screen to a real
+camera (see "What's stubbed" below).
+
+### Fonts need network on first launch
+
+`google_fonts` fetches Cormorant Garamond / Noto Sans Arabic / Inter from
+`fonts.gstatic.com` at runtime rather than bundling them. On a device with
+no network — or behind a filtered one — Arabic text renders as tofu boxes
+while Latin text falls back cleanly. Since Arabic is the default locale,
+consider vendoring the font files into `assets/fonts/` and declaring them
+in `pubspec.yaml` before shipping.
 
 ## What's implemented
 
