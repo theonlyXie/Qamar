@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:radial-gradient(120% 90% at 50% 0%,#121B33 0%,#070C19 60%,#05070E 100%);font-family:'Noto Sans Arabic',Inter,system-ui,sans-serif}
+a{color:#7B6CFF;text-decoration:none}a:hover{color:#A78BFA}
+@keyframes qfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes qpulse{0%,100%{opacity:.3}50%{opacity:1}}
+@keyframes qglow{0%,100%{box-shadow:0 0 24px rgba(123,108,255,.35)}50%{box-shadow:0 0 44px rgba(34,211,238,.45)}}
+@keyframes qbreath{0%,100%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.045);filter:brightness(1.12)}}
+@keyframes qring{0%{transform:scale(.86);opacity:.55}100%{transform:scale(1.5);opacity:0}}
+@keyframes qrise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes qspin{to{transform:rotate(360deg)}}
+@keyframes qfloat{0%{transform:translate(0,0)}18%{transform:translate(-7px,-11px)}36%{transform:translate(5px,-18px)}54%{transform:translate(9px,-7px)}72%{transform:translate(-3px,3px)}86%{transform:translate(-8px,-4px)}100%{transform:translate(0,0)}}
+@keyframes qhalo{0%,100%{opacity:.32;transform:scale(1)}50%{opacity:.72;transform:scale(1.22)}}
+@keyframes qorbit{from{transform:rotate(0deg) translateX(40px) rotate(0deg)}to{transform:rotate(360deg) translateX(40px) rotate(-360deg)}}
+@keyframes qorbit2{from{transform:rotate(200deg) translateX(31px) rotate(0deg)}to{transform:rotate(560deg) translateX(31px) rotate(-360deg)}}
+@keyframes qtwinkle{0%,100%{opacity:.15;transform:scale(.6)}50%{opacity:1;transform:scale(1.1)}}
+@keyframes qtrail{0%{opacity:.5;transform:scale(.5)}70%{opacity:0;transform:scale(1.5)}100%{opacity:0}}
+@keyframes qbranch{to{stroke-dashoffset:-64}}
+@keyframes qsway{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes qnode{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes qgrow{from{opacity:0;transform:scale(.72)}to{opacity:1;transform:scale(1)}}
+::-webkit-scrollbar{width:0;height:0}
+input::placeholder{color:#64748B}
+[data-col]>*{flex-shrink:0}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:24px;padding:34px 20px 70px;box-sizing:border-box">
+
+  <div style="width:100%;max-width:900px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <span style="font:300 26px/32px 'Cormorant Garamond',serif;color:#F8FAFC;letter-spacing:.01em">Qamar <span style="font:400 13px/32px Inter,sans-serif;color:#94A3B8">AI Health OS · MVP prototype</span></span>
+      <span style="font:400 12px/18px Inter,sans-serif;color:#64748B">Conversational onboarding · full value loop · Arabic RTL + English LTR</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;background:#111827;border:1px solid #263044;border-radius:999px;padding:3px">
+        <sc-if value="{{ isAr }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ setAr }}" style="border:0;cursor:pointer;border-radius:999px;padding:7px 16px;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;font:600 13px/16px Inter,sans-serif">العربية</button>
+          <button onClick="{{ setEn }}" style="border:0;cursor:pointer;border-radius:999px;padding:7px 16px;background:transparent;color:#94A3B8;font:600 13px/16px Inter,sans-serif">English</button>
+        </sc-if>
+        <sc-if value="{{ isEn }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ setAr }}" style="border:0;cursor:pointer;border-radius:999px;padding:7px 16px;background:transparent;color:#94A3B8;font:600 13px/16px Inter,sans-serif">العربية</button>
+          <button onClick="{{ setEn }}" style="border:0;cursor:pointer;border-radius:999px;padding:7px 16px;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;font:600 13px/16px Inter,sans-serif">English</button>
+        </sc-if>
+      </div>
+      <button onClick="{{ restart }}" style="border:1px solid #263044;cursor:pointer;border-radius:999px;padding:8px 16px;background:transparent;color:#94A3B8;font:500 13px/16px Inter,sans-serif">{{ t.restart }}</button>
+    </div>
+  </div>
+
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" width="{{ 402 }}" height="{{ 874 }}" hint-size="402px,874px">
+    <div dir="{{ dir }}" style="height:100%;position:relative;display:flex;flex-direction:column;background:radial-gradient(140% 80% at 70% 12%,#1A2338 0%,#0B1324 45%,#070C19 100%);color:#F8FAFC;font-family:'Noto Sans Arabic',Inter,system-ui,sans-serif;overflow:hidden">
+
+      <!-- WELCOME -->
+      <sc-if value="{{ isWelcome }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:20px;padding:56px 24px 34px;text-align:center">
+          <div style="flex:1;display:flex;align-items:center;justify-content:center">
+            <div style="position:relative;width:300px;height:300px;display:flex;align-items:center;justify-content:center">
+              <div style="position:absolute;width:220px;height:220px;border-radius:999px;background:radial-gradient(circle,rgba(123,108,255,.28) 0%,rgba(79,124,255,.12) 45%,transparent 70%);animation:qhalo 7s ease-in-out infinite"></div>
+              <div style="width:132px;height:132px;border-radius:999px;background:url(assets/qamar-orb-sm.png) center/cover no-repeat;animation:qfloat 9s ease-in-out infinite;box-shadow:0 26px 54px rgba(79,124,255,.3)"></div>
+              <button onClick="{{ startOnboarding }}" style="position:absolute;top:14px;inset-inline-start:-4px;display:flex;align-items:center;gap:9px;height:52px;padding:0 18px;border:1px solid rgba(123,108,255,.5);border-radius:999px;background:rgba(20,28,46,.82);backdrop-filter:blur(8px);color:#F1F5FF;font:600 15px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer;box-shadow:0 12px 30px rgba(5,8,15,.5);animation:qfloat 11s ease-in-out infinite">
+                <span style="width:8px;height:8px;border-radius:999px;background:#7B6CFF;flex:none"></span>{{ t.chatDirect }}
+              </button>
+              <button onClick="{{ openScan }}" style="position:absolute;bottom:16px;inset-inline-end:-6px;display:flex;align-items:center;gap:9px;height:52px;padding:0 18px;border:1px solid #2B3450;border-radius:999px;background:rgba(17,24,39,.86);backdrop-filter:blur(8px);color:#E7ECF3;font:600 15px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer;box-shadow:0 12px 30px rgba(5,8,15,.5);animation:qfloat 13s ease-in-out infinite">
+                <span style="width:12px;height:12px;border:2px solid #22D3EE;border-radius:3px;flex:none"></span>{{ t.scanInbody }}
+              </button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font:300 40px/48px 'Cormorant Garamond',serif;color:#F5F7FF">{{ t.brand }}</span>
+            <span style="font:400 16px/24px 'Noto Sans Arabic',Inter,sans-serif;color:#CBD5E1">{{ t.promise }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="flex:1;height:1px;background:#1F2940"></div>
+              <span style="font:400 12px/18px 'Noto Sans Arabic',Inter,sans-serif;color:#64748B">{{ t.continueWith }}</span>
+              <div style="flex:1;height:1px;background:#1F2940"></div>
+            </div>
+            <div style="display:flex;gap:10px">
+              <sc-for list="{{ providers }}" as="p" hint-placeholder-count="3">
+                <button onClick="{{ p.go }}" style="flex:1;height:52px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid #263044;border-radius:16px;background:#111827;color:#E7ECF3;font:600 14px/20px Inter,sans-serif;cursor:pointer" style-hover="border-color:#3A4763;background:#141C2E">
+                  <span style="font:700 16px/20px Inter,sans-serif;color:{{ p.color }}">{{ p.mark }}</span>{{ p.name }}
+                </button>
+              </sc-for>
+            </div>
+            <button style="height:38px;border:0;border-radius:12px;background:transparent;color:#94A3B8;font:500 14px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.haveAccount }}</button>
+            <span style="font:400 11px/17px 'Noto Sans Arabic',Inter,sans-serif;color:#64748B;max-width:300px;align-self:center">{{ t.boundary }}</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- INBODY SCAN -->
+      <sc-if value="{{ isScan }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;background:#05080F">
+          <div style="display:flex;align-items:center;gap:12px;padding:58px 20px 14px">
+            <button onClick="{{ backToWelcome }}" style="width:34px;height:34px;border-radius:999px;border:1px solid #263044;background:transparent;color:#CBD5E1;font:500 15px/1 Inter,sans-serif;cursor:pointer">×</button>
+            <span style="font:500 15px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#E7ECF3">{{ t.scanTitle }}</span>
+          </div>
+          <div style="flex:1;position:relative;margin:0 20px;border-radius:22px;overflow:hidden;background:repeating-linear-gradient(135deg,#0D131F,#0D131F 12px,#121A29 12px,#121A29 24px);display:flex;align-items:center;justify-content:center">
+            <div style="position:absolute;inset:26px;border-radius:16px;border:2px dashed rgba(123,108,255,.55)"></div>
+            <span style="font:400 12px/18px ui-monospace,SFMono-Regular,Menlo,monospace;color:#64748B">InBody report · camera preview</span>
+            <sc-if value="{{ scanReading }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;background:rgba(5,8,15,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
+                <div style="display:flex;gap:5px">
+                  <div style="width:6px;height:6px;border-radius:999px;background:#7B6CFF;animation:qpulse 1s infinite"></div>
+                  <div style="width:6px;height:6px;border-radius:999px;background:#7B6CFF;animation:qpulse 1s .2s infinite"></div>
+                  <div style="width:6px;height:6px;border-radius:999px;background:#7B6CFF;animation:qpulse 1s .4s infinite"></div>
+                </div>
+                <span style="font:400 14px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#CBD5E1">{{ t.reading }}</span>
+              </div>
+            </sc-if>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 24px 40px">
+            <span style="font:400 13px/19px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ t.scanHint }}</span>
+            <button onClick="{{ capture }}" style="width:72px;height:72px;border-radius:999px;border:3px solid #33415C;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);cursor:pointer;box-shadow:0 8px 30px rgba(79,124,255,.35)"></button>
+            <button onClick="{{ startOnboarding }}" style="border:0;background:transparent;color:#94A3B8;font:500 14px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.typeInstead }}</button>
+            <span style="font:400 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#64748B;text-align:center">{{ t.scanPriv }}</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ONBOARDING CHAT -->
+      <sc-if value="{{ isOnboard }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:12px;padding:58px 20px 12px;border-bottom:1px solid #1A2338">
+          <div style="width:36px;height:36px;border-radius:999px;background:url(assets/qamar-orb-sm.png) center/cover no-repeat;flex:none;box-shadow:0 0 18px rgba(123,108,255,.4)"></div>
+          <div style="display:flex;flex-direction:column">
+            <span style="font:300 20px/24px 'Cormorant Garamond',serif;color:#F5F7FF">{{ t.brand }}</span>
+            <span style="font:400 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ t.obSub }}</span>
+          </div>
+          <div style="margin-inline-start:auto;font:500 11px/16px Inter,sans-serif;color:#94A3B8;border:1px solid #263044;border-radius:999px;padding:4px 10px">{{ obProgress }}</div>
+        </div>
+        <div data-col style="flex:1;overflow:auto;padding:18px 20px 8px;display:flex;flex-direction:column;gap:14px">
+          <sc-for list="{{ obMsgs }}" as="m" hint-placeholder-count="2">
+            <div style="display:flex;flex-direction:column;animation:qfade .24s ease-out">
+              <sc-if value="{{ m.isQ }}" hint-placeholder-val="{{ true }}">
+                <div style="align-self:flex-start;max-width:86%;background:#141C2E;border:1px solid #263044;color:#F8FAFC;border-radius:18px;border-end-start-radius:6px;padding:12px 14px;font:400 15px/23px 'Noto Sans Arabic',Inter,sans-serif">{{ m.text }}</div>
+              </sc-if>
+              <sc-if value="{{ m.isU }}" hint-placeholder-val="{{ false }}">
+                <div style="align-self:flex-end;max-width:86%;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;border-radius:18px;border-end-end-radius:6px;padding:12px 14px;font:400 15px/23px 'Noto Sans Arabic',Inter,sans-serif">{{ m.text }}</div>
+              </sc-if>
+              <sc-if value="{{ m.isTarget }}" hint-placeholder-val="{{ false }}">
+                <div style="align-self:flex-start;width:88%;background:linear-gradient(160deg,#141C2E,#111827);border:1px solid #2B3450;border-radius:20px;padding:18px;box-shadow:0 0 34px rgba(79,124,255,.18)">
+                  <div style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8;letter-spacing:.04em">{{ t.dailyTarget }}</div>
+                  <div style="display:flex;align-items:baseline;gap:8px;margin-top:6px">
+                    <span style="font:600 36px/42px Inter,sans-serif;background:linear-gradient(120deg,#4F7CFF,#22D3EE);-webkit-background-clip:text;background-clip:text;color:transparent">{{ target.kcal }}</span>
+                    <span style="font:500 13px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ t.kcalDay }}</span>
+                  </div>
+                  <div style="display:flex;gap:8px;margin-top:16px">
+                    <sc-for list="{{ targetMacros }}" as="mm" hint-placeholder-count="3">
+                      <div style="flex:1;background:#0B1324;border:1px solid #1F2940;border-radius:14px;padding:10px 12px">
+                        <div style="font:400 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ mm.label }}</div>
+                        <div style="font:600 16px/22px Inter,sans-serif;color:#F8FAFC">{{ mm.g }}g</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="margin-top:14px;font:400 12px/18px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ assumptions }}</div>
+                  <div style="margin-top:6px;font:400 12px/18px 'Noto Sans Arabic',Inter,sans-serif;color:#F6C97A">{{ t.estimateNote }}</div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ m.isSave }}" hint-placeholder-val="{{ false }}">
+                <div style="align-self:flex-start;width:88%;background:rgba(123,108,255,.1);border:1px solid rgba(123,108,255,.4);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:8px">
+                  <span style="font:600 15px/22px 'Noto Sans Arabic',Inter,sans-serif;color:#E9ECFF">{{ t.saveTitle }}</span>
+                  <span style="font:400 13px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#CBD5E1">{{ t.saveSub }}</span>
+                  <div style="display:flex;gap:8px;margin-top:4px">
+                    <button onClick="{{ dismissSave }}" style="border:0;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;border-radius:999px;padding:10px 16px;font:600 12px/16px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.saveNow }}</button>
+                    <button onClick="{{ dismissSave }}" style="border:1px solid #263044;background:transparent;color:#94A3B8;border-radius:999px;padding:10px 16px;font:500 12px/16px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.saveLater }}</button>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <sc-if value="{{ typing }}" hint-placeholder-val="{{ false }}">
+            <div style="align-self:flex-start;display:flex;gap:5px;background:#141C2E;border:1px solid #263044;border-radius:18px;border-end-start-radius:6px;padding:14px 16px">
+              <div style="width:6px;height:6px;border-radius:999px;background:#7B6CFF;animation:qpulse 1s infinite"></div>
+              <div style="width:6px;height:6px;border-radius:999px;background:#7B6CFF;animation:qpulse 1s .2s infinite"></div>
+              <div style="width:6px;height:6px;border-radius:999px;background:#7B6CFF;animation:qpulse 1s .4s infinite"></div>
+            </div>
+          </sc-if>
+        </div>
+        <div style="padding:12px 20px 34px;border-top:1px solid #1A2338;display:flex;flex-direction:column;gap:10px">
+          <sc-if value="{{ stepChips }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <sc-for list="{{ options }}" as="o" hint-placeholder-count="2">
+                <sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ o.pick }}" style="border:1px solid #7B6CFF;background:rgba(123,108,255,.18);color:#E9ECFF;border-radius:999px;padding:11px 16px;font:500 14px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ o.label }}</button>
+                </sc-if>
+                <sc-if value="{{ o.off }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ o.pick }}" style="border:1px solid #263044;background:#111827;color:#CBD5E1;border-radius:999px;padding:11px 16px;font:500 14px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ o.label }}</button>
+                </sc-if>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ stepNumber }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:8px">
+              <sc-for list="{{ numFields }}" as="f" hint-placeholder-count="3">
+                <div style="flex:1;background:#111827;border:1px solid #263044;border-radius:14px;padding:8px 8px;display:flex;flex-direction:column;align-items:center;gap:4px">
+                  <span style="font:400 10px/14px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ f.unit }}</span>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <button onClick="{{ f.dec }}" style="width:26px;height:26px;border-radius:999px;border:1px solid #2A354D;background:transparent;color:#CBD5E1;font:600 15px/1 Inter,sans-serif;cursor:pointer">−</button>
+                    <span style="font:600 19px/24px Inter,sans-serif;min-width:34px;text-align:center">{{ f.value }}</span>
+                    <button onClick="{{ f.inc }}" style="width:26px;height:26px;border-radius:999px;border:1px solid #2A354D;background:transparent;color:#CBD5E1;font:600 15px/1 Inter,sans-serif;cursor:pointer">+</button>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ hasSubmit }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ submitStep }}" style="height:52px;border:0;border-radius:16px;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;font:600 16px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer;box-shadow:0 8px 26px rgba(79,124,255,.3)">{{ submitLabel }}</button>
+          </sc-if>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onDraftKey }}" placeholder="{{ composerPlaceholder }}" style="flex:1;height:48px;border-radius:24px;border:1px solid #263044;background:#111827;color:#F8FAFC;padding:0 16px;font:400 15px/20px 'Noto Sans Arabic',Inter,sans-serif;outline:none"/>
+            <sc-if value="{{ canSkip }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ skipStep }}" style="height:48px;border:0;background:transparent;color:#94A3B8;font:500 14px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer;padding:0 4px">{{ t.skip }}</button>
+            </sc-if>
+            <button onClick="{{ sendDraft }}" style="width:48px;height:48px;flex:none;border:0;border-radius:999px;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;font:600 18px/1 Inter,sans-serif;cursor:pointer">↑</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- TODAY -->
+      <sc-if value="{{ isToday }}" hint-placeholder-val="{{ false }}">
+        <div data-col style="flex:1;overflow:auto;padding:56px 20px 160px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between">
+            <div style="display:flex;flex-direction:column">
+              <span style="font:400 14px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ greeting }}</span>
+              <span style="font:300 34px/42px 'Cormorant Garamond',serif;color:#F5F7FF">{{ userName }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <button onClick="{{ openWallet }}" style="display:flex;align-items:center;gap:6px;border:1px solid rgba(232,194,117,.4);border-radius:999px;padding:6px 11px;background:#0F1730;cursor:pointer">
+                <img src="assets/su-coin.png" alt="Su" width="16" height="16" style="flex:none;width:16px;height:16px;border-radius:999px;display:block"/>
+                <span style="font:600 11px/16px Inter,sans-serif;color:#E8C275">{{ suAvailable }}</span>
+              </button>
+              <div style="display:flex;align-items:center;gap:8px;border:1px solid #263044;border-radius:999px;padding:6px 12px;background:#111827">
+                <div style="width:8px;height:8px;border-radius:999px;background:#10B981"></div>
+                <span style="font:500 11px/16px Inter,sans-serif;color:#CBD5E1">{{ levelLabel }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:12px;align-items:center;background:linear-gradient(140deg,#141C2E,#111827);border:1px solid #263044;border-radius:18px;padding:14px">
+            <div style="width:40px;height:40px;border-radius:12px;flex:none;background:url(assets/qamar-orb-sm.png) center/cover no-repeat;box-shadow:0 0 20px rgba(123,108,255,.5)"></div>
+            <span style="font:400 14px/21px 'Noto Sans Arabic',Inter,sans-serif;color:#E7ECF3">{{ qamarLine }}</span>
+          </div>
+
+          <div style="background:linear-gradient(160deg,#141C2E,#0F172A);border:1px solid #2B3450;border-radius:22px;padding:20px;box-shadow:0 0 40px rgba(79,124,255,.12)">
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span style="font:600 38px/44px Inter,sans-serif;background:linear-gradient(120deg,#22D3EE,#7B6CFF);-webkit-background-clip:text;background-clip:text;color:transparent">{{ remaining }}</span>
+              <span style="font:500 13px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ t.kcalRemaining }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
+              <sc-for list="{{ macros }}" as="m" hint-placeholder-count="3">
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <div style="display:flex;justify-content:space-between;font:500 12px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">
+                    <span>{{ m.label }}</span><span>{{ m.text }}</span>
+                  </div>
+                  <div style="height:6px;border-radius:999px;background:#1F2940;overflow:hidden">
+                    <div style="height:100%;border-radius:999px;background:linear-gradient(90deg,#10B981,#22D3EE);width:{{ m.pct }}"></div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <span style="font:400 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#64748B">{{ t.estimateNote }}</span>
+              <button onClick="{{ openWhy }}" style="flex:none;border:1px solid #2B3450;background:transparent;color:#94A3B8;border-radius:999px;padding:6px 12px;font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.whyCta }}</button>
+            </div>
+          </div>
+
+          <div style="background:#111827;border:1px solid rgba(16,185,129,.4);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:6px">
+            <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#10B981;letter-spacing:.04em">{{ t.nextMeal }}</span>
+            <span style="font:600 17px/24px 'Noto Sans Arabic',Inter,sans-serif">{{ nextMealName }}</span>
+            <span style="font:400 13px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ nextMealSub }}</span>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button onClick="{{ goPlan }}" style="border:1px solid #263044;background:transparent;color:#CBD5E1;border-radius:999px;padding:8px 14px;font:500 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.swap }}</button>
+              <button onClick="{{ goPlan }}" style="border:1px solid #263044;background:transparent;color:#CBD5E1;border-radius:999px;padding:8px 14px;font:500 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.openPlan }}</button>
+            </div>
+          </div>
+
+          <div style="background:#111827;border:1px solid #263044;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8;letter-spacing:.04em">{{ t.nextQuest }}</span>
+              <span style="display:flex;align-items:center;gap:5px;font:600 12px/16px Inter,sans-serif;color:#E8C275">
+                <img src="assets/su-coin.png" alt="Su" width="15" height="15" style="flex:none;width:15px;height:15px;border-radius:999px;display:block"/>{{ questReward }}
+              </span>
+            </div>
+            <span style="font:600 16px/24px 'Noto Sans Arabic',Inter,sans-serif">{{ questTitle }}</span>
+            <span style="font:400 13px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ questReason }}</span>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button onClick="{{ completeQuest }}" style="border:1px solid rgba(123,108,255,.55);background:rgba(123,108,255,.16);color:#E9ECFF;border-radius:999px;padding:8px 14px;font:500 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ questCta }}</button>
+              <button onClick="{{ replaceQuest }}" style="border:1px solid #263044;background:transparent;color:#94A3B8;border-radius:999px;padding:8px 14px;font:500 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.replace }}</button>
+            </div>
+          </div>
+
+          <button onClick="{{ goLog }}" style="height:56px;border:0;border-radius:18px;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;font:600 17px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer;box-shadow:0 10px 30px rgba(79,124,255,.32)">{{ t.logMeal }}</button>
+
+          <sc-if value="{{ hasMeals }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+              <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8;letter-spacing:.04em">{{ t.loggedToday }}</span>
+              <sc-for list="{{ meals }}" as="ml" hint-placeholder-count="1">
+                <div style="background:#111827;border:1px solid #1F2940;border-radius:16px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <span style="font:600 15px/22px 'Noto Sans Arabic',Inter,sans-serif">{{ ml.name }}</span>
+                    <span style="font:400 12px/18px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ ml.sub }}</span>
+                  </div>
+                  <span style="font:600 15px/22px Inter,sans-serif;color:#22D3EE">{{ ml.kcal }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- LOG -->
+      <sc-if value="{{ isLog }}" hint-placeholder-val="{{ false }}">
+        <div data-col style="flex:1;overflow:auto;padding:56px 20px 160px;display:flex;flex-direction:column;gap:14px">
+          <span style="font:300 30px/38px 'Cormorant Garamond',serif;color:#F5F7FF">{{ t.logMeal }}</span>
+          <span style="font:400 14px/22px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ t.logSub }}</span>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <sc-for list="{{ methods }}" as="me" hint-placeholder-count="4">
+              <button onClick="{{ me.pick }}" style="text-align:start;background:linear-gradient(150deg,#141C2E,#111827);border:1px solid #263044;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:6px;min-height:124px;cursor:pointer;color:#F8FAFC">
+                <div style="width:36px;height:36px;border-radius:12px;background:rgba(79,124,255,.14);border:1px solid rgba(123,108,255,.45);box-shadow:0 0 18px rgba(123,108,255,.2)"></div>
+                <span style="font:600 16px/22px 'Noto Sans Arabic',Inter,sans-serif;margin-top:auto">{{ me.label }}</span>
+                <span style="font:400 12px/18px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ me.sub }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;background:#111827;border:1px solid #263044;border-radius:18px;padding:14px">
+            <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ t.describeMeal }}</span>
+            <input value="{{ mealDraft }}" onChange="{{ onMealDraft }}" placeholder="{{ t.mealPlaceholder }}" style="height:48px;border-radius:14px;border:1px solid #263044;background:#0B1324;color:#F8FAFC;padding:0 14px;font:400 15px/20px 'Noto Sans Arabic',Inter,sans-serif;outline:none"/>
+            <button onClick="{{ analyze }}" style="height:48px;border:0;border-radius:14px;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;font:600 15px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.continue }}</button>
+          </div>
+          <div style="background:#111827;border:1px solid #1F2940;border-radius:16px;padding:14px 16px;font:400 12px/18px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ t.permissionNote }}</div>
+        </div>
+      </sc-if>
+
+      <!-- ANALYZING -->
+      <sc-if value="{{ isAnalyzing }}" hint-placeholder-val="{{ false }}">
+        <div data-col style="flex:1;overflow:auto;padding:56px 20px 40px;display:flex;flex-direction:column;gap:16px">
+          <span style="font:300 30px/38px 'Cormorant Garamond',serif;color:#F5F7FF">{{ t.analyzing }}</span>
+          <div style="height:150px;border-radius:18px;background:repeating-linear-gradient(135deg,#111827,#111827 10px,#141C2E 10px,#141C2E 20px);border:1px solid #263044;display:flex;align-items:center;justify-content:center;font:500 11px/18px Inter,sans-serif;color:#64748B;letter-spacing:.1em">{{ t.sourcePreview }}</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <sc-for list="{{ analyzeSteps }}" as="s" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:10px">
+                <sc-if value="{{ s.done }}" hint-placeholder-val="{{ false }}">
+                  <div style="width:16px;height:16px;border-radius:999px;background:#10B981;flex:none"></div>
+                </sc-if>
+                <sc-if value="{{ s.pending }}" hint-placeholder-val="{{ true }}">
+                  <div style="width:16px;height:16px;border-radius:999px;border:2px solid #2A354D;flex:none;animation:qpulse 1s infinite"></div>
+                </sc-if>
+                <span style="font:400 14px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#CBD5E1">{{ s.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="height:70px;border-radius:16px;background:#111827;animation:qpulse 1.4s infinite"></div>
+          <div style="height:70px;border-radius:16px;background:#111827;animation:qpulse 1.4s .2s infinite"></div>
+          <button onClick="{{ goLog }}" style="margin-top:auto;height:48px;border:1px solid #263044;border-radius:14px;background:transparent;color:#94A3B8;font:500 15px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.cancel }}</button>
+        </div>
+      </sc-if>
+
+      <!-- CONFIRM -->
+      <sc-if value="{{ isConfirm }}" hint-placeholder-val="{{ false }}">
+        <div data-col style="flex:1;overflow:auto;padding:56px 20px 40px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <span style="font:300 30px/38px 'Cormorant Garamond',serif;color:#F5F7FF">{{ t.confirmMeal }}</span>
+            <span style="font:400 13px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ t.nothingWrites }}</span>
+          </div>
+          <div style="height:120px;border-radius:18px;background:repeating-linear-gradient(135deg,#111827,#111827 10px,#141C2E 10px,#141C2E 20px);border:1px solid #263044;display:flex;align-items:center;justify-content:center;font:500 11px/18px Inter,sans-serif;color:#64748B;letter-spacing:.1em">{{ t.sourcePreview }}</div>
+          <sc-for list="{{ items }}" as="it" hint-placeholder-count="3">
+            <div style="background:#111827;border:1px solid #1F2940;border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <span style="font:600 15px/22px 'Noto Sans Arabic',Inter,sans-serif">{{ it.name }}</span>
+                  <span style="font:400 12px/18px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ it.portion }}</span>
+                </div>
+                <sc-if value="{{ it.high }}" hint-placeholder-val="{{ true }}">
+                  <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#10B981;border:1px solid rgba(16,185,129,.4);border-radius:999px;padding:3px 10px;white-space:nowrap">{{ it.conf }}</span>
+                </sc-if>
+                <sc-if value="{{ it.low }}" hint-placeholder-val="{{ false }}">
+                  <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#FBBF24;border:1px solid rgba(251,191,36,.4);border-radius:999px;padding:3px 10px;white-space:nowrap">{{ it.conf }}</span>
+                </sc-if>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <button onClick="{{ it.dec }}" style="width:30px;height:30px;border-radius:999px;border:1px solid #2A354D;background:transparent;color:#CBD5E1;font:600 15px/1 Inter,sans-serif;cursor:pointer">−</button>
+                <span style="font:600 14px/20px Inter,sans-serif;min-width:44px;text-align:center;color:#CBD5E1">{{ it.qty }}</span>
+                <button onClick="{{ it.inc }}" style="width:30px;height:30px;border-radius:999px;border:1px solid #2A354D;background:transparent;color:#CBD5E1;font:600 15px/1 Inter,sans-serif;cursor:pointer">+</button>
+                <span style="margin-inline-start:auto;font:600 14px/20px Inter,sans-serif;color:#22D3EE">{{ it.kcal }}</span>
+              </div>
+            </div>
+          </sc-for>
+          <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.35);border-radius:16px;padding:14px 16px;font:400 13px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#F6C97A">{{ t.uncertainNote }}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 2px;font:600 15px/22px Inter,sans-serif">
+            <span style="color:#94A3B8;font-weight:500">{{ t.approx }}</span>
+            <span style="color:#F8FAFC">{{ mealTotals }}</span>
+          </div>
+          <button onClick="{{ confirmMeal }}" style="height:56px;border:0;border-radius:18px;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;font:600 17px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer;box-shadow:0 10px 30px rgba(79,124,255,.32)">{{ t.confirmAndLog }}</button>
+          <button onClick="{{ goLog }}" style="height:44px;border:0;background:transparent;color:#94A3B8;font:500 14px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.cancel }}</button>
+        </div>
+      </sc-if>
+
+      <!-- ASK QAMAR (companion overlay, S18) -->
+      <sc-if value="{{ chatOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;z-index:36;display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(6,10,20,.66) 0%,rgba(6,10,20,.8) 46%,rgba(6,10,20,.94) 100%);backdrop-filter:blur(6px) saturate(.85);animation:qfade .22s ease-out">
+          <div style="display:flex;align-items:center;gap:10px;padding:52px 18px 10px">
+            <button onClick="{{ closeChat }}" style="margin-inline-start:auto;width:34px;height:34px;flex:none;border-radius:999px;border:1px solid #2B3450;background:rgba(17,24,39,.7);color:#CBD5E1;font:400 16px/1 Inter,sans-serif;cursor:pointer">×</button>
+          </div>
+
+          <div style="position:relative;flex:1;min-height:0;display:flex">
+            <div style="position:absolute;top:6px;inset-inline-start:14px;width:84px;display:flex;flex-direction:column;align-items:center;gap:7px;z-index:2">
+              <div style="position:relative;width:84px;height:84px;display:flex;align-items:center;justify-content:center">
+                <div style="position:absolute;inset:-10px;border-radius:999px;background:radial-gradient(circle,rgba(123,108,255,.42) 0%,transparent 68%);filter:blur(6px);animation:qhalo 5.4s ease-in-out infinite"></div>
+                <sc-if value="{{ orbActive }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:absolute;inset:-6px;border-radius:999px;border:1px solid rgba(123,108,255,.55);animation:qring 2.4s ease-out infinite"></div>
+                  <div style="position:absolute;inset:-6px;border-radius:999px;border:1px solid rgba(34,211,238,.4);animation:qring 2.4s 1.2s ease-out infinite"></div>
+                </sc-if>
+                <button onClick="{{ tapOrb }}" style="position:relative;width:78px;height:78px;border-radius:999px;border:0;padding:0;cursor:pointer;background:url(assets/qamar-orb-sm.png) center/cover no-repeat;box-shadow:0 0 42px rgba(123,108,255,.5);animation:qbreath 5.5s ease-in-out infinite"></button>
+              </div>
+              <span style="font:300 15px/20px 'Cormorant Garamond',serif;color:#E9ECFF">{{ t.brand }}</span>
+              <span style="font:500 9px/13px Inter,sans-serif;color:#7B6CFF;letter-spacing:.14em;text-transform:uppercase;text-align:center">{{ orbState }}</span>
+            </div>
+            <div style="position:absolute;top:104px;bottom:0;inset-inline-start:55px;width:1px;background:linear-gradient(180deg,rgba(123,108,255,.5),rgba(123,108,255,.06) 60%,transparent)"></div>
+
+            <div data-col style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:4px 18px 150px;padding-inline-start:110px">
+              <sc-for list="{{ chatThread }}" as="c" hint-placeholder-count="2">
+                <div style="display:flex;flex-direction:column;gap:8px;animation:qrise .34s ease-out">
+                  <sc-if value="{{ c.isQ }}" hint-placeholder-val="{{ true }}">
+                    <div style="align-self:flex-start;max-width:100%;background:linear-gradient(150deg,rgba(24,33,55,.95),rgba(17,24,39,.95));border:1px solid #2B3450;border-radius:18px;border-start-start-radius:5px;padding:13px 15px;display:flex;flex-direction:column;gap:5px;box-shadow:0 14px 34px rgba(5,8,15,.45)">
+                      <span style="font:500 15px/23px 'Noto Sans Arabic',Inter,sans-serif;color:#F5F7FF">{{ c.text }}</span>
+                      <sc-if value="{{ c.hasSub }}" hint-placeholder-val="{{ true }}">
+                        <span style="font:400 13px/21px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ c.sub }}</span>
+                      </sc-if>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ c.hasAction }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ c.doAction }}" style="align-self:flex-start;border:1px solid rgba(123,108,255,.55);background:rgba(123,108,255,.14);color:#E9ECFF;border-radius:999px;padding:10px 18px;font:500 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ c.action }}</button>
+                  </sc-if>
+                  <sc-if value="{{ c.isU }}" hint-placeholder-val="{{ false }}">
+                    <div style="align-self:flex-end;max-width:96%;margin-inline-start:-56px;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;border-radius:18px;border-end-end-radius:5px;padding:12px 15px;font:400 15px/23px 'Noto Sans Arabic',Inter,sans-serif;box-shadow:0 12px 28px rgba(79,124,255,.28)">{{ c.text }}</div>
+                  </sc-if>
+                </div>
+              </sc-for>
+              <sc-if value="{{ chatThinking }}" hint-placeholder-val="{{ false }}">
+                <div style="align-self:flex-start;display:flex;gap:5px;background:rgba(20,28,46,.9);border:1px solid #263044;border-radius:16px;border-start-start-radius:5px;padding:14px 16px">
+                  <div style="width:6px;height:6px;border-radius:999px;background:#7B6CFF;animation:qpulse 1s infinite"></div>
+                  <div style="width:6px;height:6px;border-radius:999px;background:#7B6CFF;animation:qpulse 1s .2s infinite"></div>
+                  <div style="width:6px;height:6px;border-radius:999px;background:#7B6CFF;animation:qpulse 1s .4s infinite"></div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+
+          <div style="position:absolute;inset-inline:0;bottom:0;padding:12px 16px 26px;display:flex;flex-direction:column;gap:10px;background:linear-gradient(180deg,transparent,rgba(6,10,20,.92) 42%)">
+            <sc-if value="{{ showSuggestions }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;gap:8px;overflow:auto;padding-bottom:2px">
+                <sc-for list="{{ chatSuggestions }}" as="sg" hint-placeholder-count="3">
+                  <button onClick="{{ sg.pick }}" style="flex:none;border:1px solid rgba(148,163,184,.24);background:rgba(20,28,46,.7);color:#94A3B8;border-radius:999px;padding:9px 14px;font:400 12px/16px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer;white-space:nowrap">{{ sg.label }}</button>
+                </sc-for>
+              </div>
+            </sc-if>
+            <div style="display:flex;gap:8px;align-items:center;background:rgba(17,24,39,.9);border:1px solid #2B3450;border-radius:999px;padding:5px;padding-inline-start:16px;box-sizing:border-box">
+              <input value="{{ chatDraft }}" onChange="{{ onChatDraft }}" onKeyDown="{{ onChatKey }}" placeholder="{{ t.chatPlaceholder }}" style="flex:1;min-width:0;height:40px;border:0;background:transparent;color:#F8FAFC;font:400 15px/20px 'Noto Sans Arabic',Inter,sans-serif;outline:none"/>
+              <button onClick="{{ tapOrb }}" style="width:40px;height:40px;flex:none;border-radius:999px;border:1px solid #2B3450;background:transparent;color:#94A3B8;font:400 15px/1 Inter,sans-serif;cursor:pointer">●</button>
+              <button onClick="{{ sendChat }}" style="width:40px;height:40px;flex:none;border-radius:999px;border:0;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;font:600 15px/1 Inter,sans-serif;cursor:pointer">↑</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- PLAN -->
+      <sc-if value="{{ isPlan }}" hint-placeholder-val="{{ false }}">
+        <div data-col style="flex:1;overflow:auto;padding:56px 20px 160px;display:flex;flex-direction:column;gap:14px">
+          <span style="font:300 30px/38px 'Cormorant Garamond',serif;color:#F5F7FF">{{ t.plan }}</span>
+          <span style="font:400 14px/22px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ t.planSub }}</span>
+          <sc-for list="{{ planMeals }}" as="p" hint-placeholder-count="3">
+            <div style="background:linear-gradient(150deg,#141C2E,#111827);border:1px solid #263044;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8;letter-spacing:.04em">{{ p.slot }}</span>
+                <span style="font:600 12px/16px Inter,sans-serif;color:#22D3EE">{{ p.kcal }}</span>
+              </div>
+              <span style="font:600 16px/24px 'Noto Sans Arabic',Inter,sans-serif">{{ p.name }}</span>
+              <span style="font:400 12px/18px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ p.note }}</span>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button onClick="{{ p.swap }}" style="border:1px solid #263044;background:transparent;color:#CBD5E1;border-radius:999px;padding:8px 14px;font:500 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.swap }}</button>
+                <button onClick="{{ goLog }}" style="border:1px solid #263044;background:transparent;color:#CBD5E1;border-radius:999px;padding:8px 14px;font:500 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.markEaten }}</button>
+              </div>
+            </div>
+          </sc-for>
+          <div style="background:rgba(123,108,255,.1);border:1px solid rgba(123,108,255,.4);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:8px">
+            <span style="font:500 15px/22px 'Noto Sans Arabic',Inter,sans-serif;color:#E9ECFF">{{ t.dayChanged }}</span>
+            <button onClick="{{ goChat }}" style="align-self:flex-start;border:0;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;border-radius:999px;padding:10px 18px;font:600 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.adjustRoute }}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- PROGRESS -->
+      <sc-if value="{{ isProgress }}" hint-placeholder-val="{{ false }}">
+        <div data-col style="flex:1;overflow:auto;padding:56px 20px 160px;display:flex;flex-direction:column;gap:14px">
+          <span style="font:300 30px/38px 'Cormorant Garamond',serif;color:#F5F7FF">{{ t.progress }}</span>
+          <span style="font:400 14px/22px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ t.progressSub }}</span>
+          <div style="background:#111827;border:1px solid rgba(16,185,129,.4);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:6px">
+            <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#10B981;letter-spacing:.04em">{{ t.thisWeek }}</span>
+            <span style="font:400 14px/22px 'Noto Sans Arabic',Inter,sans-serif;color:#E7ECF3">{{ weekSummary }}</span>
+          </div>
+          <div style="background:linear-gradient(150deg,#141C2E,#111827);border:1px solid #263044;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px">
+            <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8;letter-spacing:.04em">{{ t.activeDays }}</span>
+            <div style="display:flex;align-items:flex-end;gap:8px;height:110px">
+              <sc-for list="{{ weekBars }}" as="b" hint-placeholder-count="7">
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end">
+                  <div style="width:100%;border-radius:8px;background:linear-gradient(180deg,#22D3EE,#4F7CFF);height:{{ b.h }}"></div>
+                  <span style="font:400 10px/14px Inter,sans-serif;color:#64748B">{{ b.d }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="background:linear-gradient(150deg,#141C2E,#111827);border:1px solid #263044;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px">
+            <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8;letter-spacing:.04em">{{ t.weightTrend }}</span>
+            <svg viewBox="0 0 300 90" style="width:100%;height:90px" preserveAspectRatio="none">
+              <polyline points="8,64 56,58 104,60 152,48 200,42 248,38 292,34" fill="none" stroke="#7B6CFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              <circle cx="292" cy="34" r="5" fill="#22D3EE"></circle>
+            </svg>
+            <span style="font:400 13px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ weightSummary }}</span>
+          </div>
+          <div style="background:rgba(79,124,255,.1);border:1px solid rgba(79,124,255,.4);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:6px">
+            <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#60A5FA;letter-spacing:.04em">{{ t.weeklyInsight }}</span>
+            <span style="font:400 14px/22px 'Noto Sans Arabic',Inter,sans-serif;color:#E7ECF3">{{ insight }}</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- YOU -->
+      <sc-if value="{{ isYou }}" hint-placeholder-val="{{ false }}">
+        <div data-col style="flex:1;overflow:auto;padding:56px 20px 160px;display:flex;flex-direction:column;gap:14px">
+          <span style="font:300 30px/38px 'Cormorant Garamond',serif;color:#F5F7FF">{{ t.you }}</span>
+          <div style="background:linear-gradient(150deg,#141C2E,#111827);border:1px solid #2B3450;border-radius:18px;padding:16px;display:flex;align-items:center;gap:14px">
+            <div style="width:48px;height:48px;border-radius:999px;background:url(assets/qamar-orb-sm.png) center/cover no-repeat;flex:none"></div>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font:600 16px/22px 'Noto Sans Arabic',Inter,sans-serif">{{ userName }}</span>
+              <span style="font:400 12px/18px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ t.guestAccount }}</span>
+            </div>
+          </div>
+          <div style="background:rgba(123,108,255,.1);border:1px solid rgba(123,108,255,.4);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:8px">
+            <span style="font:600 15px/22px 'Noto Sans Arabic',Inter,sans-serif;color:#E9ECFF">{{ t.saveProgress }}</span>
+            <span style="font:400 13px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#CBD5E1">{{ t.saveProgressSub }}</span>
+            <button style="align-self:flex-start;margin-top:4px;border:0;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;border-radius:999px;padding:10px 18px;font:600 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.linkAccount }}</button>
+          </div>
+          <div style="background:rgba(232,194,117,.08);border:1px solid rgba(232,194,117,.32);border-radius:18px;padding:16px;display:flex;align-items:center;gap:14px">
+            <img src="assets/su-coin.png" alt="Su" width="30" height="30" style="flex:none;width:30px;height:30px;border-radius:999px;display:block"/>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font:600 15px/22px 'Noto Sans Arabic',Inter,sans-serif;color:#F2E4C6">{{ t.walletTitle }}</span>
+              <span style="font:400 12px/18px 'Noto Sans Arabic',Inter,sans-serif;color:#B9A57C">{{ suWalletLine }}</span>
+            </div>
+            <button onClick="{{ openWallet }}" style="margin-inline-start:auto;flex:none;border:1px solid rgba(232,194,117,.45);background:transparent;color:#E8C275;border-radius:999px;padding:9px 15px;font:600 12px/16px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.spendTab }}</button>
+          </div>
+          <sc-for list="{{ youRows }}" as="r" hint-placeholder-count="5">
+            <div style="background:#111827;border:1px solid #1F2940;border-radius:16px;padding:15px 16px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font:500 15px/22px 'Noto Sans Arabic',Inter,sans-serif;color:#E7ECF3">{{ r.label }}</span>
+              <span style="font:400 13px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#64748B">{{ r.value }}</span>
+            </div>
+          </sc-for>
+          <div style="background:linear-gradient(140deg,rgba(34,211,238,.12),rgba(123,108,255,.14));border:1px solid rgba(34,211,238,.35);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:8px">
+            <span style="font:300 24px/30px 'Cormorant Garamond',serif;color:#F5F7FF">Qamar+</span>
+            <span style="font:400 13px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#CBD5E1">{{ t.plusSub }}</span>
+            <button style="align-self:flex-start;margin-top:6px;border:0;background:#F5F7FF;color:#0B1324;border-radius:999px;padding:11px 20px;font:600 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.plusCta }}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- SU POINTS WALLET (S59) -->
+      <sc-if value="{{ isWallet }}" hint-placeholder-val="{{ false }}">
+        <div data-col style="flex:1;overflow:auto;padding:56px 20px 160px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <button onClick="{{ goToday }}" style="width:34px;height:34px;flex:none;border-radius:999px;border:1px solid #263044;background:transparent;color:#CBD5E1;font:500 15px/1 Inter,sans-serif;cursor:pointer">←</button>
+            <span style="font:300 28px/34px 'Cormorant Garamond',serif;color:#F5F7FF">{{ t.walletTitle }}</span>
+          </div>
+          <div style="background:linear-gradient(150deg,#151B33,#0F1526);border:1px solid rgba(232,194,117,.32);border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;align-items:center;gap:14px">
+              <img src="assets/su-coin.png" alt="Su" width="40" height="40" style="flex:none;width:40px;height:40px;border-radius:999px;display:block"/>
+              <div style="display:flex;flex-direction:column">
+                <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ t.suAvailable }}</span>
+                <span style="font:600 34px/40px Inter,sans-serif;color:#F2E4C6">{{ suAvailable }}</span>
+              </div>
+              <div style="margin-inline-start:auto;text-align:end;display:flex;flex-direction:column">
+                <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ t.suLifetime }}</span>
+                <span style="font:600 18px/26px Inter,sans-serif;color:#CBD5E1">{{ suLifetime }}</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="height:6px;border-radius:999px;background:#1F2940;overflow:hidden">
+                <div style="height:100%;border-radius:999px;background:linear-gradient(90deg,#E8C275,#B98B3C);width:{{ levelPct }}"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;gap:10px;font:400 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#64748B">
+                <span>{{ levelLabel }}</span><span>{{ t.levelNote }}</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;background:#0F172A;border:1px solid #1F2940;border-radius:999px;padding:4px">
+            <button onClick="{{ showSpend }}" style="flex:1;height:38px;border:0;border-radius:999px;background:{{ spendTabBg }};color:{{ spendTabFg }};font:600 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.spendTab }}</button>
+            <button onClick="{{ showHistory }}" style="flex:1;height:38px;border:0;border-radius:999px;background:{{ histTabBg }};color:{{ histTabFg }};font:600 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.historyTab }}</button>
+          </div>
+          <sc-if value="{{ walletSpend }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <sc-for list="{{ spendItems }}" as="si" hint-placeholder-count="4">
+                <div style="background:#111827;border:1px solid #1F2940;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                    <span style="font:600 15px/22px 'Noto Sans Arabic',Inter,sans-serif;color:#F8FAFC">{{ si.name }}</span>
+                    <span style="flex:none;font:600 13px/20px Inter,sans-serif;color:#E8C275">{{ si.price }}</span>
+                  </div>
+                  <span style="font:400 13px/20px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ si.what }}</span>
+                  <span style="font:400 11px/17px 'Noto Sans Arabic',Inter,sans-serif;color:#64748B">{{ si.limit }}</span>
+                  <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+                    <span style="font:400 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8">{{ si.after }}</span>
+                    <button onClick="{{ si.redeem }}" style="margin-inline-start:auto;flex:none;border:1px solid {{ si.ctaBorder }};background:transparent;color:{{ si.ctaFg }};border-radius:999px;padding:9px 16px;font:600 12px/16px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ si.cta }}</button>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ walletHistory }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ ledger }}" as="lg" hint-placeholder-count="4">
+                <div style="background:#111827;border:1px solid #1F2940;border-radius:16px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <span style="font:500 14px/21px 'Noto Sans Arabic',Inter,sans-serif;color:#E7ECF3">{{ lg.label }}</span>
+                    <span style="font:400 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#64748B">{{ lg.when }}</span>
+                  </div>
+                  <span style="flex:none;font:600 14px/20px Inter,sans-serif;color:{{ lg.color }}">{{ lg.amount }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <div style="background:#0F172A;border:1px solid #1F2940;border-radius:16px;padding:14px 16px;font:400 12px/19px 'Noto Sans Arabic',Inter,sans-serif;color:#64748B">{{ t.walletTerms }}</div>
+        </div>
+      </sc-if>
+
+      <!-- WHY / SOURCE (S61) -->
+      <sc-if value="{{ whyOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;z-index:40;background:rgba(5,8,15,.72);backdrop-filter:blur(10px);display:flex;align-items:flex-end">
+          <div style="width:100%;background:#0F172A;border-top:1px solid #2B3450;border-radius:26px 26px 0 0;padding:22px 20px 34px;display:flex;flex-direction:column;gap:12px;animation:qrise .28s ease-out">
+            <div style="width:38px;height:4px;border-radius:999px;background:#2B3450;align-self:center"></div>
+            <span style="font:300 26px/32px 'Cormorant Garamond',serif;color:#F5F7FF">{{ t.whyTitle }}</span>
+            <sc-for list="{{ whyRows }}" as="w" hint-placeholder-count="4">
+              <div style="display:flex;flex-direction:column;gap:4px;border-top:1px solid #1A2338;padding-top:11px">
+                <span style="font:500 11px/16px 'Noto Sans Arabic',Inter,sans-serif;color:#94A3B8;letter-spacing:.04em">{{ w.label }}</span>
+                <span style="font:400 14px/22px 'Noto Sans Arabic',Inter,sans-serif;color:#E7ECF3">{{ w.value }}</span>
+              </div>
+            </sc-for>
+            <button onClick="{{ closeWhy }}" style="margin-top:6px;height:50px;border:0;border-radius:16px;background:linear-gradient(120deg,#4F7CFF,#7B6CFF);color:#fff;font:600 15px/20px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer">{{ t.whyClose }}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- TREE OVERLAY -->
+      <sc-if value="{{ treeOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ closeTree }}" style="position:absolute;inset:0;z-index:30;background:rgba(7,12,25,.86);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center">
+          <div style="position:relative;width:340px;height:340px;animation:qgrow .28s cubic-bezier(.2,.9,.3,1.2)">
+            <svg viewBox="0 0 340 340" style="position:absolute;inset:0;width:340px;height:340px;overflow:visible">
+              <g fill="none" stroke-linecap="round" stroke-width="1.6" stroke-dasharray="7 9" style="animation:qbranch 3.4s linear infinite">
+                <line x1="170" y1="170" x2="170" y2="52" stroke="rgba(123,108,255,.85)"></line>
+                <line x1="170" y1="170" x2="57.8" y2="133.5" stroke="rgba(34,211,238,.8)"></line>
+                <line x1="170" y1="170" x2="282.2" y2="133.5" stroke="rgba(16,185,129,.8)"></line>
+                <line x1="170" y1="170" x2="100.6" y2="265.5" stroke="rgba(96,165,250,.8)"></line>
+                <line x1="170" y1="170" x2="239.4" y2="265.5" stroke="rgba(167,139,250,.8)"></line>
+              </g>
+              <g style="animation:qsway 3.6s ease-in-out infinite">
+                <circle cx="170" cy="105" r="2.6" fill="#A78BFA"></circle>
+                <circle cx="112" cy="152" r="2.2" fill="#22D3EE"></circle>
+                <circle cx="228" cy="152" r="2.2" fill="#10B981"></circle>
+                <circle cx="134" cy="219" r="2.2" fill="#60A5FA"></circle>
+                <circle cx="206" cy="219" r="2.2" fill="#A78BFA"></circle>
+              </g>
+            </svg>
+            <div style="position:absolute;left:105px;top:105px;width:130px;height:130px;border-radius:999px;background:radial-gradient(circle,rgba(123,108,255,.5) 0%,transparent 68%);filter:blur(8px);animation:qhalo 5.2s ease-in-out infinite"></div>
+            <button onClick="{{ goChat }}" style="position:absolute;left:126px;top:126px;width:88px;height:88px;border-radius:999px;border:0;padding:0;cursor:pointer;background:url(assets/qamar-orb-sm.png) center/cover no-repeat;box-shadow:0 0 50px rgba(123,108,255,.55),inset -8px -6px 20px rgba(11,19,36,.5);color:#0B1324;font:600 12px/16px 'Noto Sans Arabic',Inter,sans-serif;animation:qbreath 4.6s ease-in-out infinite">{{ t.ask }}</button>
+            <button onClick="{{ goToday }}" style="position:absolute;left:128px;top:10px;width:84px;height:84px;border-radius:999px;border:1px solid rgba(123,108,255,.55);background:rgba(20,28,46,.92);color:#F8FAFC;font:500 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer;box-shadow:0 0 22px rgba(123,108,255,.25);animation:qnode 5.4s ease-in-out infinite">{{ t.today }}</button>
+            <button onClick="{{ goLog }}" style="position:absolute;left:16px;top:92px;width:84px;height:84px;border-radius:999px;border:1px solid rgba(34,211,238,.55);background:rgba(20,28,46,.92);color:#F8FAFC;font:500 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer;box-shadow:0 0 22px rgba(34,211,238,.22);animation:qnode 6.1s .3s ease-in-out infinite">{{ t.log }}</button>
+            <button onClick="{{ goPlan }}" style="position:absolute;left:240px;top:92px;width:84px;height:84px;border-radius:999px;border:1px solid rgba(16,185,129,.55);background:rgba(20,28,46,.92);color:#F8FAFC;font:500 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer;box-shadow:0 0 22px rgba(16,185,129,.22);animation:qnode 5.8s .6s ease-in-out infinite">{{ t.plan }}</button>
+            <button onClick="{{ goProgress }}" style="position:absolute;left:59px;top:224px;width:84px;height:84px;border-radius:999px;border:1px solid rgba(96,165,250,.55);background:rgba(20,28,46,.92);color:#F8FAFC;font:500 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer;box-shadow:0 0 22px rgba(96,165,250,.22);animation:qnode 6.4s .9s ease-in-out infinite">{{ t.progress }}</button>
+            <button onClick="{{ goYou }}" style="position:absolute;left:197px;top:224px;width:84px;height:84px;border-radius:999px;border:1px solid rgba(167,139,250,.55);background:rgba(20,28,46,.92);color:#F8FAFC;font:500 13px/18px 'Noto Sans Arabic',Inter,sans-serif;cursor:pointer;box-shadow:0 0 22px rgba(167,139,250,.22);animation:qnode 5.2s 1.2s ease-in-out infinite">{{ t.you }}</button>
+          </div>
+          <span style="position:absolute;bottom:56px;left:0;right:0;text-align:center;font:400 12px/18px 'Noto Sans Arabic',Inter,sans-serif;color:#64748B">{{ t.treeHint }}</span>
+        </div>
+      </sc-if>
+
+      <!-- ORB + BOTTOM NAV -->
+      <sc-if value="{{ orbVisible }}" hint-placeholder-val="{{ false }}">
+        <div onPointerDown="{{ orbDown }}" onPointerMove="{{ orbMove }}" onPointerUp="{{ orbUp }}" style="position:absolute;z-index:20;touch-action:none;left:{{ orbLeft }};top:{{ orbTop }};animation:qfloat 11s ease-in-out infinite">
+          <div style="position:relative;width:92px;height:92px;display:flex;align-items:center;justify-content:center">
+            <div style="position:absolute;width:76px;height:76px;border-radius:999px;background:radial-gradient(circle,rgba(123,108,255,.55) 0%,rgba(79,124,255,.28) 45%,transparent 70%);filter:blur(6px);animation:qhalo 5.2s ease-in-out infinite"></div>
+            <div style="position:absolute;width:66px;height:66px;border-radius:999px;border:1px solid rgba(34,211,238,.35);animation:qtrail 3.6s ease-out infinite"></div>
+            <div style="position:absolute;width:6px;height:6px;border-radius:999px;background:#22D3EE;box-shadow:0 0 10px rgba(34,211,238,.9);animation:qorbit 7s linear infinite,qtwinkle 2.4s ease-in-out infinite"></div>
+            <div style="position:absolute;width:4px;height:4px;border-radius:999px;background:#A78BFA;box-shadow:0 0 9px rgba(167,139,250,.9);animation:qorbit2 5.4s linear infinite,qtwinkle 1.9s .4s ease-in-out infinite"></div>
+            <div style="position:absolute;width:3px;height:3px;border-radius:999px;background:#F5F7FF;box-shadow:0 0 8px rgba(245,247,255,.9);animation:qorbit 9.5s 1.2s linear infinite,qtwinkle 3.1s .8s ease-in-out infinite"></div>
+            <button onClick="{{ toggleTree }}" style="position:relative;width:56px;height:56px;border-radius:999px;border:0;padding:0;cursor:pointer;background:url(assets/qamar-orb-sm.png) center/cover no-repeat;box-shadow:0 0 34px rgba(123,108,255,.6),inset -6px -4px 14px rgba(11,19,36,.5);animation:qbreath 4.6s ease-in-out infinite"></button>
+          </div>
+          <span style="display:block;pointer-events:none;text-align:center;margin-top:-4px;font:600 10px/14px Inter,sans-serif;color:#94A3B8;background:rgba(17,24,39,.85);border:1px solid #263044;border-radius:999px;padding:2px 8px;width:fit-content;margin-inline:auto">{{ suBadge }}</span>
+        </div>
+      </sc-if>
+
+    </div>
+  </x-import>
+
+  <div style="max-width:900px;width:100%;display:flex;flex-wrap:wrap;gap:10px;font:400 12px/18px Inter,sans-serif;color:#64748B">
+    <span style="border:1px solid #1F2940;border-radius:999px;padding:6px 12px">S02 Welcome → S08–S15 conversational onboarding</span>
+    <span style="border:1px solid #1F2940;border-radius:999px;padding:6px 12px">S16 Today · S21–S26 log → confirm</span>
+    <span style="border:1px solid #1F2940;border-radius:999px;padding:6px 12px">S18 Chat · S30 Plan · S33 Progress · S40 You</span>
+    <span style="border:1px solid #1F2940;border-radius:999px;padding:6px 12px">S06 age gate · S07 consent · S59 Su Points wallet · S61 why/source</span>
+    <span style="border:1px solid #1F2940;border-radius:999px;padding:6px 12px">Orb + tree overlay · no write before confirm</span>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:900,&quot;height&quot;:1080}}">
+const STR = {
+  ar: {
+    brand:'قمر', restart:'من الأول',
+    promise:'أخصائي التغذية بتاعك في جيبك',
+    boundary:'إرشاد عام بالذكاء الاصطناعي للصحة اليومية. مش بديل عن استشارة طبية.',
+    startNow:'ابدأ دلوقتي', haveAccount:'عندي حساب بالفعل',
+    guestNote:'من غير تسجيل. نقدر نحفظ تقدمك بعدين.',
+    chatDirect:'اتكلم مع قمر', chatDirectSub:'دقيقتين أسئلة ونطلع هدفك',
+    scanInbody:'امسح تقرير InBody', scanInbodySub:'صوّر التقرير وهنقرأ أرقامك',
+    scanTitle:'مسح تقرير InBody', scanHint:'حط الصفحة الأولى جوه الإطار',
+    scanPriv:'الصورة بتتحلل وقتها وما بتتخزنش.', reading:'بنقرأ التقرير…', continueWith:'أو سجّل بحساب',
+    suName:'نقاط Su', suAvailable:'المتاح للاستخدام', suLifetime:'المكتسب من البداية',
+    walletTitle:'محفظة نقاط Su', walletSub:'بتتكسب بالأفعال المفيدة. مش بتتشترى ومالهاش مقابل مادي.',
+    spendTab:'الاستخدام', historyTab:'السجل', priceLabel:'السعر', limitLabel:'الحد',
+    balanceAfter:'الرصيد بعد الاستخدام', spendCta:'استخدم النقاط',
+    walletTerms:'نقاط Su مالهاش قيمة نقدية، مش قابلة للتحويل، ومش بتنتهي في الإصدار الحالي. التسجيل والتعديل والأهداف والخصوصية مجاناً دايماً.',
+    levelNote:'الاستخدام مش بيقلل مستواك أبداً.',
+    whyCta:'ليه الرقم ده؟', whyTitle:'المصدر والحساب', whyClose:'تمام',
+    whyFormula:'المعادلة', whyFormulaVal:'Mifflin-St Jeor للأيض الأساسي × معامل النشاط، ناقص فرق آمن للهدف.',
+    whyAssume:'الافتراضات', whySource:'مصدر بيانات الأكل', whySourceVal:'قاعدة أكل مصري داخلية v0.9 + وزن حصص شائعة. الحصص تقديرية وقابلة للتعديل.',
+    whyGuide:'الإرشاد الغذائي', whyGuideVal:'مراجع عامة معتمدة داخلياً. مفيش تشخيص ولا وصف علاج.',
+    whyVersion:'إصدار الحساب', barcode:'باركود', barcodeSub:'امسح المنتج', label:'ملصق التغذية', labelSub:'صوّر جدول القيم',
+    saveTitle:'تحب نحفظ تقدمك؟', saveSub:'اربط حساب عشان تسترجع بياناتك على أي جهاز. تقدر تكمّل من غير تسجيل.',
+    saveNow:'اربط حساب', saveLater:'بعدين', suEarned:'اتكسبت',
+    obSub:'بنتعرف على بعض', dailyTarget:'هدفك اليومي', kcalDay:'سعر / اليوم',
+    estimateNote:'دي تقديرات لصحة عامة، مش أرقام طبية.',
+    namePlaceholder:'اسمك الأول', skip:'تخطي', next:'كمّل', done:'تمام',
+    today:'اليوم', log:'تسجيل', plan:'الخطة', progress:'التقدم', you:'حسابي',
+    kcalRemaining:'سعر متبقي النهاردة', nextMeal:'الوجبة الجاية', nextQuest:'مهمة النهاردة',
+    swap:'بدّل', openPlan:'افتح الخطة', accept:'موافق', replace:'غيّرها', done2:'اتعملت',
+    logMeal:'سجّل وجبة', loggedToday:'المسجّل النهاردة',
+    logSub:'اختار أسهل طريقة. كله بيوصل لنفس شاشة التأكيد.',
+    photo:'صورة', photoSub:'صوّر الأكل', voice:'صوت', voiceSub:'احكيلي بالمصري',
+    text:'كتابة', textSub:'اكتب الوجبة', recent:'وجبات سابقة', recentSub:'كرّر وجبة قديمة',
+    describeMeal:'اكتب الوجبة', mealPlaceholder:'مثال: كشري وسط + دقة',
+    continue:'كمّل', permissionNote:'الكاميرا والمايك بنطلبهم وقت الاستخدام بس. الرفض مش بيمنعك من التسجيل بالكتابة.',
+    analyzing:'بنحلل الوجبة', sourcePreview:'معاينة المصدر', cancel:'إلغاء',
+    confirmMeal:'أكّد الوجبة', nothingWrites:'مفيش حاجة بتتسجل قبل ما تأكد.',
+    uncertainNote:'مش متأكد 100٪ من الكمية. بصّ على التقدير وعدّله قبل ما نسجله.',
+    approx:'التقدير', confirmAndLog:'أكّد وسجّل',
+    online:'متاح دلوقتي', chatPlaceholder:'اسأل قمر...',
+    planSub:'المسار بيتعدل، مش بيبدأ من الأول.', markEaten:'اتاكلت',
+    dayChanged:'اليوم اتغير؟ نعدّل المسار بخطوة واحدة.', adjustRoute:'عدّل المسار',
+    progressSub:'دليل من غير لوم.', thisWeek:'الأسبوع ده', activeDays:'أيام النشاط',
+    weightTrend:'اتجاه الوزن', weeklyInsight:'خلاصة الأسبوع',
+    guestAccount:'حساب ضيف · محفوظ على الجهاز',
+    saveProgress:'احفظ تقدمك', saveProgressSub:'اربط حسابك عشان ترجّع بياناتك على أي جهاز.',
+    linkAccount:'اربط الحساب',
+    plusSub:'تسجيل بالصورة والصوت من غير حدود، وخطط أعمق وتحليل أسبوعي مفصّل.',
+    plusCta:'جرّب 14 يوم', treeHint:'دوس بره للخروج · اسحب قمر لتغيير مكانه', ask:'اسأل قمر',
+    typeInstead:'أو اكتب بدل الكلام', sIdle:'دوس على القمر واتكلم', sListening:'بسمعك...', sThinking:'بفكر...', sAnswer:'قمر',
+    tapPrompt:'إيه اللي في دماغك؟',
+    protein:'بروتين', carbs:'كارب', fat:'دهون',
+  },
+  en: {
+    brand:'Qamar', restart:'Restart',
+    promise:'Your personal nutritionist, in your pocket',
+    boundary:'AI-powered general wellness guidance. Not a medical service.',
+    startNow:'Start now', haveAccount:'I already have an account',
+    guestNote:'No sign-up. You can save your progress later.',
+    chatDirect:'Chat with Qamar', chatDirectSub:'Two minutes of questions, then your target',
+    scanInbody:'Scan an InBody report', scanInbodySub:'Photograph it and I’ll read your numbers',
+    scanTitle:'Scan InBody report', scanHint:'Fit the first page inside the frame',
+    scanPriv:'The photo is analyzed on the spot and never stored.', reading:'Reading the report…', continueWith:'or sign up with',
+    suName:'Su Points', suAvailable:'Available to spend', suLifetime:'Lifetime earned',
+    walletTitle:'Su Points wallet', walletSub:'Earned through useful actions. Never purchased, never cash.',
+    spendTab:'Spend', historyTab:'History', priceLabel:'Price', limitLabel:'Limit',
+    balanceAfter:'Balance after redemption', spendCta:'Redeem',
+    walletTerms:'Su Points have no cash value, are non-transferable and do not expire at launch. Logging, editing, targets and privacy controls are always free.',
+    levelNote:'Spending never reduces your level.',
+    whyCta:'Why this number?', whyTitle:'Source and calculation', whyClose:'Got it',
+    whyFormula:'Formula', whyFormulaVal:'Mifflin-St Jeor for resting energy × activity factor, minus a safe goal difference.',
+    whyAssume:'Assumptions', whySource:'Food data source', whySourceVal:'Internal Egyptian food base v0.9 plus common portion weights. Portions are estimates and editable.',
+    whyGuide:'Guidance basis', whyGuideVal:'Internally approved general references. No diagnosis and no treatment advice.',
+    whyVersion:'Calculation version', barcode:'Barcode', barcodeSub:'Scan the product', label:'Nutrition label', labelSub:'Photograph the panel',
+    saveTitle:'Save your progress?', saveSub:'Link an account to recover your data on any device. You can keep going without it.',
+    saveNow:'Link account', saveLater:'Later', suEarned:'earned',
+    obSub:'Getting to know you', dailyTarget:'Your daily target', kcalDay:'kcal / day',
+    estimateNote:'These are general-wellness estimates, not medical values.',
+    namePlaceholder:'First name', skip:'Skip', next:'Continue', done:'Done',
+    today:'Today', log:'Log', plan:'Plan', progress:'Progress', you:'You',
+    kcalRemaining:'kcal remaining today', nextMeal:'Next meal', nextQuest:'Today’s quest',
+    swap:'Swap', openPlan:'Open plan', accept:'Accept', replace:'Replace', done2:'Completed',
+    logMeal:'Log a meal', loggedToday:'Logged today',
+    logSub:'Pick the easiest input. All of them end at the same confirmation.',
+    photo:'Photo', photoSub:'Snap the plate', voice:'Voice', voiceSub:'Say it in Egyptian',
+    text:'Text', textSub:'Type the meal', recent:'Recent', recentSub:'Repeat a meal',
+    describeMeal:'Describe the meal', mealPlaceholder:'e.g. medium koshary + daqqa',
+    continue:'Continue', permissionNote:'Camera and mic are requested only at use. Denying never blocks text logging.',
+    analyzing:'Analyzing your meal', sourcePreview:'SOURCE PREVIEW', cancel:'Cancel',
+    confirmMeal:'Confirm meal', nothingWrites:'Nothing is saved until you confirm.',
+    uncertainNote:'Not 100% sure about the portion. Check the estimate and edit before we log it.',
+    approx:'Approx.', confirmAndLog:'Confirm and log',
+    online:'Online', chatPlaceholder:'Message Qamar...',
+    planSub:'The route adapts; it does not restart.', markEaten:'Mark eaten',
+    dayChanged:'Day changed? We adjust the route in one step.', adjustRoute:'Adjust the route',
+    progressSub:'Evidence without shame.', thisWeek:'This week', activeDays:'Active days',
+    weightTrend:'Weight trend', weeklyInsight:'Weekly insight',
+    guestAccount:'Guest account · stored on device',
+    saveProgress:'Save your progress', saveProgressSub:'Link an account to recover your data on any device.',
+    linkAccount:'Link account',
+    plusSub:'Unlimited photo and voice logging, deeper plans and a fuller weekly review.',
+    plusCta:'Try 14 days', treeHint:'Tap outside to close · drag Qamar to reposition', ask:'Ask Qamar',
+    typeInstead:'or type instead', sIdle:'Tap the moon and speak', sListening:'Listening...', sThinking:'Thinking...', sAnswer:'Qamar',
+    tapPrompt:'What’s on your mind?',
+    protein:'Protein', carbs:'Carbs', fat:'Fat',
+  }
+};
+
+const STEPS = [
+  { id:'age', kind:'chips',
+    ask:{ar:'أهلاً 👋 أنا قمر. هساعدك تاكل أحسن من غير رجيم قاسي. سؤال أول للأهلية: عندك ١٨ سنة أو أكتر؟',
+         en:'Hi, I’m Qamar. I’ll help you eat better without a punishing diet. First, an eligibility question: are you 18 or older?'},
+    options:[{ar:'أيوه، ١٨ أو أكتر',en:'Yes, 18 or older',v:'adult'},{ar:'أقل من ١٨',en:'Under 18',v:'minor'}] },
+  { id:'consent', kind:'chips',
+    ask:{ar:'تمام. الخدمة دي إرشاد عام بالذكاء الاصطناعي ومش استشارة طبية. لازم أعالج بياناتك اللي بتدخلها عشان أحسب الهدف — ودي حاجة أساسية. وفي اختيار تاني منفصل: تسمح نستخدم محادثاتك لتحسين قمر؟',
+         en:'Good. This is AI-powered general guidance, not medical advice. Processing the data you enter is required to calculate your target. Separately and optionally: may we use your conversations to improve Qamar?'},
+    options:[{ar:'موافق على الأساسي بس',en:'Agree to the required only',v:'yes'},{ar:'موافق + ساعد في التحسين',en:'Agree + help improve',v:'yes_improve'},{ar:'عايز أعرف أكتر',en:'Tell me more',v:'more'}] },
+  { id:'name', kind:'text',
+    ask:{ar:'تمام. أناديك بإيه؟ (تقدر تتخطى)',en:'Great. What should I call you? (you can skip)'} },
+  { id:'body', kind:'number',
+    ask:{ar:'محتاج 3 أرقام بس عشان أحسب هدف واقعي: السن، الطول، والوزن الحالي.',
+         en:'I need just three numbers for a realistic target: age, height and current weight.'} },
+  { id:'goal', kind:'chips',
+    ask:{ar:'هدفك إيه دلوقتي؟',en:'What’s your goal right now?'},
+    options:[{ar:'أخس بهدوء',en:'Lose slowly',v:'lose'},{ar:'أثبّت وزني',en:'Maintain',v:'maintain'},{ar:'أزيد عضل',en:'Build muscle',v:'gain'}] },
+  { id:'activity', kind:'chips',
+    ask:{ar:'يومك عامل إزاي؟ اختار الأقرب.',en:'How does your day usually look? Pick the closest.'},
+    options:[{ar:'قاعد أغلب اليوم',en:'Mostly sitting',v:1.35},{ar:'بتحرك شوية',en:'Some walking',v:1.5},{ar:'شغل حركة أو تمرين',en:'Active or training',v:1.65}] },
+  { id:'food', kind:'multi',
+    ask:{ar:'في حاجة مينفعش أقترحها عليك؟ اختار اللي ينطبق.',en:'Anything I should never suggest? Pick all that apply.'},
+    options:[{ar:'مفيش',en:'Nothing',v:'none'},{ar:'حساسية مكسرات',en:'Nut allergy',v:'nuts'},{ar:'مش باكل لحوم',en:'No red meat',v:'meat'},{ar:'لاكتوز',en:'Lactose',v:'lactose'},{ar:'ميزانية محدودة',en:'Tight budget',v:'budget'}] },
+  { id:'safety', kind:'chips',
+    ask:{ar:'آخر سؤال للأمان: في أي حالة من دول؟',en:'One last safety check: does any of these apply?'},
+    options:[{ar:'ولا واحدة',en:'None of these',v:'none'},{ar:'حمل أو رضاعة',en:'Pregnant or breastfeeding',v:'preg'},{ar:'حالة مزمنة تحت علاج',en:'Chronic condition under care',v:'chronic'}] },
+];
+
+const SPEND = [
+  { id:'photo', price:20,
+    name:{ar:'مسح وجبة بالصورة زيادة',en:'Extra photo meal scan'},
+    what:{ar:'مسحة إضافية بعد ما حد الشهر يخلص.',en:'One additional photo scan after the monthly allowance is used.'},
+    limit:{ar:'لحد ٥ مرات في الشهر · فشل تقني يرجّع النقاط',en:'Up to 5 per month · technical failure auto-refunds'} },
+  { id:'insight', price:30,
+    name:{ar:'متابعة أعمق لرأي الأسبوع',en:'Deep weekly-insight follow-up'},
+    what:{ar:'متابعة واحدة محدودة مع قمر على رأي الأسبوع.',en:'One bounded Qamar follow-up on an eligible weekly insight.'},
+    limit:{ar:'مرة لكل رأي · حدود الأمان شغالة',en:'Once per insight · safety limits still apply'} },
+  { id:'plan', price:25,
+    name:{ar:'تجديد خطة اليوم',en:'Plan refresh bundle'},
+    what:{ar:'توليد خطة يوم إضافية أو تلات بدائل زيادة.',en:'One extra day-plan regeneration or three extra substitutions.'},
+    limit:{ar:'باقتين كحد أقصى في الشهر · مش مطلوبة لإصلاح خطة غير آمنة',en:'Max two bundles/month · never needed to fix an unsafe plan'} },
+  { id:'cosmetic', price:50,
+    name:{ar:'شكل جديد للقمر والشجرة',en:'Orb and tree cosmetic'},
+    what:{ar:'فتح دائم لشكل معروف مقدّماً، مفيش ميزة تغذية.',en:'Clearly previewed permanent unlock with no nutrition advantage.'},
+    limit:{ar:'٥٠–٢٠٠ نقطة · سعر ثابت · مفيش صناديق عشوائية',en:'50–200 points · fixed price · no random boxes'} }
+];
+
+class Component extends DCLogic {
+  state = {
+    lang:'ar', screen:'welcome', step:0, msgs:[], typing:false, draft:'',
+    profile:{ name:'', age:29, height:172, weight:82, fat:27, goal:'lose', activity:1.5, prefs:[] },
+    scanned:false, scanReading:false,
+    meals:[], mealDraft:'', chat:[], chatDraft:'', qty:[1,2,1],
+    chatState:'idle', answer:null, lastUser:'', typeOpen:false, turn:0, chatOpen:false,
+    orb:{ x:290, y:730 },
+    treeOpen:false, su:{ available:0, lifetime:0 }, questDone:false, planSwap:false, blocked:false,
+    minor:false, improve:false, walletTab:'spend', whyOpen:false, saveShown:false, redeemed:[]
+  };
+
+  iso(x){ return '\u2066' + x + '\u2069'; }
+  T(){ return STR[this.state.lang]; }
+  L(o){ return o[this.state.lang]; }
+
+  push(msg, cb){
+    this.setState(s => ({ msgs:[...s.msgs, msg] }), cb);
+  }
+  askStep(i){
+    const st = STEPS[i];
+    if(!st){ this.calcTarget(); return; }
+    if(st.id === 'body' && this.state.scanned){
+      const p = this.state.profile;
+      this.setState({ typing:true });
+      setTimeout(() => {
+        this.setState(s => ({ typing:false, msgs:[...s.msgs, { kind:'q',
+          ar:`أخدت الأرقام من تقرير InBody: ${this.iso(p.age)} سنة · ${this.iso(p.height)} سم · ${this.iso(p.weight)} كجم · دهون ${this.iso(p.fat)}٪. لو في حاجة غلط اكتبهالي.`,
+          en:`I took your numbers from the InBody report: ${p.age} yrs · ${p.height} cm · ${p.weight} kg · ${p.fat}% body fat. Type a correction if anything is off.` }] }),
+          () => this.advance());
+      }, 700);
+      return;
+    }
+    this.setState({ typing:true });
+    setTimeout(() => {
+      this.setState(s => ({ typing:false, msgs:[...s.msgs, { kind:'q', ar:st.ask.ar, en:st.ask.en }] }));
+    }, 600);
+  }
+  answer(text, next){
+    this.setState(s => ({ msgs:[...s.msgs, { kind:'u', ar:text.ar, en:text.en }] }), () => {
+      setTimeout(next, 260);
+    });
+  }
+  qamarSay(text, cb){
+    this.setState({ typing:true });
+    setTimeout(() => {
+      this.setState(s => ({ typing:false, msgs:[...s.msgs, { kind:'q', ar:text.ar, en:text.en }] }), cb);
+    }, 550);
+  }
+  advance(){ this.setState(p => ({ step:p.step+1 }), () => this.askStep(this.state.step)); }
+  handleFree(raw){
+    const st = STEPS[this.state.step];
+    const low = raw.toLowerCase();
+    const has = (...w) => w.some(x => low.includes(x));
+    const nums = (raw.match(/\d+/g) || []).map(Number);
+    const unclear = () => this.qamarSay({ar:'مش متأكد إني فهمت. تقدر تختار من التحت أو تقولهالي بطريقة تانية.', en:'I’m not sure I got that. Pick one below or say it another way.'});
+    if(this.state.blocked) return this.qamarSay({ar:'موجود لأي سؤال عام، بس مش هحسب هدف سعرات في الحالة دي.', en:'I’m here for general questions, but I won’t calculate a calorie target in this case.'});
+    if(!st) return this.qamarSay({ar:'خلصنا الأسئلة. اضغط "يلا نبدأ" وهنكمل جوه التطبيق.', en:'That’s all my questions. Tap “Let’s start” and we’ll keep going inside the app.'});
+    if(st.id !== 'body'){
+      const cw = raw.match(/(\d+)\s*(كجم|كيلو|kg|kilos?)/i) || (/وزن|weigh/i.test(raw) ? raw.match(/(\d+)/) : null);
+      const ch = raw.match(/(\d+)\s*(سم|cm)/i) || (/طول|height|tall/i.test(raw) ? raw.match(/(\d+)/) : null);
+      const ca = raw.match(/(\d+)\s*(سنة|سنه|عام|yrs?|years?)/i) || (/سني|عمري|\bage\b/i.test(raw) ? raw.match(/(\d+)/) : null);
+      if(cw || ch || ca){
+        const patch = {};
+        if(cw && +cw[1]>=30 && +cw[1]<=250) patch.weight = +cw[1];
+        if(ch && +ch[1]>=100 && +ch[1]<=230) patch.height = +ch[1];
+        if(ca && +ca[1]>=13 && +ca[1]<=100) patch.age = +ca[1];
+        if(Object.keys(patch).length){
+          this.setState(p => ({ profile:{...p.profile, ...patch} }), () => {
+            const p = this.state.profile;
+            this.qamarSay({ar:`ظبطتها: ${this.iso(p.age)} سنة · ${this.iso(p.height)} سم · ${this.iso(p.weight)} كجم.`, en:`Updated: ${p.age} yrs · ${p.height} cm · ${p.weight} kg.`});
+          });
+          return;
+        }
+      }
+    }
+    if(st.id === 'age'){
+      const n0 = nums[0];
+      if(has('اقل','أقل','under','no,') || (n0 && n0 < 18)){ this.setState({ blocked:true, minor:true }); return this.qamarSay({ar:'شكراً إنك قلتلي. قمر للبالغين ١٨ سنة أو أكتر بس، فمش هكمّل حساب هدف. لو محتاج مساعدة في الأكل، الأنسب متابعة مع أخصائي بموافقة ولي الأمر.', en:'Thanks for telling me. Qamar is for adults 18 and over, so I won’t continue to a target. For food support at your age, a professional with guardian consent is the right route.'}); }
+      if(has('ايوه','أيوه','اه','آه','نعم','فوق','اكبر','أكبر','yes','older','adult','sure') || (n0 && n0 >= 18)) return this.advance();
+      return unclear();
+    }
+    if(st.id === 'consent'){
+      if(has('تحسين','ساعد','improve','help')){ this.setState({ improve:true }); return this.advance(); }
+      if(has('موافق','اوافق','أوافق','تمام','ماشي','اكيد','أكيد','يلا','agree','yes','ok','sure','fine')) return this.advance();
+      if(has('اعرف','أعرف','ليه','معلومات','more','why','tell')) return this.qamarSay({ar:'باختصار: بحسبلك هدف سعرات تقريبي وأقترح أكل مصري في حدوده. مش بشخّص ولا بوصف علاج. لو تمام قولي "موافق".', en:'In short: I estimate a calorie target and suggest Egyptian meals inside it. I don’t diagnose or prescribe. Say “I agree” when you’re ready.'});
+      return unclear();
+    }
+    if(st.id === 'name'){
+      const n = raw.replace(/^(اسمي|أنا|انا|my name is|i am|i'm|im|call me)\s*/i,'').trim().slice(0,24);
+      if(!n) return unclear();
+      this.setState(p => ({ profile:{...p.profile, name:n} }));
+      return this.advance();
+    }
+    if(st.id === 'body'){
+      let age=null, h=null, w=null;
+      const la = raw.match(/(\d+)\s*(سنة|سنه|عام|yrs?|years?)/i); if(la) age = +la[1];
+      const lh = raw.match(/(\d+)\s*(سم|cm)/i); if(lh) h = +lh[1];
+      const lw = raw.match(/(\d+)\s*(كجم|كيلو|kg|kilos?)/i); if(lw) w = +lw[1];
+      nums.filter(n => n!==age && n!==h && n!==w).forEach(n => {
+        if(n>=100 && h===null) h=n;
+        else if(n>=40 && n<100 && w===null) w=n;
+        else if(n<100 && age===null) age=n;
+      });
+      const miss = [];
+      if(age===null) miss.push({ar:'السن',en:'age'});
+      if(h===null) miss.push({ar:'الطول',en:'height'});
+      if(w===null) miss.push({ar:'الوزن',en:'weight'});
+      if(miss.length) return this.qamarSay({ar:`ناقصني ${miss.map(m=>m.ar).join(' و')}. مثال: ٢٩ سنة، ١٧٢ سم، ٨٢ كجم — أو ظبطهم من التحت.`, en:`I still need your ${miss.map(m=>m.en).join(' and ')}. Example: 29 yrs, 172 cm, 82 kg — or set them below.`});
+      this.setState(p => ({ profile:{...p.profile, age, height:h, weight:w} }));
+      return this.advance();
+    }
+    if(st.id === 'goal'){
+      let g = null;
+      if(has('خس','انحف','أنحف','ارفع الدهون','رشاق','lose','cut','slim','weight off')) g='lose';
+      else if(has('ثبت','أثبت','ثابت','زي ما انا','maintain','stay','keep')) g='maintain';
+      else if(has('عضل','أزيد','ازيد','ضخامة','muscle','gain','bulk','build')) g='gain';
+      if(!g) return unclear();
+      this.setState(p => ({ profile:{...p.profile, goal:g} }));
+      return this.advance();
+    }
+    if(st.id === 'activity'){
+      let a = null;
+      if(has('قاعد','مكتب','مش بتحرك','مابتحركش','sit','desk','sedentary')) a=1.35;
+      else if(has('تمرين','جيم','رياضة','حركة كتير','active','gym','train','workout')) a=1.65;
+      else if(has('مشي','بتحرك','شوية','walk','some','moderate')) a=1.5;
+      if(!a) return unclear();
+      this.setState(p => ({ profile:{...p.profile, activity:a} }));
+      return this.advance();
+    }
+    if(st.id === 'food'){
+      const prefs = [];
+      if(has('مكسرات','فول سوداني','nut','peanut')) prefs.push('nuts');
+      if(has('لحوم','لحمة','نباتي','red meat','meat','vegetarian')) prefs.push('meat');
+      if(has('لبن','ألبان','لاكتوز','dairy','lactose','milk')) prefs.push('lactose');
+      if(has('ميزانية','فلوس','رخيص','budget','cheap','expensive')) prefs.push('budget');
+      if(!prefs.length && has('مفيش','ولا حاجة','لا','none','nothing','no')) prefs.push('none');
+      if(!prefs.length) return unclear();
+      this.setState(p => ({ profile:{...p.profile, prefs: prefs[0]==='none' ? [] : prefs} }));
+      return this.advance();
+    }
+    if(st.id === 'safety'){
+      if(has('حامل','حمل','رضاعة','مرضعة','pregnan','breastfeed','nursing') || has('مزمن','سكر','ضغط','قلب','كلى','chronic','diabet','blood pressure','kidney','heart')){
+        this.setState({ blocked:true });
+        return this.qamarSay({ar:'شكراً إنك قلتلي. في الحالة دي مش هحسبلك هدف سعرات — الأنسب متابعة مع أخصائي. تقدر تستخدم قمر للأسئلة العامة بس.', en:'Thank you for telling me. In this case I won’t calculate a calorie target — a qualified professional is the right route. You can still use Qamar for general questions.'});
+      }
+      if(has('ولا واحدة','مفيش','لا','none','no','nope')) return this.advance();
+      return unclear();
+    }
+    return unclear();
+  }
+  calcTarget(){
+    this.setState({ typing:true });
+    setTimeout(() => {
+      this.setState(s => ({ typing:false, msgs:[...s.msgs,
+        { kind:'q', ar:'حسبتلك الهدف على أساس اللي قلته. دي تقديرات، وتقدر تعدلها في أي وقت.',
+          en:'I calculated your target from what you told me. These are estimates and you can change them any time.' },
+        { kind:'target' },
+        { kind:'save' } ] , su:{ available:s.su.available+20, lifetime:s.su.lifetime+20 } }));
+    }, 900);
+  }
+  target(){
+    const p = this.state.profile;
+    const bmr = 10*p.weight + 6.25*p.height - 5*p.age + 5;
+    let kcal = bmr * p.activity;
+    if(p.goal==='lose') kcal -= 450; else if(p.goal==='gain') kcal += 300;
+    kcal = Math.max(1500, Math.round(kcal/10)*10);
+    const protein = Math.round(p.weight*1.8);
+    const fat = Math.round(kcal*0.28/9);
+    const carbs = Math.round((kcal - protein*4 - fat*9)/4);
+    return { kcal, protein, carbs, fat };
+  }
+  consumed(){
+    return this.state.meals.reduce((a,m)=>({kcal:a.kcal+m.kcal,p:a.p+m.p,c:a.c+m.c,f:a.f+m.f}),{kcal:0,p:0,c:0,f:0});
+  }
+  confirmItems(){
+    const base = [
+      { ar:'كشري', en:'Koshary', portion:{ar:'طبق وسط',en:'1 medium bowl'}, conf:'med', kcal:520, p:16, c:96, f:9 },
+      { ar:'دقة',  en:'Daqqa',   portion:{ar:'٢ معلقة',en:'2 tbsp'},        conf:'high',kcal:35,  p:1,  c:5,  f:1 },
+      { ar:'بصل محمر', en:'Fried onions', portion:{ar:'معلقة كبيرة',en:'1 tbsp'}, conf:'low', kcal:90, p:1, c:6, f:7 }
+    ];
+    return base.map((b,i)=>({ ...b, q:this.state.qty[i] }));
+  }
+  go(screen){ this.setState({ screen, treeOpen:false }); }
+
+  replies(){
+    return {
+      ar:[{d:'كمّل يومك عادي.',r:'باقيلك حوالي ٣٥ جم بروتين و٦٢٠ سعر. عشا خفيف فيه بروتين هيقفل اليوم صح.',a:'وريني العشا'},
+          {d:'هعدّل العشا بخطوة واحدة.',r:'هستبدل الأرز بسلطة وأزوّد البروتين، والباقي زي ما هو.',a:'اعمل كده'},
+          {d:'اليوم مش ضاع.',r:'مش بنبدأ من جديد — هنعدل المسار بخطوة واحدة بس.',a:'عدّل المسار'},
+          {d:'التقدير تقريبي مش دقيق.',r:'الكمية اتقدرت من وصفك، وتقدر تعدلها من تفاصيل الوجبة في أي وقت.',a:''}],
+      en:[{d:'Carry on with your day.',r:'You have about 35 g protein and 620 kcal left. A light protein dinner closes the day well.',a:'Show me dinner'},
+          {d:'I’ll adjust dinner in one step.',r:'I’ll swap the rice for salad and raise the protein; everything else stays.',a:'Do it'},
+          {d:'The day is not lost.',r:'We are not starting over — one step puts you back on the route.',a:'Adjust the route'},
+          {d:'That estimate is approximate.',r:'The portion came from your description; you can edit it from the meal detail any time.',a:''}]
+    }[this.state.lang];
+  }
+  sendChatMsg(text){
+    const list = this.replies();
+    this.setState(s => ({
+      chat:[...s.chat, { who:'u', text }],
+      lastUser:text, chatDraft:'', chatState:'thinking'
+    }));
+    setTimeout(()=>{
+      this.setState(s => {
+        const r = list[s.turn % list.length];
+        return { chatState:'idle', turn:s.turn+1, chat:[...s.chat, { who:'q', text:r.d, sub:r.r, action:r.a }] };
+      });
+    }, 1100);
+  }
+  openChat(){
+    this.setState(s => ({
+      chatOpen:true, treeOpen:false, chatState:'idle',
+      chat: s.chat.length ? s.chat : [{ who:'q',
+        text: s.lang==='ar' ? 'أنا معاك. قوللي اللي حصل وأنا أعدّل باقي اليوم.' : 'I’m here. Tell me what happened and I’ll adjust the rest of your day.',
+        sub: s.lang==='ar' ? 'اكتب أو ادوس على القمر واحكي.' : 'Type, or tap the moon and speak.', action:'' }]
+    }));
+  }
+  listen(){
+    if(this.state.chatState === 'thinking') return;
+    const prompts = this.state.lang==='ar'
+      ? ['أكلت كشري النهاردة، أعمل إيه؟','أنا تعبان ومش ناوي أطبخ','فطرت متأخر أوي']
+      : ['I ate koshary today, what now?','I’m tired and not cooking','I had a very late breakfast'];
+    this.setState({ chatState:'listening', answer:null, lastUser:'' });
+    setTimeout(()=>{
+      const p = prompts[this.state.turn % prompts.length];
+      this.sendChatMsg(p);
+    }, 1500);
+  }
+
+  renderVals(){
+    const s = this.state, t = this.T(), L = o => this.L(o);
+    const tg = this.target(), con = this.consumed();
+    const step = STEPS[s.step];
+    const isOb = s.screen === 'onboard';
+    const level = Math.min(20, 1 + Math.floor(s.su.lifetime / 25));
+    const nameOr = s.profile.name || (s.lang==='ar' ? 'يا صاحبي' : 'friend');
+
+    const pct = (a,b) => Math.min(100, Math.round(a/b*100)) + '%';
+
+    const bump = (key, delta, min, max) => () => this.setState(st => ({
+      profile:{ ...st.profile, [key]: Math.min(max, Math.max(min, st.profile[key] + delta)) }
+    }));
+
+    const pickOption = (o) => () => {
+      const st = STEPS[s.step];
+      if(st.kind === 'multi'){
+        const v = o.v;
+        this.setState(p => {
+          const has = p.profile.prefs.includes(v);
+          const prefs = v==='none' ? [] : (has ? p.profile.prefs.filter(x=>x!==v) : [...p.profile.prefs.filter(x=>x!=='none'), v]);
+          return { profile:{ ...p.profile, prefs } };
+        });
+        return;
+      }
+      if(st.id === 'goal') this.setState(p => ({ profile:{...p.profile, goal:o.v} }));
+      if(st.id === 'activity') this.setState(p => ({ profile:{...p.profile, activity:o.v} }));
+      if(st.id === 'safety' && o.v !== 'none'){
+        this.answer({ar:o.ar,en:o.en}, () => {
+          this.push({ kind:'q',
+            ar:'شكراً إنك قلتلي. في الحالة دي مش هحسبلك هدف سعرات — الأنسب متابعة مع أخصائي. تقدر تستخدم قمر للأسئلة العامة بس.',
+            en:'Thank you for telling me. In this case I won’t calculate a calorie target — a qualified professional is the right route. You can still use Qamar for general questions.' });
+          this.setState({ blocked:true });
+        });
+        return;
+      }
+      this.answer({ar:o.ar,en:o.en}, () => {
+        this.setState(p => ({ step:p.step+1 }), () => this.askStep(this.state.step));
+      });
+    };
+
+    const sendDraft = () => {
+      const raw = (s.draft || '').trim();
+      if(!raw) return;
+      this.setState(p => ({ draft:'', msgs:[...p.msgs, { kind:'u', ar:raw, en:raw }] }), () => {
+        setTimeout(() => this.handleFree(raw), 240);
+      });
+    };
+
+    const submitStep = () => {
+      const st = STEPS[s.step];
+      if(!st) return;
+      let text;
+      if(st.kind === 'text'){
+        const n = s.draft.trim();
+        this.setState(p => ({ profile:{...p.profile, name:n}, draft:'' }));
+        text = { ar: n || 'من غير اسم', en: n || 'No name' };
+      } else if(st.kind === 'number'){
+        const p = s.profile;
+        text = { ar:`${this.iso(p.age)} سنة · ${this.iso(p.height)} سم · ${this.iso(p.weight)} كجم`, en:`${p.age} yrs · ${p.height} cm · ${p.weight} kg` };
+      } else {
+        const sel = s.profile.prefs;
+        const labels = st.options.filter(o=>sel.includes(o.v));
+        text = { ar: labels.length ? labels.map(o=>o.ar).join('، ') : 'مفيش', en: labels.length ? labels.map(o=>o.en).join(', ') : 'Nothing' };
+      }
+      this.answer(text, () => this.setState(p => ({ step:p.step+1 }), () => this.askStep(this.state.step)));
+    };
+
+    const navItem = (id, label, screen) => ({
+      label, active: s.screen === screen, inactive: s.screen !== screen, go: () => this.go(screen)
+    });
+
+    const items = this.confirmItems();
+    const totals = items.reduce((a,i)=>({k:a.k+i.kcal*i.q,p:a.p+i.p*i.q,c:a.c+i.c*i.q,f:a.f+i.f*i.q}),{k:0,p:0,c:0,f:0});
+
+    return {
+      t, dir: s.lang==='ar' ? 'rtl' : 'ltr',
+      isAr: s.lang==='ar', isEn: s.lang==='en',
+      setAr: () => this.setState({lang:'ar'}), setEn: () => this.setState({lang:'en'}),
+      restart: () => this.setState({ screen:'welcome', step:0, msgs:[], meals:[], chat:[], blocked:false, minor:false, improve:false, questDone:false, qty:[1,2,1], scanned:false, scanReading:false, su:{available:0,lifetime:0}, redeemed:[], ledgerExtra:[], walletTab:'spend', whyOpen:false }),
+
+      isWelcome: s.screen==='welcome', isOnboard: isOb, isToday: s.screen==='today',
+      isScan: s.screen==='scan', scanReading: s.scanReading,
+      providers: [
+        { name:'Apple', mark:'●', color:'#F8FAFC', go:()=>this.setState({screen:'onboard',step:0,msgs:[],scanned:false},()=>setTimeout(()=>this.askStep(0),120)) },
+        { name:'Google', mark:'G', color:'#EA4335', go:()=>this.setState({screen:'onboard',step:0,msgs:[],scanned:false},()=>setTimeout(()=>this.askStep(0),120)) },
+        { name:'Facebook', mark:'f', color:'#4F8BF5', go:()=>this.setState({screen:'onboard',step:0,msgs:[],scanned:false},()=>setTimeout(()=>this.askStep(0),120)) }
+      ],
+      openScan: () => this.setState({ screen:'scan', scanReading:false }),
+      backToWelcome: () => this.setState({ screen:'welcome', scanReading:false }),
+      capture: () => {
+        this.setState({ scanReading:true });
+        setTimeout(() => this.setState(p => ({
+          scanReading:false, scanned:true, screen:'onboard', step:0, msgs:[],
+          profile:{ ...p.profile, age:31, height:174, weight:86, fat:29 }
+        }), () => setTimeout(() => this.askStep(0), 140)), 1700);
+      },
+      isLog: s.screen==='log', isAnalyzing: s.screen==='analyzing', isConfirm: s.screen==='confirm',
+      isChat: s.screen==='chat', isPlan: s.screen==='plan', isProgress: s.screen==='progress', isYou: s.screen==='you',
+      inApp: ['today','log','confirm','chat','plan','progress','you','wallet'].includes(s.screen),
+      orbVisible: ['today','log','chat','plan','progress','you','wallet'].includes(s.screen),
+      treeOpen: s.treeOpen, typing: s.typing,
+
+      startOnboarding: () => { this.setState({ screen:'onboard', step:0, msgs:[], scanned:false }); setTimeout(()=>this.askStep(0), 120); },
+
+      obMsgs: s.msgs.map(m => ({
+        isQ: m.kind==='q', isU: m.kind==='u', isTarget: m.kind==='target', isSave: m.kind==='save',
+        text: (m.kind==='target' || m.kind==='save') ? '' : (s.lang==='ar' ? m.ar : m.en)
+      })),
+      obProgress: `${Math.min(s.step+1, STEPS.length)}/${STEPS.length}`,
+      target: tg,
+      targetMacros: [
+        { label:t.protein, g:tg.protein }, { label:t.carbs, g:tg.carbs }, { label:t.fat, g:tg.fat }
+      ],
+      assumptions: s.lang==='ar'
+        ? `على أساس ${this.iso(s.profile.age)} سنة · ${this.iso(s.profile.height)} سم · ${this.iso(s.profile.weight)} كجم · نشاط متوسط`
+        : `Based on ${s.profile.age} yrs · ${s.profile.height} cm · ${s.profile.weight} kg · moderate activity`,
+
+      stepChips: isOb && !!step && (step.kind==='chips' || step.kind==='multi') && !s.blocked,
+      stepNumber: isOb && !!step && step.kind==='number',
+      stepText: isOb && !!step && step.kind==='text',
+      canSkip: isOb && !!step && step.kind==='text',
+      composerPlaceholder: s.lang==='ar'
+        ? (step ? 'اكتب ردك بكلامك…' : 'اسأل قمر أي حاجة…')
+        : (step ? 'Or just type your answer…' : 'Ask Qamar anything…'),
+      sendDraft,
+      onDraftKey: e => { if(e.key === 'Enter'){ e.preventDefault(); sendDraft(); } },
+      hasSubmit: isOb && (!step || step.kind==='number' || step.kind==='multi') && !s.blocked,
+      submitLabel: !step ? (s.lang==='ar'?'يلا نبدأ':'Let’s start') : t.next,
+      submitStep: !step ? () => this.go('today') : submitStep,
+      options: (step && step.options || []).map(o => {
+        const on = step.kind==='multi'
+          ? s.profile.prefs.includes(o.v)
+          : (step.id==='goal' ? s.profile.goal===o.v : step.id==='activity' ? s.profile.activity===o.v : false);
+        return { label: L(o), on, off: !on, pick: pickOption(o) };
+      }),
+      numFields: [
+        { unit: s.lang==='ar'?'سنة':'age', value:s.profile.age, inc:bump('age',1,18,90), dec:bump('age',-1,18,90) },
+        { unit: s.lang==='ar'?'سم':'cm', value:s.profile.height, inc:bump('height',1,140,210), dec:bump('height',-1,140,210) },
+        { unit: s.lang==='ar'?'كجم':'kg', value:s.profile.weight, inc:bump('weight',1,40,200), dec:bump('weight',-1,40,200) }
+      ],
+      draft: s.draft, onDraft: e => this.setState({ draft:e.target.value }),
+      skipStep: () => this.answer({ar:'تخطي',en:'Skip'}, () => this.setState(p=>({step:p.step+1}), ()=>this.askStep(this.state.step))),
+
+      greeting: s.lang==='ar' ? 'صباح الخير،' : 'Good morning,',
+      userName: nameOr,
+      suBadge: s.lang==='ar' ? `${this.iso(String(s.su.available))} نقطة Su` : `${s.su.available} Su`,
+      levelLabel: s.lang==='ar' ? `المستوى ${this.iso(level)}` : `Level ${level}`,
+      levelPct: `${Math.min(100, Math.round((s.su.lifetime % 25) / 25 * 100))}%`,
+      suAvailable: this.iso(String(s.su.available)),
+      suLifetime: this.iso(String(s.su.lifetime)),
+      suWalletLine: s.lang==='ar'
+        ? `${this.iso(String(s.su.available))} متاح · ${this.iso(String(s.su.lifetime))} مكتسب`
+        : `${s.su.available} available · ${s.su.lifetime} lifetime`,
+      questReward: s.lang==='ar' ? `+${this.iso('5')}` : '+5',
+      openWallet: () => this.setState({ screen:'wallet', treeOpen:false }),
+      isWallet: s.screen==='wallet',
+      walletSpend: s.walletTab==='spend', walletHistory: s.walletTab==='history',
+      showSpend: () => this.setState({ walletTab:'spend' }),
+      showHistory: () => this.setState({ walletTab:'history' }),
+      spendTabBg: s.walletTab==='spend' ? 'rgba(232,194,117,.16)' : 'transparent',
+      spendTabFg: s.walletTab==='spend' ? '#E8C275' : '#64748B',
+      histTabBg: s.walletTab==='history' ? 'rgba(232,194,117,.16)' : 'transparent',
+      histTabFg: s.walletTab==='history' ? '#E8C275' : '#64748B',
+      spendItems: SPEND.map(it => {
+        const done = s.redeemed.includes(it.id);
+        const afford = s.su.available >= it.price && !done;
+        return {
+          name: it.name[s.lang], what: it.what[s.lang], price: this.iso(`${it.price} Su`),
+          limit: it.limit[s.lang],
+          after: s.lang==='ar'
+            ? `${t.balanceAfter}: ${this.iso(String(Math.max(0, s.su.available - it.price)))}`
+            : `${t.balanceAfter}: ${Math.max(0, s.su.available - it.price)}`,
+          cta: done ? (s.lang==='ar'?'اتمت':'Redeemed') : t.spendCta,
+          ctaFg: afford ? '#E8C275' : '#64748B',
+          ctaBorder: afford ? 'rgba(232,194,117,.45)' : '#263044',
+          redeem: () => { if(!afford) return; this.setState(p => ({
+            su:{ ...p.su, available: p.su.available - it.price },
+            redeemed:[...p.redeemed, it.id],
+            ledgerExtra:[{ id:it.id, label:it.name[p.lang], amount:-it.price }, ...(p.ledgerExtra||[])]
+          })); }
+        };
+      }),
+      ledger: [
+        ...((s.ledgerExtra)||[]).map(e => ({ label:e.label, when: s.lang==='ar'?'دلوقتي':'Just now', amount:this.iso(String(e.amount)), color:'#F87171' })),
+        ...(s.meals.length ? [{ label: s.lang==='ar'?'تأكيد أول وجبة':'First meal confirmed', when: s.lang==='ar'?'النهاردة':'Today', amount:this.iso('+10'), color:'#E8C275' }] : []),
+        ...(s.su.lifetime >= 20 ? [{ label: s.lang==='ar'?'إكمال التهيئة':'Onboarding completed', when: s.lang==='ar'?'النهاردة':'Today', amount:this.iso('+20'), color:'#E8C275' }] : []),
+        ...(s.questDone ? [{ label: s.lang==='ar'?'مهمة اليوم':'Primary daily quest', when: s.lang==='ar'?'النهاردة':'Today', amount:this.iso('+5'), color:'#E8C275' }] : [])
+      ],
+      whyOpen: s.whyOpen,
+      openWhy: () => this.setState({ whyOpen:true }),
+      closeWhy: () => this.setState({ whyOpen:false }),
+      whyRows: [
+        { label:t.whyFormula, value:t.whyFormulaVal },
+        { label:t.whyAssume, value: s.lang==='ar'
+            ? `${this.iso(s.profile.age)} سنة · ${this.iso(s.profile.height)} سم · ${this.iso(s.profile.weight)} كجم · معامل نشاط ${this.iso(s.profile.activity)}`
+            : `${s.profile.age} yrs · ${s.profile.height} cm · ${s.profile.weight} kg · activity factor ${s.profile.activity}` },
+        { label:t.whySource, value:t.whySourceVal },
+        { label:t.whyGuide, value:t.whyGuideVal },
+        { label:t.whyVersion, value:this.iso('calc v2.0 · 2026-08-13') }
+      ],
+      dismissSave: () => this.setState(p => ({ msgs:p.msgs.filter(m => m.kind!=='save') })),
+      qamarLine: s.meals.length
+        ? (s.lang==='ar' ? 'سجّلت وجبة النهاردة. باقي عشا خفيف فيه بروتين ونكون قفلنا اليوم صح.' : 'You logged a meal today. A light protein dinner closes the day well.')
+        : (s.lang==='ar' ? 'أهم حاجة النهاردة: تسجّل أول وجبة. الباقي أنا هظبطه معاك.' : 'The one thing today: log your first meal. I’ll handle the rest with you.'),
+      remaining: Math.max(0, tg.kcal - con.kcal),
+      macros: [
+        { label:t.protein, text:this.iso(`${con.p} / ${tg.protein} g`), pct:pct(con.p,tg.protein) },
+        { label:t.carbs, text:this.iso(`${con.c} / ${tg.carbs} g`), pct:pct(con.c,tg.carbs) },
+        { label:t.fat, text:this.iso(`${con.f} / ${tg.fat} g`), pct:pct(con.f,tg.fat) }
+      ],
+      nextMealName: s.lang==='ar' ? 'فراخ مشوية + رز + سلطة' : 'Grilled chicken + rice + salad',
+      nextMealSub: s.lang==='ar' ? 'حوالي ٦٢٠ سعر · متاح بديل' : 'About 620 kcal · swap available',
+      questTitle: s.lang==='ar' ? 'سجّل الغدا قبل ٤ العصر' : 'Log lunch before 4pm',
+      questReason: s.lang==='ar' ? 'لما تسجّل بدري بقدر أعدّل العشا قبل ما اليوم يخلص.' : 'Logging early lets me adjust dinner before the day ends.',
+      questCta: s.questDone ? t.done2 : t.accept,
+      completeQuest: () => this.setState(p => ({ questDone:true, su:{ available:p.su.available+5, lifetime:p.su.lifetime+5 } })),
+      replaceQuest: () => this.setState({ questDone:false }),
+      hasMeals: s.meals.length > 0,
+      meals: s.meals.map(m => ({ name:m.name, sub:m.sub, kcal:this.iso(`${m.kcal} kcal`) })),
+
+      methods: [
+        { label:t.photo, sub:t.photoSub, pick:()=>this.startAnalyze() },
+        { label:t.voice, sub:t.voiceSub, pick:()=>this.startAnalyze() },
+        { label:t.text, sub:t.textSub, pick:()=>this.setState({ mealDraft: s.lang==='ar'?'كشري وسط + دقة':'medium koshary + daqqa' }) },
+        { label:t.barcode, sub:t.barcodeSub, pick:()=>this.startAnalyze() },
+        { label:t.label, sub:t.labelSub, pick:()=>this.startAnalyze() },
+        { label:t.recent, sub:t.recentSub, pick:()=>this.startAnalyze() }
+      ],
+      mealDraft: s.mealDraft, onMealDraft: e => this.setState({ mealDraft:e.target.value }),
+      analyze: () => this.startAnalyze(),
+      analyzeSteps: [
+        { label: s.lang==='ar'?'قراءة المصدر':'Reading the source', done:true, pending:false },
+        { label: s.lang==='ar'?'مطابقة الأكل المصري':'Matching Egyptian dishes', done:false, pending:true },
+        { label: s.lang==='ar'?'تقدير الكمية والقيم':'Estimating portion and values', done:false, pending:true }
+      ],
+      items: items.map((it,i) => ({
+        name:L(it), portion:L(it.portion),
+        conf: it.conf==='high' ? (s.lang==='ar'?'ثقة عالية':'High confidence') : it.conf==='med' ? (s.lang==='ar'?'ثقة متوسطة':'Medium confidence') : (s.lang==='ar'?'ثقة منخفضة':'Low confidence'),
+        high: it.conf==='high', low: it.conf!=='high',
+        qty: this.iso(`${it.q}×`), kcal: this.iso(`${it.kcal*it.q} kcal`),
+        inc: () => this.setState(p => { const q=[...p.qty]; q[i]=Math.min(6,q[i]+1); return {qty:q}; }),
+        dec: () => this.setState(p => { const q=[...p.qty]; q[i]=Math.max(0,q[i]-1); return {qty:q}; })
+      })),
+      mealTotals: this.iso(`${totals.k} kcal · P ${totals.p} · C ${totals.c} · F ${totals.f}`),
+      confirmMeal: () => {
+        const name = s.lang==='ar' ? 'كشري + دقة' : 'Koshary + daqqa';
+        this.setState(p => ({
+          meals:[...p.meals, { name, sub: p.lang==='ar'?'مسجّل بالكتابة · تقدير':'Logged by text · estimate', kcal:totals.k, p:totals.p, c:totals.c, f:totals.f }],
+          screen:'today', su:{ available:p.su.available+10, lifetime:p.su.lifetime+10 }
+        }));
+      },
+
+      lastUtterance: s.lastUser ? (s.lang==='ar' ? `«${s.lastUser}»` : `“${s.lastUser}”`) : (s.chatState==='listening' ? '' : t.tapPrompt),
+      chatOpen: s.chatOpen,
+      closeChat: () => this.setState({ chatOpen:false }),
+      chatThinking: s.chatState==='thinking',
+      showSuggestions: !s.chatDraft && s.chatState!=='thinking',
+      chatThread: s.chat.map(c => ({
+        isQ: c.who==='q', isU: c.who==='u',
+        text: c.text, sub: c.sub || '', hasSub: !!c.sub,
+        hasAction: !!c.action, action: c.action || '',
+        doAction: () => this.setState({ chatOpen:false, screen:'plan' })
+      })),
+      onChatKey: e => { if(e.key==='Enter'){ e.preventDefault(); const v=(this.state.chatDraft||'').trim(); if(v) this.sendChatMsg(v); } },
+      orbActive: s.chatState==='listening' || s.chatState==='thinking',
+      orbState: s.chatState==='listening' ? t.sListening : s.chatState==='thinking' ? t.sThinking : s.chatState==='answer' ? t.sAnswer : t.sIdle,
+      tapOrb: () => this.listen(),
+      hasAnswer: s.chatState==='answer' && !!s.answer,
+      answerDecision: s.answer && s.answer.d,
+      answerReason: s.answer && s.answer.r,
+      hasAction: !!(s.answer && s.answer.a),
+      answerAction: s.answer && s.answer.a,
+      doAction: () => this.go('plan'),
+      chatSuggestions: (s.lang==='ar'
+        ? ['أكلت كشري، أعمل إيه؟','عدّل العشا','أنا تعبان النهاردة']
+        : ['I ate koshary, what now?','Adjust dinner','I’m tired today']
+      ).map(label => ({ label, pick: () => this.sendChatMsg(label) })),
+      typeOpen: s.typeOpen, typeClosed: !s.typeOpen,
+      openType: () => this.setState({ typeOpen:true }),
+      chatDraft: s.chatDraft, onChatDraft: e => this.setState({ chatDraft:e.target.value }),
+      sendChat: () => { const v=(this.state.chatDraft||'').trim(); if(v) this.sendChatMsg(v); },
+
+      planMeals: [
+        { slot: s.lang==='ar'?'فطار':'Breakfast', name: s.lang==='ar'?'فول + عيش بلدي + خضار':'Foul + baladi bread + vegetables', note: s.lang==='ar'?'بروتين ٢٤ جم':'24 g protein', kcal:'480 kcal', swap:()=>this.setState({planSwap:true}) },
+        { slot: s.lang==='ar'?'غدا':'Lunch', name: s.planSwap ? (s.lang==='ar'?'فراخ مشوية + سلطة':'Grilled chicken + salad') : (s.lang==='ar'?'فراخ مشوية + رز + سلطة':'Grilled chicken + rice + salad'), note: s.lang==='ar'?'بديل متاح':'Swap available', kcal:'620 kcal', swap:()=>this.setState({planSwap:!s.planSwap}) },
+        { slot: s.lang==='ar'?'عشا':'Dinner', name: s.lang==='ar'?'زبادي + فاكهة + شوفان':'Yogurt + fruit + oats', note: s.lang==='ar'?'خفيف قبل النوم':'Light before sleep', kcal:'380 kcal', swap:()=>this.setState({planSwap:!s.planSwap}) }
+      ],
+      weekSummary: s.lang==='ar' ? '٤ أيام نشاط · ١٠ وجبات مسجلة · ٧١٪ داخل النطاق' : '4 active days · 10 meals logged · 71% in target range',
+      weekBars: (s.lang==='ar'?['س','ح','ن','ث','ر','خ','ج']:['S','S','M','T','W','T','F']).map((d,i)=>({ d, h:[38,64,52,80,46,70,58][i]+'%' })),
+      weightSummary: s.lang==='ar' ? 'اتجاه هادي لأسبوعين. قياس واحد مش دليل.' : 'A calm trend over two weeks. A single reading is not evidence.',
+      insight: s.lang==='ar'
+        ? 'أقوى أيامك كان فيها غدا متخطط. المهمة الجاية: جهّز الغدا مرتين الأسبوع ده.'
+        : 'Your strongest days followed a planned lunch. Next quest: prepare lunch twice this week.',
+      youRows: [
+        { label: s.lang==='ar'?'الهدف والسعرات':'Target and calories', value:`${tg.kcal} kcal` },
+        { label: s.lang==='ar'?'ما يجب تجنبه':'What to avoid', value: s.profile.prefs.length ? String(s.profile.prefs.length) : (s.lang==='ar'?'مفيش':'None') },
+        { label: s.lang==='ar'?'ذاكرة قمر':'Qamar memory', value: s.lang==='ar'?'٦ عناصر':'6 items' },
+        { label: s.lang==='ar'?'محفظة نقاط Su':'Su Points wallet', value: this.iso(String(s.su.available)) },
+        { label: s.lang==='ar'?'موافقة تحسين الخدمة':'Service-improvement consent', value: s.improve ? (s.lang==='ar'?'مفعّلة':'On') : (s.lang==='ar'?'موقوفة':'Off') },
+        { label: s.lang==='ar'?'الخصوصية والموافقات':'Privacy and consents', value: s.lang==='ar'?'الإصدار ١.١':'v1.1' },
+        { label: s.lang==='ar'?'تصدير أو حذف بياناتي':'Export or delete my data', value:'' }
+      ],
+
+      nav: [
+        navItem('today', t.today, 'today'),
+        navItem('log', t.log, 'log'),
+        navItem('plan', t.plan, 'plan'),
+        navItem('progress', t.progress, 'progress'),
+        navItem('you', t.you, 'you')
+      ],
+      orbLeft: s.orb.x + 'px', orbTop: s.orb.y + 'px',
+      orbDown: e => {
+        const host = e.currentTarget.parentElement;
+        this._drag = {
+          rect: host.getBoundingClientRect(),
+          ox: e.clientX - host.getBoundingClientRect().left - s.orb.x,
+          oy: e.clientY - host.getBoundingClientRect().top - s.orb.y, moved:false
+        };
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch(err) {}
+      },
+      orbMove: e => {
+        const d = this._drag; if(!d) return;
+        const x = Math.min(d.rect.width - 96, Math.max(4, e.clientX - d.rect.left - d.ox));
+        const y = Math.min(d.rect.height - 118, Math.max(46, e.clientY - d.rect.top - d.oy));
+        if(Math.abs(x - s.orb.x) > 3 || Math.abs(y - s.orb.y) > 3) d.moved = true;
+        this.setState({ orb:{ x, y } });
+      },
+      orbUp: e => {
+        const d = this._drag; this._drag = null;
+        if(d && d.moved){ this._justDragged = true; setTimeout(()=>{ this._justDragged = false; }, 60); }
+      },
+      toggleTree: () => { if(this._justDragged) return; this.setState(p => ({ treeOpen:!p.treeOpen })); },
+      closeTree: () => this.setState({ treeOpen:false }),
+      goToday: () => this.go('today'), goLog: () => this.go('log'), goPlan: () => this.go('plan'),
+      goProgress: () => this.go('progress'), goYou: () => this.go('you'), goChat: () => this.openChat()
+    };
+  }
+
+  startAnalyze(){
+    this.setState({ screen:'analyzing' });
+    setTimeout(() => { if(this.state.screen==='analyzing') this.setState({ screen:'confirm' }); }, 1900);
+  }
+}
+
+</script>
+</body>
+</html>

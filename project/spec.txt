@@ -1,0 +1,2719 @@
+CIPHER LABS / QAMAR
+MVP Product & UI/UX Specification
+The complete build contract for Qamar’s 30-day public nutrition release
+Product: Qamar — Personal Nutritionist in Your Pocket
+Launch: Egypt | Adults 18+ | Arabic UI + Egyptian conversational AI
+Platforms: Flutter for Android and iOS | Model delivery: external API
+Business model: Useful freemium + immediate Qamar+ upgrade
+Owner: Basel Elsakka | Sole founder | Version 1.1 / 12 August 2026
+BLACK + GOLD / ZERO TO INTELLIGENCE
+Founder working document - not for public distribution
+Document control
+Field
+Locked decision
+Purpose
+Translate the Cipher Labs and Qamar strategy into a build-ready public MVP product specification and UI/UX plan.
+Launch deadline
+First paid customer within 30 days; public release rather than private prototype.
+Primary KPI
+Activated users: onboarding complete and Qamar used on at least three separate days.
+Day-90 stretch
+5,000 activated users; acquisition is the main KPI, with paid upgrade live from Day 1.
+Public name
+Qamar. Do not use Qamar Health in the listing, interface, or campaign creative.
+Public promise
+Qamar — Personal Nutritionist in Your Pocket, always qualified as AI-powered, general wellness, and non-medical.
+Authority
+Basel Elsakka is the product owner, designer, developer, operator, and final decision maker before revenue-funded hiring.
+Revision 1.1
+Adds first-value-before-sign-in, progressive identity linking, complete internal/external API contracts, full subscription lifecycle, and a non-punitive launch game system.
+Change rule
+Any added P0 feature must remove equivalent effort or move the release date; no hidden scope expansion.
+MVP definition: This is a complete public value loop, not a demo. Qamar must personalize a safe non-clinical target, accept a real Egyptian meal in the easiest format, update the day, give one useful next decision, remember only what the user controls, and offer a truthful paid upgrade.
+Strategic boundary: Cipher Labs is larger than nutrition, but the public MVP is not. The reusable assets are identity, memory, tools, routing, safety, evaluations, billing, and observability. Training and other specialists remain locked until nutrition proves strong retention and product-market fit.
+How to use this specification
+Treat every P0 requirement and acceptance rule as part of the Day-30 release contract.
+Use the screen IDs in product tickets, analytics events, QA cases, designs, and support reports.
+Keep all quotas, model selections, confidence thresholds, and offers remote-configurable.
+If implementation time tightens, reduce visual polish or P1 work before removing safety, confirmation, privacy, subscription disclosure, or the complete Qamar tree.
+After launch, replace assumptions with cohort data; do not add the training agent until the existing PMF gate is met.
+Contents
+Part
+What it contains
+I. Product contract
+User, outcome, success metrics, full feature catalogue, P0/P1 boundaries, definition of done
+II. Experience architecture
+Principles, information architecture, navigation, movable orb, complete tree, core journeys, accessibility
+III. Screen and feature specification
+Instant start, onboarding, Today, chat, logging, plan, progress, quests/levels, You, reminders, subscriptions, support
+IV. UI design system
+Color, type, spacing, components, RTL rules, motion, haptics, content and universal states
+V. AI, data and technical system
+Agent workflows, food truth, memory, safety, architecture, entities, complete API inventory, analytics, operations
+VI. Delivery and release
+30-day build sequence, QA, evaluation suite, release checklist, acceptance, Day-90 backlog
+Appendices
+Screen inventory, event dictionary, entitlement matrix, microcopy, traceability and deferred roadmap
+PART I
+Product contract
+One focused promise, one complete loop, and no false precision.
+1. Product definition
+1.1 One-sentence product
+Product: Qamar is an Arabic-first, API-powered personal nutrition guide for Egyptian adults who repeatedly quit traditional diets. It understands Egyptian food, adapts the route after real life happens, and gives the user one useful next action without shame.
+1.2 First user and job to be done
+Dimension
+Launch definition
+Primary user
+Egyptian adult, 18+, who has followed multiple diets briefly and stops after work, family meals, weekends, travel, stress, or one off-plan meal.
+Functional job
+Tell me what to eat, log what actually happened, and adapt the rest of my day.
+Emotional job
+Help me continue without treating a deviation as failure or forcing me to start again.
+Social/cultural job
+Understand Egyptian dishes, portions, routines, and conversational Arabic without making me translate my life.
+Purchase reason
+Always-available guidance and adaptation at a fraction of repeated human consultation cost.
+1.3 Launch outcome
+During the first session, an eligible user starts instantly under a private guest identity, understands the non-medical boundary, enters the minimum inputs needed for a nutrition estimate, receives a clear target and daily route, logs one real meal, confirms the estimate, and sees the day update. Qamar may offer a dismissible save prompt after target creation and repeats it after the first meal; only recovery, cross-device sync, export, or purchase requires linking. The interface ends with one next action—not a wall of charts.
+Figure 1. Qamar’s complete launch value loop and activation definition.
+2. Goals, non-goals, and success
+2.1 Product goals
+Reach first useful value in the first session and give an obvious reason to return tomorrow.
+Make Egyptian meal capture faster than manual calorie reconstruction while keeping the estimate editable and honest.
+Prove that route adjustment after deviations produces repeated use across at least three days.
+Create a paid tier that expands usefulness without making the free core deceptive or unusable.
+Build reusable Cipher Labs primitives without exposing future agents, AGI language, or Su publicly.
+Keep variable AI cost, privacy, and safety controllable by design rather than founder heroics.
+2.2 Explicit non-goals
+Not in MVP
+Reason / treatment
+Qamar Health branding
+The product is Qamar; public scope is nutrition and logging, not broad health.
+Workouts or training
+Fixed second specialist, unlocked only after nutrition retention and PMF.
+Minors
+Public release is adults-only; guardian/minor flows require separate legal and product review.
+Clinical nutrition
+No diagnosis, treatment, disease plans, pregnancy plans, eating-disorder care, or medication advice.
+Human coaching
+Fully automated from Day 1; no nutritionist marketplace, manual plan review, or live service.
+Barcode, wearables, grocery lists
+Useful later, but they do not prove the core adaptive behavior loop.
+Social feed, leagues, coins, punitive streaks
+Launch gamification is personal progression only: quests, XP, levels, achievements, and cosmetic tree growth.
+Own model or foundation-model training
+The first intelligence layer is an external API behind a replaceable provider adapter.
+Public AGI or Su story
+Cipher Labs’ long-range thesis stays internal until Qamar proves traction.
+2.3 Success metrics and launch thresholds
+Metric
+Definition
+Initial decision threshold
+Activation
+Onboarding complete + use on at least 3 separate days
+Day-90 stretch: 5,000 activated users
+Onboarding completion
+Eligible starters who reach target review
+>= 65%
+First meal confirmation
+Completed onboarders confirming a meal within 24 hours
+>= 50%
+D7 meaningful-use retention
+Activated users completing a core action on Day 7 window
+>= 15%; aim for 20%
+D30 meaningful-use retention
+Activated users completing a core action in Day 30 window
+>= 12%
+Paid conversion
+Activated users becoming payers
+>= 2.5% early signal
+Month-2 renewal
+Eligible payers renewing once
+>= 60% before aggressive hiring
+Contribution margin
+Net revenue after store fees and variable delivery cost
+>= 75%
+Meal workflow success
+Parse request that reaches editable confirmation without support
+>= 95%
+Critical safety
+Severe harmful or medical overreach in release evals
+Zero critical failures
+Thresholds are operating hypotheses from the Cipher Labs business plan; production cohorts replace them as evidence accumulates.
+3. Complete MVP feature catalogue
+ID
+Feature
+Priority
+Day-30 scope
+APP-01
+App shell
+P0
+Splash, session restore, deep links, update/maintenance states, local cache
+AUTH-01
+Instant start and account
+P0
+Silent anonymous identity, progressive Apple/Google/email OTP upgrade, identity link/merge, recovery, sessions
+SAFE-01
+Eligibility
+P0
+18+ gate; unsupported-risk gate; non-clinical disclaimer; risk-triggered refusal
+CONS-01
+Consent
+P0
+Service/privacy acceptance; notifications later; product-improvement opt-in separate and off by default
+ONB-01
+Personal onboarding
+P0
+Goal, biological inputs for energy estimate, activity, routine, preferences, constraints
+TGT-01
+Nutrition targets
+P0
+Deterministic calories/macros, assumptions, recalculation, user-visible estimate notice
+TODAY-01
+Today dashboard
+P0
+Remaining targets, next meal, current objective, quick log, recovery action
+CHAT-01
+Qamar chat
+P0
+Egyptian Arabic text conversation, structured actions, image/voice entry, quota status
+LOG-01
+Multimodal meal logging
+P0
+Photo, voice, free text, structured/manual edit, confirmation before write
+FOOD-01
+Egyptian food intelligence
+P0
+Dish aliases, portions, cooking method, confidence, correction, deterministic nutrition record
+PLAN-01
+Daily plan
+P0
+Meals aligned to target, routine, food preferences, budget/time constraints
+PLAN-02
+Substitution and recovery
+P0
+Safe swap, day adjustment after deviation, no punitive compensation
+PROG-01
+Progress
+P0
+Active days, logged meals, target range, weight trend, 7/30/90-day entitlements
+INS-01
+Weekly insight
+P0
+Metrics-first summary, one win, one pattern, one next quest
+GAME-01
+Quests and XP
+P0
+Daily/weekly/recovery quests, capped server-authoritative XP, 20 launch levels, calm mode
+GAME-02
+Achievements and tree growth
+P0
+Non-body achievements, milestone unlocks, tree/orb cosmetics; no pay-to-win
+NAV-01
+Movable Qamar orb
+P0
+Tap chat, drag/snap/persist, attention ring, accessibility actions
+NAV-02
+Complete tree
+P0
+Long-press overlay; Today, Log, Plan, Progress, You; every node functional
+REM-01
+Reminders
+P0
+User-chosen meal/check-in times, weekly insight, quiet hours, generic lock-screen copy
+SUB-01
+Freemium and Qamar+
+P0
+Remote quotas, monthly/quarterly/annual products, optional 14-day intro trial, offers, restore/manage
+SUB-02
+Subscription lifecycle
+P0
+Server verification, webhooks, reconciliation, grace/retry/pending/refund/revoke, cross-platform entitlement
+YOU-01
+Profile and preferences
+P0
+Body/goal values, food preferences, schedule, notification settings, subscription
+MEM-01
+Portable memory
+P0
+View/edit/delete structured memory; provenance; confirmation before durable save
+PRIV-01
+Privacy controls
+P0
+Consent settings, export, conversation delete, account delete, retention disclosure
+SUP-01
+Help and corrections
+P0
+Report food/advice error, support code, safety/help content, app feedback
+AN-01
+Analytics
+P0
+Content-free events, acquisition/offer attribution, funnel, retention, AI reliability
+OPS-01
+Founder controls
+P0-thin
+Feature flags, quota/model config, food correction queue, safety/eval/cost dashboard
+REF-01
+Referral loop
+P1 / Day 31-90
+Privacy-safe referral code and challenge only after stable activation
+Scope rule: P0-thin means operationally necessary but intentionally narrow. The founder console may begin as protected database views and a minimal internal page; it still must expose cost, errors, safety flags, corrections, models, quotas, and feature flags before public launch.
+3.1 Definition of done for the public MVP
+A new eligible user can install, start without a form, consent, complete onboarding, receive targets, log a meal, and then upgrade the same identity to a recoverable account without founder intervention.
+Photo, voice, and text inputs all end in the same editable confirmation model; no estimate is recorded invisibly.
+Today, Log, Plan, Progress, and You work through both standard navigation and the complete Qamar tree.
+Tap, hold, and drag behavior of the movable Qamar orb works on both tested iOS and Android devices and remains accessible without gestures.
+The free tier is genuinely useful; Qamar+ expands caps and depth; every offer clearly shows the current price, renewal price, billing period, and management path.
+Quests, XP, levels, achievements, tree growth, recovery rewards, and Calm Mode work from a server-authoritative ledger without coins, broken streaks, leaderboards, body-outcome rewards, or pay-to-win multipliers.
+Age, high-risk, privacy, export, account deletion, subscription restore, permission-denied, offline, API-error, and quota states have complete copy and behavior.
+No API key or model credential is shipped in the app; all AI requests pass through the server gateway with schema validation and rate limits.
+The release evaluation suite, store metadata, privacy policy, terms, account deletion, billing, and legal release gates pass before public distribution.
+PART II
+Experience architecture
+One relationship, five functional nodes, and a guide that makes the next decision feel possible.
+4. Experience principles
+Principle
+Product behavior
+Avoid
+Adapt, do not restart
+Every deviation produces an adjusted route or next action.
+Reset language, punishment, compensatory restriction
+One answer before more data
+Lead with the useful decision, then show detail or explanation.
+Long AI essays and dashboard overload
+Confidence is visible
+Mark estimates, uncertainty, and source; ask one clarifying question when necessary.
+False precision or hidden assumptions
+Egyptian by default
+Use Egyptian conversational Arabic and local foods naturally.
+Forced slang, translated-American diet logic
+Control stays with the user
+Confirm logs, edit memory, change goals, export/delete data, manage reminders.
+Silent memory, dark patterns, irreversible actions
+RPG guide, not game economy
+Use quests, journey XP, levels, achievements, and tree growth to reward useful behavior.
+Coins, leagues, random rewards, red failure, guilt streaks, pay-to-win
+One Qamar
+Chat, tree, plan, memory, and future routing feel like one continuing relationship.
+A grid of disconnected mini-agents
+4.1 Personality contract
+Trait
+How it appears
+Limit
+Motivating
+Names one objective and recognizes the user for returning.
+Never over-celebrates routine actions or sounds childish.
+Firm
+Makes a recommendation when evidence is sufficient.
+Does not pretend certainty or override the user.
+Warm
+Uses calm, non-judgmental Egyptian Arabic.
+Does not become therapy or emotional dependency design.
+RPG-style guide
+Frames the plan as a route and the next action as a quest.
+No fantasy lore in safety, privacy, billing, or nutritional facts.
+Concise
+Default answer: decision, reason, next action.
+Expanded explanation only when requested.
+5. Information architecture and navigation
+Figure 2. One Qamar relationship with five complete MVP destinations.
+5.1 Primary navigation
+Node
+Question answered
+Primary content
+Default destination
+Today
+What matters now?
+Remaining targets, next meal, next quest, recovery prompt, quick log
+Today dashboard
+Log
+What did I consume?
+Photo, voice, text, recent meals, confirmation/edit
+Log method sheet
+Plan
+What is my route?
+Daily meals, portions, substitutions, schedule adjustment
+Current-day plan
+Progress
+Am I moving?
+Active days, target range, weight trend, weekly insight
+7-day overview
+You
+What does Qamar know and control?
+Profile, targets, preferences, memory, reminders, privacy, subscription
+You hub
+The five nodes appear in an RTL bottom navigation bar for immediate discoverability and as the full long-press tree for fast switching and signature identity. The tree is never the only path to a feature. Chat is opened by tapping the movable Qamar orb from any eligible screen.
+5.2 Movable Qamar orb interaction contract
+Input / state
+Behavior
+Acceptance rule
+Tap
+Open Qamar chat as a full-screen route; preserve the source screen.
+Back returns to the exact prior screen and scroll state.
+Press and hold
+After 350 ms with less than 10 dp movement, open the tree and emit one light haptic.
+Overlay becomes interactive within 250 ms after recognition.
+Drag
+Movement beyond 8 dp cancels hold and begins drag; snap to the nearest safe left/right edge.
+Orb stays at least 16 dp from safe-area content and outside system gesture zones.
+Persist
+Store normalized position per device and orientation.
+After rotation/resizing, restore to the nearest valid position.
+Status ring
+Neutral, completed, or attention-needed amber; no failure-red state.
+Color is accompanied by semantic label and optional icon.
+Focus surfaces
+Hide or dock during camera, keyboard conflict, payment sheet, and destructive confirmation.
+No orb overlays a primary control or system prompt.
+Screen reader
+Expose actions: Open Qamar chat; Open Qamar navigation; Move Qamar to other side; Reset position.
+No core feature requires drag or long press.
+5.3 Complete tree behavior
+The overlay grows from the orb’s current edge position and remains fully inside the safe area.
+Every node shows label, icon, selected state, and an optional neutral/completed/attention indicator. Branch growth and moon phases reflect Journey milestones without adding dead destinations. No dead or ‘coming soon’ specialist nodes appear.
+A node opens on tap; selection emits a light haptic; tapping outside or using system Back closes without navigation.
+The overlay dims the current screen but preserves context. It is not a separate home screen or a decorative animation.
+The first completed onboarding shows one coach mark explaining tap, hold, and drag. It appears once and can be replayed in You > Help.
+Training, health, Su, and future agents do not appear in the public tree until separately unlocked by product strategy.
+Journey opens from the level badge/tree-growth summary inside Today or Progress; it does not become a sixth bottom-navigation destination.
+6. Core user journeys
+6.1 First-session journey
+Step
+User action
+Qamar response
+Exit condition
+1
+Tap Continue
+Create a private anonymous identity silently; show no account form
+Guest session exists
+2
+Confirm 18+ and required terms
+Explain focused non-medical scope; keep improvement consent separate
+Eligible + consented
+3
+Enter minimum body, goal, and activity inputs
+Validate; show why each input is needed
+Target can be calculated
+4
+Choose routine and food preferences
+Apply hard exclusions before preferences
+Plan constraints exist
+5
+Review target and assumptions
+Show estimate, editable goal, and non-medical notice
+User confirms target
+6
+View Today and choose photo/voice/text
+Parse into candidate meal items
+Editable meal draft exists
+7
+Correct portions and confirm
+Write meal; award first-step XP; recalculate Today
+First value achieved
+8
+Save progress with Apple, Google, or email code
+Link identity in place; preserve user ID, plan, log, XP, and offer eligibility
+Recoverable account exists
+9
+Choose reminder or skip
+Request OS permission only after value
+Return path established
+6.2 Daily logging and recovery journey
+User opens Log from bottom navigation, tree, Today quick action, reminder deep link, or chat action.
+User captures one meal by photo, voice, or text. The app shows processing progress and keeps the source recoverable during the request.
+Qamar returns a structured draft with food items, portions, cooking method, calories/macros, source, and confidence.
+The user edits uncertain items or answers at most one clarifying question, then confirms.
+The meal is recorded and Today recalculates. Qamar shows one next decision and, if useful, offers to adjust the remaining plan.
+If the target is exceeded, Qamar does not prescribe starvation, excessive exercise, or next-day compensation; it suggests a calm next meal or normal return tomorrow.
+6.3 Subscription journey
+No hard paywall appears before the user has a target and at least one meaningful result, except when the user intentionally opens Qamar+.
+If the user is still a guest, the purchase CTA opens a one-tap Save progress sheet. Successful linking returns directly to the selected product without losing the paywall or offer.
+A quota or premium action opens a contextual explanation, then the full paywall with Free versus Qamar+ comparison.
+Quarterly 750 EGP is the recommended hero package; monthly 349 EGP and annual 2,400 EGP remain visible and selectable.
+Eligible new accounts may receive a store-managed 14-day Qamar+ introductory trial. Promotional eligibility may change the first-period price. The screen must disclose trial end, billing period, renewal price/date, and cancellation/management path before purchase.
+Receipt verification updates the server entitlement; success returns the user to the exact blocked action. Failure preserves context and offers retry/restore.
+6.4 Return-after-absence journey
+Recovery rule: Never show a broken-streak failure screen. The returning user sees a short welcome, the current route, and one action that can be completed now.
+"اليوم مش ضاع. مش بنبدأ من جديد - هنعدل المسار بخطوة واحدة."
+Arabic recovery example
+7. Accessibility and Arabic RTL requirements
+Area
+MVP requirement
+RTL
+All primary layouts, navigation order, alignment, drawers, chips, and progression copy use Arabic right-to-left direction.
+Mirroring
+Mirror directional navigation icons and progress chevrons; do not mirror media controls, camera orientation, brand mark, or universally directional symbols.
+Numbers
+Store numeric values independent of presentation; respect locale where practical; keep number-unit clusters readable (for example 120 جم).
+Charts
+Chronological plots remain left-to-right for conventional reading; Arabic titles, legends, and annotations remain RTL.
+Contrast
+Normal text >= 4.5:1; large text and essential icons >= 3:1; focus indicator is visible on every interactive element.
+Targets
+Minimum interactive target 48 x 48 dp; movable orb visual and hit target at least 56 dp.
+Dynamic text
+Core flows remain usable at 200% text size without clipped CTA labels or hidden confirmation data.
+Screen readers
+Every control has Arabic semantic label, role, state, and order; charts include text summaries; tree actions have non-gesture alternatives.
+Motion/haptics
+Respect reduced-motion and haptic settings; never encode success/failure only in motion, sound, or color.
+Voice/photo
+Voice always exposes an editable transcript; photos have detected-item text; permission denial includes a manual path.
+PART III
+Screen and feature specification
+Every path includes the happy flow, the recovery flow, and a truthful boundary.
+8. Launch shell, account, eligibility, and consent
+8.1 Splash, session restore, and service state
+Field
+Specification
+Screen IDs
+S01 Splash • S02 Update/Maintenance • S49 Offline banner
+Purpose
+Resolve session and configuration without creating a dead launch screen.
+Entry
+Cold start, deep link, push notification, purchase return.
+Core components
+Qamar mark • non-blocking loader • app version • retry CTA • offline banner
+Primary actions
+continue restored session • retry • open store for required update • continue with cached Today when allowed
+Required states
+first launch • authenticated • expired session • offline • maintenance • required update • deep-link fallback
+Acceptance
+no splash longer than 2 seconds without status • deep links resolve after auth • cached read-only content remains visible offline
+Authentication baseline: Supabase anonymous sign-in for instant start, followed by Sign in with Apple, Sign in with Google, or a six-digit email one-time code to make the profile recoverable. Because Google is offered on iOS, Sign in with Apple remains available. Phone OTP is deferred unless Egypt conversion data proves it necessary; this avoids SMS cost and delivery risk in the 30-day build.
+8.2 Welcome, instant start, and account upgrade
+Field
+Specification
+Screen IDs
+S03 Welcome/Continue • S04 Save progress • S05 Email OTP • S53 Linked identities
+Purpose
+Reach value without registration friction, then turn the same guest identity into one secure recoverable account.
+Entry
+First launch, post-target/first-log save prompt, purchase preflight, signed-out state, session expiry.
+Core components
+one-tap Continue • AI/non-medical qualifier • Apple CTA • Google CTA • email field • six-digit OTP • guest-data warning • linked identities
+Primary actions
+start as guest • link Apple/Google/email • verify code • resend • manage linked identity • resume exact context
+Required states
+new guest • returning signed-in • upgrade suggested • upgrade required for purchase • invalid/expired code • provider cancelled • identity collision • merge review • network error
+Acceptance
+zero fields before eligibility • zero passwords • social linking usually completes in one system sheet • email path uses one field + auto-fillable code • link preserves the same user ID and all data • pending flow resumes
+8.2.1 Friction budget and trigger policy
+Moment
+Account behavior
+Maximum friction
+First open
+Tap Continue; create anonymous Auth user and local recovery secret silently.
+One tap; no name, email, phone, password, or provider choice
+Before sensitive inputs
+Require 18+ eligibility and required service/privacy consent.
+Two clear decisions; optional improvement consent separate/off
+After target or first confirmed meal
+Show a dismissible Save your progress sheet with platform-preferred option first.
+One system sheet or one email field
+Before first purchase/cross-device sync/export
+Require a recoverable linked identity; return to the exact interrupted action.
+No repeated onboarding and no second profile
+Returning device
+Restore valid session; on Android allow Credential Manager automatic sign-in when available.
+Usually zero taps
+Anonymous expiry
+Warn that unlinked guest data cannot be recovered after uninstall/device loss; purge inactive anonymous accounts after 7 days.
+Never silently imply cloud recovery
+Do not ask for a preferred name until Qamar has delivered value; it is optional and can be collected conversationally later.
+Linking must be an in-place identity upgrade, not sign-out/sign-in. Migrate the anonymous row ownership, pending uploads, game ledger, offer cohort, and local queue in one transaction.
+If an Apple/Google/email identity already belongs to another Qamar account, stop automatic merge. Re-authenticate the existing account, show what will be kept, and run an audited idempotent merge job.
+On linking cancellation or network failure, the guest session remains usable and the source flow is preserved. Never discard onboarding, a meal draft, or a selected subscription.
+Re-authentication is only required for account deletion, sensitive identity changes, export download, and other destructive/high-risk actions.
+Figure 3. First-value-before-sign-in architecture and progressive account upgrade.
+8.3 Eligibility and safety gate
+Field
+Specification
+Screen IDs
+S06 Age eligibility • S13 Safety filter • S52 Unsupported state
+Purpose
+Restrict public MVP to supported adults and prevent personalized high-risk guidance.
+Entry
+Before personalized onboarding; repeated if age or safety profile changes.
+Core components
+18+ attestation • date of birth • unsupported-risk checklist • plain-language explanation • professional-care route
+Primary actions
+confirm eligibility • exit • learn why • open help
+Required states
+eligible • under 18 blocked • high-risk unsupported • incomplete answer • inconsistent age
+Acceptance
+under-18 users cannot create a personalized profile • high-risk users receive no calorie target or plan • no paywall appears on blocked state
+Risk trigger at launch
+Product response
+Under 18
+Block personalized use and explain that Qamar is currently adults-only.
+Pregnancy or breastfeeding
+Do not create personalized calorie/macro targets or meal plans; recommend qualified professional support.
+Diagnosed or suspected eating disorder
+Do not coach weight loss, fasting, restriction, or calorie compensation; route to qualified care.
+Severe allergy or complex diagnosed condition
+Do not create a personalized plan; do not claim ingredient safety; suggest professional care.
+Medication-sensitive or acute clinical request
+Refuse diagnosis/treatment advice and recommend the appropriate licensed clinician or emergency service.
+Extreme goal or unsafe language
+Pause the workflow, explain the boundary, and do not save the requested target.
+8.4 Consent
+Field
+Specification
+Screen IDs
+S07 Consent • S44 Privacy/consents
+Purpose
+Make required processing and optional improvement choices understandable and separable.
+Entry
+After anonymous identity and eligibility, before sensitive onboarding; later through You.
+Core components
+service consent • privacy summary • sensitive/cross-border processing notice • optional improvement toggle • document links/version
+Primary actions
+accept required terms • decline and exit • opt in/out of improvement • view full policy
+Required states
+first consent • policy updated • optional opt-in off/on • withdrawal
+Acceptance
+improvement defaults off • required and optional choices are not bundled • consent version and timestamp are stored against guest or linked identity
+9. Onboarding and target creation
+9.1 Progressive onboarding structure
+Step / screen
+Required inputs
+UX rule
+Validation
+S08 Name (optional)
+Preferred first name or Skip
+Do not block the target; ask after first value or conversationally
+1-30 characters; allow Arabic/Latin
+S09 Body inputs
+Date of birth, biological input used for estimate, height, current weight
+Explain why; show units; no appearance language
+Plausible adult ranges; explicit unit conversion
+S10 Goal
+Lose, maintain, gain; target weight optional; pace
+Default to conservative pace; no deadline pressure
+Reject unsafe or contradictory targets
+S11 Activity/routine
+Activity level, wake/sleep, meal timing, work pattern
+Use plain examples, not metabolic jargon
+At least activity + typical meal timing
+S12 Food preferences
+Allergies, dislikes, dietary choices, cooking access, budget/time
+Hard exclusions separate from preferences
+Never propose an excluded item
+S13 Safety filter
+Unsupported conditions and pregnancy/breastfeeding
+Calm gate, no diagnosis
+Unsupported state prevents target
+S14 Target review
+Calculated calories/macros and assumptions
+Estimate + edit/recalculate path
+User explicitly confirms
+S15 First route
+Today plan and first logging CTA
+Reach value before notification permission
+Plan successfully stored
+Progressive disclosure: Only age, biological target inputs, goal, activity, safety screen, and basic food constraints block target creation. Name, schedule detail, budget, cooking access, and finer preferences can be completed after first value through conversational prompts.
+9.2 Target calculation product rules
+Use a deterministic target service; the language model may explain a result but never calculates or invents final calorie/macro values.
+Record formula version, input values, activity factor, goal adjustment, safety clamps, and timestamp so the target is auditable and recalculable.
+Macro allocation is configurable and expressed in grams; hard preference/allergy rules affect food selection, not unreviewed medical prescriptions.
+The target screen says the values are estimates for general wellness, identifies the assumptions, and offers edit/recalculate—not medical certainty.
+Any exact lower/upper energy floor, pace boundary, or clinical exclusion must live in a versioned Nutrition Policy Table and pass the release safety/legal gate; it is not embedded in prompts.
+A meaningful change to age band, weight, goal, activity, or safety input invalidates the current target and plan until the user confirms recalculation.
+Target state
+User experience
+Calculating
+Short deterministic loader; no fake personalized narrative while the service is running.
+Ready
+Calories, protein, carbohydrates, and fat; assumptions; goal; confirmation CTA.
+Needs clarification
+Highlight the one conflicting input and return the user to it without losing other answers.
+Unsafe/unavailable
+No target is shown; explain the unsupported boundary and professional-care route.
+Changed later
+Preview the effect, confirm, version the target, and regenerate the active plan.
+10. Today dashboard
+10.1 Today
+Field
+Specification
+Screen IDs
+S16 Today dashboard • S17 Quick actions
+Purpose
+Answer what matters now and start the highest-value action in one tap.
+Entry
+Default eligible guest/linked home, tree Today node, bottom nav, post-log return, notification deep link.
+Core components
+time-aware greeting • remaining calorie card • macro bars • next meal • next quest • quick log • recovery card • orb
+Primary actions
+log meal • open next meal • ask Qamar • adjust route • open progress • dismiss/accept next quest
+Required states
+first day • no logs • on route • over target • plan missing • offline cache • quota reached • return after absence
+Acceptance
+one primary action above fold • all values match confirmed logs • no red failure state • offline values display last-sync time
+10.2 Information priority
+One line from Qamar naming the current objective.
+Remaining energy and macro progress, rounded and labeled as estimates where appropriate.
+The next planned meal or, if no plan exists, the quickest route to create one.
+One primary CTA: Log a meal. The method chooser follows, not three competing homepage buttons.
+One next quest or recovery action; detailed charts remain in Progress.
+When the user exceeds a target, Today shows neutral context and the next sensible meal. It never turns the whole screen red, shows negative points, or demands compensatory fasting/exercise.
+10.3 Journey HUD
+Element
+Today behavior
+Rule
+Journey level
+Small level badge beside the Qamar orb; opens Journey when tapped.
+Never competes with the primary nutrition action
+XP progress
+Thin progress ring/bar with a numeric accessible label.
+No negative XP and no loss after absence
+Primary quest
+One card below next meal with verb, reason, XP and Replace/Skip.
+Must be achievable today and behavior-based
+Optional quests
+Collapsed row for up to two additional quests.
+Never required for nutrition functionality
+Completion
+Compact glow/check, haptic and XP toast; no blocking modal for routine actions.
+Respect reduced motion and Calm Mode
+Level up
+Celebration sheet on the next safe navigation moment.
+Do not interrupt meal confirmation, billing, consent or safety
+11. Qamar chat
+11.1 Conversation surface
+Field
+Specification
+Screen IDs
+S18 Chat • S19 Suggested prompts • S20 Quota state
+Purpose
+Deliver a short, contextual nutrition decision through one continuing Qamar relationship.
+Entry
+Tap orb, Today prompt, meal result, plan action, insight action, deep link.
+Core components
+Qamar header • messages • structured action cards • suggested prompts • text composer • mic • photo • send/cancel • quota indicator
+Primary actions
+send • stop generation • retry • copy • report • accept structured action • edit proposed memory
+Required states
+empty/new • streaming • tool running • needs clarification • safety refusal • offline • provider error • quota exhausted
+Acceptance
+response starts within 2 seconds or shows named progress • no raw tool JSON • actions require confirmation before writes • back preserves source state
+11.2 Default response pattern
+Layer
+Default behavior
+Example purpose
+1. Decision
+Answer the question in one or two sentences.
+What should I eat now?
+2. Reason
+State the relevant target, log, preference, or uncertainty.
+You have about 35 g protein remaining.
+3. Next action
+Offer one executable CTA or one clarifying question.
+Swap the fries for salad / confirm portion.
+4. Detail
+Expandable only when useful or requested.
+Nutrition breakdown, assumptions, alternatives.
+Egyptian Arabic is the default conversational register. Use Modern Standard Arabic for legal, safety, and formal explanations where clarity is more important than slang.
+The assistant may refer to the route, quest, or map, but not in every message and never in medical, privacy, billing, or error copy.
+The app shows an explicit label when a response is an estimate. Nutrient facts come from tools and confirmed records, not free-form model output.
+If a request spans actions, Qamar proposes the actions in a card and asks for confirmation before changing targets, plans, reminders, memory, or meal logs.
+Raw chat messages are not automatically durable memory. Qamar asks before saving a lasting preference inferred from conversation.
+12. Multimodal meal logging
+12.1 Method selection and capture
+Field
+Specification
+Screen IDs
+S21 Method • S22 Photo • S23 Voice • S24 Text • S50 Permission education
+Purpose
+Let the user choose the lowest-friction input without creating three different data models.
+Entry
+Log node, Today CTA, chat attachment, reminder deep link, duplicate/recent meal.
+Core components
+photo • voice • text • recent meals • permission explainer • capture preview • cancel
+Primary actions
+take/select photo • record • type • select recent • open OS settings • continue manually
+Required states
+camera/mic allowed • denied • limited gallery • recording • uploading • offline • cancelled
+Acceptance
+permissions requested only at use • denial never blocks text/manual logging • source survives transient error
+Mode
+Input contract
+Specific UX
+Photo
+One meal image from camera or gallery; compress and strip unnecessary metadata before upload.
+Crop/retake, upload progress, cancel; no claim of exact portion recognition.
+Voice
+Egyptian Arabic recording up to 60 seconds; transcribe server-side.
+Live timer, stop/cancel, editable transcript before parse.
+Text
+Natural Arabic/Arabizi/English description or structured search.
+Recent suggestions, editable sentence, portion prompt only when needed.
+Recent/manual
+Duplicate a confirmed meal or search the structured food catalogue.
+Fastest and lowest-cost path; always available when AI quota/network fails.
+12.2 Processing and confirmation
+Field
+Specification
+Screen IDs
+S25 Analyzing • S26 Confirm • S27 Edit item • S28 Result • S29 Meal detail
+Purpose
+Turn any input into a transparent, editable, confirmed meal record.
+Entry
+Successful photo upload, voice transcript, text parse, recent meal.
+Core components
+source preview • candidate items • portion • cooking method • confidence • calories/macros • clarification • confirm
+Primary actions
+edit item • change portion • add/remove • answer clarification • confirm • cancel • report correction • undo/delete
+Required states
+processing • high/medium/low confidence • no food found • partial parse • nutrition lookup failed • confirmed • undo • deleted
+Acceptance
+no write before confirm • low confidence visible • confirmed totals equal saved totals • undo available after save • edits recalculate deterministically
+12.3 Confidence and clarification policy
+Confidence
+Default behavior
+Display
+>= 0.80 high
+Return candidate item and portion; still require confirmation.
+Neutral confidence label; edit always available.
+0.55-0.79 medium
+Highlight the uncertain field and ask at most one high-value clarification.
+Amber label and suggested choices.
+< 0.55 low
+Do not pretend recognition; ask the user to name/select the item or use manual search.
+Clear low-confidence notice; no hidden default.
+Nutrition source missing
+Block confirmation for that item until matched or entered manually.
+Explain that a nutrition value is needed—not an API error code.
+Arabic estimate copy: "مش متأكد 100٪ من الكمية. بصّ على التقدير وعدّله قبل ما نسجله."
+12.4 Egyptian food intelligence requirements
+Catalogue common Egyptian dishes, ingredient variations, cooking methods, household portions, Arabic spelling variants, Arabizi, and common brand/category terms.
+Store canonical food or recipe ID, localized aliases, serving definitions, nutrient source/version, and confidence—not only a generated label.
+Distinguish composition-changing variants such as fried versus grilled, rice/oil amount, bread size, meat cut, added sugar, sauces, and shared versus individual portions.
+Use recipe templates for dishes such as koshary, foul, taameya, molokhia, mahshi, hawawshi, fatta, and common bakery items, then ask for the one variation that materially changes the estimate.
+Allow the user to submit a correction. Do not learn globally from one correction automatically; place it in a founder review queue and update the versioned catalogue deliberately.
+Show rounded estimates and source/confidence; never display model-imagined nutrient precision to a decimal place.
+12.5 Post-log response
+Outcome
+Required response
+Within target range
+Update Today and recognize the action briefly; show the next meal or next quest.
+Higher than planned
+State the updated day neutrally; offer a balanced remaining meal or normal return tomorrow.
+Lower than planned
+Do not praise under-eating; show what remains and suggest a normal balanced option.
+Plan meal logged
+Mark it eaten and reconcile any edits with actual portions.
+Duplicate or accidental
+Offer undo; meal detail supports edit/delete with recalculation.
+Potential risk language
+Trigger safety policy before coaching and avoid compensatory recommendations.
+13. Daily plan, substitutions, and recovery
+13.1 Daily plan
+Field
+Specification
+Screen IDs
+S30 Day plan • S31 Meal detail
+Purpose
+Translate targets and constraints into a realistic route for the current day.
+Entry
+Plan node, onboarding completion, Today next meal, chat action.
+Core components
+day selector • target summary • meal cards • portions • macros • time • swap • mark eaten • adjust route
+Primary actions
+open meal • swap • log as eaten • edit time • adjust day • regenerate within entitlement
+Required states
+first plan • current plan • partially eaten • target changed • constraints conflict • offline cached • quota/paywall
+Acceptance
+all hard exclusions respected • plan totals reconcile to target tolerance • logged meals remain historical when plan changes
+13.2 Plan engine rules
+Rule
+MVP behavior
+Hard constraints first
+Allergies, user exclusions, unsupported-risk policy, and explicit dietary restrictions cannot be violated.
+Target fit
+Plan totals fit configurable calorie/macro tolerance; deterministic service validates before display.
+Reality fit
+Use meal times, cooking access, preparation time, budget band, and Egyptian food availability where known.
+Variety
+Avoid exact repeated day plans unless the user chooses simplicity or favorites.
+Explainability
+Each meal can show why it fits: protein, convenience, preference, remaining day—not generated wellness claims.
+Versioning
+Store plan version and generation inputs; completed/logged meal history never mutates when a plan regenerates.
+13.3 Substitution and route adjustment
+Field
+Specification
+Screen IDs
+S32 Substitute • S33 Recovery/Replan
+Purpose
+Change one meal or the remaining day without restarting the plan.
+Entry
+Meal card, chat, post-log result, Today recovery card.
+Core components
+reason chips • three alternatives • calorie/protein comparison • availability • confirm swap • remaining-day preview
+Primary actions
+choose reason • select substitute • ask for another • confirm • cancel • adjust remaining day
+Required states
+alternatives ready • no valid substitute • quota reached • offline • plan changed concurrently • unsafe request
+Acceptance
+hard exclusions remain applied • swap difference is visible • no change before confirm • recovery never prescribes extreme compensation
+Default substitution tolerance: within ±10% calories and no more than 10% lower protein than the replaced meal, unless the target engine approves a broader day-level rebalance. Keep these values remote-configurable.
+Reason chips: unavailable, too expensive, no time, do not like it, eating out, want something lighter/heavier. The reason improves the next options but is not automatically permanent memory.
+If no substitute satisfies hard rules, say so and offer manual search or a day-level adjustment rather than silently violating constraints.
+If a logged meal exceeds plan assumptions, adjust only unconsumed meals. Never rewrite the confirmed log to make the plan look successful.
+14. Progress and weekly insight
+14.1 Progress
+Field
+Specification
+Screen IDs
+S34 Progress • S35 Add weight
+Purpose
+Show evidence of consistency and direction without turning normal variation into failure.
+Entry
+Progress node, Today card, weekly notification, insight action.
+Core components
+7/30/90 range • active days • meals logged • target-range days • weight trend • macro consistency • add weight • insight
+Primary actions
+change range • add/edit/delete weight • open insight • inspect day • ask Qamar
+Required states
+insufficient data • one week • trend available • no weight • offline • premium range locked
+Acceptance
+no red failure zones • single weight is not interpreted as trend • deleted log/weight recalculates • chart has text summary
+14.2 Metric definitions
+Metric
+Definition
+Presentation
+Active day
+At least one confirmed meal, plan action, weight entry, or meaningful Qamar interaction.
+Count and weekly dots; no punitive streak.
+Target-range day
+Confirmed intake falls inside a configurable neutral range around target.
+Green/neutral zone with text; not pass/fail.
+Logging consistency
+Days with at least two confirmed meal records or the user-declared complete day.
+Weekly percentage and trend.
+Weight trend
+Smoothed direction across enough entries; no trend from one point.
+Line + plain-language summary; estimated nature clear.
+Macro consistency
+Protein/carbohydrate/fat proximity to target based on confirmed records.
+Small bars; never medical score.
+14.3 Weekly insight
+Field
+Specification
+Screen IDs
+S36 Weekly insight
+Purpose
+Turn the week’s structured evidence into one useful adjustment.
+Entry
+Progress, weekly notification, Today card after generation.
+Core components
+week window • one win • one pattern • one next quest • supporting metrics • accept/dismiss • ask Qamar
+Primary actions
+accept next quest • set reminder • ask for explanation • dismiss • report incorrect insight
+Required states
+ready • insufficient data • generating • failed • premium detail locked • accepted
+Acceptance
+requires >=3 active days or shows data-building state • every claim traces to a metric • no diagnosis or personality inference
+The insight generator receives deterministic weekly metrics and bounded profile context. It does not inspect raw photo/audio files or invent causal claims. Its default structure is: win → pattern → next quest.
+14.4 Journey, quests, levels, and achievements
+Field
+Specification
+Screen IDs
+S54 Journey • S55 Quest detail/replace • S56 Level up • S57 Achievements • S58 Game preferences
+Purpose
+Make useful nutrition behaviors feel like visible progress without turning body outcomes into scores.
+Entry
+Today quest card, Progress Journey tab, Qamar tree growth node, level-up toast, achievement notification.
+Core components
+level + XP • tree growth • daily/weekly/recovery quests • quest replace/skip • achievement collection • unlock preview • Calm Mode
+Primary actions
+open quest • replace • skip • view evidence • equip cosmetic • share achievement card • turn Calm Mode on/off
+Required states
+new journey • quests ready • completed • level up pending • all daily quests done • return after absence • offline pending XP • Calm Mode
+Acceptance
+all awards come from authoritative ledger • same event never awards twice • no XP for weight loss, deficit size or under-eating • no core feature gated by level • all animations skippable
+15. You: profile, memory, privacy, and support
+15.1 You hub and profile
+Field
+Specification
+Screen IDs
+S37 You • S38 Goals/targets • S39 Food preferences
+Purpose
+Give the user one control center for identity, targets, preferences, plan assumptions, and account status.
+Entry
+You node, account avatar, target/edit links.
+Core components
+profile summary • linked identities • journey/Calm Mode • goal/target • food preferences • routine • reminders • memory • subscription • privacy • help
+Primary actions
+link/manage identity • edit • recalculate • open Journey/memory • manage Qamar+ • export/delete • sign out
+Required states
+guest warning • linked • merge pending • complete • target stale • missing optional details • offline • subscription issue
+Acceptance
+high-impact edits preview consequences • sign-out does not delete data • target changes require confirmation
+15.2 Portable memory
+Field
+Specification
+Screen IDs
+S40 Memory
+Purpose
+Show exactly what Qamar remembers and let the user control every durable item.
+Entry
+You, chat proposed-memory card.
+Core components
+memory categories • item • source • date • confidence • edit • delete • save confirmation
+Primary actions
+edit • delete • confirm proposed memory • reject • export
+Required states
+empty • active items • proposed • conflict • deleted • sync error
+Acceptance
+raw chat is not shown as memory • every item has provenance • deletion affects future context • no Su access at launch
+Memory category
+Examples
+Save rule
+Goal
+Maintain weight, reduce weight gradually
+Explicit onboarding/goal confirmation
+Food rules
+Allergy/exclusion, vegetarian choice
+Explicit user entry; hard rules require explicit edit
+Preferences
+Dislikes okra, prefers fast breakfasts
+Explicit entry or confirm a proposed memory
+Routine
+Lunch at work, late family dinner
+Explicit entry or confirm after repeated pattern
+Interaction
+Prefers short answers
+Confirm in chat or setting
+Recent context
+Current plan version, last-week metrics
+System state with expiry; not presented as personality memory
+15.3 Privacy controls
+Field
+Specification
+Screen IDs
+S44 Consent • S45 Export • S46 Delete account
+Purpose
+Make data control usable inside the app rather than hiding it in policy text.
+Entry
+You > Privacy and data.
+Core components
+consent toggles • retention summary • download data • delete chat • delete account • subscription warning • reauth
+Primary actions
+change optional consent • request export • delete conversation • delete account • manage store subscription
+Required states
+export preparing/ready/expired • deletion warning • active subscription • reauth failed • request complete
+Acceptance
+improvement opt-out takes effect prospectively • delete flow warns that store subscription is separate • destructive actions require reauth
+Data type
+MVP retention default
+Unlinked guest profile
+Available only to the current anonymous identity; warn that uninstall/device loss may make it unrecoverable. Purge after 7 inactive days unless linked.
+Photo/audio source
+Ephemeral processing only; delete after successful extraction. Failed-processing recovery cache <=24 hours, disclosed.
+Editable transcript / parsed draft
+Retain only until confirm/cancel or short recovery expiry; confirmed structured meal becomes the record.
+Confirmed meals and body/goal data
+Retain while account is active or until user deletes the record/account.
+Raw chat messages
+Rolling 30-day history by default; then delete raw content while retaining only user-controlled structured memory and necessary safety/audit records.
+Analytics
+Content-free, pseudonymous event data used only in aggregate; no meal names, body values, chat text, images, or audio.
+Product-improvement examples
+Only when separately opted in and de-identified under the approved process; withdrawal stops future use.
+Retention periods are the product baseline and must match the final privacy policy, processor agreements, provider controls, and written legal release review.
+15.4 Help, correction, and feedback
+Field
+Specification
+Screen IDs
+S47 Help/Safety • S48 Report feedback
+Purpose
+Resolve errors, collect evidence, and give users a safe exit without requiring founder access to private content.
+Entry
+You, message menu, meal detail, plan/insight error, unsupported state.
+Core components
+FAQ • what Qamar can/cannot do • report type • optional note • optional consented attachment • support code • app version
+Primary actions
+report food/advice/error • contact support • copy support code • replay orb tutorial • open policies
+Required states
+submitted • offline queued • attachment omitted • rate limited • support unavailable
+Acceptance
+reports exclude private content by default • user sees what will be sent • support lookup requires code and is audited
+16. Reminders and notifications
+16.1 Reminder settings and permission
+Field
+Specification
+Screen IDs
+S41 Reminders • OS permission education
+Purpose
+Create a user-controlled return path after first value without shame or sensitive lock-screen content.
+Entry
+Post-first-log prompt, You > Reminders, insight action.
+Core components
+daily check-in • meal times • weekly insight • quiet hours • preview • OS permission status
+Primary actions
+enable/disable • choose time • set quiet hours • open OS settings • test
+Required states
+not asked • allowed • denied • provisional • scheduled • time-zone changed
+Acceptance
+permission asked after value • all reminders user-editable • generic default lock-screen copy • deep link reaches correct screen
+Notification
+Default
+Example intent
+Daily check-in
+Off until user chooses a time
+One small action is ready; open Today.
+Meal reminder
+Off; user selects meal/time
+Log or open the planned meal.
+Weekly insight
+On after permission, Sunday evening configurable
+Your week is ready; see one useful pattern.
+Quota/billing
+Transactional only
+Purchase restored, renewal problem, or entitlement change.
+Marketing
+Separate opt-in; off
+Campaigns/offers; never inferred from service consent.
+Generic Arabic lock-screen example: "قمر عنده خطوة صغيرة ليك." Avoid displaying meal, weight, calorie, or medical-like details on the lock screen by default.
+17. Freemium, Qamar+, offers, and billing
+17.1 Entitlement baseline
+Capability
+Free core
+Qamar+
+Targets and Today
+Full onboarding, target, dashboard
+Same core + expanded personalization
+AI chat
+5 Qamar replies/day
+50 replies/day fair-use cap
+AI meal analysis
+3 photo/voice/free-text analyses/day
+20 analyses/day fair-use cap
+Manual/recent logging
+Unlimited structured manual edits and recent-meal reuse
+Unlimited within anti-abuse rules
+Plan
+One active plan; one regeneration/7 days
+Daily regeneration and schedule adaptation
+Substitutions
+2/day
+10/day fair-use cap
+Progress history
+7 days
+90 days at launch
+Weekly insight
+Summary + one next quest
+Full pattern detail and follow-up Qamar discussion
+Reminders
+Basic daily/weekly
+Multiple meal reminders and insight actions
+All caps are launch defaults and must be remote-configurable. Public wording should say expanded access or fair use, not unlimited AI.
+17.2 Paywall and subscription management
+Field
+Specification
+Screen IDs
+S42 Subscription • S43 Paywall/offer • S20 Quota paywall
+Purpose
+Explain the value expansion, complete store billing, restore entitlement, and disclose renewals truthfully.
+Entry
+You > Qamar+, quota hit, premium range/action, contextual soft offer after first value.
+Core components
+Free vs Plus • monthly/quarterly/annual cards • quarterly hero • offer/renewal disclosure • purchase CTA • restore • manage • terms/privacy
+Primary actions
+select plan • purchase • restore • manage subscription • close and continue free • retry failed receipt
+Required states
+eligible offer • no offer • loading store price • purchase pending • success • cancelled • failed • restored • billing grace
+Acceptance
+store-returned price displayed • renewal period/price visible before CTA • close always available • success resumes blocked action
+Store product
+Planning price
+Position / offer
+Monthly
+349 EGP / month
+Flexible anchor; visible but not the hero
+Quarterly
+750 EGP / 3 months
+Recommended hero; 250 EGP monthly equivalent
+Annual
+2,400 EGP / year
+Best standard monthly equivalent: 200 EGP
+Introductory trial
+14 days Qamar+ for eligible new accounts
+Store-managed, remote-enabled; exact trial end and renewal disclosed
+Promotional offer
+Campaign-specific first period
+Store-approved code/offer; may reduce effective price; exact renewal disclosed
+Use Apple StoreKit and Google Play Billing through a server-verified entitlement layer; do not unlock access from a client success callback alone.
+Campaign codes or links resolve to store-approved promotional eligibility. Do not create an undisclosed custom renewal system inside the app.
+A paywall can be triggered by quota, premium history, advanced insight, or explicit Qamar+ entry. The user always retains the free path.
+Deleting an account and cancelling a store subscription are separate actions; the delete screen must explain and link to subscription management.
+Log offer ID, list price, paid price, renewal terms shown, acquisition source, purchase outcome, and cohort without sensitive nutrition content.
+17.3 Subscription lifecycle and source of truth
+Canonical state
+User access
+Required behavior
+FREE / TRIAL_ELIGIBLE
+Free entitlement
+Show eligible offer from store response only; never promise eligibility from local flags
+TRIALING / ACTIVE
+Qamar+
+Persist store, product, original transaction/token, expiry, auto-renew status and offer; refresh on app foreground
+PENDING
+Previous entitlement only
+Explain that payment is processing; do not spin or repurchase; reconcile from server notification
+GRACE_PERIOD / BILLING_RETRY
+Qamar+ during configured grace
+Show calm billing banner and manage link; do not erase data or game progress
+PAUSED / ACCOUNT_HOLD
+Free unless store response grants access
+Preserve plan/history; show resume/manage path
+CANCELLED_PENDING_EXPIRY
+Qamar+ until expiry
+Show exact end date and keep restore/manage available
+EXPIRED
+Free
+Keep all user data; premium history becomes locked, never deleted
+REFUNDED / REVOKED
+Free immediately after verified event
+Invalidate premium cache and explain support/manage path
+UNKNOWN / STALE
+Short signed cache grace only
+Server reconciliation required before premium writes; never trust client claim
+The entitlement service is canonical. It ingests RevenueCat webhooks if the adapter is used; otherwise App Store Server Notifications V2 plus App Store Server API and Google RTDN plus Android Publisher SubscriptionsV2.
+Every notification is signature/authentication verified, stored once by provider event ID, processed idempotently, and followed by a provider status lookup when state is ambiguous.
+Run foreground refresh, purchase-completion refresh, restore, webhook processing, and a scheduled daily reconciliation for recently active/paying accounts. Last verified state and expiry are auditable.
+Before purchase, link the guest to a recoverable Qamar identity and pass the stable opaque Qamar user ID to the billing adapter. Never use email or nutrition data as a store identifier.
+Upgrades/downgrades use store-native plan-change behavior and show effective date/proration returned by the store. Do not calculate or promise proration in Qamar copy.
+Restore Purchases remains visible in You and the paywall. Account deletion never claims to cancel Apple/Google billing; it links to store management first.
+Family Sharing is off at launch because Qamar data is personal. Web/Stripe billing is deferred; native digital access uses the platform stores for the public MVP.
+17.4 Subscription implementation choice
+Solo-founder recommendation: Use RevenueCat as the launch billing adapter if its current pricing and data terms fit the pre-revenue budget. Keep Qamar’s own entitlement table and webhook endpoint as the source consumed by product services. This removes most store-lifecycle plumbing without coupling UI or business rules to RevenueCat; direct StoreKit/Google verification remains the documented fallback.
+Operation
+Client
+Server
+Products/offers
+Fetch current offering and store-localized price; render skeleton/error/restore.
+Map products to Qamar+ entitlement and approved campaigns
+Purchase
+Launch store sheet once; handle cancel/pending/success without assumptions.
+Verify/ingest result, update entitlement, return signed status
+Restore
+User-initiated button; show progress and result.
+Reconcile all returned transactions to stable Qamar account
+Manage/cancel
+Open native subscription management URL/sheet.
+Observe lifecycle event; never claim cancellation before provider state
+Offer/trial
+Show only store-returned eligible offer and localized terms.
+Campaign config chooses allowed offer; store remains eligibility authority
+Refund/revoke
+Refresh on foreground and show truthful state.
+Webhook + provider lookup removes entitlement and records reason
+18. Gamified journey system
+Figure 4. The launch game loop rewards repeatable actions while protecting nutrition safety and user autonomy.
+18.1 Progression model
+Layer
+Launch design
+Product boundary
+Journey levels
+Levels 1-20. Cumulative thresholds are remote-configured and increase gradually; level never decreases.
+A motivational identity, not a health score
+Experience points
+Immutable server ledger, one reason/event, idempotency key, daily/weekly caps, reversals only for duplicate/fraud/error.
+No negative XP for deletion, absence, target misses or subscription loss
+Daily quests
+One primary + up to two optional; generated from eligible actions and current context; Replace and Skip always available.
+No unsafe restriction, body-outcome or purchase quest
+Weekly quest
+One evidence-based behavior experiment from the weekly insight.
+Completion does not imply medical or weight success
+Recovery quest
+A small return action after absence, with a one-time welcome-back XP award.
+Returning is rewarded; interruption is never punished
+Achievements
+Firsts, consistency, exploration, planning, learning and returning; each shows exact unlock evidence.
+No achievement for weight lost, lowest calories, fasting or body size
+Tree/cosmetics
+Branches, moon phases, orb rings and profile frames unlock at milestones; equipped separately.
+Core logging, safety, targets and data controls never gated
+Calm Mode
+Hides XP totals, level celebrations and achievement prompts while keeping plain next actions.
+User choice; no reduced entitlement or analytics penalty
+18.2 Launch XP economy
+Eligible action
+XP
+Award cap / validation
+Complete eligible onboarding
+100 once
+Target confirmed; account may still be guest
+Confirm first meal
+50 once
+Confirmed structured log; not draft or duplicate
+First meaningful action of a day
+20/day
+Confirmed log, plan action, insight action, or meaningful Qamar action
+Complete primary daily quest
+25/day
+Server rule and evidence reference
+Complete optional daily quest
+10 each
+Maximum two/day
+Complete weekly quest
+60/week
+Evidence-backed behavior action
+Read and act on weekly insight
+40/week
+Open alone is not enough; accept/dismiss with reflection/action
+Return after >=3 inactive days
+30
+Once per rolling 7 days; never labels the absence a failure
+Confirm a new memory/preference category
+10 once/category
+User-controlled durable item
+XP values are launch tuning defaults, not nutrition targets. Remote changes require a versioned rule set and cohort measurement; never retroactively remove earned levels.
+18.3 Quest generation and safety
+A deterministic eligibility service lists safe actions available today from profile, plan, recent use, entitlement, and permissions. The language model may localize the wording but cannot invent an awardable action.
+Filter out actions already completed, impossible under the current plan, disallowed by hard food/safety rules, repeated too often, dependent on a denied permission, or likely to encourage restriction.
+Choose one primary quest optimized for next useful value, then up to two optional quests for exploration or planning. Every quest stores rule version, evidence requirement, XP, expiry, and replacement history.
+When the qualifying domain event occurs, the game service validates it, writes one XP ledger entry, marks the quest complete, and returns the new balance/level in the same transaction.
+If the device is offline, show Pending XP. The server decides after sync; the client never increments the canonical balance itself.
+Deleting or correcting a meal does not punish the user. If the award was caused by a duplicate/fraud/technical error, an auditable neutral adjustment may correct the ledger without failure language.
+18.4 Achievement launch set
+Achievement
+Unlock evidence
+Reward
+First Step
+First confirmed target
+First branch bud
+Real Life Logged
+First confirmed meal in any mode
+Moon-gold orb ring
+Three-Day Explorer
+Meaningful use on three separate days
+Activation badge + branch growth
+Route Adjuster
+First confirmed substitution or recovery replan
+Route marker cosmetic
+Egyptian Food Scout
+Ten distinct confirmed Egyptian catalogue recipe IDs
+Egyptian pattern frame
+Week Reader
+Open one eligible weekly insight and take an action
+Moon phase unlock
+Welcome Back
+Complete a recovery quest after absence
+Return lantern cosmetic
+Memory Keeper
+Confirm three distinct user-controlled memory categories
+Memory leaf cosmetic
+18.5 Game and subscription boundary
+Free and Qamar+ users earn the same XP for the same action. Paid members never receive XP multipliers, exclusive levels, stronger health scores, or leaderboard advantages.
+Qamar+ may include additional cosmetic variants and longer journey history, but every launch achievement has at least one free reward and the complete game loop remains useful on Free.
+Quests never ask the user to purchase, start a trial, invite contacts, enable marketing, share body data, rate the app, or keep notifications enabled.
+No loot boxes, random paid rewards, virtual currency, trading, gambling-like animation, public ranking, social pressure, streak protection purchase, or loss aversion mechanic appears in MVP.
+The founder dashboard compares quest exposure with completion, next-day/D7 retention, meal-confirmation quality, safety events and opt-out. Disable any quest type that raises harmful behavior or lowers core completion.
+19. Key-screen wireframe plan
+Figure 5. Structural wireframes for the six highest-risk MVP surfaces; production copy and reading order are Arabic RTL.
+Figure 6. Journey UI hierarchy: useful action first, progress visible, every motivational layer optional.
+Wireframe rule: The boards fix hierarchy and interaction—not final decoration. Today prioritizes one action; confirmation prioritizes uncertainty and editability; Progress avoids failure colors; the tree is functional navigation; chat returns to the source screen; Journey makes rewards visible without blocking or replacing the nutrition task.
+PART IV
+UI design system
+Dark lunar identity, high-contrast data, and Arabic clarity before decoration.
+20. Visual direction
+Cipher Labs owns the black-and-gold company identity. Qamar inherits the lunar darkness and gold signal, then adds warm moonlight surfaces and a restrained nutrition green. The launch theme is dark-first and singular; a second theme is deferred so the 30-day build can focus on accessibility and consistency.
+20.1 Color tokens
+Token
+Hex
+Use
+Rule
+Night 950
+#0B0D12
+App background, tree overlay
+Never place muted gray text without contrast check
+Night 800
+#171A21
+Cards, chat surfaces
+Use border separation rather than heavy shadow
+Moon Gold 500
+#C89B3C
+Primary CTA, active nav, Qamar orb
+One dominant gold action per screen
+Moon Gold 200
+#EED9A6
+Highlights, chart accents
+Not for long body text on light surfaces
+Moonlight
+#F7F3EA
+Primary text and light cards
+Warm white replaces pure white in product UI
+Mist
+#B6B1A8
+Secondary text
+Never for essential text below required contrast
+Leaf
+#55A36C
+Confirmed, in-range, constructive progress
+Pair with label/icon; not medical approval
+Amber
+#E0A13B
+Attention, uncertainty, incomplete
+Not a guilt or failure color
+Error
+#D45B5B
+System error, destructive action only
+Never represent food, weight, or missed targets
+Focus
+#7BB8FF
+Keyboard/screen-reader focus
+Visible on every focusable element
+20.2 Typography
+Style
+Token
+Launch specification
+Arabic family
+font.ar
+Noto Sans Arabic, bundled; Regular 400, Medium 500, Bold 700
+Latin/numbers
+font.latn
+Inter, bundled; fall back to system sans
+Display
+32/40 Bold
+Rare: welcome and major result only
+Page title
+24/32 Bold
+One per screen; right aligned in Arabic
+Section
+20/28 Bold
+Card groups and modal titles
+Body
+16/24 Regular
+Default readable copy; no 14 px body compression
+Label
+14/20 Medium
+Controls, chart legends, metadata
+Caption
+12/18 Regular
+Non-essential helper text only
+20.3 Layout tokens
+System
+Tokens
+Usage
+Spacing
+4, 8, 12, 16, 24, 32, 48 dp
+4 dp base grid; 16 dp standard mobile edge; 24 dp section separation
+Radius
+12, 16, 24, pill
+Inputs 12; cards 16; sheets/modals 24; chips fully rounded
+Elevation
+0, 1, 2
+Prefer border and surface contrast; reserve elevation for sheets/orb
+Icon
+24 dp outline
+Consistent stroke; selected state may fill; always pair unfamiliar icons with text
+Primary CTA
+56 dp height
+Full width on transactional screens; gold; explicit verb
+Orb
+56 dp visual/hit minimum
+Edge-snapped; 16 dp safe margin; 3-4 dp status ring
+Bottom nav
+64-72 dp
+Five RTL destinations; labels always visible
+21. Component library
+Component
+Variants / states
+Key behavior
+Button
+Primary, secondary, text, destructive; enabled/loading/disabled
+Verb-led label; spinner never removes context; destructive never gold
+Input
+Text, numeric, search, OTP, multiline
+Arabic RTL, unit selector, inline validation, keyboard-safe
+Choice
+Radio card, checkbox, chip, segmented control
+Use radio for one choice, checkbox for independent consent, chip for fast filters
+Nutrition summary
+Compact and expanded
+Calories + P/C/F; rounded values; source/estimate state accessible
+Meal card
+Planned, confirmed, modified, uncertain
+Time, title, portion, estimate, status, primary action
+Confidence badge
+High, medium, low
+Text + icon + color; opens explanation/edit
+Qamar message
+Text, tool-running, action card, refusal, error
+No raw JSON; confirmation before writes
+Progress bar/ring
+Neutral, in-range, attention
+No failure-red; value and label exposed to accessibility
+Chart
+Weight, target range, activity days
+Text summary, tappable points, no 3D or decorative noise
+Sheet/modal
+Method, substitution, confirmation, permission, paywall
+Dismissal explicit; keyboard and safe area respected
+Save-progress sheet
+Suggested, required-for-purchase/sync, collision
+Platform-preferred identity first; preserves source context; no password
+Quest card
+Primary, optional, recovery, completed, pending
+Verb + reason + XP + evidence; Replace/Skip; never red failure
+XP/level
+Compact HUD, Journey detail, level-up
+Numeric semantic label; server balance; Calm Mode alternative
+Achievement tile
+Locked/progress/unlocked/equipped
+Exact unlock evidence; no body silhouette, scales or calorie-minimization imagery
+Banner
+Offline, stale, warning, success
+Does not cover CTA; named recovery action
+Skeleton
+Card/list/chart
+Matches final geometry; no fake progress percentage
+Qamar orb/tree
+Neutral, attention, open, dragging, disabled
+Motion and semantics defined in navigation contract
+22. Motion and haptics
+Interaction
+Timing
+Motion / haptic
+Standard state change
+120 ms
+Opacity/color; no haptic
+Sheet/modal
+200 ms
+Ease-out rise/fade; reduce-motion = fade only
+Tree open
+220 ms after hold recognition
+Branches grow from orb; one light haptic
+Tree selection
+120 ms
+Node focus + light selection haptic
+Orb snap
+180-260 ms
+Damped edge snap; no repeated bounce
+Meal confirmed
+200 ms
+Short check/transition; one success haptic; undo remains
+Quest complete
+180 ms
+Non-blocking XP toast and branch glow; Calm Mode/reduced-motion = text/check only
+Level up
+<=600 ms skippable
+One sheet at next safe moment; no confetti over food, billing, safety or consent
+Error
+None or 120 ms
+No shake by default; clear inline message; haptic only for destructive confirmation failure
+23. Universal states and error design
+State
+Required pattern
+Never
+Loading
+Skeleton or named step; keep cancel/back where safe; preserve user input.
+Infinite spinner with no task label
+Empty
+Explain value and give one primary action.
+Blank chart or zero score
+Offline
+Show cached Today/Plan; queue supported manual/text actions; explain AI modes need connection.
+Pretend a photo/voice analysis is running
+Timeout
+Keep source, retry once automatically when safe, then offer retry/manual path.
+Erase photo, transcript, or typed meal
+Partial AI result
+Show valid items and flag what needs attention.
+Discard everything or silently invent missing fields
+Permission denied
+Explain why, open OS settings, and offer text/manual alternative.
+Repeated system prompts
+Quota reached
+State reset time/cap and free alternative; contextual Qamar+ CTA.
+Lock already-confirmed data
+Pending XP
+Show the completed action and Pending XP until server validation/sync.
+Increment canonical balance on the client
+Quest unavailable
+Replace automatically or offer Replace/Skip with a neutral reason.
+Mark the user as failed or remove earned XP
+Safety refusal
+Name the boundary, offer a safer general path or professional route.
+Cold refusal with no next step
+Destructive
+Explain impact, re-auth, explicit confirmation, grace/undo where possible.
+Color-only warning or default destructive focus
+"في حاجة وقفت. اللي كتبته لسه محفوظ—جرّب تاني أو سجله يدوي."
+Generic Arabic error example
+24. Content and microcopy system
+24.1 Voice rules
+Context
+Voice
+Coaching
+Egyptian Arabic, short, direct, warm; one action.
+Nutrition fact
+Clear Arabic with stable units; avoid slang that changes meaning.
+Uncertainty
+Say what is uncertain and what the user can correct.
+Safety/legal
+Plain formal Arabic where needed; no RPG language; no jokes.
+Billing/privacy
+Literal, complete, and non-persuasive; current price and renewal are explicit.
+Error
+State what happened, what was preserved, and the next action.
+24.2 Launch microcopy examples
+Surface
+Arabic production-direction example
+Intent
+Welcome
+أهلاً، أنا قمر. هنظبط أكلك على حياتك—مش العكس.
+Promise adaptation, not perfection
+Age gate
+قمر متاح حالياً للبالغين +18 فقط.
+Clear eligibility
+Target
+دي نقطة بداية تقديرية، وتقدر تعدّلها في أي وقت.
+No false precision
+Log
+صوّر، اتكلم، أو اكتب اللي أكلته.
+Three input modes
+Low confidence
+راجع الكمية قبل ما نسجلها—التقدير مش مؤكد.
+Prompt correction
+Recovery
+اليوم مش ضاع. مش بنبدأ من جديد—هنعدل المسار بخطوة واحدة.
+Return without shame
+Insufficient insight
+لسه بنجمع صورة مفيدة. استخدم قمر يومين كمان.
+No invented insight
+Paywall
+كمّل مع قمر بخطة بتتظبط مع يومك.
+Value, not pressure
+Save progress
+احفظ رحلتك بخطوة واحدة—من غير باسورد.
+Progressive account upgrade
+Quest
+مهمتك النهارده: سجّل وجبة واحدة زي ما هي.
+Concrete achievable action
+Level up
+وصلت للمستوى ٣—شجرتك كبرت مع خطواتك.
+Personal progress, not body score
+Delete
+حذف الحساب نهائي. اشتراك المتجر محتاج إلغاء منفصل.
+Separate account/subscription
+PART V
+AI, data, and technical system
+The model speaks; deterministic services decide; the user confirms.
+25. AI product contract
+25.1 Workflow architecture
+Workflow
+Responsibility
+Tools / outputs
+Boundary
+Intent router
+Select chat, meal, plan, progress, account, or safety path.
+Typed intent + confidence
+No public agent chooser
+Coach
+Explain a decision and propose one next action in Egyptian Arabic.
+Profile read, target read, plan/log reads, action card
+No nutrient invention or diagnosis
+Meal parser
+Convert photo/voice/text into candidate foods and portions.
+Structured draft + confidence + clarification
+Never writes without confirmation
+Nutrition service
+Resolve canonical items and calculate calories/macros.
+Versioned deterministic totals
+Model cannot override values
+Planner
+Select meals and substitutions under constraints.
+Plan proposal + validation report
+Hard exclusions always win
+Insight
+Explain deterministic weekly metrics.
+Win, pattern, next quest + evidence refs
+No causal/medical inference
+Memory manager
+Read permitted context and propose durable memory.
+Structured item + provenance + expiry
+User confirms inferred durable items
+Quest narrator
+Localize deterministic quest templates and milestone copy.
+Approved quest ID + bounded copy
+Cannot create eligibility, evidence or XP
+Safety validator
+Classify unsupported risk and validate outgoing action.
+Allow, restrict, refuse, escalate
+Runs before personalized output
+Provider rule: OpenAI is the preferred launch provider, called only from the server through a replaceable adapter. Provider/model choice, prompt version, temperature, token budget, image detail, and fallback are remote configuration—not mobile-app constants.
+25.2 Structured response requirements
+Every tool-capable workflow uses a versioned schema. Reject or repair invalid outputs server-side; never pass raw malformed content to the app.
+Meal candidates include canonical ID when known, localized name, portion unit/quantity, cooking method, source, confidence, and clarification field.
+Chat actions include action type, human summary, proposed arguments, confirmation requirement, and success/failure copy.
+Plan and substitution outputs are validated by deterministic constraints before display; invalid proposals are retried once or replaced with a safe manual path.
+Insight statements include evidence IDs for the metrics they describe so incorrect claims can be traced and reported.
+Quest/achievement copy references an approved deterministic definition ID. The model never assigns XP, selects a body-outcome reward, or marks completion.
+Prompts never contain secrets, unrelated full account data, or uncontrolled transcript history. Use minimal relevant context and short rolling summaries.
+25.3 Latency, reliability, and cost targets
+Workflow
+UX target
+Fallback
+Chat text
+First visible progress <=2 s; p95 complete <=6 s
+Stop/retry; cached/manual guidance only where truthful
+Photo meal
+Named processing; p95 draft <=12 s
+Preserve image locally for retry; manual/search flow
+Voice meal
+Transcript + draft p95 <=10 s after stop
+Editable typed transcript/manual search
+Plan/substitution
+p95 <=8 s
+Existing plan remains; structured manual alternatives
+Weekly insight
+Background generation; no blocking dashboard
+Deterministic metric summary without AI narrative
+Compress images and choose provider image detail intentionally; do not send original metadata or unnecessary resolution.
+Limit voice input to 60 seconds; summarize conversation context; cache canonical food lookups; calculate nutrients outside the model.
+Retry idempotent provider failures once with jitter. Do not retry a write without an idempotency key.
+Track variable cost by workflow, model, platform, entitlement, and cohort; never log meal text, chat content, or body values in cost analytics.
+When budget or reliability requires, reduce free AI caps and context depth through remote configuration before breaking the useful manual core.
+26. Safety and trust system
+26.1 Layered safety flow
+Eligibility gate prevents known unsupported users from entering personalized target/plan flows.
+Input classifier detects medical, eating-disorder, pregnancy, extreme restriction, self-harm, allergy, and emergency risk cues.
+Policy layer chooses allow, restrict, refuse, or urgent escalation; it is separate from the coach personality prompt.
+Deterministic target/plan validators reject unsafe values and constraint violations.
+Output validator checks medical claims, certainty, compensatory language, and action/tool permissions before delivery.
+Safety event records category, policy/model versions, action, and de-identified audit fields; it excludes raw sensitive content unless necessary and approved.
+Class
+Allowed response
+Prohibited
+General wellness
+Everyday food choices, logging, portions, balanced meal planning, adherence support.
+Diagnosis, treatment, guaranteed outcome
+Clinical request
+State Qamar’s boundary and recommend licensed professional care.
+Personalized disease/medication plan
+Eating-disorder/extreme restriction
+Refuse restriction/compensation; encourage qualified support; show verified local resources.
+Calorie-minimization tactics, purge/fast coaching
+Severe allergy
+Do not guarantee safety; recommend label verification and professional guidance.
+Claim an item is safe from image/name alone
+Emergency
+Encourage immediate local emergency/professional help using the verified country resource sheet.
+Delay with generic nutrition conversation
+Before release, legal review must approve the exact disclaimer, risk categories, user-facing wording, escalation resources, privacy flows, and store claims. Emergency resource details must be current and country-verified.
+27. Technical architecture
+Figure 7. Recommended server-mediated architecture and reusable Cipher Labs primitives.
+27.1 Recommended launch stack
+Layer
+Recommended baseline
+Reason
+Mobile
+Flutter, one codebase for iOS and Android
+Matches launch decision and solo-founder capacity
+Backend
+Supabase/PostgreSQL with Auth, Storage, server functions, and row-level access rules
+Fast relational build, structured nutrition data, server-side access control
+AI
+OpenAI through a server-side provider adapter
+Preferred constraint; replaceable and centrally controlled
+Media
+Private ephemeral object storage with deletion job
+Temporary photo/audio processing without public URLs
+Billing
+Apple/Google store products with a server-verified entitlement service; RevenueCat acceptable as the fast adapter
+Cross-platform receipts, restore, and offer handling
+Push
+FCM/APNs through one notification service
+Cross-platform deep links and scheduling
+Analytics
+First-party content-free event stream to aggregate dashboards
+Honors no sensitive content in analytics
+Observability
+PII-scrubbed error/performance monitoring + structured server logs
+Solo-founder diagnosis without exposing nutrition content
+Build/release
+Cloud CI builds; occasional rented Mac for iOS signing/debugging
+Solves the current no-Mac constraint
+Security boundary: All provider keys, prompt versions, nutrition policy tables, entitlement checks, and privileged data access live server-side. The client receives only the data and actions allowed for the authenticated user.
+27.2 Offline and synchronization
+Capability
+Offline behavior
+Today/Plan/Progress
+Display last confirmed cache with a visible last-sync timestamp.
+Manual/recent log
+Queue locally with generated idempotency key; show pending state; sync when online.
+Photo/voice/free-text AI parse
+Require connection; preserve local source/draft and offer manual path.
+Edit/delete
+Queue only when conflict-safe; otherwise explain that connection is required.
+Subscription
+Use cached signed entitlement for short grace; refresh before premium server action.
+Conflict
+Server canonical record wins; present a reconciliation message when both versions changed.
+28. Data model
+Entity
+Minimum fields / purpose
+UserIdentity
+user_id, anonymous/linked status, auth provider refs, merge lineage, created_at, locale, last_active, status
+Consent
+type, version, granted_at, withdrawn_at, evidence
+NutritionProfile
+DOB/age, biological estimate input, height, current weight, goal, activity, status
+Preference
+category, value, hard/soft, source, confidence, confirmed_at
+SafetyProfile
+supported status, policy flags, policy_version; minimal and access-restricted
+Target
+calories, protein/carbs/fat, formula version, inputs hash, valid_from/to
+FoodItem/Recipe
+canonical ID, localized aliases, portions, nutrients, source/version
+MealDraft
+input type, candidate items, confidence, clarification, expiry; no confirmed write
+MealLog
+timestamp, items/portions, totals, source, confirmed_at, plan linkage
+Plan/PlanMeal
+day, target_version, constraints_version, items, status, generation version
+WeightEntry
+value, unit, measured_at, source
+Insight
+window, deterministic metrics, narrative, evidence refs, action status
+GameProfile
+user_id, level, xp_balance, ruleset_version, equipped cosmetics, calm_mode
+Quest
+type, template/rule version, evidence requirement, XP, issued/expires/completed/replaced, source context
+XpLedger
+immutable award/adjustment, reason, source event, idempotency key, delta, balance_after, created_at
+Achievement/Unlock
+definition version, evidence refs, unlocked_at, cosmetic entitlement/equipped state
+MemoryItem
+type, value, provenance, confidence, user-confirmed, expiry, deleted_at
+Conversation/Message
+thread, role, typed content, tool refs, retention expiry, report status
+Entitlement
+tier, product, period, store, canonical status, expiry, auto-renew/grace, offer/trial/cohort, original transaction/token reference, verified_at
+BillingEvent
+provider event ID/type, signature status, received/processed timestamps, raw encrypted reference, processing result
+Reminder
+type, local time/time zone, enabled, quiet-hours policy, deep link
+Feedback/SafetyEvent
+category, support code, versions, de-identified diagnostic fields, resolution
+Separate identity/contact data from nutrition and behavioral records; use least-privilege service access and row-level policies.
+Every derived record stores its policy/model/prompt/catalogue version so corrections can be traced.
+Soft delete only where needed for recovery/audit; user-facing deletion must flow into the documented retention/deletion job.
+Do not store raw access tokens, full receipts, provider secrets, or raw photo/audio in analytics tables.
+Portable memory is a controlled entity, not a synonym for conversation history. Future specialists receive scoped memory only through explicit routing permissions.
+29. Complete API and integration plan
+29.1 External APIs, SDKs, and subscriptions
+Capability
+Launch integration
+Required use / boundary
+Core identity
+Supabase Auth Flutter/server APIs
+Anonymous start, sessions, token refresh, email OTP, account deletion; RLS identity key
+Apple identity
+Sign in with Apple
+One-tap recoverable account on Apple platforms; verify nonce and identity token server-side
+Google identity
+Credential Manager / Sign in with Google
+Google button + automatic sign-in for eligible return users; verify ID token server-side
+Identity linking
+Supabase anonymous upgrade + identity linking
+Preserve anonymous user ID; controlled merge when identity already belongs to another account
+Transactional email
+Custom SMTP provider through Supabase
+Six-digit OTP, security/account messages and export-ready notice; no marketing without opt-in
+Database/API
+Supabase PostgreSQL, PostgREST/RPC, Edge Functions
+User-scoped records, deterministic services, jobs, webhooks and admin routes under RLS
+Private media
+Supabase Storage signed upload/download APIs
+Short-lived photo/audio objects, metadata stripping, automatic deletion; never public bucket
+AI conversation
+OpenAI Responses API
+Egyptian Arabic chat, typed tools and structured outputs; server only, provider adapter
+Meal vision
+OpenAI vision image input through Responses API
+Candidate foods/portions only; deterministic catalogue lookup and user confirmation decide record
+Voice logging
+OpenAI Audio Transcriptions API
+Egyptian Arabic transcript; user edits transcript before meal parse
+Safety signal
+OpenAI Moderation API + Qamar policy classifier
+Input/output signal only; Qamar’s eligibility and nutrition policy remains authoritative
+Food reference
+USDA FoodData Central API + internal Egyptian catalogue
+Base ingredient nutrient reference; local recipes/portions remain curated and versioned
+iOS billing
+StoreKit 2 + App Store Server API + Server Notifications V2
+Products, purchase, offer codes, status, renewals, refunds/revocations and reconciliation
+Android billing
+Google Play Billing + Android Publisher SubscriptionsV2 + RTDN/Pub/Sub
+Base plans/offers, purchase, server status, acknowledgement, lifecycle and reconciliation
+Billing adapter
+RevenueCat Flutter SDK, REST/webhooks (recommended)
+Faster cross-store offering/entitlement/restore layer; stable Qamar user ID; Qamar server still canonical
+Android push
+Firebase Cloud Messaging HTTP v1/Admin SDK
+Device-token reminders/deep links; OAuth/service credential server-side
+iOS push
+APNs through FCM or direct provider API
+Token-based delivery; generic lock-screen copy and no sensitive payload
+Crash/performance
+Sentry Flutter/server SDK or equivalent
+Scrub request bodies, nutrition data, identifiers and media; release/trace only
+App links
+Apple Universal Links + Android App Links
+Email/offer/referral/deep-link routing with HTTPS association files
+Required launch accounts and subscriptions: Apple Developer Program, Google Play Console, Supabase production project, OpenAI API account/budget, transactional email provider, and push credentials are required. RevenueCat and Sentry are recommended managed services; each can start on an eligible free tier but must have spending/usage alerts and a written fallback. No paid food API is required at launch if the Egyptian catalogue and FoodData Central reference are sufficient.
+29.2 Internal mobile API contract
+Domain
+Representative v1 endpoints
+Permission / idempotency
+Bootstrap
+GET /bootstrap; GET /config
+Guest/signed; signed config, minimum app version, flags, quotas, game ruleset
+Identity
+POST /auth/anonymous; /auth/exchange/{apple|google}; /auth/otp/start; /auth/otp/verify; /auth/link; /auth/merge; GET/DELETE /sessions
+Short-lived tokens; nonce/state; rate limit OTP; audited idempotent link/merge
+Consent
+GET /consents/current; POST /consents
+Guest or linked user; versioned evidence; optional purposes separate
+Profile/target
+GET/PATCH /profile; POST /targets/calculate; POST /targets/{id}/confirm
+User only; target and update idempotency keys
+Meals/media
+POST /media/upload-url; POST /meal-drafts; /parse; /clarify; /confirm; GET/PATCH/DELETE /meals/{id}
+User only; MIME/size validation; confirm/write idempotent; ownership checked
+Food
+GET /foods/search; /foods/{id}; /recent; POST /food-corrections
+Authenticated read; corrections queued, never global auto-learn
+Plan
+GET/POST /plans; POST /plans/{id}/substitute; /adjust; /mark-eaten
+Entitlement + expected plan version; writes idempotent
+Progress/insight
+GET /progress; weight CRUD; GET/POST /insights; POST /insights/{id}/action
+User only; bounded window and evidence IDs
+Chat
+POST /chat/responses stream; POST /chat/{id}/stop; POST /actions/{id}/confirm; POST /messages/{id}/report
+Quota/rate limit; typed tools; confirmation token before write
+Memory
+GET /memory; POST /memory/proposals/{id}/confirm; PATCH/DELETE /memory/{id}
+User only; provenance retained; re-auth for bulk export
+Game
+GET /game/profile; GET /quests; POST /quests/{id}/{replace|skip}; GET /achievements; POST /cosmetics/{id}/equip; PATCH /game/preferences
+Server awards XP from domain events; client has no award endpoint
+Billing
+GET /billing/offering; /entitlement; POST /billing/sync; /restore; POST /webhooks/{revenuecat|apple|google}
+Stable linked user; verified provider event; webhook idempotency; client cannot assign tier
+Notifications
+POST/DELETE /devices; GET/PATCH /reminders; POST /reminders/test
+User/device scoped; generic copy; token rotation and invalid-token cleanup
+Privacy
+POST /exports; GET /exports/{id}; DELETE /conversations/{id}; POST /account-deletion
+Recent re-auth; signed expiring download; auditable deletion job
+Analytics/support
+POST /events/batch; POST /feedback; GET /support-code
+Content-free allowlist; attachments opt-in and separately signed
+Founder ops
+GET/PATCH /admin/config; /corrections; /safety; /billing; /cost
+Admin MFA, role check, audit log; never exposed in consumer bundle
+29.3 API conventions and reliability
+Concern
+Contract
+Specification
+OpenAPI 3.1 is canonical. Generate typed Dart models/clients and server validators from versioned schemas; contract tests run in CI.
+Envelope/errors
+JSON success payload + request_id; typed error {code, message_key, retryable, field_errors}; never send raw provider errors to app.
+Authentication
+Short-lived bearer access token. Server derives user from token; never accepts user_id ownership from request body.
+Idempotency
+Required on confirmation, plan changes, game-triggering writes, purchases/sync, exports and deletion. Same key/body returns same result.
+Concurrency
+ETag/version or expected_version on mutable records; 409 conflict returns latest canonical record and recovery instruction.
+Pagination/time
+Cursor pagination; ISO-8601 UTC timestamps; user locale/time zone only at presentation and scheduling boundaries.
+Streaming
+SSE for chat with named progress/tool states, terminal completion/error, cancellation and resumable conversation ID.
+Retry
+Exponential backoff + jitter only for retryable idempotent calls; honor Retry-After; circuit-break providers; preserve user input.
+Rate/cost
+Per user/device/IP/workflow quotas; entitlement-aware budgets; daily provider spend alerts and kill switches preserving manual core.
+Logging
+request_id, route, status, latency, versions and cost band only; redact tokens, bodies, media URLs, contact/body/nutrition/chat data.
+Webhooks
+Verify signature/auth before parsing, persist provider event ID once, return quickly, process async, retry safely, dead-letter failures.
+Secrets
+Server secret manager/env only; separate dev/staging/prod keys; rotation runbook; mobile contains only publishable configuration.
+29.4 External data minimization and failure map
+Provider
+Minimum data sent
+Provider failure behavior
+OpenAI
+Pseudonymous request ID, minimal relevant context, compressed meal image or <=60s audio, no contact/store identity.
+Preserve source; one safe retry; manual/recent log and deterministic summary remain
+Supabase
+Required identity and user-owned structured records; private object paths.
+Cached read; local idempotent queue; do not fake successful writes
+Apple/Google identity
+Nonce/state and provider credential; requested profile scope minimized.
+Guest remains usable; allow another method; preserve interrupted flow
+Billing stores/RevenueCat
+Opaque stable Qamar user ID, store transaction identifiers, product/offer and entitlement metadata.
+Keep previous verified state within signed cache; reconcile; free path remains
+FCM/APNs
+Device token, platform, locale/time zone, generic template/deep-link ID.
+In-app reminders/settings remain; delete invalid tokens; never retry sensitive payload
+FoodData Central
+Generic ingredient/search terms only; never user, meal, body or account context.
+Use cached/versioned food data; queue catalogue gap
+Sentry
+Release, route/screen ID, sanitized stack/performance trace and random diagnostic session.
+App continues; local diagnostic buffer expires; no user-visible block
+30. Analytics, experimentation, and founder controls
+30.1 Event policy
+Analytics boundary: Events may contain IDs, timestamps, workflow/status, platform, app version, model/prompt version, entitlement, offer, acquisition source, latency, and cost band. They may not contain names, meal text, food names, photos, audio, transcripts, chat content, weight, height, target values, allergies, or diagnoses.
+30.2 Funnel and product events
+Stage
+Required events
+Acquisition
+install_attributed, first_open, campaign_offer_resolved
+Account
+guest_created, eligibility_passed/blocked, save_prompt_viewed, identity_link_started/completed/failed, merge_started/completed, consent_completed
+Onboarding
+onboarding_started, step_completed, target_created/confirmed, onboarding_completed
+First value
+log_started, input_selected, parse_completed/failed, meal_confirmed, today_updated
+Engagement
+chat_sent/answered, plan_viewed, substitution_requested/applied, progress_viewed, insight_viewed/action_accepted
+Signature UX
+orb_tapped, orb_moved, tree_opened, tree_node_selected, orb_tutorial_completed
+Journey
+quest_issued/viewed/replaced/skipped/completed, xp_awarded, level_reached, achievement_unlocked, cosmetic_equipped, calm_mode_changed
+Retention
+core_action_completed, active_day_completed, reminder_opened
+Revenue
+paywall_viewed, product_selected, purchase_started/completed/failed/cancelled, restored, entitlement_changed
+Trust
+correction_submitted, safety_restriction, export_requested, account_deletion_requested/completed
+Reliability
+api_latency, schema_repair, provider_error, tool_failure, offline_queue_synced
+30.3 Founder dashboard
+View
+Minimum decision data
+Daily funnel
+First open → guest → eligible/consented → onboarding → target → first log → identity linked → 3-day activation
+Retention
+D1/D3/D7/D14/D30 meaningful use by cohort and acquisition engine
+Revenue
+Paywall view, conversion, plan mix, realized payer-month, renewal, refunds, offer cohort
+Journey
+Quest exposure/completion/replacement, XP earn distribution, level reach, Calm Mode, next-day/D7 lift, safety correlation
+AI operations
+Calls, latency, schema failure, tool success, retry, cost/user, cost/workflow, quota hits
+Food quality
+Low-confidence rate, corrections, unresolved catalogue items, top failure categories
+Safety
+Restricted/refused counts, eval regressions, high-severity incidents; raw content access tightly controlled
+Product quality
+Crash-free users, app start, offline sync, purchase/restore failures, support reasons
+30.4 Founder operational controls
+Remote feature flags by platform/version/cohort for anonymous start, save prompts, quests, XP values, levels, cosmetics, photo, voice, plan regeneration, insights, and offers.
+Model and prompt configuration with version, rollout percentage, rollback, token/image/audio budget, and eval status.
+Free/paid quota table and emergency cost circuit breaker that preserves manual/recent logging and stored data.
+Food correction queue with source, canonical match, founder decision, catalogue version, and optional user follow-up code.
+Safety incident queue with severity, policy/model version, resolution, and auditable privileged access.
+Offer catalogue showing campaign, eligibility, first price, renewal price/period, start/end, and cohort result.
+Game ruleset with quest templates, eligibility/evidence, XP, caps, levels, achievements and kill switches; every change versioned and reversible without deleting earned progress.
+Support lookup by one-time support code; founder access is logged and restricted to the minimum necessary record.
+PART VI
+Delivery and release
+Ship the complete loop in thirty days; use evidence to decide what deserves Day 31.
+31. Thirty-day build sequence
+Days
+Build outcome
+Exit test
+1-3
+Repo, environments, CI/cloud builds, design tokens, app shell, schema, anonymous auth/link spike, provider gateway
+iOS/Android dev build; instant guest session; signed server request; no key in app
+4-7
+Eligibility, consent, progressive onboarding, target engine, Apple/Google/email account upgrade
+Eligible guest confirms target; identity links in place; blocked states work
+8-11
+Today, manual/recent logging, Egyptian catalogue seed, meal CRUD
+Confirmed meal recalculates Today deterministically
+12-16
+Text/photo/voice draft parsing, confidence, clarification, confirmation
+All three modes reach the same editable draft; failure preserves source
+17-20
+Plan, substitution, recovery, Progress, weekly insight, quest/XP ledger, levels, achievements
+Plan respects exclusions; game awards are idempotent and never body-outcome based
+21-22
+Movable orb, complete tree, bottom navigation, RTL/accessibility pass
+Tap/hold/drag/persist + all five nodes on both platforms
+23-25
+Reminders, Qamar+, products/trial/offers, stable billing identity, webhook lifecycle, restore/manage
+Sandbox purchases and every canonical entitlement state reconcile
+26-27
+Memory, privacy/export/delete, help/corrections, founder controls, analytics
+Export/delete jobs and content-free events verified
+28-29
+Golden eval, device QA, performance/cost, store metadata, policies, legal release gates
+Zero release-blocking defect or critical safety failure
+30
+Staged public release, monitor, first paid customer, rollback ready
+Production funnel, billing, support, cost and crash dashboard live
+If schedule slips: Remove referral work, advanced celebration animation, extra cosmetics, extended charts, extra onboarding questions, and P1 polish first. Keep the quest/XP ledger and one journey screen simple; do not remove age/safety gates, editable confirmation, identity linking, complete tree nodes, privacy controls, billing disclosure, receipt verification, or operational cost/error visibility.
+32. QA and evaluation plan
+32.1 Device and UX matrix
+Area
+Minimum coverage
+Devices
+Founder iPhone + Android phone; one small and one large simulator/emulator per platform; current and previous major OS where practical
+Direction
+Arabic RTL on every screen; mixed Arabic/English/Arabizi meal input; long names and localized units
+Accessibility
+Screen reader smoke test, 200% text, high contrast, reduced motion, haptics off, color-blind-readable states
+Permissions
+Camera/mic/notifications first ask, deny, limited, revoke in settings, and return
+Network
+Offline cold/open cache, slow network, timeout, partial upload, reconnect, duplicate retry
+Account
+New/returning, provider cancellation, expired session, sign-out, re-auth, export, delete
+Identity
+Anonymous start, guest expiry warning, Apple/Google/email in-place link, collision/merge, uninstall recovery, duplicate prevention
+Billing
+Monthly/quarterly/annual, trial eligible/ineligible, offer/no-offer, upgrade/downgrade, cancelled, pending, failed, restored, expired, grace/retry/hold, refund/revoke, account deletion warning
+Journey
+Award idempotency, offline Pending XP, caps, quest replace/skip/expiry, recovery return, level-up, achievement evidence, Calm Mode, reduced motion
+Orb/tree
+Tap, hold, drag, safe areas, keyboard, camera, rotation, notch, RTL order, screen-reader actions
+32.2 Golden AI evaluation set
+Set
+Minimum cases
+Pass criteria
+Egyptian food text
+50
+Correct dish/variant intent, honest clarification, schema valid
+Photo meals
+40
+Candidate food useful, uncertainty visible, no silent write
+Voice/Arabizi
+30
+Editable transcript and correct core meal meaning
+Plan/substitution
+40
+Hard exclusions 100%; target validation; reasonable Egyptian option
+Recovery coaching
+25
+No shame, no punitive compensation, one useful action
+Medical/high risk
+50
+Correct restrict/refuse/escalate; zero critical harmful guidance
+Memory/tool permissions
+25
+No unconfirmed durable save or side effect
+Adversarial/injection
+20
+No secret exposure, policy bypass, cross-user access, or unsafe tool call
+Freeze the release model/prompt/policy/catalogue versions only after the full suite passes. Any prompt/model change reruns affected sets before rollout.
+Score correctness, usefulness, Egyptian naturalness, confidence honesty, safety, schema validity, latency, and variable cost separately.
+A critical safety, cross-user data, payment, account deletion, or unconfirmed-write failure blocks release regardless of average score.
+Use production corrections to add new eval cases after de-identification and only within the user’s product-improvement consent and approved process.
+32.2.1 Deterministic identity, billing, and game suites
+Suite
+Minimum cases
+Release pass
+Identity
+Guest create/restore, Apple/Google/email link, provider cancel, expired OTP, collision, merge, offline resume, uninstall warning
+Every successful link preserves one user ID, profile, drafts/logs, XP and interrupted route; no cross-user merge
+Billing
+All products, trial eligible/ineligible, offer, cancel, pending, upgrade/downgrade, grace/retry/hold, restore, expiry, refund/revoke, duplicate/out-of-order webhook
+Canonical entitlement matches verified provider state; no client-only unlock; every event idempotent
+Game ledger
+Duplicate domain event, offline replay, cap boundary, expired/replaced quest, correction/delete, concurrent level-up, ruleset rollout
+Exactly-once award, correct balance/level/evidence, no earned-level loss
+Game safety
+Extreme deficit, under-eating, missed day, weight change, purchase/referral/rating request, high-risk profile
+Zero body-outcome, restriction, purchase, shame, notification or marketing quests/rewards
+Calm/accessibility
+Calm Mode, reduced motion, screen reader, 200% text, haptics off
+All core actions and evidence remain complete without animation, sound, drag or reward pressure
+32.3 Severity and release policy
+Severity
+Examples
+Release rule
+P0 blocker
+Cross-user data, harmful clinical advice, under-18 access, payment unlock bug, delete failure, crash in core loop
+No release / immediate rollback
+P1 critical
+Meal confirmation wrong write, target mismatch, tree node dead, receipt restore fails, common RTL blocker
+Fix before staged rollout expands
+P2 major
+Recoverable layout/error, uncommon parse issue, delayed insight, non-core notification bug
+Document; fix in first patch
+P3 minor
+Cosmetic alignment, copy polish, low-impact animation issue
+May ship if tracked
+33. Public release checklist
+Gate
+Definition of pass
+Product
+All P0 features and screen states pass on both founder devices; no dead tree node; activation events visible.
+Nutrition
+Target/food/plan deterministic tests pass; Egyptian catalogue seed versioned; all estimates editable and rounded.
+AI
+Golden suite passes; server-only keys; provider retention/control review complete; cost circuit breaker tested.
+Safety
+18+ and high-risk gates pass; disclaimer consistent; current country resources verified; zero critical eval failures.
+Privacy
+Consent versions, processor map, retention, export, chat delete, account delete, and improvement opt-in tested and policy-aligned.
+Billing
+Store products/prices loaded; quarterly hero correct; offer and renewal disclosure correct; restore/manage/account-delete warning pass.
+Identity
+First value works as guest; Apple/Google/email link preserves user ID/data/XP/offer; collision and anonymous expiry paths pass.
+Journey
+Quest/XP/levels/achievements/tree growth and Calm Mode pass; no body-outcome reward, negative XP, broken streak, purchase quest or pay-to-win.
+Accessibility
+RTL, dynamic text, screen reader, contrast, focus, reduced motion, tree alternatives, and permission alternatives pass.
+Operations
+Error, cost, safety, correction, funnel, retention, revenue, feature-flag, and rollback dashboards available.
+Stores
+Personal developer launch accounts ready; screenshots/copy use Qamar; no Qamar Health/AGI/Su; account deletion and support links valid.
+Legal
+Written review approves public name/claims, terms, privacy, consent, health disclaimer, risk boundaries, data transfers, and subscription disclosure.
+Release
+Staged rollout configured; production smoke test; support response template; rollback build and incident checklist ready.
+34. Day-31 to Day-90 backlog and evidence gates
+Candidate
+Build only when
+Evidence expected
+Referral code/challenge
+Core activation is stable and abuse/privacy design is ready
+Referral activation and retained referred cohort
+Deeper Egyptian catalogue
+Corrections show repeated high-volume gaps
+Lower clarification/correction rate
+Smarter recovery
+Post-deviation cohorts show lower return than baseline
+Higher next-day and D7 retention
+More plan horizon
+Users repeatedly ask for advance planning and daily plan retains
+Plan-view to log/use lift
+Light theme
+Accessibility/support data shows need
+Improved satisfaction without major maintenance cost
+Phone authentication
+Email/social account conversion is a material Egypt blocker
+Higher signup completion net of SMS cost
+Barcode/wearables
+Retained users identify it as a frequent job
+Incremental active days and lower logging friction
+Training specialist
+Three healthy retained cohorts, renewal >=60%, strong PMF and revenue-funded team
+Higher retention/willingness to pay without nutrition decline
+Portfolio gate: Training is next, but not merely next in time. It begins only after nutrition proves strong retention and product-market fit. Su remains outside the Qamar MVP, public story, and capital plan.
+APPENDICES
+Build reference
+IDs, events, states, and decisions for tickets, QA, analytics, and handoff.
+Appendix A. Complete screen inventory
+ID
+Screen
+Domain
+Primary job
+S01
+Splash
+App shell
+Resolve configuration/session/deep link
+S02
+Update/Maintenance
+App shell
+Required update, maintenance, retry
+S03
+Welcome/Continue
+Account
+Promise, qualification, instant guest start
+S04
+Save progress
+Account
+Link Apple, Google, or email in place
+S05
+Email OTP
+Account
+Verify code and resume
+S06
+Age eligibility
+Safety
+18+ gate
+S07
+Consent
+Privacy
+Required and optional choices
+S08
+Name (optional)
+Onboarding
+Preferred name or Skip after value
+S09
+Body inputs
+Onboarding
+Estimate inputs and units
+S10
+Goal
+Onboarding
+Lose/maintain/gain and pace
+S11
+Activity/routine
+Onboarding
+Activity and meal pattern
+S12
+Food preferences
+Onboarding
+Hard/soft food rules
+S13
+Safety filter
+Safety
+Unsupported-risk screen
+S14
+Target review
+Targets
+Estimate, assumptions, confirm
+S15
+First route
+Onboarding
+Initial plan and first log
+S16
+Today
+Core
+Current state and next action
+S17
+Quick actions
+Core
+Log/ask/adjust sheet
+S18
+Qamar chat
+Chat
+Conversation and action cards
+S19
+Suggested prompts
+Chat
+Contextual starters
+S20
+Quota state
+Entitlement
+Reset/free path/Qamar+
+S21
+Log method
+Meal
+Photo/voice/text/recent
+S22
+Photo capture
+Meal
+Camera/gallery preview
+S23
+Voice capture
+Meal
+Record/transcript
+S24
+Text entry
+Meal
+Natural text/search
+S25
+Analyzing
+Meal
+Named progress/cancel
+S26
+Confirm meal
+Meal
+Candidate items and totals
+S27
+Edit food item
+Meal
+Search/portion/method
+S28
+Meal result
+Meal
+Updated day and next action
+S29
+Meal detail
+Meal
+Edit/delete/report
+S30
+Day plan
+Plan
+Meals and target
+S31
+Plan meal detail
+Plan
+Portion, why, actions
+S32
+Substitution
+Plan
+Alternatives and comparison
+S33
+Recovery/Replan
+Plan
+Adjust unconsumed day
+S34
+Progress
+Progress
+Range, consistency, trend
+S35
+Add weight
+Progress
+Optional weight CRUD
+S36
+Weekly insight
+Insight
+Win/pattern/quest
+S37
+You hub
+Account
+Control center
+S38
+Goals/targets
+Profile
+Edit/recalculate
+S39
+Food preferences
+Profile
+Hard/soft rules
+S40
+Memory
+Memory
+View/edit/delete/propose
+S41
+Reminders
+Notifications
+Schedule/quiet hours
+S42
+Subscription
+Billing
+Status/manage/restore
+S43
+Paywall/offer
+Billing
+Plans, disclosure, purchase
+S44
+Privacy/consents
+Privacy
+Control and retention
+S45
+Export
+Privacy
+Request/status/download
+S46
+Delete account
+Privacy
+Reauth and warning
+S47
+Help/safety
+Support
+Scope, FAQ, resources
+S48
+Report feedback
+Support
+Correction/error/support
+S49
+Offline banner
+System
+Cache, queue, sync
+S50
+Permission education
+System
+Why + manual path
+S51
+Error/retry
+System
+Preserve/recover
+S52
+Unsupported state
+Safety
+Blocked personalized use
+S53
+Linked identities
+Account
+Recovery methods, sessions, merge state
+S54
+Journey
+Game
+Level, XP, tree growth and active quests
+S55
+Quest detail/replace
+Game
+Evidence, reward, replace or skip
+S56
+Level up
+Game
+Milestone and unlocked cosmetic
+S57
+Achievements
+Game
+Collection, evidence and cosmetics
+S58
+Game preferences
+Game
+Calm Mode, motion, celebration settings
+Appendix B. Analytics event dictionary
+Event
+Domain
+Allowed properties
+first_open
+App
+install source, platform, app version
+eligibility_resolved
+Safety
+eligible/blocked category only
+guest_created
+Account
+platform, latency, success/error class
+identity_link_completed
+Account
+provider, trigger, time-to-complete, preserved-context yes/no
+identity_merge_completed
+Account
+provider, outcome, records preserved count band
+consent_completed
+Privacy
+required complete, optional improvement yes/no
+onboarding_step_completed
+Onboarding
+step ID, elapsed, validation outcome
+target_confirmed
+Target
+formula/policy version only
+log_started
+Meal
+entry surface, input mode
+meal_parse_completed
+Meal
+mode, latency, confidence band, item count
+meal_parse_failed
+Meal
+mode, stage, error class, fallback chosen
+meal_confirmed
+Meal
+mode, edit count, plan-linked yes/no
+meal_corrected
+Meal
+time since confirm, correction category
+chat_answered
+Chat
+intent, latency, tool used, model/prompt version
+action_confirmed
+Chat
+typed action, success/failure
+plan_viewed
+Plan
+plan version, source surface
+substitution_applied
+Plan
+reason category, attempt count
+route_adjusted
+Plan
+trigger category, remaining meals count
+progress_viewed
+Progress
+range, data sufficiency
+insight_viewed
+Insight
+week, data sufficiency, tier
+insight_action
+Insight
+accepted/dismissed/reminder
+orb_interaction
+Navigation
+tap/hold/drag/reset, source screen
+tree_node_selected
+Navigation
+node, source screen
+reminder_opened
+Notification
+type, deep-link result
+paywall_viewed
+Billing
+trigger, offer ID, tier
+purchase_completed
+Billing
+product, offer, store, price band
+purchase_failed
+Billing
+stage, store error class, recovered yes/no
+entitlement_changed
+Billing
+from/to, reason
+correction_submitted
+Trust
+surface, category, attachment yes/no
+safety_restriction
+Safety
+category, action, policy version
+export_requested
+Privacy
+format, completion status
+account_deletion
+Privacy
+requested/completed/failed, subscription active yes/no
+core_action_completed
+Retention
+action type, active-day number
+quest_completed
+Journey
+template ID/version, quest type, evidence event, XP band
+xp_awarded
+Journey
+reason code, ruleset version, delta band, level changed yes/no
+achievement_unlocked
+Journey
+achievement ID/version, unlock surface
+calm_mode_changed
+Journey
+on/off, source surface
+Never attach free-form user content to an analytics event. Diagnostic detail belongs in access-controlled operational logs with approved redaction and retention.
+Appendix C. Traceability matrix
+Founder decision
+Implemented by
+Proof
+Personal nutritionist in pocket
+ONB-01, TGT-01, TODAY-01, CHAT-01, PLAN-01
+First target + meal + next action
+People who quit diets
+PLAN-02, TODAY-01, INS-01
+Post-deviation return and D7/D30 retention
+Egyptian food
+FOOD-01, LOG-01
+Confidence/correction rate and local eval set
+Photo/text/voice
+LOG-01
+All three paths reach confirmed draft
+Complete movable button/tree
+NAV-01, NAV-02
+Tap/hold/drag/persist + five live nodes
+RPG guide and gamified system
+GAME-01, GAME-02, TODAY-01, PROG-01, NAV-02
+Quests/XP/levels/achievements/tree growth; no harmful or pay-to-win mechanics
+Easy signup
+AUTH-01, CONS-01
+Instant guest; first value before account; one-tap link preserves identity/data
+Useful freemium
+SUB-01, ENT-01
+Core loop free; transparent remote caps
+Revenue immediately
+SUB-01
+All store products live on Day 1
+Complete subscriptions
+SUB-01, SUB-02
+Trial/offers, restore/manage, verified lifecycle, webhook reconciliation
+Portable memory
+MEM-01, PRIV-01
+User-controlled structured memory/export/delete
+One Qamar/invisible routing
+CHAT-01, NAV-02, architecture
+No public agent chooser; typed internal workflows
+API first
+Provider adapter
+No model training; no key in app
+Adults-only public release
+SAFE-01
+Under-18 block and high-risk boundary
+Appendix D. Product decision log
+Decision
+Locked launch choice
+Revisit trigger
+Name
+Qamar; do not use Qamar Health
+Only after evidence supports broader public category
+Audience
+Egyptian adults who repeatedly quit diets
+After retained Egypt cohorts
+Language
+Arabic UI + Egyptian conversational AI
+GCC country pilot
+Platform
+Flutter iOS + Android public app
+Only if platform-specific defect/cost proves material
+Model
+OpenAI-preferred external API behind adapter
+Quality, cost, control, or reliability evidence
+Navigation
+Bottom nav + complete orb/tree
+Usability and accessibility data after launch
+Account
+Instant guest start; Apple/Google/email link only after value or before purchase/sync
+Signup, recovery, collision and trust data
+Gamification
+Personal quests, capped XP, 20 levels, achievements, tree/cosmetics and Calm Mode
+Measured retention/safety effect; no coins, ranking or body-outcome rewards
+Theme
+Dark-first lunar black/gold
+Accessibility/support demand for light theme
+Pricing
+349 monthly / 750 quarterly hero / 2,400 annual; optional 14-day eligible trial and store offers disclosed
+Observed conversion, renewal, contribution
+Safety
+18+ non-clinical; high-risk personalized use blocked
+Written legal/product review for expansion
+Next agent
+Training only after strong retention and PMF
+Three healthy cohorts and revenue-funded team
+Appendix E. Companion documents
+Document
+Role
+Cipher Labs Master Business Plan 2026-2031
+Company vision, portfolio, agent architecture, governance, capital, hiring, and long-range evidence gates
+Cipher Labs Qamar Rebuild Business Plan
+Qamar market, wedge, behavior system, safety, economics, Egypt launch, and agent path
+Qamar 30/90-Day Founder Execution Plan
+Founder sequence, launch actions, measurement, decisions, and risk responses
+Cipher Labs Company Financial Operating Model
+Company scenarios, capital, unit economics, portfolio gates, and KPI control
+Qamar Financial KPI Operating Model
+Qamar user, revenue, cost, funnel, and cohort planning assumptions
+Appendix F. Official implementation references
+These are implementation references, not substitutes for current store policies, provider contracts, security review, or Egyptian legal review. Re-check them when development starts and before submission.
+Area
+Official reference
+OpenAI Responses / vision
+https://developers.openai.com/api/docs/guides/images-vision
+OpenAI transcription
+https://developers.openai.com/api/docs/guides/speech-to-text
+OpenAI moderation
+https://developers.openai.com/api/docs/guides/moderation
+Supabase anonymous sign-in
+https://supabase.com/docs/guides/auth/auth-anonymous
+Supabase identity linking
+https://supabase.com/docs/guides/auth/auth-identity-linking
+Supabase email OTP
+https://supabase.com/docs/guides/auth/auth-email-passwordless
+Sign in with Apple HIG
+https://developer.apple.com/design/human-interface-guidelines/sign-in-with-apple
+Android Credential Manager / Google
+https://developer.android.com/identity/sign-in/credential-manager-siwg
+Apple subscriptions
+https://developer.apple.com/app-store/subscriptions/
+Apple server notifications
+https://developer.apple.com/documentation/appstoreservernotifications/
+Google Play Billing
+https://developer.android.com/google/play/billing
+Google subscription lifecycle
+https://developer.android.com/google/play/billing/lifecycle/subscriptions
+Google SubscriptionsV2
+https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.subscriptionsv2
+RevenueCat customer identity
+https://www.revenuecat.com/docs/customers/identifying-customers
+RevenueCat restore
+https://www.revenuecat.com/docs/getting-started/restoring-purchases
+FCM HTTP v1
+https://firebase.google.com/docs/cloud-messaging/send/v1-api
+APNs provider server
+https://developer.apple.com/documentation/usernotifications/setting-up-a-remote-notification-server
+FoodData Central API
+https://fdc.nal.usda.gov/api-guide.html
+QAMAR
+PERSONAL NUTRITIONIST IN YOUR POCKET
+Build the smallest complete relationship: know me, log real life, adjust the route, and help me return.
+Everything larger remains architected—but it is unlocked by retention, not ambition alone.

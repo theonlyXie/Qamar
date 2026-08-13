@@ -1,0 +1,3138 @@
+
+
+CIPHER LABS / QAMAR
+
+UI/UX EXPERIENCE BIBLE
+
+The living Orb, the constellation interface, and every launch screen
+
+Canonical character direction: a lifelike lunar spirit, never a cartoon mascot.
+
+EGYPT LAUNCH · ARABIC RTL · ADULTS 18+ · NUTRITION FIRST
+
+Owner: Basel Elsakka · Version 2.0 · 13 August 2026
+
+Document mandate
+
+Experience thesis: Qamar is not a dashboard with an AI button. Qamar is a living lunar guide whose Orb is the interface, the companion and the sole global navigation system. Every screen should feel like a place the same intelligence has led the user to—not a separate feature tab.
+
+Version 2.0 design canon
+
+System
+
+Version 2.0 decision
+
+Living guide
+
+The faceless lunar-spirit Orb remains the one hero, one voice and one persistent navigation portal.
+
+Living constellation
+
+Branches are emitted moonlight and part of the Orb's body language. They carry state, focus and transition—not static connecting lines.
+
+Navigation
+
+The five destinations remain Today, Log, Plan, Progress and You. No bottom bar or duplicate global shell is introduced.
+
+Su Points
+
+The permanent currency identity is a moon-gold rising phoenix on midnight blue. It symbolizes renewal after interruption.
+
+Character hierarchy
+
+The Orb is alive. The branches are living extensions. The phoenix is a still emblem. These roles never blur.
+
+Accessibility
+
+Every light/motion state has text, semantics, focus contrast and a Reduced Motion/tap-list equivalent.
+
+Scope
+
+All 62 nutrition-first launch screens inherit these systems; no Health OS or workout scope is added.
+
+Locked decision
+
+UI/UX consequence
+
+The Orb is the hero
+
+It owns presence, voice, navigation, guidance and transition choreography across the entire product.
+
+No bottom navigation bar
+
+Today, Log, Plan, Progress and You exist only in the Orb's constellation; no persistent bar or duplicate tab shell.
+
+The Orb never disappears
+
+It may compress, dock, dim or become still, but a 56dp accessible portal remains on every usable screen.
+
+The branches are alive
+
+Every constellation branch is moonlight emitted by the Orb: it rests, blooms, focuses, travels and settles as part of the same living system.
+
+Spirit, not cartoon
+
+No eyes, mouth, cute face, humanoid body, pet needs, emotional dependency or slapstick motion.
+
+Nutrition first
+
+The launch UI contains no Health OS, sleep, HRV, movement, recovery-score or workout dashboard.
+
+Arabic-first Egypt launch
+
+Production layout is RTL; Qamar speaks concise Egyptian Arabic while facts, billing and safety stay literal.
+
+Adults 18+
+
+Eligibility and unsupported-risk states precede personalized targets.
+
+Phoenix = Su Points
+
+Every spendable Su Points representation uses one moon-gold rising phoenix; no 'Su' coin, generic star, flame burst or alternate currency mark.
+
+Game expression serves adherence
+
+Quests, Journey and Su Points reward useful behavior; no punishment, gambling, pay-to-win or weight-loss trophies.
+
+How to use this bible
+
+Use the Orb contract before designing any screen. A screen that hides, duplicates or visually contradicts the Orb is not complete.
+
+Use the 62 screen IDs in Figma pages, Flutter routes, product tickets, analytics, QA cases and support references.
+
+Prototype every gesture with Arabic RTL, large text, reduced motion and screen-reader actions before visual polish.
+
+Keep operational facts—nutrition estimates, sources, safety, privacy and billing—outside fantasy language.
+
+Treat generated mockups as composition references. Production copy, data and Arabic typography require final design and QA.
+
+Contents
+
+Part
+
+Scope
+
+I · Experience soul
+
+Reference translation, principles, emotional arc and world language
+
+II · The living Orb
+
+Character anatomy, states, movement, voice, roles and boundaries
+
+III · Orb-only navigation
+
+Gestures, living moonbeam constellation, accessible alternatives, persistence and transitions
+
+IV · Visual system
+
+Color, type, glass, phoenix currency identity, components, motion, sound, haptics and RTL
+
+V · Core journeys
+
+First launch, daily loop, logging, planning, progress, Journey, wallet and trust
+
+VI · Every page
+
+Screen-by-screen UI/UX and Orb behavior for S01-S62
+
+VII · Build and QA
+
+Design-file structure, component states, motion handoff and acceptance checklist
+
+PART I
+
+Experience soul
+
+The user is the adventurer. Qamar is the intelligent guide who keeps the route alive when real life changes.
+
+1. The experience promise
+
+A traditional diet feels like a map that becomes useless after one wrong turn. Qamar should feel like a guide that notices the turn, understands what happened, redraws the remaining route and stays beside the user. The emotional outcome is continuity: I did not fail; the route changed, and I still know what to do next.
+
+MMORPG metaphor: Borrow the useful structure of an MMORPG fairy guide—presence, orientation, quests, progress and a shared journey—without borrowing childish art, fantasy jargon in serious moments, cluttered HUDs, random rewards or dependency mechanics.
+
+Keep
+
+Avoid
+
+One recognizable guide with consistent behavior
+
+A mascot that performs for attention
+
+A world map expressed as a constellation
+
+A hidden gesture maze or decorative dead nodes
+
+Quests as small useful actions
+
+Punishment, streak loss, urgent timers or shame
+
+Character growth through richer light and motion
+
+Changing into unrelated skins that weaken trust
+
+The user is the adventurer
+
+Qamar claiming the user's success or demanding affection
+
+2. Translating the supplied references
+
+Figure 1. The supplied references define the moonlit visual language; this bible narrows their product scope.
+
+Retain the near-black lunar field, glass depth, luminous data rings, restrained violet-blue energy and constellation motion.
+
+Retain the large living-moon presence and the chat pattern that turns an insight into a clear next action.
+
+Remove 'Qamar Health', 'AI Health OS', body-recovery scoring, sleep, HRV, hydration and movement from launch UI.
+
+Replace a dashboard of equal metrics with one dominant next decision, then supporting nutrition context.
+
+Use the reference palette as the source; the production identity is simply Qamar.
+
+3. Experience principles
+
+Principle
+
+Design test
+
+ONE RELATIONSHIP
+
+Every route feels like Qamar continuing the same conversation, not a new app module.
+
+ONE NEXT ACTION
+
+Today and every result screen end with the smallest useful decision.
+
+REAL LIFE ADAPTS
+
+A deviation changes the route; it never resets the journey.
+
+EVIDENCE OVER MAGIC
+
+Character creates warmth. Sources, confidence and editable estimates create trust.
+
+CALM POWER
+
+Motion has intention and an ending. Empty space is part of the character.
+
+VISIBLE CONTROL
+
+The user can correct food, memory, targets, permissions, rewards and data.
+
+ACCESSIBLE BY DESIGN
+
+Every drag, hold, chart and animation has a semantic, tap-based alternative.
+
+NO FALSE DRAMA
+
+No red Orb, broken streak, punishment, artificial scarcity or medical certainty.
+
+PART II
+
+The living Orb
+
+A spirit made readable through matter, light, breath, posture and timing.
+
+4. Canonical character direction
+
+Figure 2. Canonical Orb concept: use its materiality and state language; do not add a face.
+
+The Orb must feel as if it occupies the same world as the interface: light refracts through it, its veil carries momentum, its tail loses energy, and its halo responds to state. It is not a sticker placed above the UI. Production animation should preserve continuity of volume and light across every state.
+
+5. Anatomy
+
+Figure 3. Orb anatomy and the functional job of each layer.
+
+Layer
+
+Production rule
+
+Crescent core
+
+Always recognizable at 24dp. Phase shifts are stateful, never used as a face or emotion icon.
+
+Translucent shell
+
+Premium glass/energy volume with controlled refraction; avoid soap-bubble rainbow noise.
+
+Aurora veil
+
+Two folded energy sheets create posture. They open, settle and trail with believable inertia.
+
+Halo/status ring
+
+Neutral, completion or amber attention only. Error red may appear in system copy, never as the Orb's emotional state.
+
+Comet tail
+
+Indicates direction and transition. It decays within 350-700ms and never writes over content.
+
+Star motes
+
+Maximum 3-8 visible near the Orb, reduced in Calm Mode and removed in Reduced Motion.
+
+6. State grammar
+
+Figure 4. The same character communicates state through posture, light and timing.
+
+State
+
+Body language
+
+Meaning
+
+Timing
+
+Dormant / boot
+
+Thin crescent, near-silent light
+
+Resolve startup
+
+0.6-1.2s; skip on warm start
+
+Resting / breathing
+
+4.8s ± 0.6 irregular breath, 1-2% scale
+
+Present without demanding attention
+
+Pause after 3 cycles when content is static
+
+Attentive
+
+Veil opens 8-12°, core brightens
+
+User pauses or focuses a decision
+
+One cycle; no nagging loop
+
+Listening
+
+Inward pulse, waveform in halo
+
+Voice or active conversation
+
+Bound to actual capture
+
+Thinking / working
+
+One orbital mote + slow veil rotation
+
+A named task is running
+
+Expose cancel and fallback
+
+Speaking
+
+Core light phrases with message cadence
+
+Qamar response is being revealed
+
+Never lip-sync or flash each word
+
+Guiding
+
+Body leans 6-10°; tail points to target
+
+One recommended action
+
+Returns to rest after action is noticed
+
+Witness / confirm
+
+Symmetrical, steady, low motion
+
+Review, evidence or sensitive input
+
+No approval/disapproval
+
+Celebrate
+
+One outward veil flare + warm mote
+
+Useful behavior completed
+
+650-900ms; never loops
+
+Amber attention
+
+Warm ring heartbeat
+
+Uncertainty or action needed
+
+Max two pulses, then static badge
+
+Recovery
+
+Dim-to-steady re-entry
+
+User returns after interruption
+
+No apology, loss or broken-streak imagery
+
+Docked portal
+
+56dp compressed crescent, veil folded
+
+Camera, keyboard, checkout, destructive flows
+
+Persistent and navigable
+
+Offline
+
+Lower glow, static tail, small connection glyph
+
+Cached/queued state
+
+No red; remains usable
+
+7. Personality and language
+
+Dimension
+
+Qamar expression
+
+Voice
+
+Warm, concise, observant and firm. Egyptian conversational Arabic; never slang-heavy or childish.
+
+Default response
+
+What happened → what it means → one next action.
+
+Motivation
+
+Recognize behavior and recovery, not body outcomes or perfect compliance.
+
+Humor
+
+Light and rare; never in safety, uncertainty, privacy, billing, deletion or food-fact provenance.
+
+Fantasy language
+
+Allowed in Journey and quest framing. Removed from nutrition facts, source explanations and legal flows.
+
+Relationship
+
+Qamar is available and consistent, but never says it needs the user, misses the user or is the user's only support.
+
+8. Role by context
+
+Figure 5. Persistence is constant; visual dominance is contextual.
+
+8.1 The Orb and branches are one organism
+
+The constellation is not a menu drawn around a character. Its branches are extensions of Qamar's lunar body: when the Orb breathes, a nearly invisible luminance moves through the closest filaments; when it becomes attentive, nearby twigs orient toward the active decision; when navigation opens, moonlight travels from the core to each destination. This shared energy origin is what makes the system feel alive rather than decorated.
+
+Element
+
+Relationship rule
+
+Core → branch
+
+Every branch begins inside the Orb's halo; no disconnected line may appear before the originating light reaches it.
+
+Branch → node
+
+A destination node receives and reflects the beam. It does not glow independently until the branch arrives.
+
+Breath
+
+Resting branches carry only a 4-8% luminance tide synchronized loosely—not mechanically—with the Orb's breath.
+
+Focus
+
+One branch gains width, speed and lunar-white core; siblings lower contrast but remain discoverable.
+
+Completion
+
+A single return wave travels node → Orb, then settles. No fireworks, vine growth or endless shimmer.
+
+Interruption
+
+Light pauses in place and fades to a stable resting state; it never snaps, breaks or withers.
+
+PART III
+
+Orb-only navigation
+
+The Orb is not beside the navigation. The Orb is the navigation.
+
+9. Global shell
+
+Locked: There is no application bottom navigation bar, top tab bar, hamburger menu or duplicate persistent navigation. The only global shell is the movable Orb and its five-node constellation.
+
+Figure 6. Orb-only global navigation contract.
+
+10. Gesture contract
+
+Input
+
+Recognition
+
+Result
+
+Recovery / accessibility
+
+Tap
+
+Up within 250ms; movement &lt;8dp
+
+Open Qamar chat from the current route
+
+Back returns to exact route/scroll; screen-reader action: Talk to Qamar
+
+Hold
+
+350ms; movement &lt;10dp
+
+Bloom complete five-node constellation around safe side
+
+Haptic tick; accessible action: Open destinations
+
+Hold + sweep
+
+After bloom, move focus ray to a node; release
+
+Travel to Today, Log, Plan, Progress or You
+
+Node names announced; tap list alternative available
+
+Drag Orb
+
+Movement &gt;8dp before hold completes
+
+Reposition; snap to left/right safe edge
+
+Reset position action; keyboard and switch access can move edge
+
+Double tap
+
+Not assigned
+
+No hidden command
+
+Avoids conflict with assistive technologies
+
+Voice command
+
+From chat or OS-supported action
+
+Open named destination or task
+
+Same authorization and confirmation as touch
+
+11. Constellation behavior
+
+The five destinations are always complete: Today, Log, Plan, Progress and You. There are no inactive future-agent nodes.
+
+The constellation blooms into available empty space. From a right-edge Orb it arcs left; from a left-edge Orb it arcs right. RTL does not reverse the meaning of spatial safety.
+
+Node orbit radius is 104-152dp depending on viewport. Maintain at least 48dp targets and 12dp separation at 200% text.
+
+Open in 220ms; labels reveal at 50ms stagger; selected ray gains violet-to-cyan light and one haptic tick; transition begins on release.
+
+Dragging outside the constellation cancels with no route change. Returning to the center opens chat only after release and explicit highlight.
+
+A simple vertical destination sheet replaces the constellation for screen readers, Switch Control, large text overflow or when Reduce Motion requests it.
+
+11.1 Living moonbeam branch system
+
+Figure 7. The branches feel alive because lunar energy moves through them with purpose.
+
+Branch state
+
+Visual behavior
+
+Timing
+
+Meaning
+
+Hidden
+
+No branch; only the Orb halo is visible
+
+Default outside navigation/task hints
+
+The interface is calm
+
+Resting residue
+
+Hairline silver-violet filament at 8-14% opacity; one or two dim nodes
+
+4.8-6.2s luminance tide
+
+The guide is present
+
+Bloom
+
+Core light leaves the Orb and grows along organic curves; offshoots resolve after the trunk
+
+220ms trunk + 40ms/node stagger
+
+Destinations are becoming available
+
+Available
+
+Five branches remain readable but restrained; nodes carry a soft lunar rim
+
+Static with slow 3-5% light drift
+
+Choose a destination
+
+Hover / focus
+
+One branch thickens 1.5x, becomes lunar-white at the core and sends a bead toward the node
+
+120-160ms
+
+Current selection
+
+Commit
+
+Selected node pulls one beam; siblings recede; light travels Orb → node
+
+180-240ms
+
+Navigation accepted
+
+Arrival
+
+A subtle return glint travels node → Orb before the new surface settles
+
+140-180ms
+
+Route connected
+
+Cancel
+
+Light drains smoothly back into the Orb; node labels fade together
+
+160-220ms
+
+No route change
+
+Attention
+
+One amber-white bead moves halfway and holds; branch never becomes red
+
+Two pulses maximum
+
+Action or uncertainty needs review
+
+Offline
+
+Travel stops; filaments remain as a stable, lower-contrast map
+
+No loop
+
+Cached routes still exist
+
+Calm Mode
+
+No offshoot particles; slower, lower-contrast branch tide
+
+6-8s
+
+Same function, less game expression
+
+Reduced Motion
+
+Static silver-violet gradient from Orb to node; focus uses contrast/width only
+
+120ms crossfade
+
+Full navigation without travel
+
+11.2 Branch geometry and material
+
+Use one cubic spine per destination with one to three short secondary twigs. Curves are asymmetrical and organic, but destination geometry stays stable enough to learn.
+
+The branch is layered: 1-2dp lunar-white core, 3-6dp violet/cyan energy, and an 8-18dp blurred aura depending on focus. Never render a hard neon cable.
+
+Light always travels outward from the Orb for opening/commit and inward for completion/cancel. Reversing this grammar without a state reason weakens the character's physical logic.
+
+Maximum visible motes: two per branch, eight across the full tree. Motes follow the spine; random background sparkles do not communicate navigation.
+
+Branches route around text, camera controls, prices and destructive actions. If safe space is insufficient, use the accessible destination sheet rather than compressing the tree into clutter.
+
+Avoid literal roots, vascular veins, lightning, fire, spiderwebs, cables and biological growth. The material is emitted moonlight with gentle living intelligence.
+
+12. Persistence, docking and safe areas
+
+Context
+
+Orb form
+
+Navigation behavior
+
+Standard scrolling
+
+64dp visual / 72dp hit area; snap edge; 16dp safe inset
+
+Tap chat, hold constellation, drag reposition
+
+Keyboard
+
+56dp dock just above keyboard edge
+
+Fully active; route change preserves draft and asks only if data would be lost
+
+Camera / scanner
+
+56dp translucent portal outside shutter controls
+
+Hold opens constellation after a Leave capture? confirmation
+
+Voice recording
+
+56dp listening portal beside Stop
+
+Hold requires Stop and leave? confirmation
+
+Checkout
+
+56dp still portal at safe edge
+
+Hold asks Leave checkout?; payment state is preserved when possible
+
+Destructive confirm
+
+48-56dp guardian portal, no particle motion
+
+Navigation remains available but warns about abandoning the action
+
+System sheet
+
+Orb remains visually behind native sheet
+
+Returns to same position and state after dismissal
+
+Rotation / device change
+
+Position persisted per orientation class
+
+If invalid, snap to nearest safe point and announce movement
+
+13. Transition language
+
+Transition
+
+Choreography
+
+Duration
+
+Destination travel
+
+Selected node becomes a light portal; current surface recedes 2%; Orb leads a short comet path; destination resolves under it.
+
+280-380ms
+
+Open chat
+
+Orb expands toward the header presence field; source screen remains as a dim spatial memory.
+
+260ms
+
+Return from chat
+
+Presence field condenses into the exact prior Orb position; restore scroll and draft.
+
+220ms
+
+Task handoff
+
+Orb leans to the CTA, tail connects once, then the next surface replaces the card—not the whole world.
+
+180-260ms
+
+Deep link
+
+Destination appears first, then Orb arrives from the nearest edge; no fake travel through intervening pages.
+
+180ms
+
+Reduced Motion
+
+Crossfade + 1% scale only; no tail, orbit or parallax.
+
+120-180ms
+
+13.1 Moonbeam choreography by event
+
+Event
+
+Orb
+
+Branches
+
+Node / surface
+
+Hold threshold met
+
+Core contracts 2%, then brightens
+
+Five trunks begin growing from inside the halo
+
+Labels wait until their branch reaches 70%
+
+Node focus
+
+Veil leans toward focus
+
+Focused branch strengthens; one bead travels outward; siblings dim 20%
+
+Node expands 4% and announces its name
+
+Commit
+
+Core releases one lunar pulse
+
+Selected branch completes; siblings drain inward
+
+Node becomes the destination portal
+
+Arrival
+
+Orb leads and reforms at saved edge
+
+One short return glint confirms continuity
+
+Destination surface resolves beneath the Orb
+
+Cancel
+
+Core opens to receive light
+
+All branches drain inward without snapping
+
+Labels fade together; source remains unchanged
+
+Quest complete
+
+One restrained completion flare
+
+If visible, one outward-and-back wave through the task branch
+
+Phoenix glints only when Su Points are credited
+
+Redemption
+
+Still witness posture
+
+No global tree animation
+
+Phoenix mark glints once; ledger and balance update atomically
+
+Safety / billing / delete
+
+Guardian posture
+
+Hidden or static accessible map only
+
+Literal information takes visual priority
+
+PART IV
+
+Visual and sensory system
+
+Moonlit intelligence, Arabic clarity and disciplined cinematic motion.
+
+14. Color system
+
+Token
+
+Hex
+
+Use
+
+Night Navy
+
+#070C19
+
+Primary background
+
+Midnight Blue
+
+#0B1324
+
+Deep surfaces / headings
+
+Space Blue
+
+#121B33
+
+Raised panels
+
+Glass Surface
+
+#141C2E
+
+Cards / overlays
+
+Lunar White
+
+#F5F7FF
+
+Orb core / high contrast
+
+Moon Glow
+
+#E9ECFF
+
+Secondary moon light
+
+Qamar Violet
+
+#7B6CFF
+
+Primary action / active constellation
+
+Luminous Blue
+
+#4F7CFF
+
+Information / transition
+
+Cyan Glow
+
+#22D3EE
+
+Focus / live processing
+
+Aqua Mint
+
+#2DD4BF
+
+Balanced / supportive signal
+
+Soft Lilac
+
+#A78BFA
+
+Insight / secondary series
+
+Warm Sand
+
+#F6C97A
+
+Su Points / quiet milestone
+
+Success
+
+#22C55E
+
+System success—not the Orb ring
+
+Warning
+
+#FBBF24
+
+Attention / uncertainty
+
+Error
+
+#F87171
+
+Literal error copy and controls only
+
+Primary Text
+
+#F8FAFC
+
+Dark-mode text
+
+Orb color rule: The Orb may be neutral moonlight, violet/blue active, cyan working, mint complete or amber attention. It never becomes red, gray-sad, or blacked-out as emotional punishment.
+
+14.1 Su Points phoenix identity
+
+Figure 8. The rising phoenix is the only Su Points currency mark; its meaning is renewal and continued progress.
+
+The phoenix turns Su Points from a generic reward counter into a meaningful symbol of Qamar's product promise: the user can return, recover and continue. It is a currency emblem—not a second character. It never speaks, reacts, flies through the interface or competes with the Orb.
+
+Identity field
+
+Design contract
+
+Meaning
+
+Renewal after interruption, earned progress and continuity. Never wealth, speculation, firepower or status dominance.
+
+Master silhouette
+
+One symmetrical rising phoenix with lifted crescent-like wings and tapered tail. Abstract head; no eyes or facial expression.
+
+Currency token
+
+Deep midnight-blue circular medallion; moon-gold/amber phoenix; optional pale lunar highlight and restrained violet rim.
+
+Small mark
+
+At 16-24dp use a simplified filled silhouette with no feather lines, crescent or outer text. It must survive grayscale and 200% zoom.
+
+Standard mark
+
+At 32-48dp show three primary feather groups per wing, central body and two-part tail; one enclosing ring maximum.
+
+Hero medallion
+
+At 64dp+ allow embossed depth, lunar crescent/halo and subtle enamel texture. No words or denomination inside the token.
+
+Color
+
+Phoenix uses Warm Sand #F6C97A and Warning Gold #FBBF24 as material colors, not warning semantics; highlights may use Moon Glow #E9ECFF.
+
+Motion
+
+One 350-500ms wing-light glint on credit; one downward dim on debit; no flapping, flame, spin, bounce, shower or slot-machine count.
+
+Placement
+
+Prefix wallet balances, quest rewards, spend prices and ledger amounts. Use once per numeric group; never repeat beside every word 'Su Points'.
+
+Semantic label
+
+Announce the numeric amount and 'Su Points'; the phoenix image is decorative when the adjacent text already names the currency.
+
+14.2 Phoenix usage matrix
+
+Surface
+
+Phoenix form
+
+Behavior
+
+Today balance chip
+
+16-20dp simplified mark inside a 24-28dp medallion
+
+Static; tap opens S59 Wallet
+
+Quest reward
+
+16dp mark before amount
+
+Warm glint only after confirmed completion
+
+Wallet hero
+
+56-72dp standard/hero medallion
+
+Low-amplitude lunar shimmer; no autonomous character motion
+
+Ledger credit
+
+14-16dp simplified mark + positive amount
+
+No animation in scrolling history
+
+Ledger debit
+
+14-16dp simplified mark + negative amount
+
+Neutral, not red; description explains the spend
+
+Spend catalogue
+
+16dp mark before exact price
+
+Selected card previews balance after redemption
+
+Insufficient balance
+
+Same mark at normal color; amount and CTA explain the gap
+
+No broken, gray, caged or sad phoenix
+
+Refund
+
+Same mark + returned amount
+
+One quiet reverse glint; ledger remains authoritative
+
+Notifications
+
+No phoenix in lock-screen payload by default
+
+Use generic privacy-safe copy
+
+App icon / Qamar logo
+
+Never
+
+The phoenix belongs only to Su Points; Qamar keeps the crescent identity
+
+14.3 Phoenix misuse
+
+Do not replace Qamar's crescent, the Orb, application icon or Cipher Labs mark with the phoenix.
+
+Do not use an Egyptian eagle, heraldic double-headed bird, realistic animal illustration, cute mascot, flame silhouette, casino chip or cryptocurrency coin.
+
+Do not put 'Su', 'SP', a denomination or circular text inside the emblem. The amount and the words Su Points remain adjacent interface copy.
+
+Do not recolor the phoenix red for errors, green for credit or gray for insufficient funds. Status comes from text, signs and surrounding UI; the currency identity stays stable.
+
+Do not animate wings, fire or flight. A material light glint is the maximum movement because the phoenix is an emblem, not a second living guide.
+
+Do not show multiple phoenix coins raining, stacking or spinning. One mark beside one balance/reward group is enough.
+
+15. Typography and RTL
+
+Element
+
+Production token
+
+Rule
+
+Arabic UI
+
+Noto Sans Arabic 400/500/600/700
+
+Primary; generous line height; avoid condensed display faces in functional UI
+
+Latin / numbers
+
+Inter 400/500/600/700
+
+Tabular numbers for calories, macros, balances and charts
+
+Hero greeting
+
+32/42 Arabic SemiBold
+
+Maximum two lines; right aligned
+
+Page title
+
+24/34 Arabic Bold
+
+One title; do not compete with the Orb
+
+Card title
+
+17/26 Arabic SemiBold
+
+Action-led, maximum two lines
+
+Body
+
+15/24 Arabic Regular
+
+Default readable copy
+
+Label / metadata
+
+12/19 Arabic Medium
+
+Never use low contrast for essential values
+
+Numbers + units
+
+28/34 or 16/24 Inter
+
+Keep numeric-unit clusters together; localize presentation
+
+Primary page flow, alignment, drawers, cards and constellation labels are RTL. Directional chevrons mirror; camera, playback, brand mark and chronological charts do not.
+
+Charts remain chronologically left-to-right while Arabic titles, legends and text summaries remain RTL.
+
+The Orb may occupy either edge. Content padding reserves a dynamic 88dp avoidance lane only near its current vertical position, not across the entire page.
+
+Test Arabic, English food names, Arabizi, numbers and mixed-unit strings in every component.
+
+16. Surfaces, layout and components
+
+System
+
+Rule
+
+Grid
+
+4dp base; 8/12/16/24/32 spacing; 20dp page gutters; 48dp minimum targets; 56dp primary controls.
+
+Glass
+
+Use blur only on elevated interactive surfaces; border #263044; keep text on stable dark fills, not noisy imagery.
+
+Cards
+
+One message or action per card. 16-20dp radius. No stacked glass within glass unless it reveals evidence.
+
+Primary CTA
+
+One per viewport; explicit verb; violet-to-blue fill; 56dp height; loading state preserves label width.
+
+Chips
+
+Suggested prompts, filters and statuses; 44dp height; wrap in RTL rather than horizontal clipping.
+
+Charts
+
+2-3 series maximum; direct labels where possible; always provide a text summary and source/period.
+
+Forms
+
+One question per screen or one coherent group; units visible; errors adjacent; keyboard never hides the active control.
+
+Orb avoidance
+
+Content must remain usable with the Orb at either edge and at 200% text. Dragging the Orb never changes data.
+
+17. Motion, haptics and sound
+
+Token
+
+Value
+
+Use
+
+micro
+
+120-180ms
+
+Focus, chip, small state change
+
+standard
+
+220-280ms
+
+Cards, chat expansion, sheets
+
+travel
+
+280-380ms
+
+Orb destination transition
+
+celebrate
+
+650-900ms
+
+One milestone flare
+
+rest breath
+
+4.2-5.4s irregular
+
+Low-amplitude idle presence; pauses when static
+
+easing
+
+cubic-bezier(.2,.8,.2,1)
+
+Most UI and Orb settle
+
+haptic light
+
+one selection tick
+
+Constellation node / toggle
+
+haptic confirm
+
+one medium impact
+
+Meal confirm / redemption
+
+sound
+
+off by default
+
+Optional soft chime; never required for meaning
+
+reduced motion
+
+crossfade + &lt;=1% scale
+
+No orbit, parallax, trail or particle field
+
+17.1 Sensory separation: Orb, moonbeams and phoenix
+
+Identity
+
+May animate
+
+Must remain still / absent
+
+Orb
+
+Breath, attention, listening, thinking, guiding, one completion flare
+
+No face, pet behavior, emotional need or sales celebration
+
+Moonbeam branches
+
+Bloom, light travel, focus, return, quiet luminance tide
+
+No random twitching, lightning, fire, breakage, withering or endless particle storm
+
+Phoenix
+
+One material glint on confirmed credit/debit/refund; optional static shimmer on wallet hero
+
+No flapping, flying, speaking, flame eruption, spin, bounce, coin shower or autonomous presence
+
+PART V
+
+Core experience journeys
+
+Each journey is a continuous exchange with the same guide.
+
+18. First launch: awakening, not onboarding theatre
+
+A thin crescent appears; within 1.2 seconds it becomes the resting Orb. Continue is immediately available—animation never holds the user hostage.
+
+Qamar states the promise and AI/non-medical boundary, creates a guest identity, resolves 18+ eligibility and consent, then asks only the minimum questions needed for a target.
+
+Each answer physically changes the guide's attention, not its affection. The sequence ends with a usable first route before sign-in, notification or payment pressure.
+
+19. Daily loop: guide, act, adapt
+
+Today opens on the next decision, not a score. The Orb occupies intentional empty space and guides once toward the highest-value action.
+
+The user logs what happened. Qamar analyzes, asks for confirmation, writes only the confirmed record, updates the remaining day and offers one action.
+
+If the day changed, Recovery redraws unconsumed meals. No restart screen, lost streak or compensatory fasting/exercise language appears.
+
+20. Meal logging: capture without false certainty
+
+Hold the Orb, sweep to Log, then choose photo, voice, text, barcode, recent or manual. The same methods remain available in an accessible list.
+
+The living branches bloom from the Orb into capture choices, then retract before camera or microphone use. The Orb docks during capture, works visibly during analysis, and becomes a calm witness during confirmation.
+
+The result shows what changed and the next decision. A phoenix-marked Su Points credit may acknowledge a useful behavior, but never replace nutrition clarity or trigger a reward shower.
+
+21. Planning and recovery: the map redraws
+
+The plan is a route through the day, not a rigid prescription. The Orb travels the route while the user scrolls and exposes Why for each meal.
+
+Substitutions compare realistic alternatives. Recovery changes only the remaining day and refuses punitive compensation.
+
+The chosen change animates as a path reroute, then settles; the animation is descriptive, not magical certainty.
+
+22. Progress, Journey and Su Points
+
+Progress presents consistency, logged behavior, useful trends and optional weight—not a total-body score.
+
+Journey turns lifetime useful behavior into Levels 1-20 and controlled Orb/moonbeam-tree cosmetics. Branch maturity is expressed through richer lunar flow and more graceful structure—not more clutter. Spending points never lowers lifetime progression.
+
+The phoenix-branded wallet separates available balance from lifetime earned, shows every ledger entry and exact redemption price, and states no cash value, transfer or expiry at launch. The phoenix symbolizes renewal; it never becomes a second assistant.
+
+23. Trust, billing and safety
+
+On source, privacy, consent, checkout, delete and unsupported states, Qamar becomes still. Information—not character performance—takes visual priority.
+
+The Orb remains a visible navigation portal. Leaving a transactional or destructive flow requires a plain confirmation only when work may be lost.
+
+No fantasy terminology appears in renewal disclosure, nutrition evidence, uncertainty, clinical boundaries or data rights.
+
+24. Today composition reference
+
+Figure 9. Version 2.0 composition: the Orb emits living moonbeam branches and Su Points carry the phoenix emblem.
+
+The reference demonstrates the hierarchy: one next-action hero, supporting nutrition context, one quest, and the Orb occupying the open edge as a persistent living portal. The filaments visibly inherit the Orb's light and branch around content; the wallet chip uses a single compact phoenix. Production should reduce branch aura and node density wherever they approach a reading zone, preserve 48dp targets, and validate all Arabic copy and data. The iPhone home indicator is operating-system chrome—not application navigation.
+
+PART VI
+
+Every launch page
+
+Sixty-two routes, one continuous character and one navigation language.
+
+25. App shell and trust entry
+
+The opening pages establish continuity, eligibility and consent before personalization. The Orb is present but becomes quieter as the information becomes more serious.
+
+S01 · Splash
+
+Experience field
+
+Design contract
+
+User question
+
+Is Qamar ready for me?
+
+Page composition
+
+Near-black field, faint crescent, compact status line; no decorative dashboard.
+
+Primary action
+
+Resolve session, configuration and deep link automatically.
+
+Orb role
+
+Awakens from a thin crescent into one slow breath; it is the only visible product control once ready.
+
+States / exit
+
+Restored / first launch / offline cache / route resolved. Continue within two seconds or name the delay.
+
+S02 · Update / Maintenance
+
+Experience field
+
+Design contract
+
+User question
+
+Why can I not continue?
+
+Page composition
+
+Plain service card, version/status, retry or store action. No lore.
+
+Primary action
+
+Retry, open the store, or use cached Today when permitted.
+
+Orb role
+
+Guardian: small, still and docked beside the status card; tap opens the accessible navigation sheet only when another route is valid.
+
+States / exit
+
+Required update / maintenance / retry / cached read-only / exit.
+
+S03 · Welcome / Continue
+
+Experience field
+
+Design contract
+
+User question
+
+What is Qamar and can I start now?
+
+Page composition
+
+Hero Orb above one promise, AI + non-medical qualifier, one Continue action.
+
+Primary action
+
+Create a private guest identity in one tap.
+
+Orb role
+
+Hero: full veil, gentle forward drift, one welcoming breath; no speech bubble until the user engages.
+
+States / exit
+
+New / returning / restored; Continue leads to eligibility with no fields.
+
+S04 · Save Progress
+
+Experience field
+
+Design contract
+
+User question
+
+How do I keep what I have already done?
+
+Page composition
+
+Dismissible sheet with Apple, Google and email; value preserved behind it.
+
+Primary action
+
+Link identity without creating a second profile.
+
+Orb role
+
+Guide: rests on the sheet edge and points once toward the platform-preferred option; never blocks Dismiss.
+
+States / exit
+
+Suggested / required for recovery, purchase, export / provider cancel / collision / resume source.
+
+S05 · Email OTP
+
+Experience field
+
+Design contract
+
+User question
+
+How do I verify without a password?
+
+Page composition
+
+One email field, then six cells with system autofill, resend timer and change email.
+
+Primary action
+
+Verify the code and return to the interrupted action.
+
+Orb role
+
+Docked portal: 56dp safe-edge form; its inner crescent pulses once when a code is auto-filled.
+
+States / exit
+
+Sent / invalid / expired / resend / offline / verified.
+
+S06 · Age Eligibility
+
+Experience field
+
+Design contract
+
+User question
+
+Can Qamar support me now?
+
+Page composition
+
+18+ decision with date of birth and a clear adults-only explanation.
+
+Primary action
+
+Confirm eligibility or exit.
+
+Orb role
+
+Guardian: still, dimmer halo, no playful motion or lore.
+
+States / exit
+
+Eligible / under 18 blocked / inconsistent age / exit.
+
+S07 · Consent
+
+Experience field
+
+Design contract
+
+User question
+
+What am I agreeing to?
+
+Page composition
+
+Layered summary: required service/privacy first; optional improvement consent separate and off.
+
+Primary action
+
+Accept required terms, manage optional choice, or decline.
+
+Orb role
+
+Guardian: stationary at the safe edge; tap exposes navigation/help without interrupting reading.
+
+States / exit
+
+First consent / policy update / optional on-off / decline.
+
+26. Onboarding and first value
+
+Onboarding is a guided conversation, one coherent decision at a time, ending in a useful route before permanent sign-in.
+
+S08 · Name — Optional
+
+Experience field
+
+Design contract
+
+User question
+
+What may Qamar call me?
+
+Page composition
+
+Single field, Skip equal in dignity, short explanation of why it is optional.
+
+Primary action
+
+Save a preferred name or skip.
+
+Orb role
+
+Guide: attentive posture; its light warms slightly after a valid entry but does not celebrate personal data.
+
+States / exit
+
+Empty / valid / invalid length / skip.
+
+S09 · Body Inputs
+
+Experience field
+
+Design contract
+
+User question
+
+What information is needed for an estimate?
+
+Page composition
+
+One input per step: age, biological estimate input, height and weight; visible units and Why link.
+
+Primary action
+
+Enter or correct inputs and continue.
+
+Orb role
+
+Guide: moves with the active field and collapses beside the keyboard; tap remains chat/navigation.
+
+States / exit
+
+Metric / imperial / validation / Why / keyboard / back.
+
+S10 · Goal
+
+Experience field
+
+Design contract
+
+User question
+
+What route am I choosing?
+
+Page composition
+
+Lose, maintain or gain cards; conservative pace; optional target weight.
+
+Primary action
+
+Choose a goal and review the pace.
+
+Orb role
+
+Guide: traces a short path between choices; no trophy or body imagery.
+
+States / exit
+
+Selected / contradictory / unsafe request / edit.
+
+S11 · Activity &amp; Routine
+
+Experience field
+
+Design contract
+
+User question
+
+What does my real day look like?
+
+Page composition
+
+Plain-language activity examples, meal times, work pattern and one common break point.
+
+Primary action
+
+Build a realistic routine model.
+
+Orb role
+
+Attentive: small orbit follows the active question; one-question-at-a-time pacing.
+
+States / exit
+
+Required minimum / optional detail / time picker / skip detail.
+
+S12 · Food Preferences
+
+Experience field
+
+Design contract
+
+User question
+
+What must Qamar respect?
+
+Page composition
+
+Separate hard exclusions/allergies from dislikes, favorites, cooking access and common Egyptian meals.
+
+Primary action
+
+Save rules and preferences.
+
+Orb role
+
+Guardian for hard rules, guide for preferences; color and copy distinguish must-not from prefer-not.
+
+States / exit
+
+Empty / conflict / hard rule / soft preference / search / custom item.
+
+S13 · Safety Filter
+
+Experience field
+
+Design contract
+
+User question
+
+Is personalized guidance appropriate here?
+
+Page composition
+
+Calm checklist with plain explanations and professional-care route.
+
+Primary action
+
+Continue only when supported.
+
+Orb role
+
+Guardian: motion pauses; neutral light, literal copy, no gamification.
+
+States / exit
+
+Supported / pregnancy-breastfeeding / eating-disorder risk / clinical complexity / exit.
+
+S14 · Target Review
+
+Experience field
+
+Design contract
+
+User question
+
+What is my estimate and why?
+
+Page composition
+
+Calories/macros, assumptions, formula version, estimate label, Edit and Confirm.
+
+Primary action
+
+Confirm or recalculate the route.
+
+Orb role
+
+Witness: floats beside the summary; crescent aligns when assumptions are opened.
+
+States / exit
+
+Ready / stale inputs / recalculating / Why detail / confirmed.
+
+S15 · First Route
+
+Experience field
+
+Design contract
+
+User question
+
+What do I do first?
+
+Page composition
+
+One-day route, first meal suggestion, quick log CTA, no permission prompt before value.
+
+Primary action
+
+Log the first real meal or open the plan.
+
+Orb role
+
+Hero-guide: reveals the route as a short constellation and points to one starting action.
+
+States / exit
+
+Plan ready / empty / regenerate / save-progress suggestion / Today.
+
+27. Today and conversation
+
+Today is the daily home; Chat is the Orb expanded into a conversation. Neither introduces a duplicate navigation shell.
+
+S16 · Today
+
+Experience field
+
+Design contract
+
+User question
+
+Where am I now and what is the next useful move?
+
+Page composition
+
+Greeting, next-action hero, remaining calories/macros, next meal, one quest and phoenix-branded Su Points chip; no bottom bar.
+
+Primary action
+
+Complete the next action, log, ask or open the living constellation.
+
+Orb role
+
+Hero: breathes in open space; dormant moonbeam filaments echo its breath, then one branch leans toward the next action while the Orb remains the global navigation portal.
+
+States / exit
+
+Morning / on-route / over estimate / missing log / comeback / offline / quota / Calm / Reduced Motion.
+
+S17 · Quick Actions
+
+Experience field
+
+Design contract
+
+User question
+
+What can I do from here?
+
+Page composition
+
+Radial or bottom-safe sheet anchored to the Orb: Log, Ask, Adjust, Scan; not persistent navigation.
+
+Primary action
+
+Choose one contextual task.
+
+Orb role
+
+Becomes the sheet anchor; four short moonbeam twigs grow from the veil, focus one at a time, then retract into the Orb.
+
+States / exit
+
+Open / one-handed edge variant / large text list variant / Reduced Motion list / dismissed.
+
+S18 · Qamar Chat
+
+Experience field
+
+Design contract
+
+User question
+
+Can Qamar help me decide?
+
+Page composition
+
+Orb presence field, conversation, structured insight cards, composer with text/voice/photo; history optional.
+
+Primary action
+
+Ask, review evidence, or execute a visible action card.
+
+Orb role
+
+Hero-speaker: expands into the header, listens, thinks and speaks through light; no duplicate floating Orb.
+
+States / exit
+
+Listening / thinking / streaming / tool action / refusal / quota / retry / back to exact source.
+
+S19 · Suggested Prompts
+
+Experience field
+
+Design contract
+
+User question
+
+What could I ask right now?
+
+Page composition
+
+Three contextual chips tied to today, meals and progress; horizontal scroll avoided in RTL.
+
+Primary action
+
+Send or edit a suggested prompt.
+
+Orb role
+
+Attentive: one subtle glance of light toward suggestions; never auto-sends.
+
+States / exit
+
+Contextual / generic / hidden after typing / refreshed.
+
+S20 · Quota State
+
+Experience field
+
+Design contract
+
+User question
+
+What remains free and what can I do now?
+
+Page composition
+
+Usage/reset, manual alternative, Su Points option where valid, and truthful Qamar+ offer.
+
+Primary action
+
+Continue free, redeem, upgrade or close.
+
+Orb role
+
+Guardian: no sad animation; neutral ring and clear routes.
+
+States / exit
+
+Near cap / cap reached / points available / paywall / reset / offline.
+
+28. Meal capture and confirmation
+
+Capture reduces friction; confirmation protects accuracy. The Orb shifts from router to worker to witness.
+
+S21 · Log Method
+
+Experience field
+
+Design contract
+
+User question
+
+What is the easiest way to log this meal?
+
+Page composition
+
+Photo, voice, text, barcode, recent and manual methods bloom as a compact living constellation around the Orb.
+
+Primary action
+
+Choose a capture method.
+
+Orb role
+
+Navigation becomes task routing: six moonbeam branches grow from the core, with a slow outward pulse; the accessible list mirrors every branch.
+
+States / exit
+
+Available / permission denied / modality quota / recent empty / Calm / Reduced Motion / cancel.
+
+S22 · Photo Capture
+
+Experience field
+
+Design contract
+
+User question
+
+Can I photograph the meal clearly?
+
+Page composition
+
+Full camera, framing guide, flash/gallery, privacy note and capture control.
+
+Primary action
+
+Capture or choose a photo.
+
+Orb role
+
+Docked but present: 56dp translucent portal outside camera controls; hold opens navigation after a leave-camera confirmation.
+
+States / exit
+
+Permission education / live / captured / retake / upload / low light / exit.
+
+S23 · Voice Capture
+
+Experience field
+
+Design contract
+
+User question
+
+Can I describe what I ate naturally?
+
+Page composition
+
+Large waveform, timer, Stop, editable transcript preview and language hint.
+
+Primary action
+
+Record, stop, edit and analyze.
+
+Orb role
+
+Listening: crescent contracts with voice energy without mimicking every syllable; docks beside Stop.
+
+States / exit
+
+Permission / recording / paused / transcript / no speech / quota / cancel.
+
+S24 · Text Entry
+
+Experience field
+
+Design contract
+
+User question
+
+Can I log this in my own words?
+
+Page composition
+
+Large Arabic-first composer, examples in Egyptian Arabic/Arabizi, recent foods and manual search.
+
+Primary action
+
+Submit text or choose a structured item.
+
+Orb role
+
+Docked above keyboard; one soft attentive pulse after input stops.
+
+States / exit
+
+Empty / composing / mixed language / suggestions / validation / cancel.
+
+S25 · Analyzing
+
+Experience field
+
+Design contract
+
+User question
+
+What is Qamar doing with my input?
+
+Page composition
+
+Named steps—detecting items, matching portions, calculating—plus cancel and elapsed fallback.
+
+Primary action
+
+Wait, cancel, or switch to manual after threshold.
+
+Orb role
+
+Worker: thinking orbit and controlled veil rotation; each task step changes orbit, not character identity.
+
+States / exit
+
+Photo / voice / text / barcode / slow / failed / cancelled / manual fallback.
+
+S26 · Confirm Meal
+
+Experience field
+
+Design contract
+
+User question
+
+Is this estimate actually my meal?
+
+Page composition
+
+Detected items, portions, methods, confidence, source labels and total; Edit precedes Confirm.
+
+Primary action
+
+Correct every item, then confirm the record.
+
+Orb role
+
+Witness: small and steady; amber attention only beside uncertain items, never red judgment.
+
+States / exit
+
+High/medium/low confidence / missing portion / source conflict / edit / confirmed.
+
+S27 · Edit Food Item
+
+Experience field
+
+Design contract
+
+User question
+
+How do I correct this item?
+
+Page composition
+
+Search, Egyptian aliases, portion visual, cooking method, source and custom/manual values.
+
+Primary action
+
+Save corrected item or remove it.
+
+Orb role
+
+Guide: points to the one unresolved field, then returns to rest.
+
+States / exit
+
+Search / no match / custom / portion units / validation / delete.
+
+S28 · Meal Result
+
+Experience field
+
+Design contract
+
+User question
+
+What changed and what should I do next?
+
+Page composition
+
+Updated remaining day, confidence note, one recovery or next-meal action and View details.
+
+Primary action
+
+Take the next action or return to Today.
+
+Orb role
+
+Witness-to-guide: one quiet completion flare, then leans toward the next useful action.
+
+States / exit
+
+On route / exceeded estimate / incomplete item / points earned / sync pending.
+
+S29 · Meal Detail
+
+Experience field
+
+Design contract
+
+User question
+
+What exactly was saved?
+
+Page composition
+
+Items, portions, nutrients, source/confidence, timestamps and Edit/Delete/Report.
+
+Primary action
+
+Inspect, correct, delete or report.
+
+Orb role
+
+Guardian-witness: still beside provenance; destructive action moves it to the confirmation edge.
+
+States / exit
+
+Saved / edited / sync pending / delete confirm / reported.
+
+29. Plan and recovery
+
+The plan behaves like a route that can be redrawn without shame.
+
+S30 · Day Plan
+
+Experience field
+
+Design contract
+
+User question
+
+What is the full route for today?
+
+Page composition
+
+Timeline of meals with totals, flexibility slots and recovery entry; one meal expanded at a time.
+
+Primary action
+
+Open, swap, log or replan a meal.
+
+Orb role
+
+Guide: travels down the meal path as the user scrolls but remains snapped to the safe edge.
+
+States / exit
+
+Current / future / consumed / skipped / stale / offline.
+
+S31 · Plan Meal Detail
+
+Experience field
+
+Design contract
+
+User question
+
+Why is this meal here?
+
+Page composition
+
+Dish, portion, ingredients, macros, rationale, substitutions and Log as eaten.
+
+Primary action
+
+Log, swap or edit serving.
+
+Orb role
+
+Guide: reveals Why as a short light path from target to meal; factual copy stays literal.
+
+States / exit
+
+Planned / unavailable / preference conflict / logged / source detail.
+
+S32 · Substitution
+
+Experience field
+
+Design contract
+
+User question
+
+What realistic alternative fits?
+
+Page composition
+
+Three options compared by fit, portion, time/cost and difference from the original.
+
+Primary action
+
+Choose a substitution or ask for more.
+
+Orb role
+
+Guide: moves once between options and settles beside the strongest fit; user remains in control.
+
+States / exit
+
+Candidates / none / quota / hard-rule conflict / selected.
+
+S33 · Recovery / Replan
+
+Experience field
+
+Design contract
+
+User question
+
+How do I continue after real life changed?
+
+Page composition
+
+What happened, untouched meals, smallest safe adjustment, no compensation or shame.
+
+Primary action
+
+Accept the revised remaining day or keep the current plan.
+
+Orb role
+
+Recovery guide: returns from dim rest to steady light; language says route change, never failure.
+
+States / exit
+
+Off-plan meal / missed meal / schedule change / cannot recalculate / accepted.
+
+30. Progress and weekly intelligence
+
+Progress shows evidence of behavior and one actionable pattern—not a broad health score.
+
+S34 · Progress
+
+Experience field
+
+Design contract
+
+User question
+
+Is my behavior becoming more consistent?
+
+Page composition
+
+7/30/90-day range, active days, logging completeness, macro/diet-quality signals and optional weight trend.
+
+Primary action
+
+Inspect a pattern, open Journey or read the weekly insight.
+
+Orb role
+
+Guide: traces one trend at a time; chart text summary remains primary for accessibility.
+
+States / exit
+
+Insufficient data / 7d / 30d / 90d / guest / offline.
+
+S35 · Add Weight
+
+Experience field
+
+Design contract
+
+User question
+
+Do I want to record an optional measurement?
+
+Page composition
+
+One numeric field, date/time, units and delete/edit history; neutral copy.
+
+Primary action
+
+Save or skip.
+
+Orb role
+
+Witness: still and small; no celebration or negative reaction to direction of change.
+
+States / exit
+
+Empty / saved / edited / deleted / implausible value.
+
+S36 · Weekly Insight
+
+Experience field
+
+Design contract
+
+User question
+
+What mattered this week?
+
+Page composition
+
+One win, one evidence-backed pattern, one recommended quest, comparison chart and Why/source detail.
+
+Primary action
+
+Accept quest, adjust plan or ask a follow-up.
+
+Orb role
+
+Narrator-guide: speaks through progressive cards, then points to one action—not a wall of analysis.
+
+States / exit
+
+Ready / partial data / source detail / follow-up quota / dismissed.
+
+31. User control, billing and privacy
+
+These pages prioritize explicit control. The Orb remains available and becomes calm, literal and non-promotional.
+
+S37 · You Hub
+
+Experience field
+
+Design contract
+
+User question
+
+How do I control my Qamar?
+
+Page composition
+
+Identity, goals, preferences, Journey, phoenix wallet, reminders, subscription, memory, privacy and help in grouped cards.
+
+Primary action
+
+Open or edit one control area.
+
+Orb role
+
+Portal: holds the five-destination living constellation; in-page settings radiate as a compact secondary list without imitating global branches.
+
+States / exit
+
+Guest / linked / stale target / subscription issue / offline / Reduced Motion.
+
+S38 · Goals &amp; Targets
+
+Experience field
+
+Design contract
+
+User question
+
+What assumptions guide my route?
+
+Page composition
+
+Current goal, pace, inputs, target version, edit/recalculate and Why.
+
+Primary action
+
+Preview and confirm a change.
+
+Orb role
+
+Guardian-guide: shows impact before commit; still during confirmation.
+
+States / exit
+
+Current / stale / recalculating / unsafe request / saved.
+
+S39 · Food Preferences
+
+Experience field
+
+Design contract
+
+User question
+
+What does Qamar remember about my food?
+
+Page composition
+
+Hard rules first, then dislikes, favorites, routine and cooking/budget preferences.
+
+Primary action
+
+Add, edit, resolve or remove a rule.
+
+Orb role
+
+Guardian for exclusions; guide for preferences; conflict shown with amber attention.
+
+States / exit
+
+Empty / active / conflict / proposed memory / deleted.
+
+S40 · Memory
+
+Experience field
+
+Design contract
+
+User question
+
+What does Qamar remember and why?
+
+Page composition
+
+User-controlled memory cards with category, source, date, confidence, Edit and Delete.
+
+Primary action
+
+Confirm, edit, reject, delete or export.
+
+Orb role
+
+Witness: small, transparent, never claims feelings or hidden memory.
+
+States / exit
+
+Empty / proposed / confirmed / conflict / deletion / sync error.
+
+S41 · Reminders
+
+Experience field
+
+Design contract
+
+User question
+
+When may Qamar invite me back?
+
+Page composition
+
+Daily/meal/weekly toggles, times, quiet hours, lock-screen preview and OS status.
+
+Primary action
+
+Enable, edit, test or open OS settings.
+
+Orb role
+
+Guide: moves along a quiet time arc; respects disabled haptics and motion.
+
+States / exit
+
+Not asked / allowed / denied / scheduled / time-zone change.
+
+S42 · Subscription
+
+Experience field
+
+Design contract
+
+User question
+
+What is my Qamar+ status?
+
+Page composition
+
+Current entitlement, renewal, manage, restore, receipt issue and included limits.
+
+Primary action
+
+Manage, restore or resolve billing.
+
+Orb role
+
+Guardian: docked, still and literal; no celebratory sales behavior.
+
+States / exit
+
+Free / active / trial / grace / pending / expired / restored.
+
+S43 · Paywall &amp; Offer
+
+Experience field
+
+Design contract
+
+User question
+
+What am I buying and what renews?
+
+Page composition
+
+Plans, promo box, first-period and renewal disclosure, native purchase CTA, Restore and Close.
+
+Primary action
+
+Apply offer, purchase, restore or continue free.
+
+Orb role
+
+Docked portal remains available; no movement near prices. Hold requires leave-checkout confirmation before navigation.
+
+States / exit
+
+Loading price / eligible / invalid code / pending / success / cancel / failed / grace.
+
+S44 · Privacy &amp; Consents
+
+Experience field
+
+Design contract
+
+User question
+
+How is my information used?
+
+Page composition
+
+Consent versions, optional improvement choice, retention summary, export and delete routes.
+
+Primary action
+
+Change optional choice or open a data action.
+
+Orb role
+
+Guardian: dim, motionless and fully semantic; no fantasy language.
+
+States / exit
+
+Current / policy update / withdrawal / offline.
+
+S45 · Export
+
+Experience field
+
+Design contract
+
+User question
+
+How do I take my data with me?
+
+Page composition
+
+Scope, format, verification, request status, expiry and secure download.
+
+Primary action
+
+Request, verify and download.
+
+Orb role
+
+Worker during preparation, guardian at download; docked and non-intrusive.
+
+States / exit
+
+Needs linked identity / preparing / ready / expired / failed.
+
+S46 · Delete Account
+
+Experience field
+
+Design contract
+
+User question
+
+What will be removed and what will not?
+
+Page composition
+
+Plain consequences, subscription separation, re-authentication and typed/hold confirmation.
+
+Primary action
+
+Delete or cancel.
+
+Orb role
+
+Guardian: smallest legal portal at edge; no animation after destructive intent except progress and completion.
+
+States / exit
+
+Warning / active subscription / reauth / processing / complete / failed.
+
+S47 · Help &amp; Safety
+
+Experience field
+
+Design contract
+
+User question
+
+What can Qamar do, and where do I get help?
+
+Page composition
+
+Scope, safety boundary, FAQ, policies, support code and replay Orb tutorial.
+
+Primary action
+
+Read, contact support, copy code or open policy.
+
+Orb role
+
+Guide for tutorial, guardian for safety; no lore in clinical boundaries.
+
+States / exit
+
+Search / article / support unavailable / offline.
+
+S48 · Report Feedback
+
+Experience field
+
+Design contract
+
+User question
+
+How do I correct Qamar safely?
+
+Page composition
+
+Report type, what will be sent, optional note/attachment consent and support code.
+
+Primary action
+
+Submit, omit attachment or cancel.
+
+Orb role
+
+Witness: acknowledges submission once; never treats a report as a quest.
+
+States / exit
+
+Draft / queued offline / submitted / rate limited / failed.
+
+32. Universal recovery and account routes
+
+Offline, permission, error, unsupported and identity states preserve context and always offer a truthful next route.
+
+S49 · Offline Banner
+
+Experience field
+
+Design contract
+
+User question
+
+What still works without a connection?
+
+Page composition
+
+Compact top banner plus queued-item state; cached content remains readable.
+
+Primary action
+
+Continue locally, retry or review queue.
+
+Orb role
+
+Offline posture: lower glow and static tail, still fully navigable to cached destinations.
+
+States / exit
+
+Offline / reconnecting / queued / conflict / synced.
+
+S50 · Permission Education
+
+Experience field
+
+Design contract
+
+User question
+
+Why does Qamar need this permission?
+
+Page composition
+
+One purpose, one privacy promise, Enable and manual alternative.
+
+Primary action
+
+Open OS prompt or choose the alternative.
+
+Orb role
+
+Guide: indicates the relevant capability, never pressures after denial.
+
+States / exit
+
+Not asked / allowed / denied / limited / settings route.
+
+S51 · Error &amp; Retry
+
+Experience field
+
+Design contract
+
+User question
+
+Was my work preserved?
+
+Page composition
+
+Named error, preserved draft confirmation, Retry, Manual route and support code when needed.
+
+Primary action
+
+Retry, recover manually or leave.
+
+Orb role
+
+Recovery: pauses, regains steady light, points to the safest next action; never red.
+
+States / exit
+
+Transient / validation / provider / sync / preserved / unrecoverable.
+
+S52 · Unsupported State
+
+Experience field
+
+Design contract
+
+User question
+
+Why is personalized use unavailable?
+
+Page composition
+
+Clear boundary, what Qamar will not provide, professional-care route and account/privacy options.
+
+Primary action
+
+Exit, open help or manage data.
+
+Orb role
+
+Guardian: neutral, still and literal; constellation only exposes safe destinations.
+
+States / exit
+
+Age / high-risk / region-service / temporary unsupported.
+
+S53 · Linked Identities
+
+Experience field
+
+Design contract
+
+User question
+
+How can I recover my account?
+
+Page composition
+
+Apple, Google, email, sessions, link/unlink, merge status and last-used device.
+
+Primary action
+
+Add, verify, remove or sign out a session.
+
+Orb role
+
+Guardian-guide: docks during provider sheets and returns to the same location.
+
+States / exit
+
+Guest / linked / collision / merge review / reauth / removed.
+
+33. Journey, achievements and wallet
+
+Game expression makes consistent behavior visible while protecting autonomy and avoiding punishment or gambling patterns.
+
+S54 · Journey
+
+Experience field
+
+Design contract
+
+User question
+
+How is my consistency growing?
+
+Page composition
+
+Level, lifetime earned Su Points, available phoenix wallet, moonbeam-tree growth, active quests and recent milestones.
+
+Primary action
+
+Open quest, achievements, wallet or Calm Mode.
+
+Orb role
+
+Hero: the spirit and living branches mature through restraint—richer lunar flow and more graceful branching, never larger clutter. The phoenix appears only on Su Points currency surfaces.
+
+States / exit
+
+New / active / returning / level near / Calm Mode / Reduced Motion / offline.
+
+S55 · Quest Detail &amp; Replace
+
+Experience field
+
+Design contract
+
+User question
+
+What counts, why, and can I choose another route?
+
+Page composition
+
+Objective, evidence, phoenix-marked Su Points reward, completion condition, Replace and Skip.
+
+Primary action
+
+Start, replace or skip without penalty.
+
+Orb role
+
+Guide: one moonbeam branch connects objective to evidence; reward uses the phoenix mark without coin shower or urgency.
+
+States / exit
+
+Available / in progress / complete / replaced / skipped / expired / Reduced Motion.
+
+S56 · Level Up
+
+Experience field
+
+Design contract
+
+User question
+
+What changed because I stayed consistent?
+
+Page composition
+
+Short full-screen milestone, unlocked cosmetic/moonbeam-tree change, Continue and Calm Mode preference.
+
+Primary action
+
+Acknowledge and continue.
+
+Orb role
+
+Celebrates with one 900ms flare; a single wave travels through visible branches and settles. No phoenix unless Su Points are also awarded.
+
+States / exit
+
+Standard / Reduced Motion / Calm Mode / queued while busy.
+
+S57 · Achievements
+
+Experience field
+
+Design contract
+
+User question
+
+What have I proven through behavior?
+
+Page composition
+
+Collection grouped by logging, learning, recovery and consistency; no body/weight trophies.
+
+Primary action
+
+Inspect evidence or equip a cosmetic.
+
+Orb role
+
+Curator: illuminates earned marks; locked items state the behavior, never tease random rewards.
+
+States / exit
+
+Empty / earned / equipped / Calm Mode / offline.
+
+S58 · Journey Preferences
+
+Experience field
+
+Design contract
+
+User question
+
+How much game expression feels right?
+
+Page composition
+
+Calm Mode, reduced celebration, haptics, sound and motion preview.
+
+Primary action
+
+Set the experience intensity.
+
+Orb role
+
+Live preview within safe limits; changes immediately and remains reversible.
+
+States / exit
+
+Default / Calm / reduced motion / haptics off / sound off.
+
+S59 · Su Points Wallet
+
+Experience field
+
+Design contract
+
+User question
+
+What do I have, how did I earn it, and where can I spend it?
+
+Page composition
+
+Phoenix medallion, available balance, lifetime earned, ledger, spend catalogue, prices, balance-after preview and terms.
+
+Primary action
+
+Inspect history or confirm a transparent redemption.
+
+Orb role
+
+Guide-witness: the moon-gold phoenix is the sole currency emblem; no coin shower, flame burst, gambling motion or scarcity panic. Redemption gets one quiet phoenix glint and ledger confirmation.
+
+States / exit
+
+Empty / available / insufficient / redeeming / success / refunded / read-only offline / Calm / Reduced Motion.
+
+34. Packaged food and evidence
+
+Barcode, label capture and source detail make estimates correctable and traceable.
+
+S60 · Barcode Scan &amp; Product
+
+Experience field
+
+Design contract
+
+User question
+
+Can Qamar identify this packaged food?
+
+Page composition
+
+Scanner, product source/date, serving confirmation, nutrients and manual fallback.
+
+Primary action
+
+Scan, confirm serving, correct or photograph the label.
+
+Orb role
+
+Docked beside scanner controls; thinking orbit appears only after capture.
+
+States / exit
+
+Permission / scanning / match / ambiguous / no match / offline cache.
+
+S61 · Why &amp; Source Detail
+
+Experience field
+
+Design contract
+
+User question
+
+Why should I trust this estimate or guidance?
+
+Page composition
+
+Claim or formula, inputs, assumptions, source title/date, confidence and what may change the answer.
+
+Primary action
+
+Inspect, correct inputs or return.
+
+Orb role
+
+Witness: small, steady and silent; evidence—not character—is the hero here.
+
+States / exit
+
+Formula / food source / guidance source / stale / unavailable.
+
+S62 · Nutrition Label Capture
+
+Experience field
+
+Design contract
+
+User question
+
+Can I add a product Qamar does not know?
+
+Page composition
+
+Photo crop, OCR fields, serving units, edit validation, source=label and private-product notice.
+
+Primary action
+
+Capture, correct and confirm.
+
+Orb role
+
+Worker: docked for camera, thinking during OCR, witness during field confirmation.
+
+States / exit
+
+Permission / crop / parsing / low confidence / validation / saved / cancel.
+
+PART VII
+
+Design handoff and QA
+
+A living character requires tighter implementation discipline than a static floating button.
+
+35. Figma and component architecture
+
+Page / library
+
+Required contents
+
+00 Foundations
+
+Color variables, typography, spacing, radius, elevation, focus, RTL and accessibility annotations
+
+01 Orb anatomy
+
+Vector/material layers, safe silhouettes at 24/48/56/72dp, light and dark backgrounds
+
+02 Orb states
+
+All state variants, transition names, entry/exit frames, Calm and Reduced Motion variants
+
+03 Orb navigation
+
+Edge positions, five-node living constellation, branch spines/states, accessible list, drag/snap, keyboard/camera/checkout docking
+
+04 Components
+
+Cards, buttons, chips, fields, charts, source cards, quest cards, phoenix currency marks, wallet rows and system states
+
+05-14 Screen families
+
+S01-S62 organized exactly by the families in this bible; Arabic RTL is canonical
+
+15 Prototypes
+
+First launch, daily loop, logging, plan recovery, weekly insight, wallet redemption and checkout
+
+16 Handoff
+
+Motion specs, Rive/Lottie asset names, Flutter state mapping, analytics IDs and redlines
+
+36. Orb implementation contract
+
+Concern
+
+Build requirement
+
+Renderer
+
+Rive state machine preferred for interactive vector/mesh states; use deterministic state inputs, not free-running decorative timelines.
+
+State inputs
+
+route, role, activity, attention, network, calmMode, reduceMotion, edge, keyboard, capture, transaction, safety context, treeOpen, focusedNode and branchPhase.
+
+Hit testing
+
+Visual may be 48-64dp; semantic hit area &gt;=56dp and separated from destructive/payment controls.
+
+Physics
+
+Critically damped snap; no bouncy toy easing. Tail follows velocity with a capped length and decays after settle.
+
+Branch renderer
+
+Use stable cubic spines plus layered glow/core/motes. Branch geometry is deterministic per edge/size class; only light phase changes continuously.
+
+Performance
+
+60fps target; degrade branch motes, aura blur and secondary twigs before frame rate. Core navigation remains responsive under AI/network load.
+
+Persistence
+
+Store normalized edge + vertical fraction by portrait/landscape/size class. Never sync exact coordinates across devices.
+
+Semantics
+
+Arabic label 'قمر'; actions: talk, open destinations, move left/right, reset position; state announced only when meaningful.
+
+Phoenix assets
+
+One vector master with hero, standard and micro simplifications; do not rely on raster downscaling for the wallet chip.
+
+Analytics
+
+orb_tap, orb_hold, orb_drag, constellation_open, branch_bloom, node_focus, node_select, cancel and accessible_action—without conversation content.
+
+37. Acceptance checklist
+
+No screen contains an application bottom navigation bar or duplicate persistent tab shell.
+
+A visible, semantic Orb portal remains on every usable route, including camera, keyboard, checkout and confirmation contexts.
+
+Every global destination is reachable with hold+sweep, an accessible tap list, screen-reader actions and supported voice routing.
+
+Tap, hold and drag thresholds do not conflict; accidental navigation rate is tested with left- and right-handed users.
+
+Route changes preserve drafts, scroll, source screen and transaction state or warn before abandoning them.
+
+The Orb has no eyes, mouth, cartoon face, pet needs, emotional coercion or endless attention loops.
+
+Every animation has a semantic equivalent and a Reduced Motion variant; Calm Mode removes reward pressure without removing utility.
+
+Every branch begins inside the Orb halo, carries purposeful outward/inward light, avoids critical content, and has Available, Focus, Commit, Cancel, Offline, Calm and Reduced Motion states.
+
+Arabic RTL, mixed Arabic/English/Arabizi, 200% text, VoiceOver/TalkBack and Switch Control are validated across S01-S62.
+
+Nutrition estimates remain editable and confidence/source-labelled; safety, evidence, privacy and billing use literal language.
+
+No Health OS, sleep, HRV, hydration, movement or workout metrics appear in the nutrition MVP.
+
+Every Su Points surface uses the approved rising-phoenix emblem at the correct simplification level; no 'Su' coin, generic star, fire animation, casino styling or alternate currency icon remains.
+
+Su Points show available and lifetime values separately; redemption is explicit, deterministic, reversible on failure and never pay-to-win.
+
+Frame-time, battery, thermal and memory tests prove the living Orb does not damage core usability on target founder devices.
+
+38. Prototype test script
+
+Start as a guest, complete eligibility/consent, create a target and reach the first route without signing in.
+
+Move the Orb to both edges; open and cancel the constellation; select each of the five destinations; reset position.
+
+Observe branch direction and light origin from both edges; verify Focus, Commit, Arrival, Cancel, Offline, Calm and Reduced Motion variants without clipped labels or obscured content.
+
+Log one meal by photo, one by voice and one by text; correct low-confidence portions; verify Orb worker/witness states.
+
+Open chat from a scrolled page, perform an action, return and confirm exact context restoration.
+
+Open camera, keyboard, checkout and delete confirmation; verify the Orb docks but never disappears or overlaps a critical control.
+
+Simulate offline, quota, provider error and app restart; verify preserved work and truthful recovery routes.
+
+Enable Reduced Motion, Calm Mode, 200% text, TalkBack/VoiceOver and Switch Control; complete the same journeys without gesture-only blockers.
+
+Inspect every Su Points occurrence at micro, standard and hero scale; verify the phoenix remains recognizable, semantic labels announce the amount, and no duplicate currency emblem appears.
+
+39. Final design principle
+
+The standard: If the user remembers a bar, a dashboard or a mascot, the experience is ordinary. If the user remembers that Qamar stayed present, understood where they were, and quietly showed the next path, the experience is working.
+
