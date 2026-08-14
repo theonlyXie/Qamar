@@ -77,6 +77,17 @@ class WalletScreen extends StatelessWidget {
             _SpendCard(item: item),
             const SizedBox(height: 12),
           ]
+        else if (state.ledger().isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+            child: Text(
+              state.isAr
+                  ? 'مفيش حركات لسه. كل نقطة بتتكسب هتظهر هنا بسببها.'
+                  : 'No entries yet. Every point you earn shows up here with its reason.',
+              style: QText.body(size: 13, height: 20, color: QColors.textMuted),
+            ),
+          )
         else
           for (final entry in state.ledger()) ...[
             Container(

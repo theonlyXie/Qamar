@@ -1,13 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../services/repositories.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 
+/// Progress, drawn from what was actually logged.
+///
+/// Nothing on this screen is illustrative. A week with no meals in it shows
+/// seven empty days and says the chart fills in as meals are logged; a weight
+/// trend needs two real readings before a line is drawn at all. Showing a
+/// convincing chart of a week that never happened is the one thing a progress
+/// screen must never do.
 class ProgressScreen extends StatelessWidget {
   const ProgressScreen({super.key});
+
+  static const _dayLettersAr = ['ن', 'ث', 'ر', 'خ', 'ج', 'س', 'ح'];
+  static const _dayLettersEn = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
   @override
   Widget build(BuildContext context) {
@@ -15,8 +26,16 @@ class ProgressScreen extends StatelessWidget {
     final t = state.t;
     final isAr = state.isAr;
 
-    final days = isAr ? ['س', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج'] : ['S', 'S', 'M', 'T', 'W', 'T', 'F'];
-    const heights = [38, 64, 52, 80, 46, 70, 58];
+    final week = state.week();
+    final target = state.target().kcal;
+    final active = state.activeDays();
+    final logged = state.mealsThisWeek();
+    final inRange = state.daysInRange();
+    final weights = state.weightHistory;
+
+    // The tallest bar is the biggest day, or the target if every day is under
+    // it — so a normal week fills the chart instead of hugging the floor.
+    final peak = [target.toDouble(), ...week.map((d) => d.kcal.toDouble())].reduce((a, b) => a > b ? a : b);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 56, 20, 160),
@@ -27,14 +46,25 @@ class ProgressScreen extends StatelessWidget {
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.green.withOpacity(0.4), radius: QRadii.xl),
+          decoration: QDecor.card(
+            color: QColors.cardDeep,
+            border: (active > 0 ? QColors.green : QColors.textFaint).withValues(alpha: 0.4),
+            radius: QRadii.xl,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(t.thisWeek, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.green, letterSpacing: 0.4)),
+              Text(t.thisWeek,
+                  style: QText.body(size: 11, weight: FontWeight.w500, color: active > 0 ? QColors.green : QColors.textMuted, letterSpacing: 0.4)),
               const SizedBox(height: 4),
               Text(
-                isAr ? '٤ أيام نشاط · ١٠ وجبات مسجلة · ٧١٪ داخل النطاق' : '4 active days · 10 meals logged · 71% in target range',
+                active == 0
+                    ? (isAr
+                        ? 'لسه مفيش وجبات مسجلة الأسبوع ده. أول ما تسجّل، الأرقام تظهر هنا.'
+                        : 'Nothing logged this week yet. The numbers appear here as soon as you log.')
+                    : (isAr
+                        ? '${state.iso('$active')} ${active == 1 ? 'يوم' : 'أيام'} نشاط · ${state.iso('$logged')} وجبة مسجلة · ${state.iso('$inRange')} من ${state.iso('$active')} داخل النطاق'
+                        : '$active active ${active == 1 ? 'day' : 'days'} · $logged ${logged == 1 ? 'meal' : 'meals'} logged · $inRange of $active in target range'),
                 style: QText.body(size: 14, height: 22, color: QColors.textHigh),
               ),
             ],
@@ -47,39 +77,23 @@ class ProgressScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(t.activeDays, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(t.activeDays, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+                  Text(isAr ? 'الهدف ${state.iso('$target')}' : 'target $target',
+                      style: QText.number(size: 10, color: QColors.textFaint)),
+                ],
+              ),
               const SizedBox(height: 12),
               SizedBox(
                 height: 110,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    for (var i = 0; i < 7; i++) ...[
+                    for (var i = 0; i < week.length; i++) ...[
                       if (i > 0) const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: Align(
-                                alignment: Alignment.bottomCenter,
-                                child: FractionallySizedBox(
-                                  heightFactor: heights[i] / 100,
-                                  widthFactor: 1,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(8),
-                                      gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [QColors.cyan, QColors.blue]),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(days[i], style: QText.number(size: 10, color: QColors.textFaint)),
-                          ],
-                        ),
-                      ),
+                      Expanded(child: _DayBar(day: week[i], peak: peak, target: target, letter: (isAr ? _dayLettersAr : _dayLettersEn)[week[i].day.weekday - 1])),
                     ],
                   ],
                 ),
@@ -96,28 +110,54 @@ class ProgressScreen extends StatelessWidget {
             children: [
               Text(t.weightTrend, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
               const SizedBox(height: 10),
-              SizedBox(width: double.infinity, height: 90, child: CustomPaint(painter: _WeightTrendPainter())),
-              const SizedBox(height: 10),
-              Text(
-                isAr ? 'اتجاه هادي لأسبوعين. قياس واحد مش دليل.' : 'A calm trend over two weeks. A single reading is not evidence.',
-                style: QText.body(size: 13, color: QColors.textMuted),
-              ),
+              if (weights.length < 2)
+                SizedBox(
+                  height: 90,
+                  child: Center(
+                    child: Text(
+                      isAr
+                          ? 'محتاج قياسين على الأقل قبل ما أرسم اتجاه.'
+                          : 'A trend needs at least two readings.',
+                      textAlign: TextAlign.center,
+                      style: QText.body(size: 13, height: 20, color: QColors.textFaint),
+                    ),
+                  ),
+                )
+              else ...[
+                SizedBox(width: double.infinity, height: 90, child: CustomPaint(painter: _WeightTrendPainter(weights))),
+                const SizedBox(height: 10),
+                Text(
+                  _trendLine(isAr, weights),
+                  style: QText.body(size: 13, color: QColors.textMuted),
+                ),
+              ],
             ],
           ),
         ),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: QColors.blue.withOpacity(0.1), border: Border.all(color: QColors.blue.withOpacity(0.4)), borderRadius: BorderRadius.circular(QRadii.xl)),
+          decoration: BoxDecoration(
+            color: QColors.blue.withValues(alpha: 0.1),
+            border: Border.all(color: QColors.blue.withValues(alpha: 0.4)),
+            borderRadius: BorderRadius.circular(QRadii.xl),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(t.weeklyInsight, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.skyBlue, letterSpacing: 0.4)),
               const SizedBox(height: 4),
+              // An insight is a claim about the person's week. Until there are
+              // enough logged days to support one, this says what is missing
+              // rather than asserting a pattern nobody measured.
               Text(
-                isAr
-                    ? 'أقوى أيامك كان فيها غدا متخطط. المهمة الجاية: جهّز الغدا مرتين الأسبوع ده.'
-                    : 'Your strongest days followed a planned lunch. Next quest: prepare lunch twice this week.',
+                active < 3
+                    ? (isAr
+                        ? 'رأي الأسبوع بيظهر بعد ٣ أيام مسجلة. لسه ${state.iso('${3 - active}')} ${3 - active == 1 ? 'يوم' : 'أيام'}.'
+                        : 'The weekly insight appears after 3 logged days — ${3 - active} to go.')
+                    : (isAr
+                        ? 'من ${state.iso('$active')} أيام مسجلة، ${state.iso('$inRange')} قربوا من هدفك. المتوسط ${state.iso('${_average(week)}')} سعرة في اليوم المسجّل.'
+                        : 'Across $active logged days, $inRange landed near your target. Your average on a logged day is ${_average(week)} kcal.'),
                 style: QText.body(size: 14, height: 22, color: QColors.textHigh),
               ),
             ],
@@ -126,44 +166,122 @@ class ProgressScreen extends StatelessWidget {
       ],
     );
   }
+
+  static int _average(List<DayTotals> week) {
+    final logged = week.where((d) => d.meals > 0).toList();
+    if (logged.isEmpty) return 0;
+    return (logged.fold(0, (s, d) => s + d.kcal) / logged.length).round();
+  }
+
+  static String _trendLine(bool isAr, List<WeightReading> w) {
+    final delta = w.last.kg - w.first.kg;
+    final days = w.last.at.difference(w.first.at).inDays;
+    final span = isAr ? 'على مدى ${days} يوم' : 'over $days days';
+    if (delta.abs() < 0.3) {
+      return isAr ? 'وزنك ثابت تقريباً $span. قياس واحد مش دليل.' : 'Essentially level $span. A single reading is not evidence.';
+    }
+    final amount = delta.abs().toStringAsFixed(1);
+    if (isAr) {
+      return '${delta < 0 ? 'نزلت' : 'زدت'} $amount كجم $span. قياس واحد مش دليل.';
+    }
+    return '${delta < 0 ? 'Down' : 'Up'} $amount kg $span. A single reading is not evidence.';
+  }
+}
+
+class _DayBar extends StatelessWidget {
+  final DayTotals day;
+  final double peak;
+  final int target;
+  final String letter;
+  const _DayBar({required this.day, required this.peak, required this.target, required this.letter});
+
+  @override
+  Widget build(BuildContext context) {
+    final empty = day.meals == 0;
+    // A minimum sliver keeps the day visible as a day; it is drawn faint so it
+    // never reads as a small amount of food.
+    final factor = empty ? 0.02 : (day.kcal / peak).clamp(0.06, 1.0);
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: FractionallySizedBox(
+              heightFactor: factor,
+              widthFactor: 1,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  gradient: empty
+                      ? null
+                      : const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [QColors.cyan, QColors.blue]),
+                  color: empty ? QColors.textFaint.withValues(alpha: 0.25) : null,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(letter, style: QText.number(size: 10, color: empty ? QColors.textFaint : QColors.textMuted)),
+      ],
+    );
+  }
 }
 
 class _WeightTrendPainter extends CustomPainter {
-  static const _points = [
-    Offset(8, 64),
-    Offset(56, 58),
-    Offset(104, 60),
-    Offset(152, 48),
-    Offset(200, 42),
-    Offset(248, 38),
-    Offset(292, 34),
-  ];
+  final List<WeightReading> readings;
+  const _WeightTrendPainter(this.readings);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final sx = size.width / 300;
-    final sy = size.height / 90;
-    final path = Path();
-    for (var i = 0; i < _points.length; i++) {
-      final p = Offset(_points[i].dx * sx, _points[i].dy * sy);
-      if (i == 0) {
-        path.moveTo(p.dx, p.dy);
-      } else {
-        path.lineTo(p.dx, p.dy);
-      }
-    }
-    final linePaint = Paint()
-      ..color = QColors.violet
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    canvas.drawPath(path, linePaint);
+    if (readings.length < 2) return;
 
-    final last = Offset(_points.last.dx * sx, _points.last.dy * sy);
-    canvas.drawCircle(last, 5, Paint()..color = QColors.cyan);
+    final first = readings.first.at.millisecondsSinceEpoch.toDouble();
+    final last = readings.last.at.millisecondsSinceEpoch.toDouble();
+    final span = (last - first).abs() < 1 ? 1.0 : last - first;
+
+    var lo = readings.first.kg, hi = readings.first.kg;
+    for (final r in readings) {
+      if (r.kg < lo) lo = r.kg;
+      if (r.kg > hi) hi = r.kg;
+    }
+    // A flat series would otherwise divide by zero and a 0.2 kg wobble would
+    // fill the whole card; both are handled by a minimum 2 kg window.
+    final mid = (lo + hi) / 2;
+    if (hi - lo < 2) {
+      lo = mid - 1;
+      hi = mid + 1;
+    }
+
+    Offset at(WeightReading r) {
+      final x = 8 + (r.at.millisecondsSinceEpoch - first) / span * (size.width - 16);
+      final y = size.height - 12 - (r.kg - lo) / (hi - lo) * (size.height - 24);
+      return Offset(x, y);
+    }
+
+    final path = Path();
+    for (var i = 0; i < readings.length; i++) {
+      final p = at(readings[i]);
+      i == 0 ? path.moveTo(p.dx, p.dy) : path.lineTo(p.dx, p.dy);
+    }
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = QColors.violet
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+    for (final r in readings) {
+      canvas.drawCircle(at(r), 2.5, Paint()..color = QColors.violet.withValues(alpha: 0.6));
+    }
+    canvas.drawCircle(at(readings.last), 5, Paint()..color = QColors.cyan);
   }
 
   @override
-  bool shouldRepaint(covariant _WeightTrendPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _WeightTrendPainter old) => old.readings != readings;
 }

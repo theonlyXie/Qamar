@@ -139,6 +139,62 @@ class SupabaseMealRepository implements MealRepository {
         .map((r) => LoggedMeal(name: r['name'] as String, sub: r['source'] as String, kcal: r['kcal'] as int, p: r['protein_g'] as int, c: r['carbs_g'] as int, f: r['fat_g'] as int))
         .toList();
   }
+
+  @override
+  Future<List<DayTotals>> dailyTotals(String userId, {int days = 7}) async {
+    final now = DateTime.now();
+    final from = DateTime(now.year, now.month, now.day).subtract(Duration(days: days - 1));
+    final rows = await _client
+        .from('meal_logs')
+        .select('kcal, logged_at')
+        .eq('user_id', userId)
+        .gte('logged_at', from.toIso8601String())
+        .order('logged_at');
+
+    // Grouped here rather than in SQL so this needs no extra database object;
+    // a week of one person's meals is a few dozen rows.
+    final byDay = <String, ({DateTime day, int kcal, int meals})>{};
+    for (final r in rows as List) {
+      final at = DateTime.parse(r['logged_at'] as String).toLocal();
+      final day = DateTime(at.year, at.month, at.day);
+      final key = day.toIso8601String();
+      final prev = byDay[key];
+      byDay[key] = (
+        day: day,
+        kcal: (prev?.kcal ?? 0) + (r['kcal'] as num).round(),
+        meals: (prev?.meals ?? 0) + 1,
+      );
+    }
+    final out = byDay.values.map((e) => DayTotals(day: e.day, kcal: e.kcal, meals: e.meals)).toList()
+      ..sort((a, b) => a.day.compareTo(b.day));
+    return out;
+  }
+
+  @override
+  Future<List<WeightReading>> weightHistory(String userId, {int days = 60}) async {
+    final from = DateTime.now().subtract(Duration(days: days));
+    final rows = await _client
+        .from('weight_entries')
+        .select('value_kg, measured_at')
+        .eq('user_id', userId)
+        .gte('measured_at', from.toIso8601String())
+        .order('measured_at');
+    return (rows as List)
+        .map((r) => WeightReading(
+              at: DateTime.parse(r['measured_at'] as String).toLocal(),
+              kg: (r['value_kg'] as num).toDouble(),
+            ))
+        .toList();
+  }
+
+  @override
+  Future<void> recordWeight(String userId, {required double kg, DateTime? at}) async {
+    await _client.from('weight_entries').insert({
+      'user_id': userId,
+      'value_kg': kg,
+      if (at != null) 'measured_at': at.toIso8601String(),
+    });
+  }
 }
 
 class SupabaseWalletRepository implements WalletRepository {

@@ -55,6 +55,19 @@ class FakeMealRepo implements MealRepository {
 
   @override
   Future<List<LoggedMeal>> mealsForDay(String userId, DateTime day) async => today;
+
+  List<DayTotals> history = [];
+  List<WeightReading> weights = [];
+  final List<double> recorded = [];
+
+  @override
+  Future<List<DayTotals>> dailyTotals(String userId, {int days = 7}) async => history;
+
+  @override
+  Future<List<WeightReading>> weightHistory(String userId, {int days = 60}) async => weights;
+
+  @override
+  Future<void> recordWeight(String userId, {required double kg, DateTime? at}) async => recorded.add(kg);
 }
 
 class FakeWalletRepo implements WalletRepository {
@@ -257,6 +270,45 @@ void main() {
     expect(state.scanned, isFalse);
     expect(state.profile.height, before.height);
     expect(state.profile.weight, before.weight);
+  });
+
+  test('the week is what was logged, and an empty week stays empty', () async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final meals = FakeMealRepo()
+      ..history = [
+        DayTotals(day: today.subtract(const Duration(days: 2)), kcal: 1900, meals: 3),
+        DayTotals(day: today.subtract(const Duration(days: 1)), kcal: 2100, meals: 4),
+      ];
+    final state = backed(meals: meals);
+    await settle();
+
+    final week = state.week();
+    expect(week.length, 7);
+    expect(week.last.day, today);
+    expect(state.activeDays(), 2, reason: 'only days with logged meals count');
+    expect(state.mealsThisWeek(), 7);
+    expect(week.where((d) => d.meals == 0).length, 5, reason: 'unlogged days must stay at zero');
+  });
+
+  test('a new user sees an empty week rather than an invented one', () async {
+    final state = backed();
+    await settle();
+
+    expect(state.activeDays(), 0);
+    expect(state.mealsThisWeek(), 0);
+    expect(state.week().every((d) => d.kcal == 0), isTrue);
+    expect(state.weightHistory, isEmpty);
+  });
+
+  test('the ledger records points as they are earned, not reconstructed', () async {
+    final state = backed(ai: FakeGateway());
+    await settle();
+    expect(state.ledger(), isEmpty, reason: 'a new user has earned nothing');
+
+    state.completeQuest();
+    expect(state.ledger().single.amount, 5);
+    expect(state.suAvailable, 5);
   });
 
   test('redeeming calls through to the wallet RPC', () async {

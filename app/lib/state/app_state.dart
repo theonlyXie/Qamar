@@ -110,6 +110,27 @@ class AppState extends ChangeNotifier {
         suAvailable = bal.available;
         suLifetime = bal.lifetime;
       }
+
+      final history = await _mealRepo?.dailyTotals(uid, days: 7);
+      if (history != null) {
+        dayHistory
+          ..clear()
+          ..addAll(history);
+      }
+
+      final weights = await _mealRepo?.weightHistory(uid);
+      if (weights != null) {
+        weightHistory
+          ..clear()
+          ..addAll(weights);
+      }
+
+      final entries = await _walletRepo?.ledger(uid);
+      if (entries != null) {
+        serverLedger
+          ..clear()
+          ..addAll(entries);
+      }
       _notify();
     } catch (e) {
       syncError = 'load: $e';
@@ -129,6 +150,18 @@ class AppState extends ChangeNotifier {
   bool scanReading = false;
 
   final List<LoggedMeal> meals = [];
+
+  /// Days that actually have logged meals behind them, from the backend.
+  /// Empty offline and empty for a new user — the Progress screen says so
+  /// rather than drawing a week that never happened.
+  final List<DayTotals> dayHistory = [];
+
+  /// Recorded weigh-ins, oldest first.
+  final List<WeightReading> weightHistory = [];
+
+  /// The wallet ledger as the database has it. Authoritative when present;
+  /// [ledgerExtra] covers the offline case.
+  final List<LedgerEntry> serverLedger = [];
 
   final List<ChatTurn> chat = [];
   String chatDraft = '';
@@ -208,6 +241,9 @@ class AppState extends ChangeNotifier {
     suLifetime = 0;
     redeemed.clear();
     ledgerExtra.clear();
+    serverLedger.clear();
+    dayHistory.clear();
+    weightHistory.clear();
     walletTab = WalletTab.spend;
     whyOpen = false;
     _notify();
@@ -857,8 +893,7 @@ class AppState extends ChangeNotifier {
       // Awarded locally for now: crediting Su Points is server-only (see
       // SupabaseWalletRepository.credit), so the balance reconciles to the
       // server's number on the next hydrate once the Edge Function exists.
-      suAvailable += 20;
-      suLifetime += 20;
+      _credit(20, ar: 'إكمال التهيئة', en: 'Onboarding completed');
       _notify();
 
       if (isBacked) {
@@ -866,6 +901,18 @@ class AppState extends ChangeNotifier {
         final t = target();
         _push('save profile', (uid) => _profileRepo!.saveProfile(uid, p));
         _push('save target', (uid) => _profileRepo!.saveTarget(uid, t, inputs: p));
+        // The weight they just gave is the first real point on the trend.
+        // Without it the Progress chart has nothing to draw from for weeks.
+        _push('record weight', (uid) async {
+          await _mealRepo?.recordWeight(uid, kg: p.weight.toDouble());
+          final w = await _mealRepo?.weightHistory(uid);
+          if (w != null) {
+            weightHistory
+              ..clear()
+              ..addAll(w);
+            _notify();
+          }
+        });
       }
     });
   }
@@ -1060,8 +1107,7 @@ class AppState extends ChangeNotifier {
     final raw = proposalRaw;
 
     meals.add(meal);
-    suAvailable += 10;
-    suLifetime += 10;
+    _credit(10, ar: 'تأكيد وجبة', en: 'Meal confirmed');
     chat.add(ChatTurn(
       who: ChatWho.q,
       text: isAr ? 'اتسجّلت: ${totals.kcal} سعرة.' : 'Logged: ${totals.kcal} kcal.',
@@ -1092,8 +1138,7 @@ class AppState extends ChangeNotifier {
 
   void completeQuest() {
     questDone = true;
-    suAvailable += 5;
-    suLifetime += 5;
+    _credit(5, ar: 'مهمة اليوم', en: 'Primary daily quest');
     _notify();
   }
 
@@ -1184,12 +1229,74 @@ class AppState extends ChangeNotifier {
     if (isBacked) _pushRedeem(item);
   }
 
-  List<LedgerEntry> ledger() => [
-        ...ledgerExtra,
-        if (meals.isNotEmpty) LedgerEntry(label: isAr ? 'تأكيد أول وجبة' : 'First meal confirmed', amount: 10, when: isAr ? 'النهاردة' : 'Today'),
-        if (suLifetime >= 20) LedgerEntry(label: isAr ? 'إكمال التهيئة' : 'Onboarding completed', amount: 20, when: isAr ? 'النهاردة' : 'Today'),
-        if (questDone) LedgerEntry(label: isAr ? 'مهمة اليوم' : 'Primary daily quest', amount: 5, when: isAr ? 'النهاردة' : 'Today'),
-      ];
+  /// Every entry here is written when the thing it describes actually
+  /// happens — see [_credit]. Nothing is reconstructed from the balance.
+  List<LedgerEntry> ledger() => serverLedger.isNotEmpty ? serverLedger : ledgerExtra;
+
+  /// Records points earned, and the reason, at the moment it is earned.
+  ///
+  /// The balance is still the server's to decide — crediting is server-side
+  /// only (see SupabaseWalletRepository.credit) — so this is the local view
+  /// until the next hydrate replaces it with the database's.
+  void _credit(int amount, {required String ar, required String en}) {
+    suAvailable += amount;
+    suLifetime += amount;
+    ledgerExtra.insert(0, LedgerEntry(label: isAr ? ar : en, amount: amount, when: isAr ? 'دلوقتي' : 'Just now'));
+  }
+
+  // ---- progress -------------------------------------------------
+  //
+  // Everything here is arithmetic over what was actually logged. A day with
+  // nothing logged is a zero, not a gap to be filled in, and a week with no
+  // data says so instead of drawing a plausible-looking chart.
+
+  /// The last seven days ending today, oldest first. Today's entry always
+  /// reflects the meals in memory, so a meal just logged shows immediately
+  /// rather than waiting for the next hydrate.
+  List<DayTotals> week() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final byDay = {for (final d in dayHistory) DateTime(d.day.year, d.day.month, d.day.day): d};
+
+    final todayTotals = consumed();
+    if (meals.isNotEmpty) {
+      byDay[today] = DayTotals(day: today, kcal: todayTotals.kcal, meals: meals.length);
+    }
+
+    return [
+      for (var i = 6; i >= 0; i--)
+        byDay[today.subtract(Duration(days: i))] ??
+            DayTotals(day: today.subtract(Duration(days: i)), kcal: 0, meals: 0),
+    ];
+  }
+
+  /// Days in the last week with anything logged at all.
+  int activeDays() => week().where((d) => d.meals > 0).length;
+
+  int mealsThisWeek() => week().fold(0, (sum, d) => sum + d.meals);
+
+  /// Days whose intake landed within 10% of the target. Only counted over days
+  /// that were actually logged — an unlogged day is unknown, not a miss.
+  int daysInRange() {
+    final tgt = target().kcal;
+    return week().where((d) => d.meals > 0 && (d.kcal - tgt).abs() <= tgt * 0.1).length;
+  }
+
+  /// How much Qamar actually holds about this person. Only things the user
+  /// gave it count — the defaults a fresh Profile carries do not.
+  int rememberedCount() {
+    const fresh = Profile();
+    var n = 0;
+    if (profile.name.isNotEmpty) n++;
+    if (profile.birthYear != fresh.birthYear || profile.birthMonth != fresh.birthMonth || profile.birthDay != fresh.birthDay) n++;
+    if (profile.height != fresh.height) n++;
+    if (profile.weight != fresh.weight) n++;
+    if (profile.goal != fresh.goal) n++;
+    if (profile.activity != fresh.activity) n++;
+    n += profile.prefs.where((p) => p != 'none').length;
+    if (meals.isNotEmpty) n++;
+    return n;
+  }
 
   int level() => math.min(20, 1 + (suLifetime / 25).floor());
   double levelPct() => math.min(100, ((suLifetime % 25) / 25 * 100)).toDouble();

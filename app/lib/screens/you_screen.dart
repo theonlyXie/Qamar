@@ -19,10 +19,19 @@ class YouScreen extends StatelessWidget {
     final isAr = state.isAr;
     final tg = state.target();
 
+    // Everything in this list is read off real state. "Qamar memory" counts
+    // what Qamar actually holds about this person — it used to say "6 items"
+    // regardless of whether it knew anything at all.
+    final remembered = state.rememberedCount();
     final rows = <(String, String)>[
       (isAr ? 'الهدف والسعرات' : 'Target and calories', '${tg.kcal} kcal'),
       (isAr ? 'ما يجب تجنبه' : 'What to avoid', state.profile.prefs.isNotEmpty ? '${state.profile.prefs.length}' : (isAr ? 'مفيش' : 'None')),
-      (isAr ? 'ذاكرة قمر' : 'Qamar memory', isAr ? '٦ عناصر' : '6 items'),
+      (
+        isAr ? 'ذاكرة قمر' : 'Qamar memory',
+        remembered == 0
+            ? (isAr ? 'فاضية' : 'Empty')
+            : (isAr ? '${state.iso('$remembered')} عناصر' : '$remembered items')
+      ),
       (isAr ? 'محفظة نقاط Su' : 'Su Points wallet', state.iso('${state.suAvailable}')),
       (isAr ? 'موافقة تحسين الخدمة' : 'Service-improvement consent', state.improve ? (isAr ? 'مفعّلة' : 'On') : (isAr ? 'موقوفة' : 'Off')),
       (isAr ? 'الموافقات' : 'Consents', isAr ? 'الإصدار ١.١' : 'v1.1'),
