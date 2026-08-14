@@ -146,21 +146,14 @@ class YouScreen extends StatelessWidget {
             ]),
           ),
         ],
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(QRadii.lg),
-            onTap: () => state.setLang(isAr ? AppLang.en : AppLang.ar),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-              decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
-              child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(isAr ? 'اللغة' : 'Language', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
-                Text(isAr ? 'العربية' : 'English', style: QText.body(size: 13, color: QColors.textFaint)),
-              ]),
-            ),
-          ),
+        Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text(isAr ? 'اللغة' : 'Language', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+            QLangToggle(lang: state.lang, onChanged: state.setLang),
+          ]),
         ),
         Container(
           padding: const EdgeInsets.all(18),

@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/explain.dart';
 import 'package:qamar/widgets/tree_overlay.dart';
@@ -124,6 +125,7 @@ void main() {
   });
 
   secondRound();
+  languageTests();
 
   group('explain registry', () {
     test('the smallest matching region wins', () {
@@ -271,6 +273,67 @@ void secondRound() {
         expect(ex.bodyAr, contains(p.ar));
       }
       expect(ex.bodyEn, contains('${mealKcal(lunch)}'));
+    });
+  });
+}
+
+/// Language switching must be available and non-destructive.
+void languageTests() {
+  group('language', () {
+    test('defaults to Arabic, right-to-left', () {
+      final state = AppState();
+      expect(state.lang, AppLang.ar);
+      expect(state.isAr, isTrue);
+      expect(state.lang.isRtl, isTrue);
+    });
+
+    test('switching mid-onboarding keeps answers and position', () async {
+      final state = AppState();
+      state.profile = state.profile.copyWith(age: 30);
+      state.primarySubmit();
+      await settle();
+      final stepBefore = state.step;
+
+      state.setLang(AppLang.en);
+
+      expect(state.lang, AppLang.en);
+      expect(state.lang.isRtl, isFalse);
+      expect(state.step, stepBefore, reason: 'must not restart the conversation');
+      expect(state.profile.age, 30, reason: 'answers already given must survive');
+      expect(state.msgs, isNotEmpty);
+    });
+
+    test('every onboarding step has both languages', () {
+      for (final step in kOnboardingSteps) {
+        expect(step.askAr.trim(), isNotEmpty, reason: step.id);
+        expect(step.askEn.trim(), isNotEmpty, reason: step.id);
+        expect(step.askAr, isNot(step.askEn), reason: '${step.id} is untranslated');
+        for (final o in step.options) {
+          expect(o.ar.trim(), isNotEmpty, reason: '${step.id} option');
+          expect(o.en.trim(), isNotEmpty, reason: '${step.id} option');
+        }
+      }
+    });
+
+    test('tree and log labels are translated', () {
+      for (final n in kTreeNodes) {
+        expect(n.label(true).trim(), isNotEmpty);
+        expect(n.label(false).trim(), isNotEmpty);
+        expect(n.label(true), isNot(n.label(false)));
+      }
+      for (final m in kLogMethods) {
+        expect(m.label(true), isNot(m.label(false)));
+      }
+    });
+
+    test('explanations carry both languages', () {
+      for (final e in kExplanations.entries) {
+        expect(e.value.titleAr, isNot(e.value.titleEn), reason: e.key);
+        expect(e.value.bodyAr.trim(), isNotEmpty, reason: e.key);
+        expect(e.value.bodyEn.trim(), isNotEmpty, reason: e.key);
+        expect(e.value.soWhatAr.trim(), isNotEmpty, reason: e.key);
+        expect(e.value.soWhatEn.trim(), isNotEmpty, reason: e.key);
+      }
     });
   });
 }

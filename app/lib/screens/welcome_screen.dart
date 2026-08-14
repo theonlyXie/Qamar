@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
+import '../widgets/common.dart';
 import '../widgets/living_orb.dart';
 
 class WelcomeScreen extends StatelessWidget {
@@ -20,6 +21,15 @@ class WelcomeScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // First thing on the first screen: someone who does not read Arabic
+          // must be able to switch before the conversation starts.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+            child: Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: QLangToggle(lang: state.lang, onChanged: state.setLang, large: true),
+            ),
+          ),
           Expanded(
             child: Center(
               child: LayoutBuilder(builder: (context, box) {

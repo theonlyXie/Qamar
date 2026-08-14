@@ -78,6 +78,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ],
               ),
               const Spacer(),
+              // Switchable mid-conversation: the questions re-render in the
+              // other language and the answers already given are kept.
+              QLangToggle(lang: state.lang, onChanged: state.setLang),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(border: Border.all(color: QColors.borderSoft), borderRadius: BorderRadius.circular(999)),

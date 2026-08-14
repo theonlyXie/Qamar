@@ -73,7 +73,13 @@ class _ScanScreenState extends State<ScanScreen> {
               children: [
                 QRoundIconButton(icon: Icons.close, onTap: state.backToWelcome),
                 const SizedBox(width: 12),
-                Text(t.scanTitle, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+                Expanded(
+                  child: Text(t.scanTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+                ),
+                QLangToggle(lang: state.lang, onChanged: state.setLang),
               ],
             ),
           ),

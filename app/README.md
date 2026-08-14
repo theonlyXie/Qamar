@@ -65,9 +65,12 @@ rebuilt as real Flutter screens rather than copying the prototype's DOM:
   orbiting sparks), `lib/widgets/orb_nav.dart` (drag-anywhere, tap-to-open),
   `lib/widgets/tree_overlay.dart` (radial nav with animated branches).
 - **i18n**: `lib/l10n/strings.dart` is the full AR/EN string table from the
-  prototype; `main.dart` flips `Directionality` live, matching the
-  prototype's AR/EN toggle (now surfaced as a row on the You screen, since
-  that toggle was prototype-preview chrome, not part of any real screen).
+  prototype; `main.dart` flips `Directionality` live. The `QLangToggle`
+  control sits on the welcome screen, in the onboarding header, on the scan
+  header and in You — the You row alone was unreachable until onboarding was
+  finished, so a user who does not read Arabic had to complete an Arabic
+  conversation before they could switch out of it. Switching mid-conversation
+  keeps the answers already given and the current step.
 
 ## What's stubbed (backend/auth/AI/payments)
 

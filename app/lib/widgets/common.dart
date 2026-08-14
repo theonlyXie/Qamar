@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -256,6 +257,88 @@ class _QWheelFieldState extends State<QWheelField> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A compact AR/EN switch.
+///
+/// The only language control used to be a row at the bottom of the You screen,
+/// which is unreachable until onboarding is finished — so someone who does not
+/// read Arabic had to complete an Arabic conversation before they could switch
+/// out of it. This goes wherever that matters: the welcome screen, the
+/// onboarding header, the scan header.
+class QLangToggle extends StatelessWidget {
+  final AppLang lang;
+  final ValueChanged<AppLang> onChanged;
+
+  /// Slightly larger, for screens with room for it.
+  final bool large;
+
+  const QLangToggle({super.key, required this.lang, required this.onChanged, this.large = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final h = large ? 34.0 : 28.0;
+    return Container(
+      height: h,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: QColors.cardDeep.withValues(alpha: 0.9),
+        border: Border.all(color: QColors.borderSoft),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      // Fixed left-to-right so the two options never swap places when the
+      // direction flips — a control that moves as you use it is disorienting.
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _Segment(label: 'ع', selected: lang == AppLang.ar, large: large, onTap: () => onChanged(AppLang.ar)),
+            _Segment(label: 'EN', selected: lang == AppLang.en, large: large, onTap: () => onChanged(AppLang.en)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Segment extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final bool large;
+  final VoidCallback onTap;
+  const _Segment({required this.label, required this.selected, required this.large, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: EdgeInsets.symmetric(horizontal: large ? 14 : 11),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: selected ? QColors.brandGradient : null,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            label,
+            style: QText.body(
+              size: large ? 13 : 12,
+              weight: FontWeight.w600,
+              color: selected ? Colors.white : QColors.textMuted,
+            ),
+          ),
         ),
       ),
     );
