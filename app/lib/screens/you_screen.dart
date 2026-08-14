@@ -50,40 +50,45 @@ class YouScreen extends StatelessWidget {
             const SizedBox(width: 14),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(state.profile.name.isNotEmpty ? state.profile.name : (isAr ? 'يا صاحبي' : 'friend'), style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),
-              Text(t.guestAccount, style: QText.body(size: 12, color: QColors.textMuted)),
+              Text(state.accountEmail ?? t.guestAccount, style: QText.body(size: 12, color: QColors.textMuted)),
             ]),
           ]),
         ),
         const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: QColors.violet.withOpacity(0.1), border: Border.all(color: QColors.violet.withOpacity(0.4)), borderRadius: BorderRadius.circular(QRadii.xl)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(t.saveProgress, style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFE9ECFF))),
-              const SizedBox(height: 4),
-              Text(t.saveProgressSub, style: QText.body(size: 13, height: 20, color: QColors.textMid)),
-              const SizedBox(height: 8),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: () {},
-                    child: Ink(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                      decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(999))),
-                      child: Text(t.linkAccount, style: QText.body(size: 13, weight: FontWeight.w600, color: Colors.white)),
+        // Only offered while the account really is a guest one. Once an email
+        // is attached this card would be inviting the user to do something
+        // they have already done.
+        if (!state.hasAccount) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: QColors.violet.withOpacity(0.1), border: Border.all(color: QColors.violet.withOpacity(0.4)), borderRadius: BorderRadius.circular(QRadii.xl)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(t.saveProgress, style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFE9ECFF))),
+                const SizedBox(height: 4),
+                Text(t.saveProgressSub, style: QText.body(size: 13, height: 20, color: QColors.textMid)),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(999),
+                      onTap: state.openLinkAccount,
+                      child: Ink(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                        decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(999))),
+                        child: Text(t.linkAccount, style: QText.body(size: 13, weight: FontWeight.w600, color: Colors.white)),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 14),
+          const SizedBox(height: 14),
+        ],
         Material(
           color: Colors.transparent,
           child: InkWell(
@@ -210,7 +215,7 @@ class YouScreen extends StatelessWidget {
                   color: Colors.transparent,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(999),
-                    onTap: () {},
+                    onTap: state.openSubscription,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
                       decoration: BoxDecoration(color: const Color(0xFFF5F7FF), borderRadius: BorderRadius.circular(999)),

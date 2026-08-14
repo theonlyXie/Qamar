@@ -51,7 +51,8 @@ Future<AppState> _backedState(Dictation dictation) async {
       anonKey: QamarConfig.supabaseAnonKey,
     );
     final client = Supabase.instance.client;
-    final user = await AuthService(client).ensureSignedIn();
+    final auth = AuthService(client);
+    final user = await auth.ensureSignedIn();
 
     return AppState(
       profileRepo: SupabaseProfileRepository(client),
@@ -59,6 +60,7 @@ Future<AppState> _backedState(Dictation dictation) async {
       walletRepo: SupabaseWalletRepository(client),
       ai: _gatewayIfConfigured(client),
       dictation: dictation,
+      auth: auth,
       userId: user.id,
     );
   } catch (e) {

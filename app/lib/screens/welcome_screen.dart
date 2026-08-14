@@ -96,20 +96,20 @@ class WelcomeScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: _ProviderButton(label: 'Apple', mark: '●', color: QColors.providerApple, onTap: state.startOnboarding)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _ProviderButton(label: 'Google', mark: 'G', color: QColors.providerGoogle, onTap: state.startOnboarding)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _ProviderButton(label: 'Facebook', mark: 'f', color: QColors.providerFacebook, onTap: state.startOnboarding)),
-                ],
+              // Email only, and it works. Apple and Google sat here as three
+              // buttons that went straight to onboarding without signing
+              // anybody in; they come back when the native entitlement and
+              // OAuth client IDs exist, not before.
+              _ProviderButton(
+                label: state.isAr ? 'كمّل بالإيميل' : 'Continue with email',
+                icon: Icons.mail_outline,
+                onTap: state.openLinkAccount,
               ),
               const SizedBox(height: 4),
               SizedBox(
                 height: 38,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: state.openSignIn,
                   child: Text(t.haveAccount, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textMuted)),
                 ),
               ),
@@ -184,10 +184,9 @@ class _FloatingPill extends StatelessWidget {
 
 class _ProviderButton extends StatelessWidget {
   final String label;
-  final String mark;
-  final Color color;
+  final IconData icon;
   final VoidCallback onTap;
-  const _ProviderButton({required this.label, required this.mark, required this.color, required this.onTap});
+  const _ProviderButton({required this.label, required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -203,9 +202,9 @@ class _ProviderButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(mark, style: QText.number(size: 16, weight: FontWeight.w700, color: color)),
+            Icon(icon, size: 18, color: QColors.textMid),
             const SizedBox(width: 8),
-            Text(label, style: QText.number(size: 14, weight: FontWeight.w600, color: QColors.textHigh)),
+            Text(label, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
           ],
         ),
       ),

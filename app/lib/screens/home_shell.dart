@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../state/app_state.dart';
 import '../theme/colors.dart';
+import '../widgets/account_sheet.dart';
 import '../widgets/ask_qamar_overlay.dart';
 import '../widgets/explain.dart';
 import '../widgets/orb_nav.dart';
@@ -68,6 +69,7 @@ class HomeShell extends StatelessWidget {
               if (state.treeOpen) const TreeOverlay(),
               if (state.chatOpen) const AskQamarOverlay(),
               if (state.whyOpen) const WhySheet(),
+              if (state.authOpen) const AccountSheet(),
               if (state.explainOpen != null) const ExplainSheet(),
             ],
           ),

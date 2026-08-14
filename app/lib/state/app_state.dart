@@ -8,6 +8,7 @@ import '../models/meal.dart';
 import '../models/messages.dart';
 import '../models/onboarding.dart';
 import '../services/ai_gateway.dart';
+import '../services/auth_service.dart';
 import '../services/dictation.dart';
 import '../services/repositories.dart';
 import '../widgets/explain.dart';
@@ -42,12 +43,14 @@ class AppState extends ChangeNotifier {
     WalletRepository? walletRepo,
     AiGateway? ai,
     Dictation? dictation,
+    Account? auth,
     String? userId,
   })  : _profileRepo = profileRepo,
         _mealRepo = mealRepo,
         _walletRepo = walletRepo,
         _ai = ai,
         _dictation = dictation,
+        _auth = auth,
         _userId = userId {
     if (isBacked) hydrate();
   }
@@ -64,6 +67,11 @@ class AppState extends ChangeNotifier {
   /// The device's speech recogniser. Null in tests and on platforms without
   /// one, where the UI falls back to typing.
   final Dictation? _dictation;
+
+  /// Real account linking, when there is a Supabase session behind it. Null
+  /// offline, where the account UI says so instead of failing silently.
+  final Account? _auth;
+
   final String? _userId;
 
   /// True when there is a signed-in user and repositories to talk to.
@@ -1242,6 +1250,151 @@ class AppState extends ChangeNotifier {
     suAvailable += amount;
     suLifetime += amount;
     ledgerExtra.insert(0, LedgerEntry(label: isAr ? ar : en, amount: amount, when: isAr ? 'دلوقتي' : 'Just now'));
+  }
+
+  // ---- account -------------------------------------------------
+  //
+  // Email only, and it genuinely works. Apple and Google need native setup
+  // this project does not have yet, so their buttons are absent rather than
+  // present and inert.
+
+  bool authOpen = false;
+
+  /// True when the user is attaching an email to the guest account they have
+  /// been using; false when they are signing in to an existing account on a
+  /// new device.
+  bool authLinking = true;
+
+  /// Whether the six-digit code has been sent and is now being waited for.
+  bool authCodeSent = false;
+  bool authBusy = false;
+  String authEmail = '';
+  String authCode = '';
+  String? authError;
+  String? authDone;
+
+  bool get hasAccount => _auth?.isAnonymous == false;
+  String? get accountEmail => _auth?.email;
+
+  void openLinkAccount() {
+    authOpen = true;
+    authLinking = true;
+    _resetAuthFields();
+  }
+
+  void openSignIn() {
+    authOpen = true;
+    authLinking = false;
+    _resetAuthFields();
+  }
+
+  void closeAuth() {
+    authOpen = false;
+    _notify();
+  }
+
+  void _resetAuthFields() {
+    authCodeSent = false;
+    authBusy = false;
+    authCode = '';
+    authError = null;
+    authDone = null;
+    _notify();
+  }
+
+  void onAuthEmailChanged(String v) {
+    authEmail = v.trim();
+    authError = null;
+    _notify();
+  }
+
+  void onAuthCodeChanged(String v) {
+    authCode = v.trim();
+    authError = null;
+    _notify();
+  }
+
+  static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s.]+\.[^@\s]+$');
+  bool get authEmailValid => _emailPattern.hasMatch(authEmail);
+
+  Future<void> sendAuthCode() async {
+    final auth = _auth;
+    if (auth == null) {
+      authError = isAr
+          ? 'الحسابات محتاجة اتصال بالسيرفر، والتطبيق شغال أوفلاين دلوقتي.'
+          : 'Accounts need a server connection, and the app is running offline.';
+      _notify();
+      return;
+    }
+    if (!authEmailValid) {
+      authError = isAr ? 'الإيميل ده مش مظبوط.' : 'That email does not look right.';
+      _notify();
+      return;
+    }
+    authBusy = true;
+    authError = null;
+    _notify();
+    try {
+      authLinking ? await auth.startLink(authEmail) : await auth.startSignIn(authEmail);
+      if (_disposed) return;
+      authCodeSent = true;
+    } catch (e) {
+      if (_disposed) return;
+      authError = _authMessage(e);
+    }
+    authBusy = false;
+    _notify();
+  }
+
+  Future<void> verifyAuthCode() async {
+    final auth = _auth;
+    if (auth == null) return;
+    if (authCode.length < 6) {
+      authError = isAr ? 'الكود ٦ أرقام.' : 'The code is six digits.';
+      _notify();
+      return;
+    }
+    authBusy = true;
+    authError = null;
+    _notify();
+    try {
+      authLinking
+          ? await auth.confirmLink(email: authEmail, token: authCode)
+          : await auth.confirmSignIn(email: authEmail, token: authCode);
+      if (_disposed) return;
+      authDone = isAr ? 'تمام، الحساب اتربط بـ $authEmail.' : 'Done — your account is linked to $authEmail.';
+      authBusy = false;
+      _notify();
+      // Signing in on a new device brings a different set of rows with it.
+      if (!authLinking) await hydrate();
+    } catch (e) {
+      if (_disposed) return;
+      authError = _authMessage(e);
+      authBusy = false;
+      _notify();
+    }
+  }
+
+  /// Turns a Supabase error into something a person can act on. The raw
+  /// message is kept when it is not one we recognise — hiding it would make a
+  /// misconfigured project look like a broken app.
+  String _authMessage(Object e) {
+    final raw = '$e';
+    if (raw.contains('already been registered') || raw.contains('already registered')) {
+      return isAr
+          ? 'الإيميل ده متسجل قبل كده. ادخل بيه من "عندي حساب".'
+          : 'That email is already registered. Use “I already have an account” to sign in with it.';
+    }
+    if (raw.contains('Token has expired') || raw.contains('expired')) {
+      return isAr ? 'الكود خلصت مدته. اطلب واحد جديد.' : 'That code has expired. Ask for a new one.';
+    }
+    if (raw.contains('Invalid token') || raw.contains('invalid')) {
+      return isAr ? 'الكود غلط. راجع الأرقام.' : 'That code is not right. Check the digits.';
+    }
+    if (raw.contains('rate limit') || raw.contains('Too many')) {
+      return isAr ? 'طلبات كتير على بعض. استنى شوية.' : 'Too many attempts. Wait a minute and try again.';
+    }
+    return raw;
   }
 
   // ---- progress -------------------------------------------------

@@ -7,9 +7,11 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/services/ai_gateway.dart';
+import 'package:qamar/services/auth_service.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
 
@@ -120,17 +122,50 @@ class FakeGateway implements AiGateway {
   }
 }
 
+class FakeAccount implements Account {
+  final List<String> linkStarts = [];
+  final List<String> signInStarts = [];
+  Object? failWith;
+  bool linked = false;
+
+  @override
+  bool get isAnonymous => !linked;
+
+  @override
+  String? get email => linked ? 'nour@example.com' : null;
+
+  @override
+  Future<void> startLink(String email) async {
+    if (failWith != null) throw failWith!;
+    linkStarts.add(email);
+  }
+
+  @override
+  Future<void> confirmLink({required String email, required String token}) async {
+    if (failWith != null) throw failWith!;
+    linked = true;
+  }
+
+  @override
+  Future<void> startSignIn(String email) async => signInStarts.add(email);
+
+  @override
+  Future<void> confirmSignIn({required String email, required String token}) async => linked = true;
+}
+
 AppState backed({
   FakeProfileRepo? profiles,
   FakeMealRepo? meals,
   FakeWalletRepo? wallet,
   FakeGateway? ai,
+  FakeAccount? auth,
 }) =>
     AppState(
       profileRepo: profiles ?? FakeProfileRepo(),
       mealRepo: meals ?? FakeMealRepo(),
       walletRepo: wallet ?? FakeWalletRepo(),
       ai: ai,
+      auth: auth,
       userId: 'user-1',
     );
 
@@ -309,6 +344,66 @@ void main() {
     state.completeQuest();
     expect(state.ledger().single.amount, 5);
     expect(state.suAvailable, 5);
+  });
+
+  group('account', () {
+    test('linking sends a code and only then attaches the email', () async {
+      final auth = FakeAccount();
+      final state = backed(auth: auth);
+      await settle();
+
+      state.openLinkAccount();
+      state.onAuthEmailChanged('nour@example.com');
+      await state.sendAuthCode();
+
+      expect(auth.linkStarts, ['nour@example.com']);
+      expect(state.authCodeSent, isTrue);
+      expect(state.hasAccount, isFalse, reason: 'an unverified code links nothing');
+
+      state.onAuthCodeChanged('123456');
+      await state.verifyAuthCode();
+
+      expect(state.hasAccount, isTrue);
+      expect(state.accountEmail, 'nour@example.com');
+    });
+
+    test('a malformed address never reaches the server', () async {
+      final auth = FakeAccount();
+      final state = backed(auth: auth);
+      await settle();
+
+      state.openLinkAccount();
+      state.onAuthEmailChanged('nour@');
+      await state.sendAuthCode();
+
+      expect(auth.linkStarts, isEmpty);
+      expect(state.authError, isNotNull);
+      expect(state.authCodeSent, isFalse);
+    });
+
+    test('an address already in use is explained, not swallowed', () async {
+      final auth = FakeAccount()..failWith = StateError('Email address already been registered');
+      final state = backed(auth: auth);
+      await settle();
+      state.setLang(AppLang.en);
+
+      state.openLinkAccount();
+      state.onAuthEmailChanged('nour@example.com');
+      await state.sendAuthCode();
+
+      expect(state.authCodeSent, isFalse);
+      expect(state.authError, contains('already registered'));
+    });
+
+    test('with no server the account UI says so rather than failing silently', () async {
+      final state = AppState();
+      state.openLinkAccount();
+      state.onAuthEmailChanged('nour@example.com');
+      await state.sendAuthCode();
+
+      expect(state.authError, isNotNull);
+      expect(state.hasAccount, isFalse);
+    });
   });
 
   test('redeeming calls through to the wallet RPC', () async {
