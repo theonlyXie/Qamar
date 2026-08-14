@@ -10,6 +10,12 @@
 class QamarConfig {
   QamarConfig._();
 
+  /// Shown on the You screen so a tester can tell at a glance which build is
+  /// on the phone. Keep in step with `version:` in pubspec.yaml — reading the
+  /// real value at runtime would mean adding package_info_plus, which is not
+  /// worth a dependency for one label.
+  static const buildLabel = '0.2.0 (2)';
+
   /// Supplied via --dart-define=SUPABASE_URL=... at build time. Never commit
   /// real values — this file only reads them from the environment.
   static const supabaseUrl = String.fromEnvironment('SUPABASE_URL');

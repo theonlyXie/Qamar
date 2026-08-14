@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/strings.dart';
+import '../services/config.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
@@ -191,6 +192,13 @@ class YouScreen extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        Center(
+          child: Text(
+            'Qamar ${QamarConfig.buildLabel}',
+            style: QText.number(size: 11, color: QColors.textFaint),
           ),
         ),
       ],
