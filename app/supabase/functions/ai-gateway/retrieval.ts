@@ -122,7 +122,7 @@ async function openFoodFacts(query: string): Promise<FoodFacts | null> {
     `&fields=product_name,nutriments,code`;
   try {
     const res = await fetch(url, {
-      headers: { "User-Agent": "Qamar/0.6 (nutrition app; contact: support@qamar.app)" },
+      headers: { "User-Agent": "Qamar/0.6 (https://dr-qamar.com; contact: support@dr-qamar.com)" },
     });
     if (!res.ok) return null;
     const json = await res.json();

@@ -1,7 +1,7 @@
 name: qamar
 description: Qamar — AI Health OS. Personal nutritionist in your pocket.
 publish_to: "none"
-version: 0.6.0+6
+version: 0.7.0+7
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -30,6 +30,10 @@ dependencies:
 
   # Store billing for the Qamar+ subscription once real product IDs exist.
   in_app_purchase: ^3.2.0
+
+  # Opening the legal pages on dr-qamar.com. Already present transitively via
+  # supabase_flutter; declared here because we call it directly.
+  url_launcher: ^6.3.2
 
   intl: ^0.20.3
   http: ^1.2.2

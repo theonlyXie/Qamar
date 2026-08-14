@@ -14,7 +14,7 @@ class QamarConfig {
   /// on the phone. Keep in step with `version:` in pubspec.yaml — reading the
   /// real value at runtime would mean adding package_info_plus, which is not
   /// worth a dependency for one label.
-  static const buildLabel = '0.6.0 (6)';
+  static const buildLabel = '0.7.0 (7)';
 
   /// Supplied via --dart-define=SUPABASE_URL=... at build time. Never commit
   /// real values — this file only reads them from the environment.
@@ -26,6 +26,15 @@ class QamarConfig {
   /// the app; all AI requests pass through the server gateway" — the app
   /// never holds an OpenAI/etc key directly.
   static const aiGatewayUrl = String.fromEnvironment('AI_GATEWAY_URL');
+
+  /// Public site. The store listings require reachable privacy and support
+  /// URLs, and the app must link to the same terms the subscription is sold
+  /// under.
+  static const site = 'https://dr-qamar.com';
+  static const privacyUrl = '$site/privacy';
+  static const termsUrl = '$site/terms';
+  static const supportUrl = '$site/support';
+  static const deleteDataUrl = '$site/delete-account';
 
   static bool get useSupabase => supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
   static bool get useAiGateway => aiGatewayUrl.isNotEmpty;

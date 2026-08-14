@@ -25,8 +25,7 @@ class YouScreen extends StatelessWidget {
       (isAr ? 'ذاكرة قمر' : 'Qamar memory', isAr ? '٦ عناصر' : '6 items'),
       (isAr ? 'محفظة نقاط Su' : 'Su Points wallet', state.iso('${state.suAvailable}')),
       (isAr ? 'موافقة تحسين الخدمة' : 'Service-improvement consent', state.improve ? (isAr ? 'مفعّلة' : 'On') : (isAr ? 'موقوفة' : 'Off')),
-      (isAr ? 'الخصوصية والموافقات' : 'Privacy and consents', isAr ? 'الإصدار ١.١' : 'v1.1'),
-      (isAr ? 'تصدير أو حذف بياناتي' : 'Export or delete my data', ''),
+      (isAr ? 'الموافقات' : 'Consents', isAr ? 'الإصدار ١.١' : 'v1.1'),
     ];
 
     return ListView(
@@ -145,6 +144,34 @@ class YouScreen extends StatelessWidget {
             ]),
           ),
         ],
+        // Both of these are store requirements, and the second is a legal
+        // obligation — they cannot stay as decoration.
+        Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text(isAr ? 'سياسة الخصوصية والشروط' : 'Privacy policy and terms',
+                style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+            Row(children: [
+              QLegalLink(label: isAr ? 'الخصوصية' : 'Privacy', url: QamarConfig.privacyUrl, size: 12),
+              Text('  ·  ', style: QText.body(size: 12, color: QColors.textFaint)),
+              QLegalLink(label: isAr ? 'الشروط' : 'Terms', url: QamarConfig.termsUrl, size: 12),
+            ]),
+          ]),
+        ),
+        Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Flexible(
+              child: Text(isAr ? 'تصدير أو حذف بياناتي' : 'Export or delete my data',
+                  style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+            ),
+            QLegalLink(label: isAr ? 'افتح' : 'Open', url: QamarConfig.deleteDataUrl, size: 12),
+          ]),
+        ),
         Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),

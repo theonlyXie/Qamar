@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../services/config.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
@@ -169,9 +170,11 @@ class SubscriptionScreen extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(isAr ? 'الشروط' : 'Terms', style: QText.body(size: 11, color: QColors.textMuted)),
+            QLegalLink(label: isAr ? 'الشروط' : 'Terms', url: QamarConfig.termsUrl),
             Text('  ·  ', style: QText.body(size: 11, color: QColors.textFaint)),
-            Text(isAr ? 'الخصوصية' : 'Privacy', style: QText.body(size: 11, color: QColors.textMuted)),
+            QLegalLink(label: isAr ? 'الخصوصية' : 'Privacy', url: QamarConfig.privacyUrl),
+            Text('  ·  ', style: QText.body(size: 11, color: QColors.textFaint)),
+            QLegalLink(label: isAr ? 'الدعم' : 'Support', url: QamarConfig.supportUrl),
           ],
         ),
       ],

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
@@ -417,5 +418,40 @@ class ChatScroller {
   void dispose() {
     _settle?.cancel();
     controller.dispose();
+  }
+}
+
+
+/// A text link to one of the public pages on dr-qamar.com.
+///
+/// The stores require reachable privacy and support pages, and a subscription
+/// has to link to the terms it is sold under — so these must actually open,
+/// not sit there as decoration.
+class QLegalLink extends StatelessWidget {
+  final String label;
+  final String url;
+  final double size;
+  const QLegalLink({super.key, required this.label, required this.url, this.size = 11});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () async {
+        final uri = Uri.parse(url);
+        // externalApplication: legal pages belong in the browser, where the
+        // user can see the address they are being shown.
+        if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+          await launchUrl(uri);
+        }
+      },
+      child: Text(
+        label,
+        style: QText.body(
+          size: size,
+          weight: FontWeight.w500,
+          color: QColors.textMuted,
+        ).copyWith(decoration: TextDecoration.underline, decorationColor: QColors.textFaint),
+      ),
+    );
   }
 }
