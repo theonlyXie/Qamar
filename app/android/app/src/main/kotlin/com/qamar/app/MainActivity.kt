@@ -1,4 +1,4 @@
-package com.drqamar.app
+package com.qamar.app
 
 import io.flutter.embedding.android.FlutterActivity
 
