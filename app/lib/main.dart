@@ -5,7 +5,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'l10n/strings.dart';
 import 'screens/home_shell.dart';
+import 'services/ai_gateway.dart';
 import 'services/auth_service.dart';
+import 'services/dictation.dart';
 import 'services/config.dart';
 import 'services/supabase_repositories.dart';
 import 'state/app_state.dart';
@@ -19,11 +21,15 @@ Future<void> main() async {
   // --dart-define turns on persistence; everything below degrades to the
   // offline behaviour if any of it fails, because failing to reach a backend
   // must never be the reason someone cannot use the app.
+  // Dictation is on-device and needs no configuration, so it is always
+  // available to try; it reports honestly if the platform cannot do it.
+  final dictation = Dictation();
+
   AppState state;
   if (QamarConfig.useSupabase) {
-    state = await _backedState();
+    state = await _backedState(dictation);
   } else {
-    state = AppState();
+    state = AppState(ai: _gatewayIfConfigured(null), dictation: dictation);
   }
 
   runApp(
@@ -38,7 +44,7 @@ Future<void> main() async {
 /// repositories. Anonymous sign-in comes first so a new user has an identity —
 /// and therefore rows they own under RLS — before answering a single question;
 /// linking Apple or Google later keeps the same id and the same data.
-Future<AppState> _backedState() async {
+Future<AppState> _backedState(Dictation dictation) async {
   try {
     await Supabase.initialize(
       url: QamarConfig.supabaseUrl,
@@ -51,14 +57,30 @@ Future<AppState> _backedState() async {
       profileRepo: SupabaseProfileRepository(client),
       mealRepo: SupabaseMealRepository(client),
       walletRepo: SupabaseWalletRepository(client),
+      ai: _gatewayIfConfigured(client),
+      dictation: dictation,
       userId: user.id,
     );
   } catch (e) {
     // No network, anonymous sign-ins not enabled, bad keys: run offline
     // rather than showing a dead app.
     debugPrint('Qamar: continuing without a backend — $e');
-    return AppState();
+    return AppState(dictation: dictation);
   }
+}
+
+/// The real assistant, or null.
+///
+/// Null is deliberate and visible: with no gateway the app says it is not
+/// connected rather than replying from a script. The gateway is called with
+/// the user's own access token, so it can check who is asking and refuse a
+/// blocked profile server-side.
+AiGateway? _gatewayIfConfigured(SupabaseClient? client) {
+  if (!QamarConfig.useAiGateway || client == null) return null;
+  return HttpAiGateway(
+    baseUrl: QamarConfig.aiGatewayUrl,
+    authTokenProvider: () => client.auth.currentSession?.accessToken ?? '',
+  );
 }
 
 class QamarApp extends StatelessWidget {

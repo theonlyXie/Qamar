@@ -6,8 +6,9 @@
 //
 // Routes:
 //   POST /ai-gateway/chat/reply     { message, lang }
-//   POST /ai-gateway/meal/analyze   { inputType, text?, mediaPath? }
+//   POST /ai-gateway/meal/analyze   { inputType, text?, imageBase64?, imageMediaType? }
 //   POST /ai-gateway/plan/generate  { date? }
+//   POST /ai-gateway/scan/read      { imageBase64, imageMediaType, lang }
 //
 // Secrets (supabase secrets set ...):
 //   ANTHROPIC_API_KEY   required
@@ -15,7 +16,17 @@
 //   USDA_API_KEY        optional, improves whole-food figures
 //   QAMAR_MODEL         optional, defaults to claude-sonnet-5
 
-import { callModel, chatSystemPrompt, mealAnalysisSystemPrompt, parseJson, planSystemPrompt, type UserContext } from "./model.ts";
+import {
+  bodyScanSystemPrompt,
+  callModel,
+  chatSystemPrompt,
+  mealAnalysisSystemPrompt,
+  mealPhotoSystemPrompt,
+  parseJson,
+  planSystemPrompt,
+  type ImageInput,
+  type UserContext,
+} from "./model.ts";
 import { lookupFoods, retrieve, type FoodFacts, type Passage, type Source } from "./retrieval.ts";
 import { classify, refusalText } from "./scope.ts";
 
@@ -193,9 +204,32 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
   return json({ reply: text, sources: asSources(passages, foods), refused: false });
 }
 
+/**
+ * The photo the app sent, if it sent one.
+ *
+ * A meal photo arrives inline as base64 rather than as a storage path: the
+ * picture is only needed for the length of this one call, so uploading it,
+ * reading it back and then having to delete it buys nothing.
+ *
+ * Anthropic accepts images up to 5 MB after base64 encoding. The app already
+ * downscales before sending; this is the backstop, and it refuses clearly
+ * instead of letting the model call fail with something unreadable.
+ */
+const MAX_IMAGE_B64 = 5 * 1024 * 1024;
+const ALLOWED_MEDIA = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+function readImage(body: { imageBase64?: string; imageMediaType?: string }): ImageInput | string | null {
+  const data = (body.imageBase64 ?? "").trim();
+  if (!data) return null;
+  if (data.length > MAX_IMAGE_B64) return "image too large";
+  const mediaType = (body.imageMediaType ?? "image/jpeg").toLowerCase();
+  if (!ALLOWED_MEDIA.includes(mediaType)) return `unsupported image type ${mediaType}`;
+  return { data, mediaType };
+}
+
 async function analyzeMeal(
   userId: string,
-  body: { inputType?: string; text?: string; mediaPath?: string; lang?: string },
+  body: { inputType?: string; text?: string; imageBase64?: string; imageMediaType?: string; lang?: string },
 ): Promise<Response> {
   const lang = body.lang === "ar" ? "ar" : "en";
   const described = (body.text ?? "").trim();
@@ -203,31 +237,102 @@ async function analyzeMeal(
   const { ctx, blocked } = await loadContext(userId, lang);
   if (blocked) return json({ error: "not eligible" }, 403);
 
-  if (!described) {
-    // Photo and voice need transcription/vision before this can be grounded.
-    // Returning empty is honest; the app keeps its confirm-before-write step.
-    return json({ items: [], note: "no text to analyse" });
-  }
+  const image = readImage(body);
+  if (typeof image === "string") return json({ error: image }, 413);
 
+  if (!described && !image) return json({ items: [], note: "nothing to analyse" });
+
+  // Free text names foods we can look up; a photo does not, so the lookup is
+  // driven by whatever the user typed alongside it, if anything.
   const foods = await lookupFoods(foodTerms(described));
+
+  // A photo with no caption still needs something in the user turn — the
+  // instruction is what the picture is being asked about.
+  const ask = image
+    ? described || (lang === "ar" ? "الوجبة دي فيها إيه وكام سعرة؟" : "What is in this meal, and how many calories?")
+    : described;
+
   const { text, model } = await callModel({
-    system: mealAnalysisSystemPrompt(ctx, foods),
-    user: described,
+    system: image ? mealPhotoSystemPrompt(ctx, foods) : mealAnalysisSystemPrompt(ctx, foods),
+    user: ask,
     maxTokens: 900,
     prefill: "{",
+    image: image ?? undefined,
   });
 
-  const parsed = parseJson<{ items: unknown[] }>(text);
+  const parsed = parseJson<{ items: unknown[]; note_ar?: string; note_en?: string }>(text);
   if (!parsed?.items) return json({ error: "could not analyse" }, 502);
 
   await record(userId, "meal_analysis", {
     inScope: true,
-    question: described,
+    question: image ? `[photo] ${ask}` : ask,
     answer: JSON.stringify(parsed.items).slice(0, 2000),
     sources: asSources([], foods),
     model,
   });
-  return json({ items: parsed.items, sources: asSources([], foods) });
+  return json({
+    items: parsed.items,
+    note: (lang === "ar" ? parsed.note_ar : parsed.note_en) ?? null,
+    sources: asSources([], foods),
+  });
+}
+
+interface BodyScanShape {
+  heightCm?: number | null;
+  weightKg?: number | null;
+  bodyFatPct?: number | null;
+  age?: number | null;
+  note?: string | null;
+}
+
+/**
+ * Reads a body-composition report.
+ *
+ * Anything outside a plausible human range is dropped rather than trusted: a
+ * misread "1.74" as 174 kg has to fail closed, because these numbers set the
+ * person's calorie target and nobody re-checks them afterwards.
+ */
+function plausible(v: unknown, min: number, max: number): number | null {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  const n = Math.round(v);
+  return n >= min && n <= max ? n : null;
+}
+
+async function readBodyScan(
+  userId: string,
+  body: { imageBase64?: string; imageMediaType?: string; lang?: string },
+): Promise<Response> {
+  const lang = body.lang === "ar" ? "ar" : "en";
+  const image = readImage(body);
+  if (typeof image === "string") return json({ error: image }, 413);
+  if (!image) return json({ error: "no image supplied" }, 400);
+
+  const { text, model } = await callModel({
+    system: bodyScanSystemPrompt(lang),
+    user: lang === "ar" ? "اقرا الأرقام اللي في التقرير ده." : "Read the figures on this report.",
+    maxTokens: 400,
+    prefill: "{",
+    image,
+  });
+
+  const parsed = parseJson<BodyScanShape>(text);
+  if (!parsed) return json({ error: "could not read the report" }, 502);
+
+  const result = {
+    heightCm: plausible(parsed.heightCm, 120, 230),
+    weightKg: plausible(parsed.weightKg, 30, 300),
+    bodyFatPct: plausible(parsed.bodyFatPct, 3, 70),
+    age: plausible(parsed.age, 13, 100),
+    note: typeof parsed.note === "string" ? parsed.note : null,
+  };
+
+  await record(userId, "meal_analysis", {
+    inScope: true,
+    question: "[body scan]",
+    answer: JSON.stringify(result),
+    model,
+  });
+  return json(result);
 }
 
 interface PlanShape {
@@ -314,6 +419,8 @@ Deno.serve(async (req) => {
         return await analyzeMeal(userId, body);
       case "/plan/generate":
         return await generatePlan(userId, body);
+      case "/scan/read":
+        return await readBodyScan(userId, body);
       default:
         return json({ error: `unknown route ${route}` }, 404);
     }

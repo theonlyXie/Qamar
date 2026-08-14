@@ -4,6 +4,12 @@
          would oblige us to request it and would break devices that only have
          a gallery. Marked not-required so phones without a camera can still
          install and use the typed onboarding path. -->
+    <!-- Dictation. RECORD_AUDIO is requested at runtime by speech_to_text; the
+         queries block is required on Android 11+ so the app can see that a
+         speech recogniser exists at all. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
@@ -48,6 +54,11 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
         </intent>
     </queries>
 </manifest>

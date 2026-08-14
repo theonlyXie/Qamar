@@ -12,6 +12,7 @@ import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/state/app_state.dart';
+import 'package:qamar/state/chat_replies.dart';
 import 'package:qamar/widgets/explain.dart';
 import 'package:qamar/widgets/tree_overlay.dart';
 
@@ -234,12 +235,34 @@ void secondRound() {
       expect(state.screen, before, reason: 'logging must not push a page');
     });
 
-    test('speaking puts the moon straight into listening', () {
+    test('speaking opens the conversation and tries to listen for real', () async {
+      // No Dictation injected — the device has no recogniser, as far as this
+      // AppState is concerned.
       final state = AppState()..openTreeHold();
       state.quickLog(QuickLog.voice);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
 
       expect(state.chatOpen, isTrue);
-      expect(state.chatState, ChatState.listening);
+      // It must NOT pretend to listen. The old implementation sat in
+      // `listening` for 1.5s and then inserted a scripted sentence; the real
+      // one reports that dictation is unavailable and leaves typing open.
+      expect(state.chatState, ChatState.idle);
+      expect(state.dictationError, isNotNull);
+      expect(state.chat.any((c) => c.who == ChatWho.u), isFalse,
+          reason: 'nothing may be said on the user behalf');
+    });
+
+    test('an unconnected assistant admits it rather than inventing a reply', () async {
+      final state = AppState();
+      expect(state.hasAssistant, isFalse);
+
+      await state.sendChatMsg('how much protein today?');
+
+      final reply = state.chat.lastWhere((c) => c.who == ChatWho.q);
+      // The canned replies live in chat_replies.dart; none of them may appear.
+      expect(kChatRepliesEn.any((r) => r.d == reply.text), isFalse,
+          reason: 'a scripted answer must never be presented as the assistant');
+      expect(state.chatState, ChatState.idle);
     });
 
     test('a photographed meal lands in the conversation, not a confirm page', () {

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/meal.dart';
 import '../models/messages.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
@@ -42,11 +43,16 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> {
     }
 
     final orbActive = state.chatState == ChatState.listening || state.chatState == ChatState.thinking;
-    final orbStateLabel = switch (state.chatState) {
-      ChatState.listening => t.sListening,
-      ChatState.thinking => t.sThinking,
-      ChatState.idle => t.sIdle,
-    };
+    // While dictating, show the words as the recogniser hears them — that is
+    // the difference between the microphone obviously working and the user
+    // wondering whether it is on. Falls back to the status label before the
+    // first word lands, and surfaces a real failure instead of hiding it.
+    final orbStateLabel = state.dictationError ??
+        switch (state.chatState) {
+          ChatState.listening => state.heard.isEmpty ? t.sListening : state.heard,
+          ChatState.thinking => t.sThinking,
+          ChatState.idle => t.sIdle,
+        };
     final showSuggestions = state.chatDraft.isEmpty && state.chatState != ChatState.thinking;
 
     return Positioned.fill(
@@ -89,6 +95,9 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> {
                         children: [
                           for (final c in state.chat) _ChatBubble(turn: c),
                           if (state.chatState == ChatState.thinking) const _ThinkingBubble(),
+                          // What the assistant read off the meal, waiting to be
+                          // confirmed. Nothing is written until it is.
+                          if (state.hasProposal) const _ProposalCard(),
                         ],
                       ),
                       PositionedDirectional(
@@ -315,6 +324,107 @@ class _ChatBubble extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The meal the assistant read, offered for confirmation inside the
+/// conversation. This is the whole confirm step — there is no confirm page —
+/// and the meal reaches the day's totals only when the button is pressed.
+class _ProposalCard extends StatelessWidget {
+  const _ProposalCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final t = state.t;
+    final isAr = state.isAr;
+    final items = state.proposalItems();
+    final totals = state.proposalTotals();
+
+    String confLabel(Confidence c) => switch (c) {
+          Confidence.high => isAr ? 'ثقة عالية' : 'High confidence',
+          Confidence.med => isAr ? 'ثقة متوسطة' : 'Medium confidence',
+          Confidence.low => isAr ? 'تقدير' : 'Estimate',
+        };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xF2182137), Color(0xF2111827)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        border: Border.all(color: QColors.violet.withOpacity(0.5)),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(t.nothingWrites, style: QText.body(size: 12, color: QColors.textMuted)),
+          const SizedBox(height: 10),
+          for (var i = 0; i < items.length; i++) ...[
+            Opacity(
+              // A dropped item stays visible: the reading is still what the
+              // assistant saw, it just is not going in the log.
+              opacity: items[i].q == 0 ? 0.4 : 1,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(isAr ? items[i].def.ar : items[i].def.en,
+                                  style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textPrimary)),
+                              Text(isAr ? items[i].def.portionAr : items[i].def.portionEn,
+                                  style: QText.body(size: 12, color: QColors.textMuted)),
+                            ],
+                          ),
+                        ),
+                        ConfidenceBadge(high: items[i].def.conf == Confidence.high, label: confLabel(items[i].def.conf)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        QRoundIconButton(icon: Icons.remove, onTap: () => state.decQty(i), size: 28),
+                        SizedBox(width: 40, child: Text('${items[i].q}×', textAlign: TextAlign.center, style: QText.number(size: 14, weight: FontWeight.w600, color: QColors.textMid))),
+                        QRoundIconButton(icon: Icons.add, onTap: () => state.incQty(i), size: 28),
+                        const Spacer(),
+                        Text('${items[i].def.kcal * items[i].q} kcal',
+                            style: QText.number(size: 14, weight: FontWeight.w600, color: QColors.cyan)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(t.approx, style: QText.number(size: 14, weight: FontWeight.w500, color: QColors.textMuted)),
+              Flexible(
+                child: Text('${totals.kcal} kcal · P ${totals.p} · C ${totals.c} · F ${totals.f}',
+                    textAlign: TextAlign.end,
+                    style: QText.number(size: 14, weight: FontWeight.w600, color: QColors.textPrimary)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          QPrimaryButton(label: t.confirmAndLog, onTap: state.confirmProposal, height: 48),
+          Center(
+            child: TextButton(
+              onPressed: state.discardProposal,
+              child: Text(t.cancel, style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
+            ),
+          ),
         ],
       ),
     );

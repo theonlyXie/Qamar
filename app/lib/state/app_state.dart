@@ -7,6 +7,8 @@ import '../l10n/strings.dart';
 import '../models/meal.dart';
 import '../models/messages.dart';
 import '../models/onboarding.dart';
+import '../services/ai_gateway.dart';
+import '../services/dictation.dart';
 import '../services/repositories.dart';
 import '../widgets/explain.dart';
 import '../models/profile.dart';
@@ -18,7 +20,7 @@ enum PlusPlan { monthly, annual }
 /// How a meal gets logged straight from the orb, with no page in between.
 enum QuickLog { voice, text, photo }
 
-enum AppScreen { welcome, scan, onboard, today, log, analyzing, confirm, plan, progress, you, wallet, subscription }
+enum AppScreen { welcome, scan, onboard, today, plan, progress, you, wallet, subscription }
 
 enum ChatState { idle, listening, thinking }
 
@@ -38,10 +40,14 @@ class AppState extends ChangeNotifier {
     ProfileRepository? profileRepo,
     MealRepository? mealRepo,
     WalletRepository? walletRepo,
+    AiGateway? ai,
+    Dictation? dictation,
     String? userId,
   })  : _profileRepo = profileRepo,
         _mealRepo = mealRepo,
         _walletRepo = walletRepo,
+        _ai = ai,
+        _dictation = dictation,
         _userId = userId {
     if (isBacked) hydrate();
   }
@@ -49,6 +55,15 @@ class AppState extends ChangeNotifier {
   final ProfileRepository? _profileRepo;
   final MealRepository? _mealRepo;
   final WalletRepository? _walletRepo;
+
+  /// The real assistant, when AI_GATEWAY_URL is configured. Null means the
+  /// app tells the truth about being unconnected rather than pretending.
+  final AiGateway? _ai;
+  bool get hasAssistant => _ai != null;
+
+  /// The device's speech recogniser. Null in tests and on platforms without
+  /// one, where the UI falls back to typing.
+  final Dictation? _dictation;
   final String? _userId;
 
   /// True when there is a signed-in user and repositories to talk to.
@@ -114,11 +129,9 @@ class AppState extends ChangeNotifier {
   bool scanReading = false;
 
   final List<LoggedMeal> meals = [];
-  String mealDraft = '';
 
   final List<ChatTurn> chat = [];
   String chatDraft = '';
-  final List<int> qty = [1, 2, 1];
 
   ChatState chatState = ChatState.idle;
   String lastUser = '';
@@ -185,9 +198,10 @@ class AppState extends ChangeNotifier {
     plusPlan = PlusPlan.annual;
     improve = false;
     questDone = false;
-    qty
-      ..clear()
-      ..addAll([1, 2, 1]);
+    proposal = null;
+    proposalQty = [];
+    proposalRaw = null;
+    lastMealPhotoPath = null;
     scanned = false;
     scanReading = false;
     suAvailable = 0;
@@ -250,21 +264,67 @@ class AppState extends ChangeNotifier {
     _notify();
   }
 
-  void capture() {
+  /// What the reader could actually make out on the report. Drives the line
+  /// onboarding opens with, and which questions it still has to ask.
+  BodyScan? scanRead;
+
+  /// Reads the photographed report and starts onboarding from what it says.
+  ///
+  /// The numbers here become the person's calorie target, so nothing is
+  /// invented: whatever the reader cannot see stays unset, and onboarding asks
+  /// for it in the ordinary way. With no assistant configured, the photo is
+  /// simply not read and the user is told that, rather than being handed a
+  /// stranger's body composition.
+  Future<void> capture() async {
+    final path = scanPhotoPath;
+    final gateway = _ai;
     scanReading = true;
     scanCameraError = null;
+    scanRead = null;
     _notify();
-    Future.delayed(const Duration(milliseconds: 1700), () {
-      if (_disposed) return;
-      scanReading = false;
-      scanned = true;
-      screen = AppScreen.onboard;
-      step = 0;
-      msgs.clear();
-      profile = profile.copyWith(age: 31, height: 174, weight: 86, fat: 29);
-      _notify();
-      Future.delayed(const Duration(milliseconds: 140), () => askStep(0));
-    });
+
+    if (gateway != null && path != null) {
+      try {
+        scanRead = await gateway.readBodyScan(imagePath: path, lang: lang.code);
+      } catch (e) {
+        scanRead = BodyScan(
+          note: isAr
+              ? 'مقدرتش أقرا التقرير دلوقتي، فهسألك الأرقام بنفسي.'
+              : 'I could not read the report just now, so I will ask you for the numbers.',
+        );
+        debugPrint('Qamar: body scan read failed — $e');
+      }
+    } else {
+      scanRead = BodyScan(
+        note: isAr
+            ? 'لسه مش متوصل بالمساعد، فمش هقدر أقرا التقرير. هسألك الأرقام.'
+            : 'I am not connected to the assistant, so I cannot read the report. I will ask you instead.',
+      );
+    }
+    if (_disposed) return;
+
+    final read = scanRead!;
+    profile = profile.copyWith(
+      age: read.age ?? profile.age,
+      height: read.heightCm ?? profile.height,
+      weight: read.weightKg ?? profile.weight,
+      fat: read.bodyFatPct ?? profile.fat,
+    );
+
+    scanReading = false;
+    // 'scanned' means the body questions can be skipped — only true when the
+    // figures that drive the target actually came off the page.
+    scanned = read.heightCm != null && read.weightKg != null;
+    screen = AppScreen.onboard;
+    step = 0;
+    msgs.clear();
+    // When the report could not be read, say why before asking — otherwise the
+    // user has photographed something and been silently ignored.
+    if (!scanned && read.note != null && read.note!.isNotEmpty) {
+      msgs.add(ObMessage.q(ar: read.note!, en: read.note!));
+    }
+    _notify();
+    Future.delayed(const Duration(milliseconds: 140), () => askStep(0));
   }
 
   // ---- onboarding chat -------------------------------------------------
@@ -316,10 +376,24 @@ class AppState extends ChangeNotifier {
       Future.delayed(const Duration(milliseconds: 700), () {
         if (_disposed) return;
         typing = false;
-        final p = profile;
+        // Only the figures that were genuinely on the page are read back. A
+        // number the reader never saw must not appear in this sentence.
+        final read = scanRead;
+        final ar = <String>[
+          if (read?.age != null) '${iso('${read!.age}')} سنة',
+          if (read?.heightCm != null) '${iso('${read!.heightCm}')} سم',
+          if (read?.weightKg != null) '${iso('${read!.weightKg}')} كجم',
+          if (read?.bodyFatPct != null) 'دهون ${iso('${read!.bodyFatPct}')}٪',
+        ];
+        final en = <String>[
+          if (read?.age != null) '${read!.age} yrs',
+          if (read?.heightCm != null) '${read!.heightCm} cm',
+          if (read?.weightKg != null) '${read!.weightKg} kg',
+          if (read?.bodyFatPct != null) '${read!.bodyFatPct}% body fat',
+        ];
         _pushQ(
-          'أخدت الأرقام من تقرير InBody: ${iso('${p.age}')} سنة · ${iso('${p.height}')} سم · ${iso('${p.weight}')} كجم · دهون ${iso('${p.fat}')}٪. لو في حاجة غلط اكتبهالي.',
-          'I took your numbers from the InBody report: ${p.age} yrs · ${p.height} cm · ${p.weight} kg · ${p.fat}% body fat. Type a correction if anything is off.',
+          'قريت من التقرير: ${ar.join(' · ')}. لو في حاجة غلط اكتبهالي.',
+          'I read this off the report: ${en.join(' · ')}. Type a correction if anything is off.',
         );
         advance();
       });
@@ -832,13 +906,41 @@ class AppState extends ChangeNotifier {
   }
 
   // ---- logging a meal -------------------------------------------------
+  //
+  // Logging happens inside the conversation. The assistant reads the photo or
+  // the description, proposes items, and *nothing is written* until the user
+  // confirms — so a wrong reading costs a tap, never a corrupted day.
 
-  List<({ConfirmItemDef def, int q})> confirmItemsWithQty() =>
-      List.generate(kMockConfirmItems.length, (i) => (def: kMockConfirmItems[i], q: qty[i]));
+  /// What the assistant proposed for the meal being logged, or null when
+  /// there is nothing awaiting confirmation.
+  MealAnalysis? proposal;
 
-  Totals confirmTotals() {
+  /// How many of each proposed item the user says they actually ate. Starts
+  /// at one apiece; zero drops the item without deleting the assistant's
+  /// reading of it.
+  List<int> proposalQty = [];
+
+  /// How the meal reached us — 'photo', 'voice' or 'text'. Stored with the
+  /// draft so a later correction can be traced to the input that caused it.
+  String proposalInput = 'text';
+
+  /// What the user said or the caption on the photo, kept for the draft row.
+  String? proposalRaw;
+
+  /// Set while the next chat message should be read as a meal rather than a
+  /// question. Quick-logging arms it; producing a proposal disarms it.
+  bool _loggingMeal = false;
+
+  bool get hasProposal => proposal != null && proposal!.items.isNotEmpty;
+
+  List<({ConfirmItemDef def, int q})> proposalItems() => [
+        for (var i = 0; i < (proposal?.items.length ?? 0); i++)
+          (def: proposal!.items[i], q: i < proposalQty.length ? proposalQty[i] : 1),
+      ];
+
+  Totals proposalTotals() {
     var k = 0, p = 0, c = 0, f = 0;
-    for (final it in confirmItemsWithQty()) {
+    for (final it in proposalItems()) {
       k += it.def.kcal * it.q;
       p += it.def.p * it.q;
       c += it.def.c * it.q;
@@ -848,61 +950,140 @@ class AppState extends ChangeNotifier {
   }
 
   void incQty(int i) {
-    qty[i] = math.min(6, qty[i] + 1);
+    if (i >= proposalQty.length) return;
+    proposalQty[i] = math.min(9, proposalQty[i] + 1);
     _notify();
   }
 
   void decQty(int i) {
-    qty[i] = math.max(0, qty[i] - 1);
+    if (i >= proposalQty.length) return;
+    proposalQty[i] = math.max(0, proposalQty[i] - 1);
     _notify();
   }
 
-  void onMealDraftChanged(String v) {
-    mealDraft = v;
+  void discardProposal() {
+    proposal = null;
+    proposalQty = [];
+    proposalRaw = null;
+    lastMealPhotoPath = null;
     _notify();
   }
 
-  void presetMealDraftExample() {
-    mealDraft = isAr ? 'كشري وسط + دقة' : 'medium koshary + daqqa';
-    _notify();
-  }
+  /// Asks the assistant to read a meal, and puts the answer up for
+  /// confirmation. Never writes anything by itself.
+  Future<void> _analyseMeal({required String inputType, String? text, String? imagePath}) async {
+    final gateway = _ai;
+    proposalInput = inputType;
+    proposalRaw = text;
 
-  void startAnalyze() {
-    screen = AppScreen.analyzing;
+    if (gateway == null) {
+      chatState = ChatState.idle;
+      chat.add(ChatTurn(
+        who: ChatWho.q,
+        text: isAr
+            ? 'لسه مش متوصل بالمساعد، فمش هقدر أقرأ الوجبة دي دلوقتي.'
+            : 'I am not connected to the assistant yet, so I cannot read this meal.',
+        sub: isAr ? 'مش هخمّن أرقام' : 'I will not guess the numbers',
+      ));
+      _notify();
+      return;
+    }
+
+    chatState = ChatState.thinking;
     _notify();
-    Future.delayed(const Duration(milliseconds: 1900), () {
-      if (!_disposed && screen == AppScreen.analyzing) {
-        screen = AppScreen.confirm;
-        _notify();
+    try {
+      final result = await gateway.analyzeMeal(
+        inputType: inputType,
+        text: text,
+        imagePath: imagePath,
+        lang: lang.code,
+      );
+      if (_disposed) return;
+      chatState = ChatState.idle;
+
+      if (result.items.isEmpty) {
+        // An empty reading is a real answer — usually a photo too dark or too
+        // crowded to trust. Saying so beats inventing a plate of food.
+        chat.add(ChatTurn(
+          who: ChatWho.q,
+          text: result.note ??
+              (isAr
+                  ? 'مقدرتش أقرأ الوجبة من الصورة دي. جرّب صورة أوضح، أو احكيلي أكلت إيه.'
+                  : 'I could not read this meal. Try a clearer photo, or tell me what you ate.'),
+        ));
+        proposal = null;
+        proposalQty = [];
+      } else {
+        proposal = result;
+        proposalQty = List.filled(result.items.length, 1);
+        chat.add(ChatTurn(
+          who: ChatWho.q,
+          text: isAr ? 'شايف كده. ظبّط الكميات وأكّد.' : 'Here is what I see. Adjust the amounts and confirm.',
+          sub: result.note,
+        ));
       }
-    });
+    } catch (e) {
+      if (_disposed) return;
+      chatState = ChatState.idle;
+      chat.add(ChatTurn(
+        who: ChatWho.q,
+        text: isAr
+            ? 'مقدرتش أوصل للمساعد عشان أقرأ الوجبة. جرّب تاني بعد شوية.'
+            : 'I could not reach the assistant to read the meal. Try again in a moment.',
+        sub: '$e'.length > 120 ? null : '$e',
+      ));
+    }
+    _notify();
   }
 
-  void confirmMeal() {
-    final totals = confirmTotals();
-    final name = isAr ? 'كشري + دقة' : 'Koshary + daqqa';
-    final sub = isAr ? 'مسجّل بالكتابة · تقدير' : 'Logged by text · estimate';
+  /// Writes the meal the user just confirmed.
+  void confirmProposal() {
+    final items = proposalItems().where((it) => it.q > 0).toList();
+    if (items.isEmpty) {
+      discardProposal();
+      return;
+    }
+
+    final totals = proposalTotals();
+    final name = items.map((it) => isAr ? it.def.ar : it.def.en).take(3).join(' + ');
+    final how = switch (proposalInput) {
+      'photo' => isAr ? 'بالصورة' : 'by photo',
+      'voice' => isAr ? 'بالصوت' : 'by voice',
+      _ => isAr ? 'بالكتابة' : 'by text',
+    };
+    final anyLow = items.any((it) => it.def.conf != Confidence.high);
+    final sub = isAr
+        ? 'مسجّل $how${anyLow ? ' · تقدير' : ''}'
+        : 'Logged $how${anyLow ? ' · estimate' : ''}';
     final meal = LoggedMeal(name: name, sub: sub, kcal: totals.kcal, p: totals.p, c: totals.c, f: totals.f);
-    final items = confirmItemsWithQty().map((it) => (def: it.def, qty: it.q)).toList();
+    final drafted = items.map((it) => (def: it.def, qty: it.q)).toList();
+    final raw = proposalRaw;
 
     meals.add(meal);
-    screen = AppScreen.today;
     suAvailable += 10;
     suLifetime += 10;
-    qty
-      ..clear()
-      ..addAll([1, 2, 1]);
+    chat.add(ChatTurn(
+      who: ChatWho.q,
+      text: isAr ? 'اتسجّلت: ${totals.kcal} سعرة.' : 'Logged: ${totals.kcal} kcal.',
+      sub: isAr ? '+١٠ نقطة' : '+10 Su',
+    ));
+    proposal = null;
+    proposalQty = [];
+    proposalRaw = null;
+    lastMealPhotoPath = null;
     _notify();
 
     // The schema keeps the draft the user confirmed as well as the log, so a
     // correction stays traceable back to what was proposed.
     if (isBacked) {
+      final repo = _mealRepo!;
+      final input = proposalInput;
       _push('log meal', (uid) async {
-        final draftId = await _mealRepo!.saveDraft(
+        final draftId = await repo.saveDraft(
           uid,
-          MealAnalysisDraft(inputType: 'text', items: items, rawText: mealDraft.isEmpty ? null : mealDraft),
+          MealAnalysisDraft(inputType: input, items: drafted, rawText: raw),
         );
-        await _mealRepo!.confirmMeal(uid, draftId: draftId, meal: meal);
+        await repo.confirmMeal(uid, draftId: draftId, meal: meal);
       });
     }
   }
@@ -1063,34 +1244,132 @@ class AppState extends ChangeNotifier {
     if (v.isNotEmpty) sendChatMsg(v);
   }
 
-  void sendChatMsg(String text) {
-    final list = isAr ? kChatRepliesAr : kChatRepliesEn;
+  /// Sends a message and answers it with the real assistant.
+  ///
+  /// There is no scripted fallback. If the gateway is not configured or the
+  /// call fails, Qamar says so — a health app inventing a plausible-sounding
+  /// reply is worse than one admitting it is not connected.
+  Future<void> sendChatMsg(String text) async {
     chat.add(ChatTurn(who: ChatWho.u, text: text));
     lastUser = text;
     chatDraft = '';
     chatState = ChatState.thinking;
     _notify();
-    Future.delayed(const Duration(milliseconds: 1100), () {
+
+    // Armed by quick-logging: this message describes a meal, so it goes to the
+    // analyser rather than the chat model, and comes back as something to
+    // confirm instead of something to read.
+    if (_loggingMeal) {
+      _loggingMeal = false;
+      await _analyseMeal(inputType: proposalInput, text: text);
+      return;
+    }
+
+    final gateway = _ai;
+    if (gateway == null) {
+      chatState = ChatState.idle;
+      chat.add(ChatTurn(
+        who: ChatWho.q,
+        text: isAr
+            ? 'لسه مش متوصل بالمساعد. اتظبط الاتصال الأول وبعدين أقدر أرد عليك بجد.'
+            : 'I am not connected to the assistant yet. Once that is set up I can answer you properly.',
+        sub: isAr ? 'مفيش رد جاهز — مش هألّف' : 'No canned reply — I will not invent one',
+      ));
+      _notify();
+      return;
+    }
+
+    try {
+      final reply = await gateway.chatReply(message: text, lang: lang.code);
       if (_disposed) return;
-      final r = list[turn % list.length];
       chatState = ChatState.idle;
       turn += 1;
-      chat.add(ChatTurn(who: ChatWho.q, text: r.d, sub: r.r, action: r.a.isEmpty ? null : r.a));
-      _notify();
-    });
+      chat.add(ChatTurn(who: ChatWho.q, text: reply));
+    } catch (e) {
+      if (_disposed) return;
+      chatState = ChatState.idle;
+      chat.add(ChatTurn(
+        who: ChatWho.q,
+        text: isAr
+            ? 'مقدرتش أوصل للمساعد دلوقتي. جرّب تاني بعد شوية.'
+            : 'I could not reach the assistant just now. Try again in a moment.',
+        sub: '$e'.length > 120 ? null : '$e',
+      ));
+    }
+    _notify();
   }
 
-  void tapOrbListen() {
+  /// Live transcript while the user is speaking, so the words appear as they
+  /// are said instead of arriving all at once.
+  String heard = '';
+
+  /// Set when dictation cannot run at all — no recogniser, or the microphone
+  /// was refused. The UI offers typing instead of leaving a dead button.
+  String? dictationError;
+
+  /// Starts real dictation. Replaces a placeholder that waited 1.5 seconds and
+  /// then inserted a scripted sentence.
+  Future<void> tapOrbListen() async {
     if (chatState == ChatState.thinking) return;
-    final prompts = isAr ? kChatPromptsAr : kChatPromptsEn;
-    chatState = ChatState.listening;
+
+    // Tapping again while listening submits what has been heard so far.
+    if (chatState == ChatState.listening) {
+      await _dictation?.stop();
+      final said = heard.trim();
+      chatState = ChatState.idle;
+      heard = '';
+      _notify();
+      if (said.isNotEmpty) await sendChatMsg(said);
+      return;
+    }
+
+    final dictation = _dictation;
+    if (dictation == null) {
+      dictationError = isAr
+          ? 'التسجيل الصوتي مش متاح على الجهاز ده. اكتب وأنا أفهم.'
+          : 'Dictation is not available on this device. Type instead and I will follow.';
+      _notify();
+      return;
+    }
+
+    final ok = await dictation.prepare(
+      onError: (e) {
+        dictationError = isAr
+            ? 'مقدرتش أسمع: $e. جرّب تكتب.'
+            : 'I could not listen: $e. Try typing.';
+        chatState = ChatState.idle;
+        _notify();
+      },
+    );
+    if (!ok) {
+      dictationError = isAr
+          ? 'محتاج إذن الميكروفون عشان أسمعك.'
+          : 'I need microphone permission to hear you.';
+      _notify();
+      return;
+    }
+
+    dictationError = null;
+    heard = '';
     lastUser = '';
+    chatState = ChatState.listening;
     _notify();
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (_disposed) return;
-      final p = prompts[turn % prompts.length];
-      sendChatMsg(p);
-    });
+
+    await dictation.start(
+      lang: lang.code,
+      onResult: (text, isFinal) {
+        if (_disposed) return;
+        heard = text;
+        _notify();
+        if (isFinal) {
+          chatState = ChatState.idle;
+          final said = heard.trim();
+          heard = '';
+          _notify();
+          if (said.isNotEmpty) sendChatMsg(said);
+        }
+      },
+    );
   }
 
   void chatSuggestionTap(String label) => sendChatMsg(label);
@@ -1107,7 +1386,6 @@ class AppState extends ChangeNotifier {
 
   bool get orbVisible => const {
         AppScreen.today,
-        AppScreen.log,
         AppScreen.plan,
         AppScreen.progress,
         AppScreen.you,
@@ -1208,18 +1486,35 @@ class AppState extends ChangeNotifier {
     treeHoverSub = null;
     treeLogIndex = null;
     openChat();
+
+    if (kind == QuickLog.photo) return; // the caller hands the shot back
+
+    // Whatever they say or type next is a meal, not a question.
+    _loggingMeal = true;
+    proposalInput = kind == QuickLog.voice ? 'voice' : 'text';
+    chat.add(ChatTurn(
+      who: ChatWho.q,
+      text: kind == QuickLog.voice
+          ? (isAr ? 'أنا سامعك. أكلت إيه؟' : 'I am listening. What did you eat?')
+          : (isAr ? 'اكتبلي أكلت إيه.' : 'Tell me what you ate.'),
+      sub: isAr ? 'مفيش حاجة بتتسجل قبل ما تأكد.' : 'Nothing is saved until you confirm.',
+    ));
     if (kind == QuickLog.voice) tapOrbListen();
   }
 
   /// Most recent meal photo, shown inside the conversation.
   String? lastMealPhotoPath;
 
-  /// A meal photographed from the orb. The picture goes into the conversation
-  /// and Qamar answers there, instead of routing through an analysing page and
-  /// then a confirm page.
+  /// A meal photographed from the orb. The picture is sent to the assistant,
+  /// which reads it and proposes items — all inside the conversation, with no
+  /// analysing page and no confirm page.
   void logPhotoTaken(String path) {
     lastMealPhotoPath = path;
-    sendChatMsg(isAr ? 'صوّرت الوجبة دي' : 'I photographed this meal');
+    _loggingMeal = false;
+    proposalInput = 'photo';
+    chat.add(ChatTurn(who: ChatWho.u, text: isAr ? 'صوّرت الوجبة دي' : 'I photographed this meal'));
+    _notify();
+    _analyseMeal(inputType: 'photo', imagePath: path);
   }
 
   void toggleTree() {

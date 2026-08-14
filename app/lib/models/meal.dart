@@ -49,14 +49,6 @@ class ConfirmItemDef {
   });
 }
 
-/// Mock analysis result for a logged meal (photo/voice/text/barcode/label all
-/// converge on this same confirm screen in the prototype).
-const List<ConfirmItemDef> kMockConfirmItems = [
-  ConfirmItemDef(ar: 'كشري', en: 'Koshary', portionAr: 'طبق وسط', portionEn: '1 medium bowl', conf: Confidence.med, kcal: 520, p: 16, c: 96, f: 9),
-  ConfirmItemDef(ar: 'دقة', en: 'Daqqa', portionAr: '٢ معلقة', portionEn: '2 tbsp', conf: Confidence.high, kcal: 35, p: 1, c: 5, f: 1),
-  ConfirmItemDef(ar: 'بصل محمر', en: 'Fried onions', portionAr: 'معلقة كبيرة', portionEn: '1 tbsp', conf: Confidence.low, kcal: 90, p: 1, c: 6, f: 7),
-];
-
 class LedgerEntry {
   final String label;
   final int amount; // negative for spends

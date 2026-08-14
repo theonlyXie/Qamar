@@ -8,9 +8,6 @@ import '../widgets/explain.dart';
 import '../widgets/orb_nav.dart';
 import '../widgets/tree_overlay.dart';
 import '../widgets/why_sheet.dart';
-import 'analyzing_screen.dart';
-import 'confirm_screen.dart';
-import 'log_screen.dart';
 import 'onboarding_screen.dart';
 import 'plan_screen.dart';
 import 'progress_screen.dart';
@@ -38,12 +35,6 @@ class HomeShell extends StatelessWidget {
         return const OnboardingScreen();
       case AppScreen.today:
         return const TodayScreen();
-      case AppScreen.log:
-        return const LogScreen();
-      case AppScreen.analyzing:
-        return const AnalyzingScreen();
-      case AppScreen.confirm:
-        return const ConfirmScreen();
       case AppScreen.plan:
         return const PlanScreen();
       case AppScreen.progress:

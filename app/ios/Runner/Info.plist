@@ -49,6 +49,10 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Qamar uses the microphone so you can log a meal by speaking instead of typing.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Qamar turns what you say into text so it can log the meal you describe.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Qamar uses the camera so you can photograph your InBody report and your meals instead of typing the numbers in.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

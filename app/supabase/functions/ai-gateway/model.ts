@@ -16,20 +16,40 @@ export interface ModelResult {
   model: string;
 }
 
+/** A photo to reason about, as the model expects it. */
+export interface ImageInput {
+  /** base64, no data: prefix. */
+  data: string;
+  mediaType: string;
+}
+
 interface CallOptions {
   system: string;
   user: string;
   maxTokens?: number;
   /** Forces JSON-only output for the structured endpoints. */
   prefill?: string;
+  /** Attached before the text, which is what the vision docs recommend. */
+  image?: ImageInput;
 }
 
-export async function callModel({ system, user, maxTokens = 1024, prefill }: CallOptions): Promise<ModelResult> {
+export async function callModel({ system, user, maxTokens = 1024, prefill, image }: CallOptions): Promise<ModelResult> {
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) throw new Error("ANTHROPIC_API_KEY is not configured");
   const model = Deno.env.get("QAMAR_MODEL") ?? DEFAULT_MODEL;
 
-  const messages: { role: string; content: string }[] = [{ role: "user", content: user }];
+  // Image first, then the question: models attend to an image better when it
+  // precedes the text asking about it.
+  const content: unknown[] = [];
+  if (image) {
+    content.push({
+      type: "image",
+      source: { type: "base64", media_type: image.mediaType, data: image.data },
+    });
+  }
+  content.push({ type: "text", text: user });
+
+  const messages: { role: string; content: unknown }[] = [{ role: "user", content }];
   // Putting the opening brace in the assistant's mouth is the cheapest way to
   // stop a model wrapping JSON in prose.
   if (prefill) messages.push({ role: "assistant", content: prefill });
@@ -187,6 +207,65 @@ Return ONLY JSON, no prose:
      "confidence": "high|low", "kcal": 0, "proteinG": 0, "carbsG": 0, "fatG": 0}
   ]
 }`;
+}
+
+export function mealPhotoSystemPrompt(u: UserContext, foods: FoodFacts[]): string {
+  return `${COMMON_RULES}
+
+THE PERSON: ${describeUser(u)}
+
+FOOD DATA (use these per-100g figures wherever an item matches):
+${renderFoods(foods)}
+
+You are looking at a photograph of a meal. Identify what is on the plate and
+estimate the portion of each item from what you can see — plate size, utensils
+and hands are the usual scale references.
+
+Rules specific to a photo:
+- Confidence is "high" only for an item you can both name confidently AND
+  match to the food data. Anything estimated from the picture alone is "low".
+- If the photo is too dark, blurred or crowded to read, return an empty items
+  array rather than guessing.
+- Do not invent side dishes you cannot see. Under-reporting is recoverable —
+  the user confirms before anything is written — but a phantom item is not.
+
+Return ONLY JSON, no prose:
+{
+  "items": [
+    {"ar": "", "en": "", "portionAr": "", "portionEn": "",
+     "confidence": "high|low", "kcal": 0, "proteinG": 0, "carbsG": 0, "fatG": 0}
+  ],
+  "note_ar": "", "note_en": ""
+}`;
+}
+
+/**
+ * Reading an InBody (or any body-composition) printout.
+ *
+ * The output drives the person's calorie target, so a misread digit is not
+ * cosmetic. Every field is allowed to come back null, and the prompt is
+ * written so that null is the expected answer whenever the figure is not
+ * plainly legible — the app then asks the question instead.
+ */
+export function bodyScanSystemPrompt(lang: string): string {
+  return `You read body-composition reports (InBody, Tanita, Omron, gym printouts,
+or a handwritten note from a clinic) and return the figures on them.
+
+You are not interpreting or advising — you are transcribing. Rules:
+1. Return a field ONLY if you can read the number itself on the page. If it is
+   cropped, blurred, glared over or absent, return null for it. Null is a
+   correct answer and costs nothing; a wrong number changes what this person
+   eats every day.
+2. Do not convert between units unless the page states the unit. Height in
+   metres (1.74) becomes 174 cm. Weight in pounds becomes kg, rounded.
+3. Body fat is the percentage figure (PBF / body fat %), never fat mass in kg.
+4. If the image is not a body-composition report at all, return every field
+   null and say so in the note.
+5. The note is one short sentence, in ${lang === "ar" ? "Egyptian Arabic" : "English"},
+   describing what you could and could not read.
+
+Return ONLY JSON, no prose:
+{"heightCm": null, "weightKg": null, "bodyFatPct": null, "age": null, "note": ""}`;
 }
 
 /** Pulls the JSON object out of a model reply, tolerating stray wrapping. */
