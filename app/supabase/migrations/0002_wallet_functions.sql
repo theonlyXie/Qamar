@@ -1,7 +1,30 @@
 -- Atomic wallet operations: every balance change is a ledger insert plus a
 -- wallet_accounts update in one transaction, guarded by the ledger's
--- (user_id, idempotency_key) uniqueness so retried client calls can't
--- double-credit or double-spend.
+-- (user_id, idempotency_key) uniqueness so retried calls cannot double-credit
+-- or double-spend.
+--
+-- Both functions are SECURITY DEFINER and take p_user_id, so both must prove
+-- the caller owns that wallet. Without the guard, any authenticated user could
+-- pass someone else's id — or their own — and mint points at will.
+
+create or replace function public.qamar_assert_wallet_owner(p_user_id uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  -- The server (service_role) acts on behalf of any user; a signed-in client
+  -- may only ever touch its own wallet.
+  if auth.role() = 'service_role' then
+    return;
+  end if;
+  if auth.uid() is null or auth.uid() <> p_user_id then
+    raise exception 'not authorised to modify this wallet';
+  end if;
+end;
+$$;
 
 create or replace function public.qamar_wallet_credit(
   p_user_id uuid,
@@ -18,6 +41,8 @@ declare
   v_new_lifetime int;
   v_ledger public.su_point_ledger;
 begin
+  perform public.qamar_assert_wallet_owner(p_user_id);
+
   if p_delta = 0 then
     raise exception 'delta must be non-zero';
   end if;
@@ -67,6 +92,8 @@ declare
   v_available int;
   v_ledger public.su_point_ledger;
 begin
+  perform public.qamar_assert_wallet_owner(p_user_id);
+
   select price into v_price from public.wallet_catalog_items where id = p_catalog_item_id and active;
   if v_price is null then
     raise exception 'unknown or inactive catalog item %', p_catalog_item_id;
@@ -87,7 +114,12 @@ begin
 end;
 $$;
 
+revoke all on function public.qamar_assert_wallet_owner(uuid) from public;
 revoke all on function public.qamar_wallet_credit(uuid, int, text, text) from public;
 revoke all on function public.qamar_wallet_redeem(uuid, text, text) from public;
-grant execute on function public.qamar_wallet_credit(uuid, int, text, text) to authenticated;
+
+-- Spending is a client action; minting is not. Points are only ever awarded by
+-- the server for a verified action, so `credit` is deliberately NOT granted to
+-- authenticated — otherwise any user could award themselves an unlimited
+-- balance straight from the app.
 grant execute on function public.qamar_wallet_redeem(uuid, text, text) to authenticated;

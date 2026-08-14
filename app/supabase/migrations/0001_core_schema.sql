@@ -22,7 +22,11 @@ create table if not exists public.profiles (
   locale text not null default 'ar' check (locale in ('ar', 'en')),
   -- Stored as a date, not an age: an age goes stale silently, and the
   -- eligibility gate has to stay correct as the user's birthday passes.
-  birth_date date check (birth_date > '1900-01-01' and birth_date < now()),
+  -- A fixed range, not `< now()`: Postgres rejects non-IMMUTABLE functions in
+  -- a CHECK constraint. "Not in the future" and the 18+ eligibility rule are
+  -- enforced by the client and by eligibility_status; add a trigger here if
+  -- they ever need enforcing at the database level too.
+  birth_date date check (birth_date between '1900-01-01' and '2100-01-01'),
   gender text check (gender in ('male', 'female')),
   height_cm int check (height_cm between 100 and 230),
   weight_kg int check (weight_kg between 30 and 250),
