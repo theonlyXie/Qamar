@@ -1,7 +1,7 @@
 name: qamar
 description: Qamar — AI Health OS. Personal nutritionist in your pocket.
 publish_to: "none"
-version: 0.7.1+8
+version: 0.8.0+9
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -16,10 +16,6 @@ dependencies:
   # State management — one app-wide store mirrors the prototype's single
   # Component class; Provider keeps that mapping literal and avoids codegen.
   provider: ^6.1.2
-
-  # Design system fonts (Cormorant Garamond, Noto Sans Arabic, Inter),
-  # same families the prototype loads from Google Fonts.
-  google_fonts: ^6.2.1
 
   # Backend integration surface. Disabled by default (see lib/services/config.dart);
   # the app runs fully on local in-memory state until real keys are supplied.
@@ -54,3 +50,33 @@ flutter:
     - assets/images/qamar_orb.png
     - assets/images/qamar_orb_sm.png
     - assets/images/su_coin.png
+
+  # Bundled rather than fetched at runtime. google_fonts downloads on first
+  # launch, so a phone with no connection — or one in Egypt on a bad line —
+  # rendered the whole Arabic UI as tofu boxes until the download landed.
+  # Only the weights the app actually asks for are shipped.
+  fonts:
+    - family: Cormorant Garamond
+      fonts:
+        - asset: assets/fonts/CormorantGaramond-300.ttf
+          weight: 300
+    - family: Noto Sans Arabic
+      fonts:
+        - asset: assets/fonts/NotoSansArabic-400.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSansArabic-500.ttf
+          weight: 500
+        - asset: assets/fonts/NotoSansArabic-600.ttf
+          weight: 600
+        - asset: assets/fonts/NotoSansArabic-700.ttf
+          weight: 700
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-400.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-500.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-600.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-700.ttf
+          weight: 700

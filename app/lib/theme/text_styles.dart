@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'colors.dart';
 
 /// Three font families from the prototype, each exposed as a sized builder
 /// so call sites read like the original `font: weight size/lineHeight family`.
+///
+/// The families are bundled in the app (see pubspec.yaml) rather than fetched
+/// from Google Fonts at runtime: the first launch of an Arabic-first app must
+/// not depend on a download landing, or the entire UI is tofu boxes until it
+/// does.
 class QText {
   QText._();
 
@@ -15,7 +19,8 @@ class QText {
     Color color = QColors.textBrand,
     double? letterSpacing,
   }) =>
-      GoogleFonts.cormorantGaramond(
+      TextStyle(
+        fontFamily: 'Cormorant Garamond',
         fontSize: size,
         height: height != null ? height / size : null,
         fontWeight: weight,
@@ -31,7 +36,8 @@ class QText {
     Color color = QColors.textPrimary,
     double? letterSpacing,
   }) =>
-      GoogleFonts.notoSansArabic(
+      TextStyle(
+        fontFamily: 'Noto Sans Arabic',
         fontSize: size,
         height: height != null ? height / size : null,
         fontWeight: weight,
@@ -47,7 +53,8 @@ class QText {
     Color color = QColors.textPrimary,
     double? letterSpacing,
   }) =>
-      GoogleFonts.inter(
+      TextStyle(
+        fontFamily: 'Inter',
         fontSize: size,
         height: height != null ? height / size : null,
         fontWeight: weight,
