@@ -20,10 +20,20 @@ Verified against **Flutter 3.47.0 / Dart 3.13.0**: `flutter analyze` is
 error-free, `flutter test` passes, and both `flutter build web` and
 `flutter build apk --debug` succeed.
 
-Camera/mic/photo-library usage strings (`NSCameraUsageDescription` on iOS,
-permissions in `AndroidManifest.xml`) are **not** set yet — the generated
-manifests are stock. Add them when you wire the scan screen to a real
-camera (see "What's stubbed" below).
+`NSCameraUsageDescription` / `NSPhotoLibraryUsageDescription` are set in
+`ios/Runner/Info.plist`, and the Android manifest declares the camera as
+optional hardware. No runtime `CAMERA` permission is declared on purpose:
+`image_picker` goes through system intents, and declaring it would oblige us
+to request it and would break devices that only have a gallery.
+
+### The moon is drawn, not an asset
+
+`lib/widgets/moon.dart` paints the moon as a lit sphere — spherical shading,
+a true elliptical terminator, foreshortened craters, earthshine on the night
+side — so it stays sharp at every size from the 34px chat avatar to the
+welcome hero. `assets/images/qamar_orb*.png` are no longer referenced by the
+app. [LivingOrb] still owns the breathing, halo, wander and spark motion; the
+only motion inside the moon itself is a very slow phase drift.
 
 ### Fonts need network on first launch
 
@@ -106,6 +116,14 @@ rewrite.
   pixel-identical on every frame.
   - The weight-trend chart is a simplified `CustomPainter` polyline rather
     than the prototype's inline SVG, matching the same data points.
-- The InBody scan screen's camera preview is a static styled mock (as
-  designed in the prototype); wiring `image_picker`/a real camera view is a
-  follow-up (the dependency is already in `pubspec.yaml`).
+- The InBody scan screen opens the real device camera (or the photo library)
+  via `image_picker` and shows the captured shot in the frame, but the
+  *reading* of that photo is still the prototype's canned result — extracting
+  real numbers needs the AI gateway. Camera failures (no camera, refused
+  permission, unsupported platform) surface on screen and the typed path
+  stays available, so a missing camera never dead-ends onboarding.
+- The orb's data explanations (`lib/widgets/explain.dart`) are static copy
+  keyed by metric. The interaction is real — drag the orb over a value and
+  drop it — but the words are written, not generated. Once the AI gateway
+  exists they become the fallback and the orb explains the number in the
+  user's own context.

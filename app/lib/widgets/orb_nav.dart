@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
+import 'explain.dart';
 import 'living_orb.dart';
 
 /// The persistent floating orb — drag it anywhere, tap to open the radial
@@ -45,6 +46,15 @@ class _DraggableOrb extends StatefulWidget {
 
 class _DraggableOrbState extends State<_DraggableOrb> {
   double _dragDistance = 0;
+  final GlobalKey _moonKey = GlobalKey();
+
+  /// Centre of the moon in global coordinates — the point the orb "reads"
+  /// with, rather than wherever the finger happens to be.
+  Offset? get _moonCentre {
+    final box = _moonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return null;
+    return box.localToGlobal(box.size.center(Offset.zero));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,14 +65,25 @@ class _DraggableOrbState extends State<_DraggableOrb> {
       onPanUpdate: (d) {
         _dragDistance += d.delta.distance;
         state.setOrbPosition(state.orbX + d.delta.dx, state.orbY + d.delta.dy, maxX: widget.maxX, maxY: widget.maxY);
+        final centre = _moonCentre;
+        state.setExplainHover(centre == null ? null : ExplainRegistry.instance.hitTest(centre));
       },
       onPanEnd: (_) {
-        if (_dragDistance < 6) state.toggleTree();
+        final hovering = state.explainHoverId;
+        // A drop onto a value explains it; a tap with no drag opens the tree.
+        if (hovering != null && _dragDistance >= 6) {
+          state.openExplain(hovering);
+        } else if (_dragDistance < 6) {
+          state.setExplainHover(null);
+          state.toggleTree();
+        } else {
+          state.setExplainHover(null);
+        }
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          LivingOrb(size: 56, wander: true, sparks: true),
+          SizedBox(key: _moonKey, width: 56, height: 56, child: const Center(child: LivingOrb(size: 56, wander: true, sparks: true))),
           Transform.translate(
             offset: const Offset(0, -4),
             child: Container(

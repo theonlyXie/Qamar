@@ -1,11 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
+import 'moon.dart';
 
-/// The Qamar moon — an image that breathes, glows and (optionally) wanders
-/// and throws off orbiting sparks, matching the prototype's qbreath/qhalo/
-/// qfloat/qorbit keyframes. One widget covers every place the orb appears:
-/// welcome hero, nav orb, chat companion, tree center.
+/// The Qamar moon — a drawn sphere (see [QamarMoon]) that breathes, glows and
+/// (optionally) wanders and throws off orbiting sparks, matching the
+/// prototype's qbreath/qhalo/qfloat/qorbit keyframes. One widget covers every
+/// place the orb appears: welcome hero, nav orb, chat companion, tree center.
 class LivingOrb extends StatefulWidget {
   final double size;
   final bool wander;
@@ -15,7 +16,6 @@ class LivingOrb extends StatefulWidget {
   final Duration haloDuration;
   final Duration wanderDuration;
   final VoidCallback? onTap;
-  final String assetPath;
 
   const LivingOrb({
     super.key,
@@ -27,7 +27,6 @@ class LivingOrb extends StatefulWidget {
     this.haloDuration = const Duration(milliseconds: 5200),
     this.wanderDuration = const Duration(milliseconds: 11000),
     this.onTap,
-    this.assetPath = 'assets/images/qamar_orb_sm.png',
   });
 
   @override
@@ -119,11 +118,11 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
                     height: s,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      image: DecorationImage(image: AssetImage(widget.assetPath), fit: BoxFit.cover),
                       boxShadow: [
                         BoxShadow(color: QColors.violet.withOpacity(0.55), blurRadius: s * 0.5),
                       ],
                     ),
+                    child: QamarMoon(size: s),
                   ),
                 ),
               ],

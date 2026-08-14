@@ -1,4 +1,8 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../state/app_state.dart';
@@ -6,13 +10,57 @@ import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 
-class ScanScreen extends StatelessWidget {
+class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
+
+  @override
+  State<ScanScreen> createState() => _ScanScreenState();
+}
+
+class _ScanScreenState extends State<ScanScreen> {
+  final ImagePicker _picker = ImagePicker();
+  bool _busy = false;
+
+  /// Opens the device camera (or the photo library) for the InBody report.
+  ///
+  /// Anything that stops the picker — no camera on the device, a refused
+  /// permission, an unsupported platform — is reported on screen rather than
+  /// swallowed, and the flow still lets the user continue by typing, so a
+  /// missing camera never dead-ends onboarding.
+  Future<void> _pick(ImageSource source) async {
+    if (_busy) return;
+    final state = context.read<AppState>();
+    setState(() => _busy = true);
+    try {
+      final shot = await _picker.pickImage(
+        source: source,
+        imageQuality: 88,
+        maxWidth: 2000,
+      );
+      if (!mounted) return;
+      // A null result means the user backed out of the camera — not an error.
+      if (shot == null) return;
+      state.setScanPhoto(shot.path);
+      state.capture();
+    } on Exception catch (e) {
+      if (!mounted) return;
+      final isAr = state.isAr;
+      state.setScanCameraError(
+        isAr
+            ? 'مقدرتش أفتح الكاميرا على الجهاز ده. جرّب تختار صورة من الاستوديو، أو اكتب أرقامك بدل الscan. (${e.runtimeType})'
+            : 'I couldn’t open the camera on this device. Try picking a photo from your library, or type your numbers instead. (${e.runtimeType})',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final t = state.t;
+    final isAr = state.isAr;
+    final photo = state.scanPhotoPath;
 
     return Container(
       color: QColors.bgScan,
@@ -38,18 +86,61 @@ class ScanScreen extends StatelessWidget {
                   Container(
                     decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), color: const Color(0xFF0D131F)),
                   ),
+                  // Once a shot is taken, show it in the frame so the user can
+                  // see what Qamar is reading.
+                  if (photo != null && !kIsWeb)
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(22),
+                        child: Image.file(File(photo), fit: BoxFit.cover),
+                      ),
+                    ),
                   Positioned.fill(
                     child: Padding(
                       padding: const EdgeInsets.all(26),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: QColors.violet.withOpacity(0.55), width: 2),
+                          border: Border.all(color: QColors.violet.withValues(alpha: 0.55), width: 2),
                         ),
                       ),
                     ),
                   ),
-                  Text('InBody report · camera preview', style: QText.number(size: 12, color: QColors.textFaint, letterSpacing: 0.4)),
+                  if (photo == null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 34),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_busy ? Icons.hourglass_empty : Icons.photo_camera_outlined,
+                              size: 34, color: QColors.textFaint),
+                          const SizedBox(height: 10),
+                          Text(
+                            _busy
+                                ? (isAr ? 'بفتح الكاميرا…' : 'Opening the camera…')
+                                : (isAr ? 'اضغط الزرار عشان تفتح الكاميرا وتصوّر تقرير InBody' : 'Tap the button to open the camera and photograph your InBody report'),
+                            textAlign: TextAlign.center,
+                            style: QText.body(size: 13, height: 20, color: QColors.textFaint),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (state.scanCameraError != null)
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 16,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: QColors.amber.withValues(alpha: 0.12),
+                          border: Border.all(color: QColors.amber.withValues(alpha: 0.45)),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(state.scanCameraError!,
+                            style: QText.body(size: 12, height: 18, color: QColors.amberSoft)),
+                      ),
+                    ),
                   if (state.scanReading)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(22),
@@ -76,18 +167,42 @@ class ScanScreen extends StatelessWidget {
               children: [
                 Text(t.scanHint, style: QText.body(size: 13, color: QColors.textMuted)),
                 const SizedBox(height: 14),
-                GestureDetector(
-                  onTap: state.capture,
-                  child: Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: QColors.brandGradient,
-                      border: Border.all(color: const Color(0xFF33415C), width: 3),
-                      boxShadow: [BoxShadow(color: QColors.blue.withOpacity(0.35), blurRadius: 30, offset: const Offset(0, 8))],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _CircleAction(
+                      icon: Icons.photo_library_outlined,
+                      tooltip: isAr ? 'من الاستوديو' : 'From library',
+                      onTap: _busy ? null : () => _pick(ImageSource.gallery),
                     ),
-                  ),
+                    const SizedBox(width: 26),
+                    GestureDetector(
+                      onTap: _busy ? null : () => _pick(ImageSource.camera),
+                      child: Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: QColors.brandGradient,
+                          border: Border.all(color: const Color(0xFF33415C), width: 3),
+                          boxShadow: [
+                            BoxShadow(color: QColors.blue.withValues(alpha: 0.35), blurRadius: 30, offset: const Offset(0, 8)),
+                          ],
+                        ),
+                        child: Icon(
+                          _busy ? Icons.more_horiz : Icons.photo_camera,
+                          color: Colors.white.withValues(alpha: 0.92),
+                          size: 26,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 26),
+                    _CircleAction(
+                      icon: Icons.keyboard_outlined,
+                      tooltip: isAr ? 'اكتب بدل التصوير' : 'Type instead',
+                      onTap: state.startOnboarding,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 14),
                 TextButton(
@@ -99,6 +214,37 @@ class ScanScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CircleAction extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+  const _CircleAction({required this.icon, required this.tooltip, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: QColors.cardDeep,
+              border: Border.all(color: QColors.borderSoft),
+            ),
+            child: Icon(icon, size: 20, color: onTap == null ? QColors.textFaint : QColors.textMid),
+          ),
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/profile.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -20,8 +21,8 @@ class WhySheet extends StatelessWidget {
       (
         t.whyAssume,
         state.isAr
-            ? '${state.iso('${p.age}')} سنة · ${state.iso('${p.height}')} سم · ${state.iso('${p.weight}')} كجم · معامل نشاط ${state.iso('${p.activity}')}'
-            : '${p.age} yrs · ${p.height} cm · ${p.weight} kg · activity factor ${p.activity}',
+            ? '${state.iso('${p.age}')} سنة · ${p.gender == Gender.female ? 'أنثى' : 'ذكر'} · ${state.iso('${p.height}')} سم · ${state.iso('${p.weight}')} كجم · معامل نشاط ${state.iso('${p.activity}')}'
+            : '${p.age} yrs · ${p.gender == Gender.female ? 'female' : 'male'} · ${p.height} cm · ${p.weight} kg · activity factor ${p.activity}',
       ),
       (t.whySource, t.whySourceVal),
       (t.whyGuide, t.whyGuideVal),

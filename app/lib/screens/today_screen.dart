@@ -6,6 +6,8 @@ import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
+import '../widgets/explain.dart';
+import '../widgets/moon.dart';
 
 class TodayScreen extends StatelessWidget {
   const TodayScreen({super.key});
@@ -46,11 +48,14 @@ class TodayScreen extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
                       decoration: BoxDecoration(border: Border.all(color: QColors.gold.withOpacity(0.4)), borderRadius: BorderRadius.circular(999), color: const Color(0xFF0F1730)),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const SuCoinIcon(size: 16),
-                        const SizedBox(width: 6),
-                        Text('${state.suAvailable}', style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.gold)),
-                      ]),
+                      child: Explainable(
+                        id: 'su_points',
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const SuCoinIcon(size: 16),
+                          const SizedBox(width: 6),
+                          Text('${state.suAvailable}', style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.gold)),
+                        ]),
+                      ),
                     ),
                   ),
                 ),
@@ -58,11 +63,14 @@ class TodayScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(border: Border.all(color: QColors.borderSoft), borderRadius: BorderRadius.circular(999), color: QColors.cardDeep),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.green)),
-                    const SizedBox(width: 8),
-                    Text(state.isAr ? 'المستوى ${state.level()}' : 'Level ${state.level()}', style: QText.number(size: 11, weight: FontWeight.w500, color: QColors.textMid)),
-                  ]),
+                  child: Explainable(
+                    id: 'level',
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.green)),
+                      const SizedBox(width: 8),
+                      Text(state.isAr ? 'المستوى ${state.level()}' : 'Level ${state.level()}', style: QText.number(size: 11, weight: FontWeight.w500, color: QColors.textMid)),
+                    ]),
+                  ),
                 ),
               ],
             ),
@@ -74,7 +82,7 @@ class TodayScreen extends StatelessWidget {
           decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), radius: QRadii.xl),
           child: Row(
             children: [
-              ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.asset('assets/images/qamar_orb_sm.png', width: 40, height: 40, fit: BoxFit.cover)),
+              const QamarMoon(size: 40),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -96,19 +104,22 @@ class TodayScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-                ShaderMask(
-                  shaderCallback: (r) => QColors.cyanVioletGradient.createShader(r),
-                  child: Text('$remaining', style: QText.number(size: 38, weight: FontWeight.w600, color: Colors.white)),
+                Explainable(
+                  id: 'kcal_remaining',
+                  child: ShaderMask(
+                    shaderCallback: (r) => QColors.cyanVioletGradient.createShader(r),
+                    child: Text('$remaining', style: QText.number(size: 38, weight: FontWeight.w600, color: Colors.white)),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Text(t.kcalRemaining, style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
               ]),
               const SizedBox(height: 16),
-              _MacroRow(label: t.protein, text: '${con.p} / ${tg.protein} g', pct: pct(con.p, tg.protein)),
+              Explainable(id: 'protein', child: _MacroRow(label: t.protein, text: '${con.p} / ${tg.protein} g', pct: pct(con.p, tg.protein))),
               const SizedBox(height: 12),
-              _MacroRow(label: t.carbs, text: '${con.c} / ${tg.carbs} g', pct: pct(con.c, tg.carbs)),
+              Explainable(id: 'carbs', child: _MacroRow(label: t.carbs, text: '${con.c} / ${tg.carbs} g', pct: pct(con.c, tg.carbs))),
               const SizedBox(height: 12),
-              _MacroRow(label: t.fat, text: '${con.f} / ${tg.fat} g', pct: pct(con.f, tg.fat)),
+              Explainable(id: 'fat', child: _MacroRow(label: t.fat, text: '${con.f} / ${tg.fat} g', pct: pct(con.f, tg.fat))),
               const SizedBox(height: 14),
               Row(
                 children: [

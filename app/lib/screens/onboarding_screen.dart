@@ -3,11 +3,13 @@ import 'package:provider/provider.dart';
 
 import '../models/messages.dart';
 import '../models/onboarding.dart';
+import '../models/profile.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
+import '../widgets/moon.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -50,8 +52,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     final stepChips = step != null && (step.kind == StepKind.chips || step.kind == StepKind.multi) && !state.blocked;
     final stepNumber = step != null && step.kind == StepKind.number;
+    final stepDate = step != null && step.kind == StepKind.date && !state.blocked;
     final canSkip = step != null && step.kind == StepKind.text;
-    final hasSubmit = (step == null || step.kind == StepKind.number || step.kind == StepKind.multi) && !state.blocked;
+    final hasSubmit = (step == null ||
+            step.kind == StepKind.number ||
+            step.kind == StepKind.multi ||
+            step.kind == StepKind.date) &&
+        !state.blocked;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -61,7 +68,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: QColors.borderFaint))),
           child: Row(
             children: [
-              ClipOval(child: Image.asset('assets/images/qamar_orb_sm.png', width: 36, height: 36, fit: BoxFit.cover)),
+              const QamarMoon(size: 36),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,11 +122,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 const SizedBox(height: 10),
               ],
+              if (stepDate) ...[
+                Row(
+                  children: [
+                    QStepperField(unit: state.isAr ? 'يوم' : 'day', value: state.profile.birthDay, onInc: () => state.bumpBirthDay(1), onDec: () => state.bumpBirthDay(-1)),
+                    const SizedBox(width: 8),
+                    QStepperField(unit: state.isAr ? 'شهر' : 'month', value: state.profile.birthMonth, onInc: () => state.bumpBirthMonth(1), onDec: () => state.bumpBirthMonth(-1)),
+                    const SizedBox(width: 8),
+                    QStepperField(unit: state.isAr ? 'سنة' : 'year', value: state.profile.birthYear, onInc: () => state.bumpBirthYear(1), onDec: () => state.bumpBirthYear(-1)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _AgeReadout(state: state),
+                const SizedBox(height: 10),
+              ],
               if (stepNumber) ...[
                 Row(
                   children: [
-                    QStepperField(unit: state.isAr ? 'سنة' : 'age', value: state.profile.age, onInc: () => state.bumpAge(1), onDec: () => state.bumpAge(-1)),
-                    const SizedBox(width: 8),
                     QStepperField(unit: state.isAr ? 'سم' : 'cm', value: state.profile.height, onInc: () => state.bumpHeight(1), onDec: () => state.bumpHeight(-1)),
                     const SizedBox(width: 8),
                     QStepperField(unit: state.isAr ? 'كجم' : 'kg', value: state.profile.weight, onInc: () => state.bumpWeight(1), onDec: () => state.bumpWeight(-1)),
@@ -178,6 +197,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ],
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Live feedback under the birth-date steppers: the age the date implies, and
+/// an up-front warning when it falls under 18, so the eligibility rule is
+/// visible before the user commits rather than only after.
+class _AgeReadout extends StatelessWidget {
+  final AppState state;
+  const _AgeReadout({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final age = state.profile.age;
+    final adult = state.profile.isAdult;
+    final label = state.isAr ? '${state.iso('$age')} سنة' : '$age years old';
+    final warn = state.isAr ? 'قمر للبالغين ١٨ سنة أو أكتر' : 'Qamar is for adults 18 and over';
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(adult ? Icons.cake_outlined : Icons.info_outline, size: 14, color: adult ? QColors.textMuted : QColors.amber),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            adult ? label : '$label · $warn',
+            textAlign: TextAlign.center,
+            style: QText.body(size: 12, color: adult ? QColors.textMuted : QColors.amber),
           ),
         ),
       ],
@@ -279,9 +329,11 @@ class _TargetCard extends StatelessWidget {
     final t = state.t;
     final tg = state.target();
     final p = state.profile;
+    final sexAr = p.gender == Gender.female ? 'أنثى' : 'ذكر';
+    final sexEn = p.gender == Gender.female ? 'female' : 'male';
     final assumptions = state.isAr
-        ? 'على أساس ${state.iso('${p.age}')} سنة · ${state.iso('${p.height}')} سم · ${state.iso('${p.weight}')} كجم · نشاط متوسط'
-        : 'Based on ${p.age} yrs · ${p.height} cm · ${p.weight} kg · moderate activity';
+        ? 'على أساس ${state.iso('${p.age}')} سنة · $sexAr · ${state.iso('${p.height}')} سم · ${state.iso('${p.weight}')} كجم · نشاط متوسط'
+        : 'Based on ${p.age} yrs · $sexEn · ${p.height} cm · ${p.weight} kg · moderate activity';
 
     return FractionallySizedBox(
       widthFactor: 0.88,

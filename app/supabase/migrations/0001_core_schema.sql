@@ -20,7 +20,10 @@ create table if not exists public.profiles (
   user_id uuid primary key references auth.users (id) on delete cascade,
   name text,
   locale text not null default 'ar' check (locale in ('ar', 'en')),
-  age int check (age between 13 and 100),
+  -- Stored as a date, not an age: an age goes stale silently, and the
+  -- eligibility gate has to stay correct as the user's birthday passes.
+  birth_date date check (birth_date > '1900-01-01' and birth_date < now()),
+  gender text check (gender in ('male', 'female')),
   height_cm int check (height_cm between 100 and 230),
   weight_kg int check (weight_kg between 30 and 250),
   body_fat_pct int check (body_fat_pct between 3 and 70),
@@ -57,7 +60,7 @@ create table if not exists public.targets (
   carbs_g int not null,
   fat_g int not null,
   formula_version text not null default 'calc v2.0',
-  inputs jsonb not null, -- {age, height_cm, weight_kg, activity_factor, goal}
+  inputs jsonb not null, -- {birth_date, gender, height_cm, weight_kg, activity_factor, goal}
   confirmed_at timestamptz not null default now(),
   valid_from timestamptz not null default now(),
   valid_to timestamptz

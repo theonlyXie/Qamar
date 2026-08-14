@@ -152,7 +152,15 @@ class QStepperField extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 QRoundIconButton(icon: Icons.remove, onTap: onDec, size: 26),
-                SizedBox(width: 34, child: Text('$value', textAlign: TextAlign.center, style: QText.number(size: 19, weight: FontWeight.w600))),
+                // Wide enough for a 4-digit year, and scaled down rather than
+                // wrapped if a value ever outgrows it.
+                SizedBox(
+                  width: 44,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text('$value', textAlign: TextAlign.center, style: QText.number(size: 19, weight: FontWeight.w600)),
+                  ),
+                ),
                 QRoundIconButton(icon: Icons.add, onTap: onInc, size: 26),
               ],
             ),
