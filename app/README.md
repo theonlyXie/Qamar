@@ -92,13 +92,38 @@ for you to connect:
 | `lib/services/payments.dart` | `in_app_purchase` wrapper for the Qamar+ subscription (Su Points are earned only — see `walletTerms` copy — never a paid product) | Create `qamar_plus_monthly`/`qamar_plus_annual` in App Store Connect / Play Console, and a server endpoint to verify receipts before flipping entitlement |
 | `lib/services/config.dart` | `--dart-define` driven flags (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `AI_GATEWAY_URL`) | `flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...` |
 
-**Wiring plan**: once you have real credentials, the natural next step is to
-make `AppState` accept the repositories via constructor injection and swap
-its in-memory mutations (`meals.add(...)`, `suAvailable += ...`, etc.) for
-repository calls, while keeping every method's external signature the same
-so the screens don't change. I left `AppState` untouched (rather than
-half-wiring it) so the fully-offline demo stays correct and testable while
-you do that migration deliberately, with a compiler available to check it.
+**Wiring — done.** `AppState` now takes optional repositories plus a user id.
+With none supplied (the default, and what every test uses) it behaves exactly
+as before: entirely in memory, no network, fully demoable offline. Supplied,
+the same methods additionally write through — the profile on each answered
+onboarding step, the target when it is calculated, a meal as a draft plus a
+log on confirm, and redemptions via the wallet RPC. No screen changed and no
+method signature moved.
+
+Two rules the wiring keeps:
+
+- **A backend problem never costs the user anything.** Every write is
+  fire-and-forget behind `_push`; the local change lands first and the screen
+  moves on. Failures set `syncError` rather than being swallowed, and
+  `main.dart` falls back to a fully offline `AppState` if Supabase cannot be
+  reached or sign-in fails.
+- **Su Points are never minted by the client.** `qamar_wallet_credit` is
+  EXECUTE-revoked from `anon` and `authenticated`, so the client cannot award
+  points even if it tried; `SupabaseWalletRepository.credit` throws to say so
+  in a legible place. Balances shown locally reconcile to the server's number
+  on the next hydrate. Awarding must move to an Edge Function using the
+  service role once earning actions are verified server-side.
+
+Run against the live project with:
+
+```bash
+flutter run \
+  --dart-define=SUPABASE_URL=https://<project>.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<publishable key>
+```
+
+**Anonymous sign-in must be enabled first** (Authentication → Providers →
+Anonymous). Until it is, the app starts, logs the reason, and runs offline.
 
 ## Explicitly out of scope here
 

@@ -7,6 +7,7 @@ import '../l10n/strings.dart';
 import '../models/meal.dart';
 import '../models/messages.dart';
 import '../models/onboarding.dart';
+import '../services/repositories.dart';
 import '../widgets/explain.dart';
 import '../models/profile.dart';
 import 'chat_replies.dart';
@@ -28,6 +29,79 @@ enum WalletTab { spend, history }
 /// `context.watch<AppState>()` and call its methods the way the prototype's
 /// markup called `{{ handler }}`.
 class AppState extends ChangeNotifier {
+  /// Optional persistence. When every repository is null — the default —
+  /// AppState behaves exactly as it always has: entirely in memory, no
+  /// network, fully demoable and testable offline. Supplying them makes the
+  /// same methods write through to Supabase as well, without changing a
+  /// single method signature the screens depend on.
+  AppState({
+    ProfileRepository? profileRepo,
+    MealRepository? mealRepo,
+    WalletRepository? walletRepo,
+    String? userId,
+  })  : _profileRepo = profileRepo,
+        _mealRepo = mealRepo,
+        _walletRepo = walletRepo,
+        _userId = userId {
+    if (isBacked) hydrate();
+  }
+
+  final ProfileRepository? _profileRepo;
+  final MealRepository? _mealRepo;
+  final WalletRepository? _walletRepo;
+  final String? _userId;
+
+  /// True when there is a signed-in user and repositories to talk to.
+  bool get isBacked => _userId != null;
+
+  /// Set when a write failed. The UI keeps working on local state regardless —
+  /// losing a round trip must never cost the user their meal — but the failure
+  /// is recorded rather than swallowed so it can be surfaced and retried.
+  String? syncError;
+
+  /// Runs a backend call without ever letting it break the screen.
+  Future<void> _push(String what, Future<void> Function(String userId) work) async {
+    final uid = _userId;
+    if (uid == null) return;
+    try {
+      await work(uid);
+      if (syncError != null) {
+        syncError = null;
+        _notify();
+      }
+    } catch (e) {
+      syncError = '$what: $e';
+      _notify();
+    }
+  }
+
+  /// Pulls the server's copy over the local defaults on start.
+  Future<void> hydrate() async {
+    final uid = _userId;
+    if (uid == null) return;
+    try {
+      final saved = await _profileRepo?.loadProfile(uid);
+      if (saved != null) profile = saved;
+
+      final today = await _mealRepo?.mealsForDay(uid, DateTime.now());
+      if (today != null) {
+        meals
+          ..clear()
+          ..addAll(today);
+      }
+
+      final bal = await _walletRepo?.balance(uid);
+      if (bal != null) {
+        suAvailable = bal.available;
+        suLifetime = bal.lifetime;
+      }
+      _notify();
+    } catch (e) {
+      syncError = 'load: $e';
+      _notify();
+    }
+  }
+
   AppLang lang = AppLang.ar;
   AppScreen screen = AppScreen.welcome;
   int step = 0;
@@ -223,6 +297,10 @@ class AppState extends ChangeNotifier {
   void advance() {
     step += 1;
     _notify();
+    // Persist once per answered step rather than on every stepper notch, so a
+    // half-finished onboarding survives the app being closed without turning
+    // each wheel tick into a request.
+    if (isBacked) _saveProfile();
     askStep(step);
   }
 
@@ -407,6 +485,13 @@ class AppState extends ChangeNotifier {
   void _bumpProfile({int? age, int? height, int? weight}) {
     profile = profile.copyWith(age: age, height: height, weight: weight);
     _notify();
+  }
+
+  /// Write the profile through. Called at the points where it has genuinely
+  /// settled — not on every stepper tick, which would be a request per notch.
+  void _saveProfile() {
+    final p = profile;
+    _push('save profile', (uid) => _profileRepo!.saveProfile(uid, p));
   }
 
   /// The onboarding composer's primary CTA: submits number/multi steps, or
@@ -695,9 +780,19 @@ class AppState extends ChangeNotifier {
         const ObMessage.target(),
         const ObMessage.save(),
       ]);
+      // Awarded locally for now: crediting Su Points is server-only (see
+      // SupabaseWalletRepository.credit), so the balance reconciles to the
+      // server's number on the next hydrate once the Edge Function exists.
       suAvailable += 20;
       suLifetime += 20;
       _notify();
+
+      if (isBacked) {
+        final p = profile;
+        final t = target();
+        _push('save profile', (uid) => _profileRepo!.saveProfile(uid, p));
+        _push('save target', (uid) => _profileRepo!.saveTarget(uid, t, inputs: p));
+      }
     });
   }
 
@@ -787,7 +882,10 @@ class AppState extends ChangeNotifier {
     final totals = confirmTotals();
     final name = isAr ? 'كشري + دقة' : 'Koshary + daqqa';
     final sub = isAr ? 'مسجّل بالكتابة · تقدير' : 'Logged by text · estimate';
-    meals.add(LoggedMeal(name: name, sub: sub, kcal: totals.kcal, p: totals.p, c: totals.c, f: totals.f));
+    final meal = LoggedMeal(name: name, sub: sub, kcal: totals.kcal, p: totals.p, c: totals.c, f: totals.f);
+    final items = confirmItemsWithQty().map((it) => (def: it.def, qty: it.q)).toList();
+
+    meals.add(meal);
     screen = AppScreen.today;
     suAvailable += 10;
     suLifetime += 10;
@@ -795,6 +893,18 @@ class AppState extends ChangeNotifier {
       ..clear()
       ..addAll([1, 2, 1]);
     _notify();
+
+    // The schema keeps the draft the user confirmed as well as the log, so a
+    // correction stays traceable back to what was proposed.
+    if (isBacked) {
+      _push('log meal', (uid) async {
+        final draftId = await _mealRepo!.saveDraft(
+          uid,
+          MealAnalysisDraft(inputType: 'text', items: items, rawText: mealDraft.isEmpty ? null : mealDraft),
+        );
+        await _mealRepo!.confirmMeal(uid, draftId: draftId, meal: meal);
+      });
+    }
   }
 
   // ---- quest / wallet -------------------------------------------------
@@ -875,6 +985,10 @@ class AppState extends ChangeNotifier {
 
   bool isRedeemed(String id) => redeemed.contains(id);
 
+  void _pushRedeem(SpendItemDef item) {
+    _push('redeem', (uid) => _walletRepo!.redeem(uid, item: item, idempotencyKey: '${uid}_redeem_${item.id}'));
+  }
+
   void redeem(SpendItemDef item) {
     final done = isRedeemed(item.id);
     final afford = suAvailable >= item.price && !done;
@@ -883,6 +997,10 @@ class AppState extends ChangeNotifier {
     redeemed.add(item.id);
     ledgerExtra.insert(0, LedgerEntry(label: isAr ? item.nameAr : item.nameEn, amount: -item.price, when: isAr ? 'دلوقتي' : 'Just now'));
     _notify();
+
+    // The database is the authority on the balance: the RPC re-checks the
+    // price and refuses if the points are not really there.
+    if (isBacked) _pushRedeem(item);
   }
 
   List<LedgerEntry> ledger() => [

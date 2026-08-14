@@ -61,7 +61,11 @@ class SupabaseProfileRepository implements ProfileRepository {
       'carbs_g': target.carbs,
       'fat_g': target.fat,
       'inputs': {
-        'age': inputs.age,
+        'birth_date': '${inputs.birthYear.toString().padLeft(4, '0')}-'
+            '${inputs.birthMonth.toString().padLeft(2, '0')}-'
+            '${inputs.birthDay.toString().padLeft(2, '0')}',
+        'gender': inputs.gender.name,
+        'age_at_calculation': inputs.age,
         'height_cm': inputs.height,
         'weight_kg': inputs.weight,
         'activity_factor': inputs.activity,
@@ -148,18 +152,20 @@ class SupabaseWalletRepository implements WalletRepository {
     return (available: row['available_points'] as int, lifetime: row['lifetime_earned'] as int);
   }
 
-  /// Credits/debits go through su_point_ledger (source of truth) — call a
-  /// Postgres function or Edge Function to keep the ledger insert and the
-  /// wallet_accounts balance update atomic. This client-side version is a
-  /// reference sketch only; do the real balance math server-side.
+  /// Awarding points is deliberately not something a client can do.
+  ///
+  /// `qamar_wallet_credit` is EXECUTE-revoked from anon and authenticated
+  /// (migration 0003): if the app could call it, any user could award
+  /// themselves an unlimited balance. Points must be credited by the server
+  /// after it has verified the action that earned them. Calling this from the
+  /// client would fail with a permission error at the database, so it fails
+  /// here instead, where the reason is legible.
   @override
-  Future<void> credit(String userId, {required int amount, required String reason, required String idempotencyKey}) async {
-    await _client.rpc('qamar_wallet_credit', params: {
-      'p_user_id': userId,
-      'p_delta': amount,
-      'p_reason': reason,
-      'p_idempotency_key': idempotencyKey,
-    });
+  Future<void> credit(String userId, {required int amount, required String reason, required String idempotencyKey}) {
+    throw UnsupportedError(
+      'Su Points can only be credited server-side. Award them from an Edge '
+      'Function using the service role after verifying the earning action.',
+    );
   }
 
   @override
