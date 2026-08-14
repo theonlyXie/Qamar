@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/plan.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
+import '../widgets/explain.dart';
+import '../widgets/moon.dart';
 
 class TodayScreen extends StatelessWidget {
   const TodayScreen({super.key});
@@ -18,6 +21,8 @@ class TodayScreen extends StatelessWidget {
     final con = state.consumed();
     final remaining = (tg.kcal - con.kcal).clamp(0, 1 << 30);
     final nameOr = state.profile.name.isNotEmpty ? state.profile.name : (state.isAr ? 'يا صاحبي' : 'friend');
+    final (nextBase, nextAlt) = kPlanSlots[kNextMealSlot];
+    final nextMeal = state.isSlotSwapped(nextBase.id) ? nextAlt : nextBase;
 
     double pct(int a, int b) => b == 0 ? 0 : (a / b).clamp(0, 1).toDouble();
 
@@ -46,11 +51,14 @@ class TodayScreen extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
                       decoration: BoxDecoration(border: Border.all(color: QColors.gold.withOpacity(0.4)), borderRadius: BorderRadius.circular(999), color: const Color(0xFF0F1730)),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const SuCoinIcon(size: 16),
-                        const SizedBox(width: 6),
-                        Text('${state.suAvailable}', style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.gold)),
-                      ]),
+                      child: Explainable(
+                        id: 'su_points',
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const SuCoinIcon(size: 16),
+                          const SizedBox(width: 6),
+                          Text('${state.suAvailable}', style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.gold)),
+                        ]),
+                      ),
                     ),
                   ),
                 ),
@@ -58,11 +66,14 @@ class TodayScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(border: Border.all(color: QColors.borderSoft), borderRadius: BorderRadius.circular(999), color: QColors.cardDeep),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.green)),
-                    const SizedBox(width: 8),
-                    Text(state.isAr ? 'المستوى ${state.level()}' : 'Level ${state.level()}', style: QText.number(size: 11, weight: FontWeight.w500, color: QColors.textMid)),
-                  ]),
+                  child: Explainable(
+                    id: 'level',
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.green)),
+                      const SizedBox(width: 8),
+                      Text(state.isAr ? 'المستوى ${state.level()}' : 'Level ${state.level()}', style: QText.number(size: 11, weight: FontWeight.w500, color: QColors.textMid)),
+                    ]),
+                  ),
                 ),
               ],
             ),
@@ -74,7 +85,7 @@ class TodayScreen extends StatelessWidget {
           decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), radius: QRadii.xl),
           child: Row(
             children: [
-              ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.asset('assets/images/qamar_orb_sm.png', width: 40, height: 40, fit: BoxFit.cover)),
+              const QamarMoon(size: 40),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -96,19 +107,22 @@ class TodayScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-                ShaderMask(
-                  shaderCallback: (r) => QColors.cyanVioletGradient.createShader(r),
-                  child: Text('$remaining', style: QText.number(size: 38, weight: FontWeight.w600, color: Colors.white)),
+                Explainable(
+                  id: 'kcal_remaining',
+                  child: ShaderMask(
+                    shaderCallback: (r) => QColors.cyanVioletGradient.createShader(r),
+                    child: Text('$remaining', style: QText.number(size: 38, weight: FontWeight.w600, color: Colors.white)),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Text(t.kcalRemaining, style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
               ]),
               const SizedBox(height: 16),
-              _MacroRow(label: t.protein, text: '${con.p} / ${tg.protein} g', pct: pct(con.p, tg.protein)),
+              Explainable(id: 'protein', child: _MacroRow(label: t.protein, text: '${con.p} / ${tg.protein} g', pct: pct(con.p, tg.protein))),
               const SizedBox(height: 12),
-              _MacroRow(label: t.carbs, text: '${con.c} / ${tg.carbs} g', pct: pct(con.c, tg.carbs)),
+              Explainable(id: 'carbs', child: _MacroRow(label: t.carbs, text: '${con.c} / ${tg.carbs} g', pct: pct(con.c, tg.carbs))),
               const SizedBox(height: 12),
-              _MacroRow(label: t.fat, text: '${con.f} / ${tg.fat} g', pct: pct(con.f, tg.fat)),
+              Explainable(id: 'fat', child: _MacroRow(label: t.fat, text: '${con.f} / ${tg.fat} g', pct: pct(con.f, tg.fat))),
               const SizedBox(height: 14),
               Row(
                 children: [
@@ -120,26 +134,38 @@ class TodayScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.green.withOpacity(0.4), radius: QRadii.xl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(t.nextMeal, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.green, letterSpacing: 0.4)),
-              Text(state.isAr ? 'فراخ مشوية + رز + سلطة' : 'Grilled chicken + rice + salad', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.textPrimary)),
-              Text(state.isAr ? 'حوالي ٦٢٠ سعر · متاح بديل' : 'About 620 kcal · swap available', style: QText.body(size: 13, color: QColors.textMuted)),
-              const SizedBox(height: 8),
-              Row(children: [
-                QOutlineButton(label: t.swap, onTap: state.togglePlanSwap, height: 34, color: QColors.textMid),
-                const SizedBox(width: 8),
-                QOutlineButton(label: t.openPlan, onTap: () => state.go(AppScreen.plan), height: 34, color: QColors.textMid),
-              ]),
-            ],
+        Explainable(
+          id: 'next_meal',
+          explanation: mealExplanation(nextMeal),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.green.withOpacity(0.4), radius: QRadii.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(t.nextMeal, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.green, letterSpacing: 0.4)),
+                Text(state.isAr ? nextMeal.nameAr : nextMeal.nameEn,
+                    style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.textPrimary)),
+                Text(
+                  state.isAr
+                      ? 'حوالي ${state.iso('${mealKcal(nextMeal)}')} سعر · متاح بديل'
+                      : 'About ${mealKcal(nextMeal)} kcal · swap available',
+                  style: QText.body(size: 13, color: QColors.textMuted),
+                ),
+                const SizedBox(height: 8),
+                Row(children: [
+                  QOutlineButton(label: t.swap, onTap: () => state.toggleSlotSwap(nextMeal.id), height: 34, color: QColors.textMid),
+                  const SizedBox(width: 8),
+                  QOutlineButton(label: t.openPlan, onTap: () => state.go(AppScreen.plan), height: 34, color: QColors.textMid),
+                ]),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 14),
-        Container(
+        Explainable(
+          id: 'quest',
+          child: Container(
           padding: const EdgeInsets.all(16),
           decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.xl),
           child: Column(
@@ -181,8 +207,10 @@ class TodayScreen extends StatelessWidget {
             ],
           ),
         ),
+        ),
         const SizedBox(height: 14),
-        QPrimaryButton(label: t.logMeal, onTap: () => state.go(AppScreen.log), height: 56),
+        // No "log a meal" button: hold the orb and pick speak / type / photo.
+        _OrbLogHint(state: state),
         if (state.meals.isNotEmpty) ...[
           const SizedBox(height: 18),
           Text(t.loggedToday, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
@@ -235,6 +263,42 @@ class _MacroRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+
+/// Replaces the old "log a meal" button. The action itself now lives in the
+/// orb — hold it, sweep to Log, and pick speak, type or photo — so this only
+/// has to teach the gesture once.
+class _OrbLogHint extends StatelessWidget {
+  final AppState state;
+  const _OrbLogHint({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: QColors.violet.withValues(alpha: 0.08),
+        border: Border.all(color: QColors.violet.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(QRadii.xl),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.touch_app_outlined, size: 18, color: QColors.violetSoft),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              isAr
+                  ? 'عشان تسجّل وجبة: استمر ضاغط على القمر، اسحب لـ«سجّل»، واختار تتكلم أو تكتب أو تصوّر.'
+                  : 'To log a meal: hold the moon, sweep to Log, then pick speak, type or photo.',
+              style: QText.body(size: 12, height: 18, color: QColors.textMid),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

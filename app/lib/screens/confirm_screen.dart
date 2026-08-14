@@ -95,7 +95,7 @@ class ConfirmScreen extends StatelessWidget {
         QPrimaryButton(label: t.confirmAndLog, onTap: state.confirmMeal, height: 56),
         const SizedBox(height: 4),
         Center(
-          child: TextButton(onPressed: () => state.go(AppScreen.log), child: Text(t.cancel, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textMuted))),
+          child: TextButton(onPressed: () => state.go(AppScreen.today), child: Text(t.cancel, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textMuted))),
         ),
       ],
     );

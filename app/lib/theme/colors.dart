@@ -31,6 +31,12 @@ class QColors {
   static const borderStrong = Color(0xFF2B3450);
   static const borderStep = Color(0xFF2A354D);
 
+  /// Mangata — the moon's road on water. Everything the moon throws off is
+  /// this one cool white at varying strength, rather than a different hue per
+  /// destination.
+  static const moonlight = Color(0xFFE8EEFF);
+  static const moonbeam = Color(0xFFC3D2F5);
+
   static const blue = Color(0xFF4F7CFF);
   static const violet = Color(0xFF7B6CFF);
   static const violetSoft = Color(0xFFA78BFA);

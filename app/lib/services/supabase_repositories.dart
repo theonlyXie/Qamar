@@ -18,9 +18,13 @@ class SupabaseProfileRepository implements ProfileRepository {
   Future<Profile?> loadProfile(String userId) async {
     final row = await _client.from('profiles').select().eq('user_id', userId).maybeSingle();
     if (row == null) return null;
+    final birth = DateTime.tryParse(row['birth_date'] as String? ?? '');
     return Profile(
       name: row['name'] as String? ?? '',
-      age: row['age'] as int? ?? 29,
+      birthYear: birth?.year ?? 1997,
+      birthMonth: birth?.month ?? 6,
+      birthDay: birth?.day ?? 15,
+      gender: (row['gender'] as String?) == 'female' ? Gender.female : Gender.male,
       height: row['height_cm'] as int? ?? 172,
       weight: row['weight_kg'] as int? ?? 82,
       fat: row['body_fat_pct'] as int? ?? 27,
@@ -35,7 +39,10 @@ class SupabaseProfileRepository implements ProfileRepository {
     await _client.from('profiles').upsert({
       'user_id': userId,
       'name': profile.name,
-      'age': profile.age,
+      'birth_date': '${profile.birthYear.toString().padLeft(4, '0')}-'
+          '${profile.birthMonth.toString().padLeft(2, '0')}-'
+          '${profile.birthDay.toString().padLeft(2, '0')}',
+      'gender': profile.gender.name,
       'height_cm': profile.height,
       'weight_kg': profile.weight,
       'body_fat_pct': profile.fat,

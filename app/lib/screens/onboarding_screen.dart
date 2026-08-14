@@ -3,11 +3,13 @@ import 'package:provider/provider.dart';
 
 import '../models/messages.dart';
 import '../models/onboarding.dart';
+import '../models/profile.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
+import '../widgets/moon.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -16,22 +18,14 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  final _scroll = ScrollController();
+  final _chat = ChatScroller();
   final _draftCtrl = TextEditingController();
-  int _lastLen = 0;
 
   @override
   void dispose() {
-    _scroll.dispose();
+    _chat.dispose();
     _draftCtrl.dispose();
     super.dispose();
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
-      _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
-    });
   }
 
   @override
@@ -40,18 +34,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final t = state.t;
     final step = state.currentStep;
 
-    if (state.msgs.length != _lastLen || state.typing) {
-      _lastLen = state.msgs.length;
-      _scrollToBottom();
-    }
+    // Any change in the transcript — a new message, or the typing bubble
+    // appearing or going away — re-pins the list to the bottom.
+    _chat.sync(state.msgs.length * 2 + (state.typing ? 1 : 0));
     if (_draftCtrl.text != state.draft) {
       _draftCtrl.value = TextEditingValue(text: state.draft, selection: TextSelection.collapsed(offset: state.draft.length));
     }
 
     final stepChips = step != null && (step.kind == StepKind.chips || step.kind == StepKind.multi) && !state.blocked;
     final stepNumber = step != null && step.kind == StepKind.number;
+    final stepDate = step != null && step.kind == StepKind.date && !state.blocked;
     final canSkip = step != null && step.kind == StepKind.text;
-    final hasSubmit = (step == null || step.kind == StepKind.number || step.kind == StepKind.multi) && !state.blocked;
+    final hasSubmit = (step == null ||
+            step.kind == StepKind.number ||
+            step.kind == StepKind.multi ||
+            step.kind == StepKind.date) &&
+        !state.blocked;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -61,7 +59,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: QColors.borderFaint))),
           child: Row(
             children: [
-              ClipOval(child: Image.asset('assets/images/qamar_orb_sm.png', width: 36, height: 36, fit: BoxFit.cover)),
+              const QamarMoon(size: 36),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,6 +69,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ],
               ),
               const Spacer(),
+              // Switchable mid-conversation: the questions re-render in the
+              // other language and the answers already given are kept.
+              QLangToggle(lang: state.lang, onChanged: state.setLang),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(border: Border.all(color: QColors.borderSoft), borderRadius: BorderRadius.circular(999)),
@@ -82,7 +84,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
         Expanded(
           child: ListView.separated(
-            controller: _scroll,
+            controller: _chat.controller,
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
             itemCount: state.msgs.length + (state.typing ? 1 : 0),
             separatorBuilder: (_, __) => const SizedBox(height: 14),
@@ -115,14 +117,59 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 const SizedBox(height: 10),
               ],
+              if (stepDate) ...[
+                Row(
+                  children: [
+                    QWheelField(
+                      unit: state.isAr ? 'يوم' : 'day',
+                      value: state.profile.birthDay,
+                      min: 1,
+                      max: state.birthMonthLength,
+                      loop: true,
+                      onChanged: state.setBirthDay,
+                    ),
+                    const SizedBox(width: 8),
+                    QWheelField(
+                      unit: state.isAr ? 'شهر' : 'month',
+                      value: state.profile.birthMonth,
+                      min: 1,
+                      max: 12,
+                      loop: true,
+                      format: (m) => (state.isAr ? _monthsAr : _monthsEn)[m - 1],
+                      onChanged: state.setBirthMonth,
+                    ),
+                    const SizedBox(width: 8),
+                    QWheelField(
+                      unit: state.isAr ? 'سنة' : 'year',
+                      value: state.profile.birthYear,
+                      min: DateTime.now().year - 90,
+                      max: DateTime.now().year - 10,
+                      onChanged: state.setBirthYear,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _AgeReadout(state: state),
+                const SizedBox(height: 10),
+              ],
               if (stepNumber) ...[
                 Row(
                   children: [
-                    QStepperField(unit: state.isAr ? 'سنة' : 'age', value: state.profile.age, onInc: () => state.bumpAge(1), onDec: () => state.bumpAge(-1)),
+                    QWheelField(
+                      unit: state.isAr ? 'سم' : 'cm',
+                      value: state.profile.height,
+                      min: 140,
+                      max: 210,
+                      onChanged: state.setHeight,
+                    ),
                     const SizedBox(width: 8),
-                    QStepperField(unit: state.isAr ? 'سم' : 'cm', value: state.profile.height, onInc: () => state.bumpHeight(1), onDec: () => state.bumpHeight(-1)),
-                    const SizedBox(width: 8),
-                    QStepperField(unit: state.isAr ? 'كجم' : 'kg', value: state.profile.weight, onInc: () => state.bumpWeight(1), onDec: () => state.bumpWeight(-1)),
+                    QWheelField(
+                      unit: state.isAr ? 'كجم' : 'kg',
+                      value: state.profile.weight,
+                      min: 40,
+                      max: 200,
+                      onChanged: state.setWeight,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -178,6 +225,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ],
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Live feedback under the birth-date steppers: the age the date implies, and
+/// an up-front warning when it falls under 18, so the eligibility rule is
+/// visible before the user commits rather than only after.
+class _AgeReadout extends StatelessWidget {
+  final AppState state;
+  const _AgeReadout({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final age = state.profile.age;
+    final adult = state.profile.isAdult;
+    final label = state.isAr ? '${state.iso('$age')} سنة' : '$age years old';
+    final warn = state.isAr ? 'قمر للبالغين ١٨ سنة أو أكتر' : 'Qamar is for adults 18 and over';
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(adult ? Icons.cake_outlined : Icons.info_outline, size: 14, color: adult ? QColors.textMuted : QColors.amber),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            adult ? label : '$label · $warn',
+            textAlign: TextAlign.center,
+            style: QText.body(size: 12, color: adult ? QColors.textMuted : QColors.amber),
           ),
         ),
       ],
@@ -279,9 +357,11 @@ class _TargetCard extends StatelessWidget {
     final t = state.t;
     final tg = state.target();
     final p = state.profile;
+    final sexAr = p.gender == Gender.female ? 'أنثى' : 'ذكر';
+    final sexEn = p.gender == Gender.female ? 'female' : 'male';
     final assumptions = state.isAr
-        ? 'على أساس ${state.iso('${p.age}')} سنة · ${state.iso('${p.height}')} سم · ${state.iso('${p.weight}')} كجم · نشاط متوسط'
-        : 'Based on ${p.age} yrs · ${p.height} cm · ${p.weight} kg · moderate activity';
+        ? 'على أساس ${state.iso('${p.age}')} سنة · $sexAr · ${state.iso('${p.height}')} سم · ${state.iso('${p.weight}')} كجم · نشاط متوسط'
+        : 'Based on ${p.age} yrs · $sexEn · ${p.height} cm · ${p.weight} kg · moderate activity';
 
     return FractionallySizedBox(
       widthFactor: 0.88,
@@ -401,3 +481,7 @@ class _SaveCard extends StatelessWidget {
     );
   }
 }
+
+
+const _monthsAr = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const _monthsEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

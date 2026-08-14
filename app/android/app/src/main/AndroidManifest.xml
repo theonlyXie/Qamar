@@ -1,4 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- image_picker launches the system camera/gallery via intents, so no
+         runtime permission is declared here on purpose: declaring CAMERA
+         would oblige us to request it and would break devices that only have
+         a gallery. Marked not-required so phones without a camera can still
+         install and use the typed onboarding path. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
     <application
         android:label="qamar"
         android:name="${applicationName}"

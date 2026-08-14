@@ -1,4 +1,7 @@
 import 'dart:ui';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,6 +10,7 @@ import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import 'living_orb.dart';
+import 'common.dart';
 
 /// S18 — Ask Qamar as a companion overlay: the page behind fades/blurs, the
 /// orb docks to the side, and messages emerge from it along a moonbeam.
@@ -17,22 +21,14 @@ class AskQamarOverlay extends StatefulWidget {
 }
 
 class _AskQamarOverlayState extends State<AskQamarOverlay> {
-  final _scroll = ScrollController();
+  final _chat = ChatScroller();
   final _ctrl = TextEditingController();
-  int _lastLen = 0;
 
   @override
   void dispose() {
-    _scroll.dispose();
+    _chat.dispose();
     _ctrl.dispose();
     super.dispose();
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
-      _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 240), curve: Curves.easeOut);
-    });
   }
 
   @override
@@ -40,10 +36,7 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> {
     final state = context.watch<AppState>();
     final t = state.t;
 
-    if (state.chat.length != _lastLen || state.chatState == ChatState.thinking) {
-      _lastLen = state.chat.length;
-      _scrollToBottom();
-    }
+    _chat.sync(state.chat.length * 3 + state.chatState.index);
     if (_ctrl.text != state.chatDraft) {
       _ctrl.value = TextEditingValue(text: state.chatDraft, selection: TextSelection.collapsed(offset: state.chatDraft.length));
     }
@@ -91,7 +84,7 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> {
                   child: Stack(
                     children: [
                       ListView(
-                        controller: _scroll,
+                        controller: _chat.controller,
                         padding: const EdgeInsetsDirectional.fromSTEB(110, 4, 18, 150),
                         children: [
                           for (final c in state.chat) _ChatBubble(turn: c),
@@ -168,6 +161,35 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> {
                           ),
                         ),
                         const SizedBox(height: 10),
+                      ],
+                      // Proof the camera actually fired: the shot the user just
+                      // took, attached to the message they are about to send.
+                      if (state.lastMealPhotoPath != null && !kIsWeb) ...[
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xE5111827),
+                              border: Border.all(color: QColors.borderStrong),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.file(File(state.lastMealPhotoPath!), width: 44, height: 44, fit: BoxFit.cover),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(state.isAr ? 'صورة الوجبة' : 'Meal photo',
+                                    style: QText.body(size: 12, color: QColors.textMuted)),
+                                const SizedBox(width: 8),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                       Container(
                         padding: const EdgeInsetsDirectional.only(start: 16, end: 5, top: 5, bottom: 5),

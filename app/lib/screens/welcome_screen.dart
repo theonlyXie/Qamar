@@ -1,9 +1,11 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
+import '../widgets/common.dart';
 import '../widgets/living_orb.dart';
 
 class WelcomeScreen extends StatelessWidget {
@@ -19,13 +21,30 @@ class WelcomeScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // First thing on the first screen: someone who does not read Arabic
+          // must be able to switch before the conversation starts.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+            child: Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: QLangToggle(lang: state.lang, onChanged: state.setLang, large: true),
+            ),
+          ),
           Expanded(
             child: Center(
-              child: SizedBox(
-                width: 300,
-                height: 300,
+              child: LayoutBuilder(builder: (context, box) {
+                // Was a fixed 300px Stack with the pills hung off its edges at
+                // left:-4 / right:-6. Stack clips by default, so on a narrower
+                // phone — or once the real Arabic font loads and the labels get
+                // wider than a fallback's tofu boxes — the pills were cut off
+                // at the sides. Size to the screen and let them overhang.
+                final side = math.min(box.maxWidth - 24, 320.0);
+                return SizedBox(
+                width: side,
+                height: side,
                 child: Stack(
                   alignment: Alignment.center,
+                  clipBehavior: Clip.none,
                   children: [
                     LivingOrb(size: 132, wander: true, wanderDuration: const Duration(milliseconds: 9000), haloDuration: const Duration(milliseconds: 7000)),
                     Positioned(
@@ -50,7 +69,8 @@ class WelcomeScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
+              );
+              }),
             ),
           ),
           Column(
@@ -120,6 +140,9 @@ class _FloatingPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Never wider than the screen less a margin, so a long label shortens
+    // instead of running off the edge.
+    final maxWidth = MediaQuery.of(context).size.width - 40;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -127,6 +150,7 @@ class _FloatingPill extends StatelessWidget {
         onTap: onTap,
         child: Container(
           height: 52,
+          constraints: BoxConstraints(maxWidth: maxWidth),
           padding: const EdgeInsets.symmetric(horizontal: 18),
           decoration: BoxDecoration(
             color: emphasis ? const Color(0xD1141C2E) : const Color(0xDB111827),
@@ -144,7 +168,12 @@ class _FloatingPill extends StatelessWidget {
                 Container(width: 12, height: 12, decoration: BoxDecoration(border: Border.all(color: QColors.cyan, width: 2), borderRadius: BorderRadius.circular(3))),
                 const SizedBox(width: 9),
               ],
-              Text(label, style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFF1F5FF))),
+              Flexible(
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFF1F5FF))),
+              ),
             ],
           ),
         ),

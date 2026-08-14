@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/strings.dart';
+import '../services/config.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
+import '../widgets/moon.dart';
 
 class YouScreen extends StatelessWidget {
   const YouScreen({super.key});
@@ -37,7 +39,7 @@ class YouScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), border: QColors.borderStrong, radius: QRadii.xl),
           child: Row(children: [
-            ClipOval(child: Image.asset('assets/images/qamar_orb_sm.png', width: 48, height: 48, fit: BoxFit.cover)),
+            const QamarMoon(size: 48),
             const SizedBox(width: 14),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(state.profile.name.isNotEmpty ? state.profile.name : (isAr ? 'يا صاحبي' : 'friend'), style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),
@@ -75,6 +77,45 @@ class YouScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(QRadii.xl),
+            onTap: state.openSubscription,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
+                border: Border.all(color: QColors.violet.withValues(alpha: 0.45)),
+                borderRadius: BorderRadius.circular(QRadii.xl),
+              ),
+              child: Row(children: [
+                const QamarMoon(size: 34),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Text('Qamar+', style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFE9ECFF))),
+                      if (state.plusActive) ...[
+                        const SizedBox(width: 8),
+                        Text(isAr ? 'مفعّل' : 'Active',
+                            style: QText.body(size: 11, weight: FontWeight.w600, color: QColors.green)),
+                      ],
+                    ]),
+                    Text(
+                      state.plusActive
+                          ? (isAr ? 'شكراً إنك معانا' : 'Thanks for supporting Qamar')
+                          : (isAr ? 'الخطة الكاملة والتحليل بالصورة من غير حد' : 'The full plan and unlimited photo analysis'),
+                      style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+                    ),
+                  ]),
+                ),
+                const Icon(Icons.chevron_right, size: 20, color: QColors.textFaint),
+              ]),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: QColors.gold.withOpacity(0.08), border: Border.all(color: QColors.gold.withOpacity(0.32)), borderRadius: BorderRadius.circular(QRadii.xl)),
@@ -105,21 +146,14 @@ class YouScreen extends StatelessWidget {
             ]),
           ),
         ],
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(QRadii.lg),
-            onTap: () => state.setLang(isAr ? AppLang.en : AppLang.ar),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-              decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
-              child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(isAr ? 'اللغة' : 'Language', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
-                Text(isAr ? 'العربية' : 'English', style: QText.body(size: 13, color: QColors.textFaint)),
-              ]),
-            ),
-          ),
+        Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text(isAr ? 'اللغة' : 'Language', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+            QLangToggle(lang: state.lang, onChanged: state.setLang),
+          ]),
         ),
         Container(
           padding: const EdgeInsets.all(18),
@@ -151,6 +185,13 @@ class YouScreen extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        Center(
+          child: Text(
+            'Qamar ${QamarConfig.buildLabel}',
+            style: QText.number(size: 11, color: QColors.textFaint),
           ),
         ),
       ],

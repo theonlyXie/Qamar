@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../widgets/ask_qamar_overlay.dart';
+import '../widgets/explain.dart';
 import '../widgets/orb_nav.dart';
 import '../widgets/tree_overlay.dart';
 import '../widgets/why_sheet.dart';
@@ -15,6 +16,7 @@ import 'plan_screen.dart';
 import 'progress_screen.dart';
 import 'scan_screen.dart';
 import 'today_screen.dart';
+import 'subscription_screen.dart';
 import 'wallet_screen.dart';
 import 'welcome_screen.dart';
 import 'you_screen.dart';
@@ -50,6 +52,8 @@ class HomeShell extends StatelessWidget {
         return const YouScreen();
       case AppScreen.wallet:
         return const WalletScreen();
+      case AppScreen.subscription:
+        return const SubscriptionScreen();
     }
   }
 
@@ -73,6 +77,7 @@ class HomeShell extends StatelessWidget {
               if (state.treeOpen) const TreeOverlay(),
               if (state.chatOpen) const AskQamarOverlay(),
               if (state.whyOpen) const WhySheet(),
+              if (state.explainOpen != null) const ExplainSheet(),
             ],
           ),
         ),

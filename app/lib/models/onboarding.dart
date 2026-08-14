@@ -1,4 +1,4 @@
-enum StepKind { chips, text, number, multi }
+enum StepKind { chips, text, number, multi, date }
 
 class StepOption {
   final String ar;
@@ -24,18 +24,16 @@ class OnboardingStep {
   });
 }
 
-/// Ported 1:1 from the prototype's STEPS array (S06 age gate → S07 consent →
-/// name → body numbers → goal → activity → food exclusions → S-safety gate).
+/// Date of birth → consent → name → gender → body numbers → goal → activity
+/// → food exclusions → safety gate. The prototype's S06 "are you 18+" chip pair
+/// is now a real birth date, and sex is asked outright because the resting-
+/// metabolism equation needs it.
 final List<OnboardingStep> kOnboardingSteps = [
   OnboardingStep(
-    id: 'age',
-    kind: StepKind.chips,
-    askAr: 'أهلاً 👋 أنا قمر. هساعدك تاكل أحسن من غير رجيم قاسي. سؤال أول للأهلية: عندك ١٨ سنة أو أكتر؟',
-    askEn: 'Hi, I’m Qamar. I’ll help you eat better without a punishing diet. First, an eligibility question: are you 18 or older?',
-    options: const [
-      StepOption(ar: 'أيوه، ١٨ أو أكتر', en: 'Yes, 18 or older', value: 'adult'),
-      StepOption(ar: 'أقل من ١٨', en: 'Under 18', value: 'minor'),
-    ],
+    id: 'dob',
+    kind: StepKind.date,
+    askAr: 'أهلاً 👋 أنا قمر. هساعدك تاكل أحسن من غير رجيم قاسي. أول حاجة: تاريخ ميلادك إيه؟ (بيحدد أهليتك وبيدخل في حساب السعرات)',
+    askEn: 'Hi, I’m Qamar. I’ll help you eat better without a punishing diet. First: what’s your date of birth? (it sets your eligibility and feeds the calorie maths)',
   ),
   OnboardingStep(
     id: 'consent',
@@ -57,10 +55,20 @@ final List<OnboardingStep> kOnboardingSteps = [
     askEn: 'Great. What should I call you? (you can skip)',
   ),
   OnboardingStep(
+    id: 'gender',
+    kind: StepKind.chips,
+    askAr: 'عشان معادلة السعرات تطلع مظبوطة، محتاج أعرف: ذكر ولا أنثى؟',
+    askEn: 'So the calorie equation comes out right, I need to know: male or female?',
+    options: const [
+      StepOption(ar: 'ذكر', en: 'Male', value: 'male'),
+      StepOption(ar: 'أنثى', en: 'Female', value: 'female'),
+    ],
+  ),
+  OnboardingStep(
     id: 'body',
     kind: StepKind.number,
-    askAr: 'محتاج 3 أرقام بس عشان أحسب هدف واقعي: السن، الطول، والوزن الحالي.',
-    askEn: 'I need just three numbers for a realistic target: age, height and current weight.',
+    askAr: 'محتاج رقمين بس عشان أحسب هدف واقعي: الطول والوزن الحالي.',
+    askEn: 'I need just two numbers for a realistic target: your height and current weight.',
   ),
   OnboardingStep(
     id: 'goal',
