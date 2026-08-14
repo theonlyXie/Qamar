@@ -1,91 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/plan.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/explain.dart';
-
-/// One component of a planned meal. The plan is only actionable if it says how
-/// much of each thing to eat — a bare "620 kcal" tells you the answer without
-/// telling you what to put on the plate.
-typedef PlanPortion = ({String ar, String en, String amountAr, String amountEn, int kcal});
-
-typedef PlanMeal = ({
-  String slotAr,
-  String slotEn,
-  String nameAr,
-  String nameEn,
-  String noteAr,
-  String noteEn,
-  List<PlanPortion> portions,
-});
-
-/// Meal totals are summed from the portions rather than written down
-/// separately, so the headline number can never drift from the breakdown —
-/// including when the lunch swap drops the rice.
-int _mealKcal(PlanMeal m) => m.portions.fold(0, (sum, p) => sum + p.kcal);
-
-const _breakfast = (
-  slotAr: 'فطار',
-  slotEn: 'Breakfast',
-  nameAr: 'فول + عيش بلدي + خضار',
-  nameEn: 'Foul + baladi bread + vegetables',
-  noteAr: 'بروتين ٢٤ جم',
-  noteEn: '24 g protein',
-  portions: <PlanPortion>[
-    (ar: 'فول مدمس', en: 'Foul medames', amountAr: '١٥٠ جم', amountEn: '150 g', kcal: 180),
-    (ar: 'عيش بلدي', en: 'Baladi bread', amountAr: 'رغيف ونص', amountEn: '1½ loaves', kcal: 220),
-    (ar: 'طماطم وخيار', en: 'Tomato & cucumber', amountAr: '١٠٠ جم', amountEn: '100 g', kcal: 30),
-    (ar: 'زيت زيتون', en: 'Olive oil', amountAr: 'معلقة صغيرة', amountEn: '1 tsp', kcal: 50),
-  ],
-);
-
-const _lunchWithRice = (
-  slotAr: 'غدا',
-  slotEn: 'Lunch',
-  nameAr: 'فراخ مشوية + رز + سلطة',
-  nameEn: 'Grilled chicken + rice + salad',
-  noteAr: 'بديل متاح',
-  noteEn: 'Swap available',
-  portions: <PlanPortion>[
-    (ar: 'صدور فراخ مشوية', en: 'Grilled chicken breast', amountAr: '١٥٠ جم', amountEn: '150 g', kcal: 250),
-    (ar: 'رز أبيض مطبوخ', en: 'Cooked white rice', amountAr: '١٥٠ جم', amountEn: '150 g', kcal: 200),
-    (ar: 'سلطة خضرا', en: 'Green salad', amountAr: '١٥٠ جم', amountEn: '150 g', kcal: 45),
-    (ar: 'زيت زيتون', en: 'Olive oil', amountAr: 'معلقة كبيرة', amountEn: '1 tbsp', kcal: 125),
-  ],
-);
-
-const _lunchNoRice = (
-  slotAr: 'غدا',
-  slotEn: 'Lunch',
-  nameAr: 'فراخ مشوية + سلطة',
-  nameEn: 'Grilled chicken + salad',
-  noteAr: 'من غير نشويات — أخف ١٧٠ سعر',
-  noteEn: 'No starch — 170 kcal lighter',
-  portions: <PlanPortion>[
-    (ar: 'صدور فراخ مشوية', en: 'Grilled chicken breast', amountAr: '١٨٠ جم', amountEn: '180 g', kcal: 300),
-    (ar: 'سلطة خضرا', en: 'Green salad', amountAr: '٢٠٠ جم', amountEn: '200 g', kcal: 60),
-    (ar: 'زيت زيتون', en: 'Olive oil', amountAr: 'معلقة صغيرة', amountEn: '1 tsp', kcal: 50),
-    (ar: 'عيش سن', en: 'Wholemeal bread', amountAr: 'نص رغيف', amountEn: '½ loaf', kcal: 40),
-  ],
-);
-
-const _dinner = (
-  slotAr: 'عشا',
-  slotEn: 'Dinner',
-  nameAr: 'زبادي + فاكهة + شوفان',
-  nameEn: 'Yogurt + fruit + oats',
-  noteAr: 'خفيف قبل النوم',
-  noteEn: 'Light before sleep',
-  portions: <PlanPortion>[
-    (ar: 'زبادي يوناني', en: 'Greek yogurt', amountAr: '٢٠٠ جم', amountEn: '200 g', kcal: 130),
-    (ar: 'شوفان', en: 'Oats', amountAr: '٤٠ جم', amountEn: '40 g', kcal: 150),
-    (ar: 'موزة', en: 'Banana', amountAr: 'واحدة متوسطة', amountEn: '1 medium', kcal: 100),
-  ],
-);
 
 class PlanScreen extends StatelessWidget {
   const PlanScreen({super.key});
@@ -95,12 +17,10 @@ class PlanScreen extends StatelessWidget {
     final state = context.watch<AppState>();
     final t = state.t;
 
-    final meals = <PlanMeal>[
-      _breakfast,
-      state.planSwap ? _lunchNoRice : _lunchWithRice,
-      _dinner,
+    final meals = [
+      for (final (base, alternative) in kPlanSlots) state.isSlotSwapped(base.id) ? alternative : base,
     ];
-    final dayTotal = meals.fold(0, (sum, m) => sum + _mealKcal(m));
+    final dayTotal = meals.fold(0, (sum, m) => sum + mealKcal(m));
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 56, 20, 160),
@@ -111,7 +31,12 @@ class PlanScreen extends StatelessWidget {
         const SizedBox(height: 10),
         Explainable(id: 'plan_total', child: _DayTotal(state: state, kcal: dayTotal)),
         const SizedBox(height: 14),
-        for (final m in meals) _MealCard(state: state, meal: m),
+        for (final m in meals)
+          Explainable(
+            id: 'plan_meal_${m.id}',
+            explanation: mealExplanation(m),
+            child: _MealCard(state: state, meal: m),
+          ),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -187,7 +112,7 @@ class _MealCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = state.t;
     final isAr = state.isAr;
-    final kcal = _mealKcal(meal);
+    final kcal = mealKcal(meal);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -245,10 +170,10 @@ class _MealCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
+          // Only "swap" here: logging a meal is the orb's job now, not a
+          // button that pushes the user into another page.
           Row(children: [
-            QOutlineButton(label: t.swap, onTap: state.togglePlanSwap, height: 34, color: QColors.textMid),
-            const SizedBox(width: 8),
-            QOutlineButton(label: t.markEaten, onTap: () => state.go(AppScreen.log), height: 34, color: QColors.textMid),
+            QOutlineButton(label: t.swap, onTap: () => state.toggleSlotSwap(meal.id), height: 34, color: QColors.textMid),
           ]),
         ],
       ),

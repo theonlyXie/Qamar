@@ -56,7 +56,7 @@ class AnalyzingScreen extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-          child: QOutlineButton(label: t.cancel, onTap: () => state.go(AppScreen.log), height: 48),
+          child: QOutlineButton(label: t.cancel, onTap: () => state.go(AppScreen.today), height: 48),
         ),
       ],
     );

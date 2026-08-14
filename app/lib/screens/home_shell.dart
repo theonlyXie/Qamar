@@ -77,7 +77,7 @@ class HomeShell extends StatelessWidget {
               if (state.treeOpen) const TreeOverlay(),
               if (state.chatOpen) const AskQamarOverlay(),
               if (state.whyOpen) const WhySheet(),
-              if (state.explainOpenId != null) const ExplainSheet(),
+              if (state.explainOpen != null) const ExplainSheet(),
             ],
           ),
         ),

@@ -7,11 +7,15 @@ import '../l10n/strings.dart';
 import '../models/meal.dart';
 import '../models/messages.dart';
 import '../models/onboarding.dart';
+import '../widgets/explain.dart';
 import '../models/profile.dart';
 import 'chat_replies.dart';
 
 /// Qamar+ billing period.
 enum PlusPlan { monthly, annual }
+
+/// How a meal gets logged straight from the orb, with no page in between.
+enum QuickLog { voice, text, photo }
 
 enum AppScreen { welcome, scan, onboard, today, log, analyzing, confirm, plan, progress, you, wallet, subscription }
 
@@ -54,7 +58,10 @@ class AppState extends ChangeNotifier {
   int suAvailable = 0;
   int suLifetime = 0;
   bool questDone = false;
-  bool planSwap = false;
+  /// Meal slots the user has swapped to their alternative, keyed by slot id
+  /// ('breakfast' | 'lunch' | 'dinner'). Previously a single bool, which meant
+  /// every meal's swap button drove the same flag and only lunch ever changed.
+  final Set<String> swappedSlots = {};
   bool blocked = false;
   bool minor = false;
   bool improve = false;
@@ -96,8 +103,9 @@ class AppState extends ChangeNotifier {
     chat.clear();
     blocked = false;
     minor = false;
+    swappedSlots.clear();
     explainHoverId = null;
-    explainOpenId = null;
+    explainOpen = null;
     plusActive = false;
     plusNotice = null;
     plusPlan = PlusPlan.annual;
@@ -318,6 +326,33 @@ class AppState extends ChangeNotifier {
   }
 
   void bumpAge(int d) => _bumpProfile(age: (profile.age + d).clamp(18, 90).toInt());
+
+  /// Absolute setters, for the value wheels. The old bump-by-one API is kept
+  /// for the InBody correction path.
+  void setHeight(int cm) => _bumpProfile(height: cm.clamp(140, 210).toInt());
+  void setWeight(int kg) => _bumpProfile(weight: kg.clamp(40, 200).toInt());
+
+  void setBirthYear(int year) {
+    final now = DateTime.now();
+    final y = year.clamp(now.year - 90, now.year - 10).toInt();
+    profile = profile.copyWith(birthYear: y, birthDay: _clampDay(y, profile.birthMonth, profile.birthDay));
+    _notify();
+  }
+
+  void setBirthMonth(int month) {
+    final m = month.clamp(1, 12).toInt();
+    profile = profile.copyWith(birthMonth: m, birthDay: _clampDay(profile.birthYear, m, profile.birthDay));
+    _notify();
+  }
+
+  void setBirthDay(int day) {
+    profile = profile.copyWith(birthDay: _clampDay(profile.birthYear, profile.birthMonth, day));
+    _notify();
+  }
+
+  /// Days available in the currently selected birth month — the day wheel's
+  /// upper bound, so February never offers a 31st.
+  int get birthMonthLength => Profile.daysInMonth(profile.birthYear, profile.birthMonth);
 
   /// Birth-date steppers. The year range runs down to 10 years old rather than
   /// stopping at 18, so an under-age user can actually express their real date
@@ -872,8 +907,10 @@ class AppState extends ChangeNotifier {
 
   // ---- plan -------------------------------------------------
 
-  void togglePlanSwap() {
-    planSwap = !planSwap;
+  bool isSlotSwapped(String slotId) => swappedSlots.contains(slotId);
+
+  void toggleSlotSwap(String slotId) {
+    if (!swappedSlots.remove(slotId)) swappedSlots.add(slotId);
     _notify();
   }
 
@@ -971,8 +1008,10 @@ class AppState extends ChangeNotifier {
   /// The explainable value the orb is currently hovering over mid-drag.
   String? explainHoverId;
 
-  /// The value whose explanation sheet is open, if any.
-  String? explainOpenId;
+  /// The explanation currently on screen, snapshotted when the orb was
+  /// dropped. Held as the object rather than an id so explanations built from
+  /// live data survive the source widget scrolling away.
+  Explanation? explainOpen;
 
   void setExplainHover(String? id) {
     if (explainHoverId == id) return;
@@ -980,15 +1019,71 @@ class AppState extends ChangeNotifier {
     _notify();
   }
 
-  void openExplain(String id) {
-    explainOpenId = id;
+  void openExplain(Explanation ex) {
+    explainOpen = ex;
     explainHoverId = null;
     _notify();
   }
 
   void closeExplain() {
-    explainOpenId = null;
+    explainOpen = null;
     _notify();
+  }
+
+  // ---- radial menu: hold, drag, release ---------------------------------
+
+  /// True while the menu is being driven by a held finger. Tapping the orb
+  /// still opens it in the old sticky way; holding lets the user sweep to a
+  /// destination and release, without a second tap.
+  bool treeHold = false;
+
+  /// Node under the finger, and — once Log has been dwelt on — the input
+  /// method under it.
+  int? treeHoverNode;
+  int? treeHoverSub;
+
+  /// Index of the Log node while its input methods are fanned out.
+  int? treeLogIndex;
+  bool get treeLogExpanded => treeLogIndex != null;
+
+  void openTreeHold() {
+    treeOpen = true;
+    treeHold = true;
+    treeHoverNode = null;
+    treeHoverSub = null;
+    treeLogIndex = null;
+    _notify();
+  }
+
+  void setTreeHover(int? node, int? sub) {
+    if (treeHoverNode == node && treeHoverSub == sub) return;
+    treeHoverNode = node;
+    treeHoverSub = sub;
+    _notify();
+  }
+
+  void expandTreeLog(int index) {
+    treeLogIndex = index;
+    _notify();
+  }
+
+  void endTreeHold() {
+    treeHold = false;
+    treeHoverNode = null;
+    treeHoverSub = null;
+    treeLogIndex = null;
+    _notify();
+  }
+
+  /// How a meal is being logged from the orb.
+  void quickLog(QuickLog kind) {
+    treeOpen = false;
+    treeHold = false;
+    treeHoverNode = null;
+    treeHoverSub = null;
+    treeLogIndex = null;
+    if (kind == QuickLog.text) presetMealDraftExample();
+    startAnalyze();
   }
 
   void toggleTree() {
@@ -997,6 +1092,10 @@ class AppState extends ChangeNotifier {
   }
 
   void closeTree() {
+    treeHold = false;
+    treeHoverNode = null;
+    treeHoverSub = null;
+    treeLogIndex = null;
     treeOpen = false;
     _notify();
   }

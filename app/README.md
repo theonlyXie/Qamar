@@ -122,8 +122,13 @@ rewrite.
   real numbers needs the AI gateway. Camera failures (no camera, refused
   permission, unsupported platform) surface on screen and the typed path
   stays available, so a missing camera never dead-ends onboarding.
+- The orb is the primary navigation and logging surface. Hold it to open the
+  radial menu, sweep to a destination and release; dwell on Log and its three
+  input methods (speak / type / photo) fan out in place, so logging a meal
+  never opens a chooser page. Tapping still opens the menu the sticky way.
 - The orb's data explanations (`lib/widgets/explain.dart`) are static copy
-  keyed by metric. The interaction is real — drag the orb over a value and
+  keyed by metric, except planned meals, whose explanation is built from the
+  meal's own portions. The interaction is real — drag the orb over a value and
   drop it — but the words are written, not generated. Once the AI gateway
   exists they become the fallback and the orb explains the number in the
   user's own context.

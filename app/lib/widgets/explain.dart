@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/plan.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
@@ -103,6 +104,16 @@ const kExplanations = <String, Explanation>{
     soWhatAr: 'الاستمرار أهم من الكمال. يوم واحد مضبوط أحسن من أسبوع مثالي وبعده انقطاع.',
     soWhatEn: 'Consistency beats perfection. One honest day beats a perfect week followed by quitting.',
   ),
+  'quest': Explanation(
+    titleAr: 'مهمة اليوم',
+    titleEn: "Today's quest",
+    bodyAr:
+        'حاجة واحدة صغيرة بس ليها أثر — مش قائمة مهام. بتديك نقاط Su لما تخلّصها، وبتتغير كل يوم حسب اللي ناقصك.',
+    bodyEn:
+        'One small thing with outsized effect — not a to-do list. It pays Su Points when you finish it, and changes daily based on what you are missing.',
+    soWhatAr: 'لو المهمة مش مناسبة لظروف يومك، اضغط «غيّرها» — ده مش فشل.',
+    soWhatEn: 'If it does not fit your day, tap Replace — that is not a failure.',
+  ),
   'plan_total': Explanation(
     titleAr: 'إجمالي الخطة',
     titleEn: 'Plan total',
@@ -112,6 +123,24 @@ const kExplanations = <String, Explanation>{
     soWhatEn: 'A small gap from your target is fine — the plan is a suggestion, not an instruction.',
   ),
 };
+
+/// Builds the orb's answer for a planned meal from the meal itself, so hovering
+/// a meal gives the portions and the reasoning without opening the Plan page —
+/// which is the whole point of the orb.
+Explanation mealExplanation(PlanMeal m) {
+  final kcal = mealKcal(m);
+  final linesAr = m.portions.map((p) => '• ${p.ar} — ${p.amountAr} — ${p.kcal} سعر').join('\n');
+  final linesEn = m.portions.map((p) => '• ${p.en} — ${p.amountEn} — ${p.kcal} kcal').join('\n');
+
+  return Explanation(
+    titleAr: '${m.slotAr}: ${m.nameAr}',
+    titleEn: '${m.slotEn}: ${m.nameEn}',
+    bodyAr: 'إجمالي $kcal سعر، موزّعة كده:\n$linesAr',
+    bodyEn: 'A total of $kcal kcal, made up of:\n$linesEn',
+    soWhatAr: 'الكميات تقريبية — الأقرب أحسن من المضبوط. لو مكوّن مش متاح، اضغط «بديل» وهجيبلك واحد قريب منه في السعرات.',
+    soWhatEn: 'Amounts are approximate — close is better than exact. If something is unavailable, tap Swap and I will offer a near-equivalent.',
+  );
+}
 
 /// Where an explainable value currently sits on screen.
 ///
@@ -124,8 +153,23 @@ class ExplainRegistry {
 
   final Map<String, Rect> _spots = {};
 
-  void register(String id, Rect rect) => _spots[id] = rect;
-  void unregister(String id) => _spots.remove(id);
+  /// Explanations built from live data — a plan meal's actual portions, say —
+  /// rather than looked up from [kExplanations]. Registered alongside the
+  /// rect so the orb can read them without knowing which screen it is over.
+  final Map<String, Explanation> _dynamic = {};
+
+  void register(String id, Rect rect, [Explanation? explanation]) {
+    _spots[id] = rect;
+    if (explanation != null) _dynamic[id] = explanation;
+  }
+
+  void unregister(String id) {
+    _spots.remove(id);
+    _dynamic.remove(id);
+  }
+
+  /// Copy for [id]: whatever was registered with it, else the static table.
+  Explanation? explanationFor(String id) => _dynamic[id] ?? kExplanations[id];
 
   /// The explainable value under [point], if any. Smallest match wins so a
   /// value nested inside a larger card resolves to the value.
@@ -148,8 +192,11 @@ class ExplainRegistry {
 /// it lights up; drop the orb and the explanation opens.
 class Explainable extends StatefulWidget {
   final String id;
+
+  /// Built from live data. Omit to use the static entry for [id].
+  final Explanation? explanation;
   final Widget child;
-  const Explainable({super.key, required this.id, required this.child});
+  const Explainable({super.key, required this.id, this.explanation, required this.child});
 
   @override
   State<Explainable> createState() => _ExplainableState();
@@ -176,7 +223,11 @@ class _ExplainableState extends State<Explainable> {
     if (!mounted) return;
     final box = _key.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return;
-    ExplainRegistry.instance.register(widget.id, box.localToGlobal(Offset.zero) & box.size);
+    ExplainRegistry.instance.register(
+      widget.id,
+      box.localToGlobal(Offset.zero) & box.size,
+      widget.explanation,
+    );
   }
 
   @override
@@ -217,8 +268,7 @@ class ExplainSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final id = state.explainOpenId;
-    final ex = id == null ? null : kExplanations[id];
+    final ex = state.explainOpen;
     if (ex == null) return const SizedBox.shrink();
 
     final isAr = state.isAr;

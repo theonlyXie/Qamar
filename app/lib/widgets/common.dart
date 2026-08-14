@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -18,7 +19,12 @@ class QPrimaryButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(QRadii.lg),
-          onTap: onTap,
+          onTap: onTap == null
+              ? null
+              : () {
+                  HapticFeedback.lightImpact();
+                  onTap!();
+                },
           child: Ink(
             decoration: QDecor.gradientButton(gradient: gradient),
             child: Center(
@@ -67,7 +73,10 @@ class QPillChip extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(QRadii.pill),
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
           decoration: BoxDecoration(
@@ -131,38 +140,120 @@ class QRoundIconButton extends StatelessWidget {
   }
 }
 
-class QStepperField extends StatelessWidget {
+/// An iOS-style value wheel: scroll to choose, with a selection tick on every
+/// notch. Replaces the old +/- stepper, which needed one tap per unit — 30 of
+/// them to move a birth year.
+///
+/// Values are supplied as a range so the wheel can be as long as it needs to
+/// be; [format] renders each one (month names, for instance).
+class QWheelField extends StatefulWidget {
   final String unit;
   final int value;
-  final VoidCallback onInc;
-  final VoidCallback onDec;
-  const QStepperField({super.key, required this.unit, required this.value, required this.onInc, required this.onDec});
+  final int min;
+  final int max;
+
+  /// Wrap past the ends — right for months and days, wrong for a birth year.
+  final bool loop;
+  final String Function(int)? format;
+  final ValueChanged<int> onChanged;
+
+  const QWheelField({
+    super.key,
+    required this.unit,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+    this.loop = false,
+    this.format,
+  });
+
+  @override
+  State<QWheelField> createState() => _QWheelFieldState();
+}
+
+class _QWheelFieldState extends State<QWheelField> {
+  late FixedExtentScrollController _ctrl;
+
+  int get _count => widget.max - widget.min + 1;
+  int get _index => (widget.value - widget.min).clamp(0, _count - 1);
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = FixedExtentScrollController(initialItem: _index);
+  }
+
+  @override
+  void didUpdateWidget(covariant QWheelField old) {
+    super.didUpdateWidget(old);
+    // Follow programmatic changes (a day clamped by a month change) without
+    // fighting the user's own scrolling.
+    if (widget.value != old.value && _ctrl.hasClients && _ctrl.selectedItem != _index) {
+      _ctrl.jumpToItem(_index);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final children = [
+      for (var v = widget.min; v <= widget.max; v++)
+        Center(
+          child: Text(
+            widget.format?.call(v) ?? '$v',
+            maxLines: 1,
+            style: QText.number(size: 19, weight: FontWeight.w600),
+          ),
+        ),
+    ];
+
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.md),
         child: Column(
           children: [
-            Text(unit, style: QText.body(size: 10, color: QColors.textMuted)),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                QRoundIconButton(icon: Icons.remove, onTap: onDec, size: 26),
-                // Wide enough for a 4-digit year, and scaled down rather than
-                // wrapped if a value ever outgrows it.
-                SizedBox(
-                  width: 44,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text('$value', textAlign: TextAlign.center, style: QText.number(size: 19, weight: FontWeight.w600)),
+            Text(widget.unit, style: QText.body(size: 10, color: QColors.textMuted)),
+            const SizedBox(height: 2),
+            SizedBox(
+              height: 88,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // The selection band, so it is obvious what the wheel is on.
+                  IgnorePointer(
+                    child: Container(
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: QColors.violet.withValues(alpha: 0.12),
+                        border: Border.symmetric(
+                          horizontal: BorderSide(color: QColors.violet.withValues(alpha: 0.45)),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                QRoundIconButton(icon: Icons.add, onTap: onInc, size: 26),
-              ],
+                  ListWheelScrollView.useDelegate(
+                    controller: _ctrl,
+                    itemExtent: 32,
+                    diameterRatio: 1.5,
+                    perspective: 0.004,
+                    physics: const FixedExtentScrollPhysics(),
+                    onSelectedItemChanged: (i) {
+                      HapticFeedback.selectionClick();
+                      widget.onChanged(widget.min + (i % _count));
+                    },
+                    childDelegate: widget.loop
+                        ? ListWheelChildLoopingListDelegate(children: children)
+                        : ListWheelChildListDelegate(children: children),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

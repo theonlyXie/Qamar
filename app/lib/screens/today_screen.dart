@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/plan.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
@@ -20,6 +21,8 @@ class TodayScreen extends StatelessWidget {
     final con = state.consumed();
     final remaining = (tg.kcal - con.kcal).clamp(0, 1 << 30);
     final nameOr = state.profile.name.isNotEmpty ? state.profile.name : (state.isAr ? 'يا صاحبي' : 'friend');
+    final (nextBase, nextAlt) = kPlanSlots[kNextMealSlot];
+    final nextMeal = state.isSlotSwapped(nextBase.id) ? nextAlt : nextBase;
 
     double pct(int a, int b) => b == 0 ? 0 : (a / b).clamp(0, 1).toDouble();
 
@@ -131,26 +134,38 @@ class TodayScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.green.withOpacity(0.4), radius: QRadii.xl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(t.nextMeal, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.green, letterSpacing: 0.4)),
-              Text(state.isAr ? 'فراخ مشوية + رز + سلطة' : 'Grilled chicken + rice + salad', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.textPrimary)),
-              Text(state.isAr ? 'حوالي ٦٢٠ سعر · متاح بديل' : 'About 620 kcal · swap available', style: QText.body(size: 13, color: QColors.textMuted)),
-              const SizedBox(height: 8),
-              Row(children: [
-                QOutlineButton(label: t.swap, onTap: state.togglePlanSwap, height: 34, color: QColors.textMid),
-                const SizedBox(width: 8),
-                QOutlineButton(label: t.openPlan, onTap: () => state.go(AppScreen.plan), height: 34, color: QColors.textMid),
-              ]),
-            ],
+        Explainable(
+          id: 'next_meal',
+          explanation: mealExplanation(nextMeal),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.green.withOpacity(0.4), radius: QRadii.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(t.nextMeal, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.green, letterSpacing: 0.4)),
+                Text(state.isAr ? nextMeal.nameAr : nextMeal.nameEn,
+                    style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.textPrimary)),
+                Text(
+                  state.isAr
+                      ? 'حوالي ${state.iso('${mealKcal(nextMeal)}')} سعر · متاح بديل'
+                      : 'About ${mealKcal(nextMeal)} kcal · swap available',
+                  style: QText.body(size: 13, color: QColors.textMuted),
+                ),
+                const SizedBox(height: 8),
+                Row(children: [
+                  QOutlineButton(label: t.swap, onTap: () => state.toggleSlotSwap(nextMeal.id), height: 34, color: QColors.textMid),
+                  const SizedBox(width: 8),
+                  QOutlineButton(label: t.openPlan, onTap: () => state.go(AppScreen.plan), height: 34, color: QColors.textMid),
+                ]),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 14),
-        Container(
+        Explainable(
+          id: 'quest',
+          child: Container(
           padding: const EdgeInsets.all(16),
           decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.xl),
           child: Column(
@@ -192,8 +207,10 @@ class TodayScreen extends StatelessWidget {
             ],
           ),
         ),
+        ),
         const SizedBox(height: 14),
-        QPrimaryButton(label: t.logMeal, onTap: () => state.go(AppScreen.log), height: 56),
+        // No "log a meal" button: hold the orb and pick speak / type / photo.
+        _OrbLogHint(state: state),
         if (state.meals.isNotEmpty) ...[
           const SizedBox(height: 18),
           Text(t.loggedToday, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
@@ -246,6 +263,42 @@ class _MacroRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+
+/// Replaces the old "log a meal" button. The action itself now lives in the
+/// orb — hold it, sweep to Log, and pick speak, type or photo — so this only
+/// has to teach the gesture once.
+class _OrbLogHint extends StatelessWidget {
+  final AppState state;
+  const _OrbLogHint({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: QColors.violet.withValues(alpha: 0.08),
+        border: Border.all(color: QColors.violet.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(QRadii.xl),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.touch_app_outlined, size: 18, color: QColors.violetSoft),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              isAr
+                  ? 'عشان تسجّل وجبة: استمر ضاغط على القمر، اسحب لـ«سجّل»، واختار تتكلم أو تكتب أو تصوّر.'
+                  : 'To log a meal: hold the moon, sweep to Log, then pick speak, type or photo.',
+              style: QText.body(size: 12, height: 18, color: QColors.textMid),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

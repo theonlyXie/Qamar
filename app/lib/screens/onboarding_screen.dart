@@ -125,11 +125,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               if (stepDate) ...[
                 Row(
                   children: [
-                    QStepperField(unit: state.isAr ? 'يوم' : 'day', value: state.profile.birthDay, onInc: () => state.bumpBirthDay(1), onDec: () => state.bumpBirthDay(-1)),
+                    QWheelField(
+                      unit: state.isAr ? 'يوم' : 'day',
+                      value: state.profile.birthDay,
+                      min: 1,
+                      max: state.birthMonthLength,
+                      loop: true,
+                      onChanged: state.setBirthDay,
+                    ),
                     const SizedBox(width: 8),
-                    QStepperField(unit: state.isAr ? 'شهر' : 'month', value: state.profile.birthMonth, onInc: () => state.bumpBirthMonth(1), onDec: () => state.bumpBirthMonth(-1)),
+                    QWheelField(
+                      unit: state.isAr ? 'شهر' : 'month',
+                      value: state.profile.birthMonth,
+                      min: 1,
+                      max: 12,
+                      loop: true,
+                      format: (m) => (state.isAr ? _monthsAr : _monthsEn)[m - 1],
+                      onChanged: state.setBirthMonth,
+                    ),
                     const SizedBox(width: 8),
-                    QStepperField(unit: state.isAr ? 'سنة' : 'year', value: state.profile.birthYear, onInc: () => state.bumpBirthYear(1), onDec: () => state.bumpBirthYear(-1)),
+                    QWheelField(
+                      unit: state.isAr ? 'سنة' : 'year',
+                      value: state.profile.birthYear,
+                      min: DateTime.now().year - 90,
+                      max: DateTime.now().year - 10,
+                      onChanged: state.setBirthYear,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -139,9 +160,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               if (stepNumber) ...[
                 Row(
                   children: [
-                    QStepperField(unit: state.isAr ? 'سم' : 'cm', value: state.profile.height, onInc: () => state.bumpHeight(1), onDec: () => state.bumpHeight(-1)),
+                    QWheelField(
+                      unit: state.isAr ? 'سم' : 'cm',
+                      value: state.profile.height,
+                      min: 140,
+                      max: 210,
+                      onChanged: state.setHeight,
+                    ),
                     const SizedBox(width: 8),
-                    QStepperField(unit: state.isAr ? 'كجم' : 'kg', value: state.profile.weight, onInc: () => state.bumpWeight(1), onDec: () => state.bumpWeight(-1)),
+                    QWheelField(
+                      unit: state.isAr ? 'كجم' : 'kg',
+                      value: state.profile.weight,
+                      min: 40,
+                      max: 200,
+                      onChanged: state.setWeight,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -453,3 +486,7 @@ class _SaveCard extends StatelessWidget {
     );
   }
 }
+
+
+const _monthsAr = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const _monthsEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
