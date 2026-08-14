@@ -165,8 +165,8 @@ class _DraggableOrbState extends State<_DraggableOrb> {
     }
   }
 
-  /// Photo opens the real camera; the other two go straight to analysis.
-  /// Either way there is no method-picker page in between.
+  /// Photo opens the real camera; the other two drop straight into the
+  /// conversation. Nothing here pushes a screen.
   Future<void> _runQuickLog(AppState state, QuickLog kind) async {
     if (kind != QuickLog.photo) {
       state.quickLog(kind);
@@ -177,9 +177,10 @@ class _DraggableOrbState extends State<_DraggableOrb> {
       if (!mounted) return;
       if (shot == null) return; // backed out of the camera
       state.quickLog(kind);
+      state.logPhotoTaken(shot.path);
     } on Exception {
       if (!mounted) return;
-      // No camera, or permission refused: still let them log.
+      // No camera, or permission refused: still let them log by typing.
       state.quickLog(QuickLog.text);
     }
   }

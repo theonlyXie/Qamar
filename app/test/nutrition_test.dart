@@ -6,6 +6,7 @@ import 'dart:ui' show Offset, Rect;
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
@@ -222,14 +223,48 @@ void secondRound() {
       expect(state.treeLogExpanded, isFalse);
     });
 
-    test('quick logging closes the menu and heads for analysis', () {
+    test('quick logging opens the conversation and never changes screen', () {
       final state = AppState()..openTreeHold();
+      final before = state.screen;
       state.quickLog(QuickLog.text);
 
       expect(state.treeOpen, isFalse);
       expect(state.treeHold, isFalse);
-      expect(state.screen, AppScreen.analyzing);
-      expect(state.mealDraft, isNotEmpty, reason: 'typing should seed a draft');
+      expect(state.chatOpen, isTrue);
+      expect(state.screen, before, reason: 'logging must not push a page');
+    });
+
+    test('speaking puts the moon straight into listening', () {
+      final state = AppState()..openTreeHold();
+      state.quickLog(QuickLog.voice);
+
+      expect(state.chatOpen, isTrue);
+      expect(state.chatState, ChatState.listening);
+    });
+
+    test('a photographed meal lands in the conversation, not a confirm page', () {
+      final state = AppState();
+      final before = state.screen;
+      state.quickLog(QuickLog.photo);
+      state.logPhotoTaken('/tmp/meal.jpg');
+
+      expect(state.screen, before);
+      expect(state.chatOpen, isTrue);
+      expect(state.lastMealPhotoPath, '/tmp/meal.jpg');
+      expect(state.chat.any((c) => c.who == ChatWho.u), isTrue);
+    });
+
+    test('the log methods sit on distinct ring positions', () {
+      final seen = <Offset>{};
+      for (var i = 0; i < kLogMethods.length; i++) {
+        final c = TreeGeometry.localSubCenter(1, i);
+        for (final other in seen) {
+          // Overlapping circles were why only one of them could be tapped.
+          expect((c - other).distance, greaterThan(60), reason: 'methods overlap');
+        }
+        seen.add(c);
+      }
+      expect(seen.length, kLogMethods.length);
     });
 
     test('exactly one node is the log action, and it has no destination', () {

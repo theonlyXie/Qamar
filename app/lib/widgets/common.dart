@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../l10n/strings.dart';
@@ -176,6 +178,13 @@ class QWheelField extends StatefulWidget {
 class _QWheelFieldState extends State<QWheelField> {
   late FixedExtentScrollController _ctrl;
 
+  /// True while we are moving the wheel ourselves. Without this the sequence
+  /// scroll -> onChanged -> parent notifies -> didUpdateWidget -> jumpToItem
+  /// -> onSelectedItemChanged -> onChanged loops forever, and a wheel stuck in
+  /// that loop starves the gesture arena: every button on the screen stops
+  /// responding, including the one that submits the step.
+  bool _syncing = false;
+
   int get _count => widget.max - widget.min + 1;
   int get _index => (widget.value - widget.min).clamp(0, _count - 1);
 
@@ -188,11 +197,24 @@ class _QWheelFieldState extends State<QWheelField> {
   @override
   void didUpdateWidget(covariant QWheelField old) {
     super.didUpdateWidget(old);
-    // Follow programmatic changes (a day clamped by a month change) without
-    // fighting the user's own scrolling.
-    if (widget.value != old.value && _ctrl.hasClients && _ctrl.selectedItem != _index) {
+    if (!_ctrl.hasClients) return;
+
+    // Only correct the wheel when it genuinely disagrees with the value —
+    // e.g. the day was clamped because the month changed under it. Never while
+    // the user is still moving it, and never during this build.
+    final needsSync = _ctrl.selectedItem != _index;
+    final rangeChanged = widget.min != old.min || widget.max != old.max;
+    if (!needsSync && !rangeChanged) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_ctrl.hasClients) return;
+      if (_ctrl.position.isScrollingNotifier.value) return; // still flinging
+      if (_ctrl.selectedItem == _index) return;
+      _syncing = true;
       _ctrl.jumpToItem(_index);
-    }
+      // Cleared a frame later: jumpToItem's notification arrives after this.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _syncing = false);
+    });
   }
 
   @override
@@ -246,8 +268,11 @@ class _QWheelFieldState extends State<QWheelField> {
                     perspective: 0.004,
                     physics: const FixedExtentScrollPhysics(),
                     onSelectedItemChanged: (i) {
+                      if (_syncing) return;
+                      final next = widget.min + (i % _count);
+                      if (next == widget.value) return;
                       HapticFeedback.selectionClick();
-                      widget.onChanged(widget.min + (i % _count));
+                      widget.onChanged(next);
                     },
                     childDelegate: widget.loop
                         ? ListWheelChildLoopingListDelegate(children: children)
@@ -342,5 +367,55 @@ class _Segment extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Keeps a message list pinned to the newest message.
+///
+/// A single post-frame `animateTo(maxScrollExtent)` is not enough: the extent
+/// is measured before tall content (the target card, a meal breakdown) has
+/// finished laying out, so the list stops short and the newest message stays
+/// off screen until the user scrolls by hand. This re-settles a moment later,
+/// and gets out of the way if the user has deliberately scrolled up to read
+/// back through the conversation.
+class ChatScroller {
+  final ScrollController controller = ScrollController();
+  Timer? _settle;
+  int _signature = -1;
+
+  /// Distance from the bottom within which we still consider the user "at the
+  /// bottom" and safe to auto-scroll.
+  static const _stickyWindow = 160.0;
+
+  /// Call from build with a value that changes whenever the content does.
+  void sync(int signature) {
+    if (signature == _signature) return;
+    _signature = signature;
+    _schedule();
+  }
+
+  void _schedule() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _go(animate: true));
+    _settle?.cancel();
+    // Second pass once late-laid-out content has grown the extent.
+    _settle = Timer(const Duration(milliseconds: 240), () => _go(animate: false));
+  }
+
+  void _go({required bool animate}) {
+    if (!controller.hasClients) return;
+    final pos = controller.position;
+    // Never yank the view away from someone reading earlier messages.
+    if (pos.pixels < pos.maxScrollExtent - _stickyWindow && !animate) return;
+    if (animate) {
+      controller.animateTo(pos.maxScrollExtent,
+          duration: const Duration(milliseconds: 240), curve: Curves.easeOut);
+    } else {
+      controller.jumpTo(pos.maxScrollExtent);
+    }
+  }
+
+  void dispose() {
+    _settle?.cancel();
+    controller.dispose();
   }
 }

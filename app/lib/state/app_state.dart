@@ -1076,14 +1076,32 @@ class AppState extends ChangeNotifier {
   }
 
   /// How a meal is being logged from the orb.
+  /// Logging happens where the user already is — the companion overlay, which
+  /// floats over the current screen — never on a pushed page.
+  ///
+  ///  * speak — the moon starts listening straight away,
+  ///  * type  — the conversation opens ready for typing,
+  ///  * photo — the caller opens the camera first and hands the shot back
+  ///    through [logPhotoTaken].
   void quickLog(QuickLog kind) {
     treeOpen = false;
     treeHold = false;
     treeHoverNode = null;
     treeHoverSub = null;
     treeLogIndex = null;
-    if (kind == QuickLog.text) presetMealDraftExample();
-    startAnalyze();
+    openChat();
+    if (kind == QuickLog.voice) tapOrbListen();
+  }
+
+  /// Most recent meal photo, shown inside the conversation.
+  String? lastMealPhotoPath;
+
+  /// A meal photographed from the orb. The picture goes into the conversation
+  /// and Qamar answers there, instead of routing through an analysing page and
+  /// then a confirm page.
+  void logPhotoTaken(String path) {
+    lastMealPhotoPath = path;
+    sendChatMsg(isAr ? 'صوّرت الوجبة دي' : 'I photographed this meal');
   }
 
   void toggleTree() {

@@ -126,9 +126,12 @@ rewrite.
   permission, unsupported platform) surface on screen and the typed path
   stays available, so a missing camera never dead-ends onboarding.
 - The orb is the primary navigation and logging surface. Hold it to open the
-  radial menu, sweep to a destination and release; dwell on Log and its three
-  input methods (speak / type / photo) fan out in place, so logging a meal
-  never opens a chooser page. Tapping still opens the menu the sticky way.
+  radial menu, sweep to a destination and release; choosing Log swaps the ring
+  for its three input methods. All three act in place — speak starts the moon
+  listening, type opens the conversation, photo opens the camera — so logging
+  never pushes a page. Tapping still opens the menu the sticky way.
+- The ring follows the *mangata*, the moon's road on water: one cool white
+  light at varying strength rather than a colour per destination.
 - The orb's data explanations (`lib/widgets/explain.dart`) are static copy
   keyed by metric, except planned meals, whose explanation is built from the
   meal's own portions. The interaction is real — drag the orb over a value and

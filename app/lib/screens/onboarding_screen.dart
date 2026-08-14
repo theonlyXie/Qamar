@@ -18,22 +18,14 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  final _scroll = ScrollController();
+  final _chat = ChatScroller();
   final _draftCtrl = TextEditingController();
-  int _lastLen = 0;
 
   @override
   void dispose() {
-    _scroll.dispose();
+    _chat.dispose();
     _draftCtrl.dispose();
     super.dispose();
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
-      _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
-    });
   }
 
   @override
@@ -42,10 +34,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final t = state.t;
     final step = state.currentStep;
 
-    if (state.msgs.length != _lastLen || state.typing) {
-      _lastLen = state.msgs.length;
-      _scrollToBottom();
-    }
+    // Any change in the transcript — a new message, or the typing bubble
+    // appearing or going away — re-pins the list to the bottom.
+    _chat.sync(state.msgs.length * 2 + (state.typing ? 1 : 0));
     if (_draftCtrl.text != state.draft) {
       _draftCtrl.value = TextEditingValue(text: state.draft, selection: TextSelection.collapsed(offset: state.draft.length));
     }
@@ -93,7 +84,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
         Expanded(
           child: ListView.separated(
-            controller: _scroll,
+            controller: _chat.controller,
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
             itemCount: state.msgs.length + (state.typing ? 1 : 0),
             separatorBuilder: (_, __) => const SizedBox(height: 14),
