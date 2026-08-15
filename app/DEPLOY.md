@@ -89,6 +89,15 @@ do not set them yourself.
 supabase functions deploy ai-gateway
 ```
 
+`ai-gateway` is already deployed and ACTIVE (`verify_jwt` on), and answers an
+unauthenticated call with 401. It has no secrets yet, so every route that
+reaches the model returns 500 until section 2 is done.
+
+That first deploy went up through the Supabase MCP connector, which uploads
+file contents rather than a directory, so run the command above once from a
+checkout when convenient. It republishes straight from `supabase/functions/`
+and makes the deployed bundle provably identical to the repository.
+
 Verify it is up. A 401 is the correct answer to an unauthenticated call — it
 means the function is running and rejecting you, which is what you want. A 404
 means it is not deployed.
