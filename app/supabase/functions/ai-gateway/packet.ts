@@ -325,22 +325,59 @@ export async function loadUserFacts(
   return facts;
 }
 
+/** A row of the targets table, as the packet needs to cite it. */
+export interface TargetRow {
+  kcal: number;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  formula_version: string | null;
+  inputs: Record<string, unknown> | null;
+}
+
 /**
- * The targets this answer was built against.
+ * The targets this answer was built against, and what produced them.
  *
- * equation_version is null and will stay null until the requirement engine
- * exists: the current target came from whatever wrote the targets table, and
- * naming an equation it did not use would be a fabricated citation.
+ * equation_version was null on every packet until 0025, because until then
+ * `targets.formula_version` was the string 'calc v2.0' naming a formula whose
+ * coefficients existed nowhere, and citing it would have been worse than citing
+ * nothing. Rows written by qamar_set_target now name the equation and carry the
+ * inputs it ran on, so the citation is real — and a row from before the engine
+ * still says so rather than borrowing the new provenance.
  */
-export function targetsFrom(ctx: UserContext): unknown[] {
-  if (ctx.targetKcal == null) return [];
-  return [{
-    metric: "energy_kcal",
-    value: ctx.targetKcal,
-    unit: "kcal/day",
-    equation_version: null,
-    source: "targets table",
-  }];
+export function targetsFrom(ctx: UserContext, target: TargetRow | null): unknown[] {
+  if (!target && ctx.targetKcal == null) return [];
+  if (!target) {
+    return [{
+      metric: "energy_kcal",
+      value: ctx.targetKcal,
+      unit: "kcal/day",
+      equation_version: null,
+      source: "targets table, provenance unknown",
+    }];
+  }
+
+  const derived = target.formula_version !== null &&
+    target.formula_version !== "calc v2.0";
+  const cite = (metric: string, value: number | null, unit: string) =>
+    value == null ? null : {
+      metric,
+      value,
+      unit,
+      equation_version: derived ? target.formula_version : null,
+      source: derived ? "qamar_set_target" : "targets table, predates the requirement engine",
+      // Only on the energy row: it is the one the equation actually computed,
+      // and repeating the whole input set on all four would suggest four
+      // separate derivations.
+      ...(metric === "energy_kcal" && derived ? { inputs: target.inputs } : {}),
+    };
+
+  return [
+    cite("energy_kcal", target.kcal, "kcal/day"),
+    cite("protein_g", target.protein_g, "g/day"),
+    cite("carbs_g", target.carbs_g, "g/day"),
+    cite("fat_g", target.fat_g, "g/day"),
+  ].filter((x) => x !== null);
 }
 
 interface RawRule {

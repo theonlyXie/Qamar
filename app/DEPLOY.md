@@ -22,7 +22,7 @@ scratch is the only fix.
 
 ## 1. Apply the migrations
 
-`0001`–`0024` are all live on `stqirjlqzchcoeegumoq` as of 2026-08-15. This
+`0001`–`0025` are all live on `stqirjlqzchcoeegumoq` as of 2026-08-15. This
 section is kept for rebuilding the project from scratch, and for the next
 migration.
 

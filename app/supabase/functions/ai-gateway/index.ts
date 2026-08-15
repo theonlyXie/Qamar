@@ -59,6 +59,7 @@ import {
   type Kind,
   type PacketInput,
   type StageCost,
+  type TargetRow,
 } from "./packet.ts";
 import {
   blocks,
@@ -124,17 +125,21 @@ async function db(path: string, init: RequestInit = {}): Promise<Response> {
 async function loadContext(
   userId: string,
   lang: string,
-): Promise<{ ctx: UserContext; blocked: boolean; lifeStage: string }> {
+): Promise<{ ctx: UserContext; blocked: boolean; lifeStage: string; target: TargetRow | null }> {
   const res = await db(`profiles?user_id=eq.${userId}&select=*`);
   const rows = res.ok ? await res.json() : [];
   const p = rows[0];
 
-  let targetKcal: number | null = null;
-  const tRes = await db(`targets?user_id=eq.${userId}&select=kcal&order=valid_from.desc&limit=1`);
-  if (tRes.ok) {
-    const tRows = await tRes.json();
-    targetKcal = tRows[0]?.kcal ?? null;
-  }
+  // The whole row, not just the kcal: since 0025 it carries the equation that
+  // produced it and the inputs that equation ran on, which is what the evidence
+  // packet cites.
+  let target: TargetRow | null = null;
+  const tRes = await db(
+    `targets?user_id=eq.${userId}&select=kcal,protein_g,carbs_g,fat_g,formula_version,inputs` +
+      `&order=valid_from.desc&limit=1`,
+  );
+  if (tRes.ok) target = (await tRes.json())[0] ?? null;
+  const targetKcal = target?.kcal ?? null;
 
   let age: number | null = null;
   if (p?.birth_date) {
@@ -152,6 +157,7 @@ async function loadContext(
 
   return {
     blocked,
+    target,
     // Pregnancy and lactation are recorded since 0007 but nothing read the
     // column, so the refusal was still a keyword match on the question. A user
     // who declared it at onboarding and then asked plainly got an answer from
@@ -287,7 +293,7 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
     return json({ reply: refusalText(verdict.reason, lang), refused: true, reason: verdict.reason });
   }
 
-  const { ctx, blocked, lifeStage } = await loadContext(userId, lang);
+  const { ctx, blocked, lifeStage, target } = await loadContext(userId, lang);
   if (blocked) {
     const id = await record(userId, "chat", { inScope: false, refusal: "minor", question: message });
     await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", message);
@@ -353,7 +359,7 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
   await trace(userId, id, "chat", {
     userFacts: facts,
     foodFacts: toPacketFacts(resolved),
-    calculatedTargets: targetsFrom(ctx),
+    calculatedTargets: targetsFrom(ctx, target),
     applicableRules: rules.applicable,
     excludedRules: rules.excluded,
     candidateDecision: { reply: text.slice(0, 2000), domain: verdict.domain, sources },
@@ -422,7 +428,7 @@ async function analyzeMeal(
   const lang = body.lang === "ar" ? "ar" : "en";
   const described = (body.text ?? "").trim();
 
-  const { ctx, blocked, lifeStage } = await loadContext(userId, lang);
+  const { ctx, blocked, lifeStage, target } = await loadContext(userId, lang);
   if (blocked) {
     const id = await record(userId, "meal_analysis", {
       inScope: false,
@@ -557,7 +563,7 @@ async function analyzeMeal(
   await trace(userId, id, "meal_analysis", {
     userFacts: facts,
     foodFacts: toPacketFacts(resolved),
-    calculatedTargets: targetsFrom(ctx),
+    calculatedTargets: targetsFrom(ctx, target),
     applicableRules: rules.applicable,
     excludedRules: rules.excluded,
     candidateDecision: { items, input: image ? "photo" : "text" },
@@ -687,7 +693,7 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
   const lang = body.lang === "ar" ? "ar" : "en";
   const day = body.date ?? new Date().toISOString().slice(0, 10);
 
-  const { ctx, blocked, lifeStage } = await loadContext(userId, lang);
+  const { ctx, blocked, lifeStage, target } = await loadContext(userId, lang);
   if (blocked) {
     const id = await record(userId, "plan", { inScope: false, refusal: "minor", question: "[plan]" });
     await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", "[plan]");
@@ -832,7 +838,7 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
     await trace(userId, null, "plan", {
       userFacts: await loadUserFacts(SUPABASE_URL, SERVICE_KEY, userId, ctx),
       foodFacts: toPacketFacts(resolved),
-      calculatedTargets: targetsFrom(ctx),
+      calculatedTargets: targetsFrom(ctx, target),
       candidateDecision: { meals, plan_date: day, rejected: true },
       safetyFlags: [...flags, "restricted_food_in_output"],
       uncertainty: { staples_withheld: excludedFoods },
@@ -886,7 +892,7 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
   await trace(userId, planId, "plan", {
     userFacts: facts,
     foodFacts: toPacketFacts(resolved),
-    calculatedTargets: targetsFrom(ctx),
+    calculatedTargets: targetsFrom(ctx, target),
     applicableRules: rules.applicable,
     excludedRules: rules.excluded,
     candidateDecision: { meals, plan_date: day },

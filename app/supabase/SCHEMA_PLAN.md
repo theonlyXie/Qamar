@@ -374,9 +374,9 @@ answers gets recorded once you have it.
 
 ---
 
-## 4b. Status — `0007`–`0024` applied, 2026-08-15
+## 4b. Status — `0007`–`0025` applied, 2026-08-15
 
-52 tables, RLS on every one of them.
+53 tables, RLS on every one of them.
 
 | Migration | Landed |
 |---|---|
@@ -396,6 +396,7 @@ answers gets recorded once you have it.
 | `0022` cost and rule selection | `model_prices` (9 rows), `qamar_token_cost`, pricing trigger on `ai_stage_costs`, `ai_cost_daily`, `stage_budget_pressure`, `qamar_rule_selection` |
 | `0023` hardening | `security_invoker` on the four earlier views, staff views revoked from `anon`/`authenticated`, `search_path` pinned on the `0018` resolver functions |
 | `0024` verifier views | `verifier_activity`, `verifier_failures`, `verifier_revisions` |
+| `0025` requirement engine | RMR coefficients seeded into `equation_versions`, `requirement_policy` (16 constants), `qamar_estimate_rmr`, `qamar_compute_targets`, `qamar_set_target`, `qamar_assert_self` |
 
 The gateway now writes an `evidence_packets` row and a set of `ai_stage_costs`
 rows for every request, including the ones that fail to parse — a call that
@@ -427,9 +428,30 @@ from the NASEM report, because a value without a citable edition does not
 belong in a table that promises traceability. `eval_cases` waits on the first
 frozen set.
 
-**Ten tables have RLS on with no policy, which is intentional**: `source_registry`,
+`0025` closed the half of that gap that could be closed honestly. The
+resting-metabolic-rate equations are four coefficients each and checkable digit
+by digit, so Mifflin-St Jeor, Katch-McArdle and the revised Harris-Benedict are
+seeded with their citations and the engine reads them from
+`equation_versions` rather than embedding them in SQL. The `EER` row keeps its
+null coefficients and now says what is used instead: RMR times a physical
+activity level, recorded as such on every target written. `dri_reference` stays
+empty on the same reasoning as before — transcription risk scales with the size
+of the table, and the DRI tables are hundreds of values where an equation is
+four.
+
+Verified against the live project, all rolled back: a male 80 kg / 180 cm / 30 y
+gives RMR 1780 and a 2136 kcal target where the 20%-of-maintenance ceiling binds
+before the rate ceiling does; a female 60 kg / 160 cm / 45 y sedentary is held
+at her RMR of 1214 rather than the 1165 the deficit asked for; a measured 20%
+body fat routes to Katch-McArdle (1752); an unrecorded sex uses the midpoint
+constant and says so; pregnancy and a 16-year-old are refused with a reason
+rather than given a number. `qamar_set_target` closes the previous row instead
+of overwriting it, refuses a direct database connection and refuses a signed-in
+client acting for somebody else.
+
+**Eleven tables have RLS on with no policy, which is intentional**: `source_registry`,
 `red_flag_rules`, `verifier_results`, `ai_stage_costs`, `stage_budgets`,
-`model_prices`, `clinician_reviews`, `eval_cases`, `eval_runs`, `eval_results`. These are staff
+`model_prices`, `requirement_policy`, `clinician_reviews`, `eval_cases`, `eval_runs`, `eval_results`. These are staff
 and operational surfaces — a user must not read a clinician's notes about them
 through the public API, and eval expectations are not user data. The service
 role bypasses RLS, so the gateway reads them normally. Anything here that later

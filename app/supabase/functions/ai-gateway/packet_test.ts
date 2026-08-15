@@ -12,6 +12,7 @@ import {
   numericClaims,
   resolutionUncertainty,
   targetsFrom,
+  type TargetRow,
 } from "./packet.ts";
 import type { Resolution } from "./graph.ts";
 import type { UserContext } from "./model.ts";
@@ -112,19 +113,59 @@ Deno.test("carries every reason the resolver was unsure, keyed by phrase", () =>
 
 const user = (over: Partial<UserContext> = {}): UserContext => ({ lang: "ar", ...over });
 
-Deno.test("records the target, and never invents an equation for it", () => {
-  const [t] = targetsFrom(user({ targetKcal: 2100 })) as {
-    metric: string;
-    value: number;
-    equation_version: null;
-  }[];
-  assertEquals(t.metric, "energy_kcal");
-  assertEquals(t.value, 2100);
-  // The requirement engine does not exist yet. Naming an equation the target
-  // did not come from would be a fabricated citation in an audit record.
-  assertEquals(t.equation_version, null);
+interface Cited {
+  metric: string;
+  value: number;
+  unit: string;
+  equation_version: string | null;
+  source: string;
+}
+
+const target = (over: Partial<TargetRow> = {}): TargetRow => ({
+  kcal: 2136,
+  protein_g: 144,
+  carbs_g: 240,
+  fat_g: 66,
+  formula_version: "Mifflin-St Jeor x PAL 1.5",
+  inputs: { rmr_kcal: 1780, tdee_kcal: 2670 },
+  ...over,
+});
+
+Deno.test("cites the equation behind every target it records", () => {
+  const cited = targetsFrom(user({ targetKcal: 2136 }), target()) as Cited[];
+  assertEquals(cited.map((c) => c.metric), ["energy_kcal", "protein_g", "carbs_g", "fat_g"]);
+  assertEquals(cited.every((c) => c.equation_version === "Mifflin-St Jeor x PAL 1.5"), true);
+  // The inputs belong to the energy row alone: it is the one the equation
+  // computed, and repeating them on all four would imply four derivations.
+  assertEquals("inputs" in cited[0], true);
+  assertEquals("inputs" in cited[1], false);
+});
+
+Deno.test("does not lend the new provenance to an older target", () => {
+  // 'calc v2.0' was the 0001 default: a formula whose coefficients existed
+  // nowhere. Citing it would be worse than citing nothing.
+  const [energy] = targetsFrom(
+    user({ targetKcal: 2000 }),
+    target({ formula_version: "calc v2.0" }),
+  ) as Cited[];
+  assertEquals(energy.equation_version, null);
+  assertEquals(energy.source.includes("predates"), true);
+});
+
+Deno.test("records a macro target only when there is one", () => {
+  const cited = targetsFrom(
+    user({ targetKcal: 2136 }),
+    target({ protein_g: null, carbs_g: null, fat_g: null }),
+  ) as Cited[];
+  assertEquals(cited.map((c) => c.metric), ["energy_kcal"]);
+});
+
+Deno.test("falls back to the bare kcal when no target row was loaded", () => {
+  const [energy] = targetsFrom(user({ targetKcal: 1900 }), null) as Cited[];
+  assertEquals(energy.value, 1900);
+  assertEquals(energy.equation_version, null);
 });
 
 Deno.test("records no target when there is none", () => {
-  assertEquals(targetsFrom(user()), []);
+  assertEquals(targetsFrom(user(), null), []);
 });
