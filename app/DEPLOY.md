@@ -189,6 +189,35 @@ What the answers mean:
 
 Then rebuild the APK with `AI_GATEWAY_URL` set, per the README.
 
+## 6b. The safety log
+
+Every refusal, escalation and hard block is now recorded. Three views answer
+the questions worth asking:
+
+```sql
+select * from public.safety_rule_activity;  -- which rules fire, and when last
+select * from public.safety_daily;          -- tier mix per day, with a denominator
+select * from public.clinician_queue;       -- what is waiting on a human
+```
+
+**Three of the eight rules have no detection wired and will sit at
+`times_fired = 0` forever.** They are defined so the escalation route and tier
+are agreed, not because anything triggers them yet:
+
+- `severe_symptom` — needs a symptom keyword set in `scope.ts`.
+- `rapid_weight_change` — needs the weight-trend engine.
+- `critical_lab` — needs `user_labs` to actually be populated.
+
+The other five are live: `medical_question`, `eating_disorder`, `minor`,
+`pregnancy_declared` and `prompt_injection`. `eating_disorder` is the one that
+escalates rather than merely refusing, so it queues a clinician review — check
+`clinician_queue` has an owner before relying on that.
+
+A rule at zero is either never triggered or quietly broken, and from inside the
+application those look identical. `safety_rule_activity` is where the
+difference becomes visible, so it is worth reading after the first week of real
+traffic rather than assuming silence means safety.
+
 ## 7. Sign-in: what is actually switched on
 
 Anonymous sign-in works today, and it is the only path that does. Everything

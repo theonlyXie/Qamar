@@ -38,6 +38,13 @@ import {
   type Resolution,
 } from "./graph.ts";
 import { classify, refusalText } from "./scope.ts";
+import {
+  loadHardConstraints,
+  recordAllowed,
+  recordHardBlock,
+  recordRefusal,
+  violatesConstraint,
+} from "./safety.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -86,7 +93,10 @@ async function db(path: string, init: RequestInit = {}): Promise<Response> {
  * gateway: a blocked user must not be able to reach the model by calling the
  * API directly, whatever the app shows.
  */
-async function loadContext(userId: string, lang: string): Promise<{ ctx: UserContext; blocked: boolean }> {
+async function loadContext(
+  userId: string,
+  lang: string,
+): Promise<{ ctx: UserContext; blocked: boolean; lifeStage: string }> {
   const res = await db(`profiles?user_id=eq.${userId}&select=*`);
   const rows = res.ok ? await res.json() : [];
   const p = rows[0];
@@ -114,6 +124,11 @@ async function loadContext(userId: string, lang: string): Promise<{ ctx: UserCon
 
   return {
     blocked,
+    // Pregnancy and lactation are recorded since 0007 but nothing read the
+    // column, so the refusal was still a keyword match on the question. A user
+    // who declared it at onboarding and then asked plainly got an answer from
+    // equations that are not valid for them.
+    lifeStage: p?.life_stage ?? "none",
     ctx: {
       name: p?.name ?? null,
       age,
@@ -133,10 +148,14 @@ async function record(
   userId: string,
   kind: "chat" | "meal_analysis" | "plan" | "body_scan",
   fields: { inScope: boolean; refusal?: string; question?: string; answer?: string; sources?: Source[]; model?: string },
-): Promise<void> {
+): Promise<string | null> {
+  // Returns the row id so a safety event can point at the interaction that
+  // caused it. Null on failure, which callers pass through: an unlinked safety
+  // event is worth more than no safety event.
   try {
-    await db("ai_interactions", {
+    const res = await db("ai_interactions", {
       method: "POST",
+      headers: { Prefer: "return=representation" },
       body: JSON.stringify({
         user_id: userId,
         kind,
@@ -148,8 +167,12 @@ async function record(
         model: fields.model ?? null,
       }),
     });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return rows?.[0]?.id ?? null;
   } catch {
     // Audit is important but never worth failing the user's request over.
+    return null;
   }
 }
 
@@ -179,13 +202,19 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
 
   const verdict = classify(message);
   if (!verdict.allowed) {
-    await record(userId, "chat", { inScope: false, refusal: verdict.reason, question: message });
+    const id = await record(userId, "chat", {
+      inScope: false,
+      refusal: verdict.reason,
+      question: message,
+    });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, verdict.reason, message);
     return json({ reply: refusalText(verdict.reason, lang), refused: true, reason: verdict.reason });
   }
 
-  const { ctx, blocked } = await loadContext(userId, lang);
+  const { ctx, blocked, lifeStage } = await loadContext(userId, lang);
   if (blocked) {
-    await record(userId, "chat", { inScope: false, refusal: "minor", question: message });
+    const id = await record(userId, "chat", { inScope: false, refusal: "minor", question: message });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", message);
     return json({ reply: refusalText("minor", lang), refused: true, reason: "minor" });
   }
 
@@ -208,13 +237,25 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
   });
 
   const sources = resolvedSources(passages, resolved);
-  await record(userId, "chat", {
+  const id = await record(userId, "chat", {
     inScope: true,
     question: message,
     answer: text,
     sources,
     model,
   });
+  // Allowed requests are recorded too. A safety log that only holds refusals
+  // cannot answer what proportion of traffic was high-risk, which is the
+  // question an audit actually asks.
+  await recordAllowed(
+    SUPABASE_URL,
+    SERVICE_KEY,
+    userId,
+    id,
+    lifeStage === "none" ? "general_wellness" : "condition_aware",
+    lifeStage === "none" ? [] : [`life_stage:${lifeStage}`],
+    ["answer_grounded"],
+  );
   return json({ reply: text, sources, refused: false });
 }
 
@@ -248,8 +289,16 @@ async function analyzeMeal(
   const lang = body.lang === "ar" ? "ar" : "en";
   const described = (body.text ?? "").trim();
 
-  const { ctx, blocked } = await loadContext(userId, lang);
-  if (blocked) return json({ error: "not eligible" }, 403);
+  const { ctx, blocked, lifeStage } = await loadContext(userId, lang);
+  if (blocked) {
+    const id = await record(userId, "meal_analysis", {
+      inScope: false,
+      refusal: "minor",
+      question: described || "[photo]",
+    });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", described || "[photo]");
+    return json({ error: "not eligible" }, 403);
+  }
 
   const image = readImage(body);
   if (typeof image === "string") return json({ error: image }, 413);
@@ -296,13 +345,24 @@ async function analyzeMeal(
   if (!parsed?.items) return json({ error: "could not analyse" }, 502);
 
   const sources = resolvedSources(passages, resolved);
-  await record(userId, "meal_analysis", {
+  const id = await record(userId, "meal_analysis", {
     inScope: true,
     question: image ? `[photo] ${ask}` : ask,
     answer: JSON.stringify(parsed.items).slice(0, 2000),
     sources,
     model,
   });
+  // Describing what someone ate is general wellness whatever their life stage —
+  // it is prescription that pregnancy takes out of scope, not observation.
+  await recordAllowed(
+    SUPABASE_URL,
+    SERVICE_KEY,
+    userId,
+    id,
+    "general_wellness",
+    lifeStage === "none" ? [] : [`life_stage:${lifeStage}`],
+    ["analyse_meal"],
+  );
   return json({
     items: parsed.items,
     note: (lang === "ar" ? parsed.note_ar : parsed.note_en) ?? null,
@@ -386,8 +446,30 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
   const lang = body.lang === "ar" ? "ar" : "en";
   const day = body.date ?? new Date().toISOString().slice(0, 10);
 
-  const { ctx, blocked } = await loadContext(userId, lang);
-  if (blocked) return json({ error: "not eligible" }, 403);
+  const { ctx, blocked, lifeStage } = await loadContext(userId, lang);
+  if (blocked) {
+    const id = await record(userId, "plan", { inScope: false, refusal: "minor", question: "[plan]" });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", "[plan]");
+    return json({ error: "not eligible" }, 403);
+  }
+
+  // Pregnancy and lactation are out of consumer-wellness scope, and the
+  // pregnancy module in clinical_modules is not approved. Prescribing a day of
+  // eating is exactly the act that is out of scope — which is why this gate is
+  // here and not on chat or meal analysis, where the user is asking about food
+  // rather than being told what to eat.
+  if (lifeStage !== "none") {
+    const id = await record(userId, "plan", {
+      inScope: false,
+      refusal: "pregnancy",
+      question: `[plan] life_stage=${lifeStage}`,
+    });
+    await recordRefusal(
+      SUPABASE_URL, SERVICE_KEY, userId, id, "pregnancy", `[plan] life_stage=${lifeStage}`,
+    );
+    return json({ error: refusalText("pregnancy", lang), refused: true, reason: "life_stage" }, 409);
+  }
+
   if (!ctx.targetKcal) return json({ error: "no target yet — finish onboarding first" }, 409);
 
   const brief =
@@ -405,7 +487,32 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
     "فول", "عيش بلدي", "رز", "فراخ", "زبادي", "شوفان",
     "موز", "زيت زيتون", "طماطم", "خيار", "بيض", "تونة", "جبنة قريش", "عدس أصفر",
   ];
-  const resolved = await resolveFoods(SUPABASE_URL, SERVICE_KEY, staples);
+  const resolvedAll = await resolveFoods(SUPABASE_URL, SERVICE_KEY, staples);
+
+  // Hard constraints are applied before the model sees the food list, not
+  // checked afterwards. An allergen the model never receives cannot end up in
+  // the plan, whereas one it receives and is merely asked to avoid depends on
+  // it obeying an instruction.
+  const constraints = await loadHardConstraints(SUPABASE_URL, SERVICE_KEY, userId);
+  const resolved = [];
+  for (const r of resolvedAll) {
+    const hit = r.facts
+      ? violatesConstraint(constraints, {
+        name: [r.facts.name, r.food?.nameAr, r.food?.nameEg, r.phrase].filter(Boolean).join(" "),
+      })
+      : null;
+    if (hit) {
+      await recordHardBlock(SUPABASE_URL, SERVICE_KEY, userId, null, "restricted_food_excluded", {
+        food: r.food?.slug ?? r.phrase,
+        restriction: hit.label,
+        kind: hit.kind,
+        severity: hit.severity,
+        stage: "plan_staples",
+      });
+      continue;
+    }
+    resolved.push(r);
+  }
 
   const { text, model } = await callModel({
     system: planSystemPrompt(ctx, passages, renderResolutions(resolved)),
@@ -434,7 +541,22 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
   });
   if (!saved.ok) return json({ error: `could not save plan: ${await saved.text()}` }, 500);
 
-  await record(userId, "plan", { inScope: true, question: brief, answer: JSON.stringify(parsed.meals).slice(0, 2000), sources, model });
+  const planId = await record(userId, "plan", {
+    inScope: true,
+    question: brief,
+    answer: JSON.stringify(parsed.meals).slice(0, 2000),
+    sources,
+    model,
+  });
+  await recordAllowed(
+    SUPABASE_URL,
+    SERVICE_KEY,
+    userId,
+    planId,
+    "general_wellness",
+    constraints.length ? [`hard_constraints:${constraints.length}`] : [],
+    ["generate_plan"],
+  );
   return json({ plan: parsed, date: day, sources });
 }
 
