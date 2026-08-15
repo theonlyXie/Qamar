@@ -30,7 +30,13 @@ import {
   type ImageInput,
   type UserContext,
 } from "./model.ts";
-import { lookupFoods, retrieve, type FoodFacts, type Passage, type Source } from "./retrieval.ts";
+import { retrieve, type FoodFacts, type Passage, type Source } from "./retrieval.ts";
+import {
+  renderResolutions,
+  resolveFoods,
+  toPacketFacts,
+  type Resolution,
+} from "./graph.ts";
 import { classify, refusalText } from "./scope.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -152,6 +158,10 @@ const asSources = (p: Passage[], f: FoodFacts[] = []): Source[] => [
   ...f.map((x) => ({ source: x.source, title: x.name, url: x.url })),
 ];
 
+/** Sources from a resolution set, so a graph-resolved food still cites itself. */
+const resolvedSources = (p: Passage[], r: Resolution[]): Source[] =>
+  asSources(p, r.map((x) => x.facts).filter((x): x is FoodFacts => x !== null));
+
 /** Candidate food names to look up, from free text. Crude on purpose. */
 function foodTerms(text: string): string[] {
   return text
@@ -190,21 +200,22 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
     return json({ reply, refused: true, reason: "no_grounding" });
   }
 
-  const foods = await lookupFoods(foodTerms(message));
+  const resolved = await resolveFoods(SUPABASE_URL, SERVICE_KEY, foodTerms(message));
   const { text, model } = await callModel({
-    system: chatSystemPrompt(ctx, passages, foods),
+    system: chatSystemPrompt(ctx, passages, renderResolutions(resolved)),
     user: message,
     maxTokens: 600,
   });
 
+  const sources = resolvedSources(passages, resolved);
   await record(userId, "chat", {
     inScope: true,
     question: message,
     answer: text,
-    sources: asSources(passages, foods),
+    sources,
     model,
   });
-  return json({ reply: text, sources: asSources(passages, foods), refused: false });
+  return json({ reply: text, sources, refused: false });
 }
 
 /**
@@ -245,9 +256,11 @@ async function analyzeMeal(
 
   if (!described && !image) return json({ items: [], note: "nothing to analyse" });
 
-  // Free text names foods we can look up; a photo does not, so the lookup is
-  // driven by whatever the user typed alongside it, if anything.
-  const foods = await lookupFoods(foodTerms(described));
+  // Free text names foods we can resolve; a photo does not, so resolution is
+  // driven by whatever the user typed alongside it, if anything. The graph
+  // answers first and knows what a رغيف weighs; an external lookup is the
+  // fallback for what it does not carry.
+  const resolved = await resolveFoods(SUPABASE_URL, SERVICE_KEY, foodTerms(described));
 
   // Meal analysis needs the knowledge base as much as chat does: no food
   // database contains a cooked national dish, so the only way to price a plate
@@ -268,8 +281,11 @@ async function analyzeMeal(
     ? described || (lang === "ar" ? "الوجبة دي فيها إيه وكام سعرة؟" : "What is in this meal, and how many calories?")
     : described;
 
+  const foodBlock = renderResolutions(resolved);
   const { text, model } = await callModel({
-    system: image ? mealPhotoSystemPrompt(ctx, passages, foods) : mealAnalysisSystemPrompt(ctx, passages, foods),
+    system: image
+      ? mealPhotoSystemPrompt(ctx, passages, foodBlock)
+      : mealAnalysisSystemPrompt(ctx, passages, foodBlock),
     user: ask,
     maxTokens: 900,
     prefill: "{",
@@ -279,17 +295,22 @@ async function analyzeMeal(
   const parsed = parseJson<{ items: unknown[]; note_ar?: string; note_en?: string }>(text);
   if (!parsed?.items) return json({ error: "could not analyse" }, 502);
 
+  const sources = resolvedSources(passages, resolved);
   await record(userId, "meal_analysis", {
     inScope: true,
     question: image ? `[photo] ${ask}` : ask,
     answer: JSON.stringify(parsed.items).slice(0, 2000),
-    sources: asSources(passages, foods),
+    sources,
     model,
   });
   return json({
     items: parsed.items,
     note: (lang === "ar" ? parsed.note_ar : parsed.note_en) ?? null,
-    sources: asSources(passages, foods),
+    sources,
+    // What the graph made of each phrase: the canonical food, the portion it
+    // assumed, and every reason it is unsure. The confirmation screen needs
+    // this to ask a specific question rather than a vague one.
+    resolutions: toPacketFacts(resolved),
   });
 }
 
@@ -377,14 +398,17 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
   if (passages.length === 0) return json({ error: "no grounded guidance available" }, 503);
 
   // Look the staples up so the model has real per-100g figures to divide.
+  // Resolved through the graph, so the plan is built on Egyptian foods with
+  // known household portions rather than whatever an international database
+  // returns for "bread".
   const staples = [
-    "foul medames", "baladi bread", "white rice cooked", "chicken breast grilled",
-    "greek yogurt", "oats", "banana", "olive oil", "tomato", "cucumber", "eggs", "tuna",
+    "فول", "عيش بلدي", "رز", "فراخ", "زبادي", "شوفان",
+    "موز", "زيت زيتون", "طماطم", "خيار", "بيض", "تونة", "جبنة قريش", "عدس أصفر",
   ];
-  const foods = await lookupFoods(staples);
+  const resolved = await resolveFoods(SUPABASE_URL, SERVICE_KEY, staples);
 
   const { text, model } = await callModel({
-    system: planSystemPrompt(ctx, passages, foods),
+    system: planSystemPrompt(ctx, passages, renderResolutions(resolved)),
     user: brief,
     maxTokens: 2000,
     prefill: "{",
@@ -393,7 +417,7 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
   const parsed = parseJson<PlanShape>(text);
   if (!parsed?.meals?.length) return json({ error: "could not generate a plan" }, 502);
 
-  const sources = asSources(passages, foods);
+  const sources = resolvedSources(passages, resolved);
   const saved = await db("meal_plans?on_conflict=user_id,plan_date", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=representation" },

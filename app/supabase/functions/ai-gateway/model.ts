@@ -109,7 +109,12 @@ function renderPassages(passages: Passage[]): string {
     .join("\n\n");
 }
 
-function renderFoods(foods: FoodFacts[]): string {
+/**
+ * Exported because the food block can now come from two places: the Qamar
+ * graph, which knows portions in grams, or a bare external lookup. Callers
+ * render whichever they have and pass the string in.
+ */
+export function renderFoods(foods: FoodFacts[]): string {
   if (foods.length === 0) return "(no food database matches)";
   return foods
     .map((f) => `${f.name}: per 100 g — ${f.per100g.kcal} kcal, P ${f.per100g.protein} g, C ${f.per100g.carbs} g, F ${f.per100g.fat} g (${f.source})`)
@@ -137,7 +142,7 @@ Hard rules, in order of priority:
    'ar', otherwise plain English.
 `.trim();
 
-export function chatSystemPrompt(u: UserContext, passages: Passage[], foods: FoodFacts[]): string {
+export function chatSystemPrompt(u: UserContext, passages: Passage[], foodBlock: string): string {
   return `${COMMON_RULES}
 
 THE PERSON: ${describeUser(u)}
@@ -147,13 +152,13 @@ RETRIEVED GUIDANCE:
 ${renderPassages(passages)}
 
 FOOD DATA:
-${renderFoods(foods)}
+${foodBlock}
 
 Answer in at most four sentences. Cite the guidance you used as [1], [2] where
 it carries real weight — not on every sentence.`;
 }
 
-export function planSystemPrompt(u: UserContext, passages: Passage[], foods: FoodFacts[]): string {
+export function planSystemPrompt(u: UserContext, passages: Passage[], foodBlock: string): string {
   return `${COMMON_RULES}
 
 THE PERSON: ${describeUser(u)}
@@ -162,7 +167,7 @@ RETRIEVED GUIDANCE:
 ${renderPassages(passages)}
 
 FOOD DATA (use these figures; do not invent others):
-${renderFoods(foods)}
+${foodBlock}
 
 Write one day of eating: breakfast, lunch and dinner. Requirements:
 - The three meals must total within 5% of the daily target.
@@ -200,7 +205,7 @@ Return ONLY JSON of this exact shape, no prose:
 }`;
 }
 
-export function mealAnalysisSystemPrompt(u: UserContext, passages: Passage[], foods: FoodFacts[]): string {
+export function mealAnalysisSystemPrompt(u: UserContext, passages: Passage[], foodBlock: string): string {
   return `${COMMON_RULES}
 
 THE PERSON: ${describeUser(u)}
@@ -209,7 +214,7 @@ RETRIEVED GUIDANCE — how these dishes are built and what a normal portion is:
 ${renderPassages(passages)}
 
 FOOD DATA (use these figures where they match; otherwise mark confidence low):
-${renderFoods(foods)}
+${foodBlock}
 
 The user has described or photographed a meal. Break it into items with
 portions and nutrition. Confidence is "high" only when the item matched the
@@ -230,7 +235,7 @@ Return ONLY JSON, no prose:
 }`;
 }
 
-export function mealPhotoSystemPrompt(u: UserContext, passages: Passage[], foods: FoodFacts[]): string {
+export function mealPhotoSystemPrompt(u: UserContext, passages: Passage[], foodBlock: string): string {
   return `${COMMON_RULES}
 
 THE PERSON: ${describeUser(u)}
@@ -239,7 +244,7 @@ RETRIEVED GUIDANCE — how these dishes are built and what a normal portion is:
 ${renderPassages(passages)}
 
 FOOD DATA (use these per-100g figures wherever an item matches):
-${renderFoods(foods)}
+${foodBlock}
 
 You are looking at a photograph of a meal. Identify what is on the plate and
 estimate the portion of each item from what you can see — plate size, utensils

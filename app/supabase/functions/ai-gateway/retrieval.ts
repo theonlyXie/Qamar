@@ -189,8 +189,7 @@ export async function lookupFood(query: string): Promise<FoodFacts | null> {
   return fromUsda ?? fromOff;
 }
 
-/** Looks up several foods at once, dropping the ones that cannot be resolved. */
-export async function lookupFoods(names: string[]): Promise<FoodFacts[]> {
-  const results = await Promise.all(names.slice(0, 12).map(lookupFood));
-  return results.filter((r): r is FoodFacts => r !== null);
-}
+// lookupFoods() used to batch this for the gateway. graph.ts owns that job now:
+// it resolves against the Qamar graph first and calls lookupFood() only for
+// what the graph cannot answer. Two entry points into food resolution would be
+// two places for the source-router rule to be forgotten, so there is one.
