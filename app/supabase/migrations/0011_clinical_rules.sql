@@ -103,6 +103,7 @@ create or replace function public.qamar_rule_applies(
 ) returns boolean
 language sql
 immutable
+set search_path = public
 as $$
   select p_rule.is_active
      and (p_rule.condition = 'general_wellness' or p_rule.condition = p_condition)

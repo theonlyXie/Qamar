@@ -374,6 +374,39 @@ answers gets recorded once you have it.
 
 ---
 
+## 4b. Status — all sixteen applied, 2026-08-15
+
+`0007`–`0016` are live. 51 tables, RLS on every one of them.
+
+| Migration | Landed |
+|---|---|
+| `0009` food graph | `foods`, `food_aliases`, `food_portions`, `food_nutrients`, `food_source_links`, `recipes`, `recipe_ingredients`, `nutrients` (19 seeded), pg_trgm indexes on names and aliases |
+| `0010` reference values | `equation_versions` (5 declared), `dri_reference` (empty by design) |
+| `0011` clinical rules | `clinical_rules` with supersession, `kb_chunks.rule_id`, `qamar_rule_applies()` |
+| `0012` diet ontology | `diet_patterns` (15 seeded, 10 in consumer scope), `diet_pattern_rules`, `user_diet_strategy` |
+| `0013` assessment | `profile_facts` (13 backfilled), `assessment_gaps`, `user_labs`, `user_medications`, `user_supplements`, `interaction_findings` |
+| `0014` risk and modules | `clinical_modules` (12 seeded, 1 live), `user_active_modules`, `risk_assessments`, `red_flag_rules` (8), `safety_events` |
+| `0015` evidence and cost | `evidence_packets`, `verifier_results`, `ai_stage_costs`, `stage_budgets` (8) |
+| `0016` adaptation and oversight | `personal_energy_estimates`, `clinician_reviews`, `eval_cases`, `eval_runs`, `eval_results` |
+
+Four constraints were tested by trying to violate them: an unapproved module
+would not activate, the one live module did, a 600 kcal energy step was refused
+where 100 kcal passed, and the verifier revision cap held.
+
+Two seeded tables are deliberately empty. `dri_reference` waits on ingestion
+from the NASEM report, because a value without a citable edition does not
+belong in a table that promises traceability. `eval_cases` waits on the first
+frozen set.
+
+**Nine tables have RLS on with no policy, which is intentional**: `source_registry`,
+`red_flag_rules`, `verifier_results`, `ai_stage_costs`, `stage_budgets`,
+`clinician_reviews`, `eval_cases`, `eval_runs`, `eval_results`. These are staff
+and operational surfaces — a user must not read a clinician's notes about them
+through the public API, and eval expectations are not user data. The service
+role bypasses RLS, so the gateway reads them normally. Anything here that later
+needs a human-facing view wants a separate authenticated staff role, not a
+policy loosened on these tables.
+
 ## 5. Order of work
 
 `0007` first and immediately — it is small and it stops bad data. Then `0008`,
