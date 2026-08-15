@@ -5,6 +5,21 @@ Function. Both need credentials that only the project owner has — a Supabase
 personal access token, or the database password — so they are run from your
 machine rather than from a build agent.
 
+## 0. Two things that will bite you
+
+**The `vector` extension.** `0005` opens with `create extension if not exists
+vector`. In the dashboard SQL editor this works, because that runs as
+`postgres`. Running the file through a connection pooler as a lesser role will
+fail on that first line and take the rest of the file with it.
+
+**1024 dimensions, and never mix providers.** `kb_chunks.embedding` is declared
+`vector(1024)`. Voyage's `voyage-3` produces 1024 natively; OpenAI's
+`text-embedding-3-small` is asked for 1024 explicitly in `ingest.ts`. Pick one
+provider and stay on it. Embeddings from two different models are not
+comparable — retrieval will still return rows, ranked by nothing meaningful,
+and the app will quietly answer from the wrong passages. Re-ingesting from
+scratch is the only fix.
+
 ## 1. Apply the migrations
 
 `0001`–`0003` are already live. `0004` (the 100-point signup bonus) and `0005`
@@ -24,6 +39,21 @@ supabase db push
 
 `db push` applies everything in `supabase/migrations/` that the project has not
 seen, tracked in `supabase_migrations.schema_migrations`.
+
+Check it landed:
+
+```sql
+select table_name from information_schema.tables
+where table_schema = 'public'
+  and table_name in ('kb_documents','kb_chunks','meal_plans','ai_interactions');
+-- expect 4 rows
+
+select tgname from pg_trigger where tgname = 'qamar_on_auth_user_created';
+-- expect 1 row (the 100-point signup bonus)
+```
+
+`0004` also backfills the bonus for users who already exist, so the wallet on
+your test account should jump to 100 the moment it runs.
 
 ## 2. Set the function's secrets
 
@@ -81,6 +111,18 @@ Then rebuild the vector index, which the ingest script reminds you about:
 reindex index kb_chunks_embedding_idx;
 ```
 
+Check the corpus is really in there:
+
+```sql
+select d.title, count(c.id) as chunks
+from kb_documents d left join kb_chunks c on c.document_id = d.id
+group by d.title order by d.title;
+-- expect 10 documents, every one with chunks > 0
+
+select count(*) from kb_chunks where embedding is null;
+-- expect 0 — a chunk with no embedding is invisible to retrieval
+```
+
 Read `supabase/knowledge/README.md` before adding to it. The short version:
 guidance and structure belong in the corpus, per-dish calorie numbers do not —
 those come from USDA and Open Food Facts at query time, so every figure the app
@@ -97,3 +139,29 @@ flutter build apk --release --split-per-abi \
   --dart-define=SUPABASE_ANON_KEY=<publishable key> \
   --dart-define=AI_GATEWAY_URL=https://stqirjlqzchcoeegumoq.supabase.co/functions/v1/ai-gateway
 ```
+
+## 6. End-to-end check
+
+With the function deployed and the corpus ingested, ask it something it should
+be able to ground, using a real user's token rather than the anon key:
+
+```sh
+curl -s -X POST \
+  https://stqirjlqzchcoeegumoq.supabase.co/functions/v1/ai-gateway/chat/reply \
+  -H "Authorization: Bearer <a signed-in user's access token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"how much protein should I eat","lang":"en"}'
+```
+
+What the answers mean:
+
+- **A grounded reply with `[1]` citations** — everything works.
+- **`"refused": true, "reason": "no_grounding"`** — the function is up but
+  retrieval found nothing. The corpus is not ingested, or it was embedded with
+  a different model than the gateway queries with.
+- **`401`** — the token is wrong or expired, not a deployment problem.
+- **`500`** — check `supabase functions logs ai-gateway`; almost always a
+  missing secret.
+- **`404`** — not deployed.
+
+Then rebuild the APK with `AI_GATEWAY_URL` set, per the README.
