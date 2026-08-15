@@ -36,6 +36,8 @@ export type EscalateTo = "refuse" | "clinician_review" | "urgent_referral";
  * the rows that matter.
  */
 const RULE_FOR_REASON: Record<RefusalReason, string | null> = {
+  self_harm: "self_harm",
+  severe_symptom: "severe_symptom",
   medical: "medical_question",
   eating_disorder: "eating_disorder",
   pregnancy: "pregnancy_declared",
@@ -110,7 +112,14 @@ export async function recordRefusal(
       body: JSON.stringify({
         user_id: userId,
         interaction_id: interactionId,
-        kind: reason === "prompt_injection" ? "override_attempt" : "refusal",
+        // An event that escalates is filed as an escalation, not a refusal, so
+        // the two can be counted apart. Refusing a medical question and routing
+        // a crisis to a human are not the same event.
+        kind: reason === "prompt_injection"
+          ? "override_attempt"
+          : escalate !== "refuse"
+          ? "escalation"
+          : "refusal",
         rule_slug: slug,
         reason,
         // The question is kept because "why did it refuse this" is
