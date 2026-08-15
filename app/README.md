@@ -163,3 +163,21 @@ rewrite.
   drop it — but the words are written, not generated. Once the AI gateway
   exists they become the fallback and the orb explains the number in the
   user's own context.
+
+## Building a real APK
+
+The app compiles its backend configuration in at build time. Without these
+defines it runs entirely offline — no accounts, no persistence, no AI — which
+looks like a working build until you try to sign in:
+
+```sh
+flutter build apk --release --split-per-abi \
+  --dart-define=SUPABASE_URL=https://<project>.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<publishable key> \
+  --dart-define=AI_GATEWAY_URL=https://<project>.supabase.co/functions/v1/ai-gateway
+```
+
+Leave `AI_GATEWAY_URL` out until the Edge Function is actually deployed. With
+it set but nothing behind it, every AI call fails with a network error; with
+it absent, the app says plainly that the assistant is not connected, which is
+the truthful state.
