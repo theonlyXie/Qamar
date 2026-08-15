@@ -38,6 +38,22 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!-- Where Google, Apple and Facebook send the browser back to
+                 after a sign-in. Without this the provider completes, the tab
+                 closes, and the app never learns that it worked.
+
+                 The same URL must be listed in the Supabase dashboard under
+                 Authentication -> URL Configuration -> Redirect URLs, and it
+                 must match AuthService.redirectUrl exactly. singleTop above is
+                 what delivers the callback to the running activity instead of
+                 starting a second copy of the app. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.qamar.app" android:host="login-callback"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

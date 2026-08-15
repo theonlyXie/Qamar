@@ -1,15 +1,28 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// The one-tap sign-in providers.
+///
+/// Apple is not optional once Google or Facebook is offered: App Store review
+/// guideline 4.8 requires an equivalent privacy-preserving login wherever a
+/// third-party one is available, and Sign in with Apple is what satisfies it.
+enum OAuthChoice { google, apple, facebook }
+
 /// Identity per spec_mvp.txt §29.1: Supabase anonymous sign-in for instant
-/// start, then optional upgrade to Apple / Google / email OTP so the
-/// profile survives a reinstall or device change. Phone OTP is explicitly
+/// start, then optional upgrade to Apple / Google / Facebook / email OTP so
+/// the profile survives a reinstall or device change. Phone OTP is explicitly
 /// deferred in the spec.
 ///
-/// Email is implemented because it works with nothing but the Supabase
-/// project that already exists. Apple and Google need native entitlements and
-/// OAuth client IDs that are not set up yet, so their buttons are not shown —
-/// a sign-in button that silently does nothing is worse than no button.
+/// Every one of these is a real call. What they still need is configuration
+/// in the Supabase dashboard — a client ID and secret per provider — without
+/// which the provider returns an error the app surfaces rather than hides.
 abstract class Account {
+  /// One-tap sign-in. Opens the provider in a browser tab and returns as soon
+  /// as it has been launched; completion arrives on [changes], because the
+  /// user leaves the app and comes back through a deep link.
+  Future<void> startOAuth(OAuthChoice provider);
+
   /// Starts linking an email to the current (anonymous) user, keeping the
   /// same id and therefore all of their data. Sends a six-digit code.
   Future<void> startLink(String email);
@@ -18,6 +31,11 @@ abstract class Account {
   /// Signs in to an account that already exists, on a new device.
   Future<void> startSignIn(String email);
   Future<void> confirmSignIn({required String email, required String token});
+
+  /// Fires whenever the signed-in identity changes — including when the user
+  /// returns from a provider's browser tab, which is the only way the app
+  /// learns that an OAuth flow succeeded.
+  Stream<void> get changes;
 
   /// The email on the current session, once linked.
   String? get email;
@@ -37,6 +55,38 @@ class AuthService implements Account {
   String? get email {
     final e = currentUser?.email;
     return (e == null || e.isEmpty) ? null : e;
+  }
+
+  /// Where the provider sends the browser back to. Registered as an intent
+  /// filter on Android and a URL type on iOS; Supabase must also list it under
+  /// Authentication → URL Configuration → Redirect URLs, or the provider
+  /// refuses the callback.
+  static const redirectUrl = 'com.qamar.app://login-callback';
+
+  static OAuthProvider _provider(OAuthChoice c) => switch (c) {
+        OAuthChoice.google => OAuthProvider.google,
+        OAuthChoice.apple => OAuthProvider.apple,
+        OAuthChoice.facebook => OAuthProvider.facebook,
+      };
+
+  @override
+  Stream<void> get changes => _client.auth.onAuthStateChange;
+
+  /// One-tap sign-in, preserving the guest's data where possible.
+  ///
+  /// An anonymous user gets `linkIdentity`, which attaches the provider to the
+  /// id they already have — so the meals, profile and wallet they built up
+  /// before signing in survive. `signInWithOAuth` would mint a second user and
+  /// strand the first, which is the failure people notice a week later when
+  /// their history is gone.
+  @override
+  Future<void> startOAuth(OAuthChoice provider) async {
+    final p = _provider(provider);
+    if (isAnonymous && currentUser != null) {
+      await _client.auth.linkIdentity(p, redirectTo: redirectUrl);
+      return;
+    }
+    await _client.auth.signInWithOAuth(p, redirectTo: redirectUrl);
   }
 
   /// Linking, not signing in: `updateUser` attaches the address to the

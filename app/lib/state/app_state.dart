@@ -53,6 +53,7 @@ class AppState extends ChangeNotifier {
         _dictation = dictation,
         _auth = auth,
         _userId = userId {
+    _watchAccount();
     if (isBacked) hydrate();
   }
 
@@ -203,6 +204,7 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _authSub?.cancel();
     super.dispose();
   }
 
@@ -1277,6 +1279,87 @@ class AppState extends ChangeNotifier {
   bool get hasAccount => _auth?.isAnonymous == false;
   String? get accountEmail => _auth?.email;
 
+  /// The provider whose browser tab is currently open, if any.
+  OAuthChoice? authProvider;
+
+  StreamSubscription<void>? _authSub;
+
+  /// Watches for the identity changing under us. An OAuth flow finishes in a
+  /// browser tab, not in the app, so nothing else tells the UI it worked.
+  void _watchAccount() {
+    final auth = _auth;
+    if (auth == null) return;
+    _authSub = auth.changes.listen((_) {
+      if (_disposed) return;
+      if (!auth.isAnonymous) {
+        authProvider = null;
+        authBusy = false;
+        authError = null;
+        authDone = isAr
+            ? 'تمام، حسابك اتربط.'
+            : 'Done — your account is linked.';
+        _notify();
+        // A provider sign-in on a new device brings its own rows with it.
+        hydrate();
+      } else {
+        _notify();
+      }
+    });
+  }
+
+  /// Starts a one-tap sign-in. The browser opens; the result arrives through
+  /// the deep link that brings the user back, handled in [_watchAccount].
+  Future<void> signInWith(OAuthChoice provider) async {
+    final auth = _auth;
+    if (auth == null) {
+      authError = isAr
+          ? 'الحسابات محتاجة اتصال بالسيرفر، والتطبيق شغال أوفلاين دلوقتي.'
+          : 'Accounts need a server connection, and the app is running offline.';
+      _notify();
+      return;
+    }
+    authProvider = provider;
+    authBusy = true;
+    authError = null;
+    _notify();
+    try {
+      await auth.startOAuth(provider);
+      // Deliberately still busy: the browser tab is open and the flow is not
+      // finished until the user comes back. _watchAccount clears it.
+    } catch (e) {
+      if (_disposed) return;
+      authProvider = null;
+      authBusy = false;
+      authError = _oauthMessage(provider, e);
+      _notify();
+    }
+  }
+
+  /// A provider that is not configured in the Supabase dashboard fails with a
+  /// flat 400. Saying which provider and what is missing is the difference
+  /// between a bug report and a five-minute fix.
+  String _oauthMessage(OAuthChoice provider, Object e) {
+    final name = switch (provider) {
+      OAuthChoice.google => 'Google',
+      OAuthChoice.apple => 'Apple',
+      OAuthChoice.facebook => 'Facebook',
+    };
+    final raw = '$e';
+    if (raw.contains('not enabled') || raw.contains('Unsupported provider') || raw.contains('400')) {
+      return isAr
+          ? 'الدخول بـ $name لسه مش مفعّل على السيرفر.'
+          : 'Signing in with $name is not switched on yet on the server.';
+    }
+    if (raw.contains('identity_already_exists') || raw.contains('already linked')) {
+      return isAr
+          ? 'الحساب ده مربوط بـ $name قبل كده. ادخل بيه على طول.'
+          : 'That $name account is already linked. Sign in with it directly.';
+    }
+    return isAr
+        ? 'مقدرتش أكمّل الدخول بـ $name. جرّب تاني أو استخدم الإيميل.'
+        : 'I could not finish signing in with $name. Try again, or use email.';
+  }
+
   void openLinkAccount() {
     authOpen = true;
     authLinking = true;
@@ -1297,6 +1380,7 @@ class AppState extends ChangeNotifier {
   void _resetAuthFields() {
     authCodeSent = false;
     authBusy = false;
+    authProvider = null;
     authCode = '';
     authError = null;
     authDone = null;

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
+import '../widgets/account_sheet.dart';
 import '../widgets/common.dart';
 import '../widgets/living_orb.dart';
 
@@ -96,15 +97,22 @@ class WelcomeScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              // Email only, and it works. Apple and Google sat here as three
-              // buttons that went straight to onboarding without signing
-              // anybody in; they come back when the native entitlement and
-              // OAuth client IDs exist, not before.
+              // One tap, no typing. These are real linkIdentity/signInWithOAuth
+              // calls — they used to be three buttons that went straight to
+              // onboarding without signing anybody in.
+              const ProviderRow(),
+              const SizedBox(height: 10),
               _ProviderButton(
                 label: state.isAr ? 'كمّل بالإيميل' : 'Continue with email',
                 icon: Icons.mail_outline,
                 onTap: state.openLinkAccount,
               ),
+              if (state.authError != null) ...[
+                const SizedBox(height: 8),
+                Text(state.authError!,
+                    textAlign: TextAlign.center,
+                    style: QText.body(size: 12, height: 18, color: QColors.amberSoft)),
+              ],
               const SizedBox(height: 4),
               SizedBox(
                 height: 38,

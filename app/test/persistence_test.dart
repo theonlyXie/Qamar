@@ -5,6 +5,8 @@
 // that is slow, broken or absent never costs the user their data or blocks the
 // screen.
 
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qamar/l10n/strings.dart';
@@ -137,8 +139,29 @@ class FakeGateway implements AiGateway {
 class FakeAccount implements Account {
   final List<String> linkStarts = [];
   final List<String> signInStarts = [];
+  final List<OAuthChoice> oauthStarts = [];
   Object? failWith;
+  Object? oauthFailsWith;
   bool linked = false;
+
+  final _changes = StreamController<void>.broadcast();
+
+  @override
+  Stream<void> get changes => _changes.stream;
+
+  @override
+  Future<void> startOAuth(OAuthChoice provider) async {
+    if (oauthFailsWith != null) throw oauthFailsWith!;
+    oauthStarts.add(provider);
+    // A real provider flow leaves the app here; nothing is linked until the
+    // browser comes back, which the test drives with [returnFromBrowser].
+  }
+
+  /// Simulates the deep link that brings the user back, signed in.
+  void returnFromBrowser({bool success = true}) {
+    linked = success;
+    _changes.add(null);
+  }
 
   @override
   bool get isAnonymous => !linked;
@@ -472,6 +495,58 @@ void main() {
 
       expect(state.hasPlan, isFalse);
       expect(state.planError, isNotNull);
+    });
+  });
+
+  group('one-tap sign-in', () {
+    test('a provider tap opens the flow and links nothing until it returns', () async {
+      final auth = FakeAccount();
+      final state = backed(auth: auth);
+      await settle();
+
+      await state.signInWith(OAuthChoice.google);
+
+      expect(auth.oauthStarts, [OAuthChoice.google]);
+      expect(state.hasAccount, isFalse, reason: 'the browser tab is still open');
+      expect(state.authBusy, isTrue, reason: 'the flow is not finished until the user comes back');
+
+      auth.returnFromBrowser();
+      await settle();
+
+      expect(state.hasAccount, isTrue);
+      expect(state.authBusy, isFalse);
+      expect(state.authDone, isNotNull);
+    });
+
+    test('all three providers are reachable', () async {
+      for (final p in OAuthChoice.values) {
+        final auth = FakeAccount();
+        final state = backed(auth: auth);
+        await settle();
+        await state.signInWith(p);
+        expect(auth.oauthStarts, [p]);
+      }
+    });
+
+    test('a provider that is not switched on server-side says which one', () async {
+      final auth = FakeAccount()..oauthFailsWith = StateError('Unsupported provider: provider is not enabled');
+      final state = backed(auth: auth);
+      await settle();
+      state.setLang(AppLang.en);
+
+      await state.signInWith(OAuthChoice.facebook);
+
+      expect(state.authBusy, isFalse, reason: 'a failed launch must not leave the buttons spinning');
+      expect(state.authError, contains('Facebook'));
+      expect(state.hasAccount, isFalse);
+    });
+
+    test('with no server a provider tap explains rather than hanging', () async {
+      final state = AppState();
+      await state.signInWith(OAuthChoice.apple);
+
+      expect(state.authError, isNotNull);
+      expect(state.authBusy, isFalse);
     });
   });
 

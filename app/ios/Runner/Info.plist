@@ -49,6 +49,22 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Where Google, Apple and Facebook send Safari back to after a sign-in.
+	     Must match AuthService.redirectUrl and the Supabase dashboard's
+	     Redirect URLs list exactly. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.qamar.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.qamar.app</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Qamar uses the microphone so you can log a meal by speaking instead of typing.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
