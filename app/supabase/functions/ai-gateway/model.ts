@@ -200,10 +200,13 @@ Return ONLY JSON of this exact shape, no prose:
 }`;
 }
 
-export function mealAnalysisSystemPrompt(u: UserContext, foods: FoodFacts[]): string {
+export function mealAnalysisSystemPrompt(u: UserContext, passages: Passage[], foods: FoodFacts[]): string {
   return `${COMMON_RULES}
 
 THE PERSON: ${describeUser(u)}
+
+RETRIEVED GUIDANCE — how these dishes are built and what a normal portion is:
+${renderPassages(passages)}
 
 FOOD DATA (use these figures where they match; otherwise mark confidence low):
 ${renderFoods(foods)}
@@ -211,6 +214,12 @@ ${renderFoods(foods)}
 The user has described or photographed a meal. Break it into items with
 portions and nutrition. Confidence is "high" only when the item matched the
 food data; otherwise "low".
+
+A named dish is not in any food database — no table contains "koshary". Build
+it from the RETRIEVED GUIDANCE, which gives the ingredients and a typical
+portion of each, and price those ingredients against the FOOD DATA. Report the
+dish as one item with the total, and say which portion size you assumed.
+
 
 Return ONLY JSON, no prose:
 {
@@ -221,10 +230,13 @@ Return ONLY JSON, no prose:
 }`;
 }
 
-export function mealPhotoSystemPrompt(u: UserContext, foods: FoodFacts[]): string {
+export function mealPhotoSystemPrompt(u: UserContext, passages: Passage[], foods: FoodFacts[]): string {
   return `${COMMON_RULES}
 
 THE PERSON: ${describeUser(u)}
+
+RETRIEVED GUIDANCE — how these dishes are built and what a normal portion is:
+${renderPassages(passages)}
 
 FOOD DATA (use these per-100g figures wherever an item matches):
 ${renderFoods(foods)}
@@ -232,6 +244,12 @@ ${renderFoods(foods)}
 You are looking at a photograph of a meal. Identify what is on the plate and
 estimate the portion of each item from what you can see — plate size, utensils
 and hands are the usual scale references.
+
+
+A named dish is not in any food database — no table contains "koshary". Build
+it from the RETRIEVED GUIDANCE, which gives the ingredients and a typical
+portion of each, and price those ingredients against the FOOD DATA. Report the
+dish as one item with the total, and say which portion size you assumed.
 
 Rules specific to a photo:
 - Confidence is "high" only for an item you can both name confidently AND

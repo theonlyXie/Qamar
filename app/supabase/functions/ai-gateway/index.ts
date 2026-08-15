@@ -13,7 +13,10 @@
 // Secrets (supabase secrets set ...):
 //   ANTHROPIC_API_KEY   required
 //   VOYAGE_API_KEY      or OPENAI_API_KEY — required for retrieval
-//   USDA_API_KEY        optional, improves whole-food figures
+//   USDA_API_KEY        free from api.data.gov — without it the ingredient
+//                       lookups fall back to a shared demo key that is rate
+//                       limited to the point of uselessness, and the model is
+//                       left estimating figures it should be reading
 //   QAMAR_MODEL         optional, defaults to claude-sonnet-5
 
 import {
@@ -246,6 +249,19 @@ async function analyzeMeal(
   // driven by whatever the user typed alongside it, if anything.
   const foods = await lookupFoods(foodTerms(described));
 
+  // Meal analysis needs the knowledge base as much as chat does: no food
+  // database contains a cooked national dish, so the only way to price a plate
+  // of koshary is to retrieve what it is made of and look up the ingredients.
+  // A bare photo has no text to retrieve on, so it falls back to a standing
+  // query that pulls the dish and household-portion documents.
+  const passages = await retrieve(
+    SUPABASE_URL,
+    SERVICE_KEY,
+    described || "Egyptian dish ingredients and typical household portion sizes",
+    "nutrition",
+    6,
+  );
+
   // A photo with no caption still needs something in the user turn — the
   // instruction is what the picture is being asked about.
   const ask = image
@@ -253,7 +269,7 @@ async function analyzeMeal(
     : described;
 
   const { text, model } = await callModel({
-    system: image ? mealPhotoSystemPrompt(ctx, foods) : mealAnalysisSystemPrompt(ctx, foods),
+    system: image ? mealPhotoSystemPrompt(ctx, passages, foods) : mealAnalysisSystemPrompt(ctx, passages, foods),
     user: ask,
     maxTokens: 900,
     prefill: "{",
@@ -267,13 +283,13 @@ async function analyzeMeal(
     inScope: true,
     question: image ? `[photo] ${ask}` : ask,
     answer: JSON.stringify(parsed.items).slice(0, 2000),
-    sources: asSources([], foods),
+    sources: asSources(passages, foods),
     model,
   });
   return json({
     items: parsed.items,
     note: (lang === "ar" ? parsed.note_ar : parsed.note_en) ?? null,
-    sources: asSources([], foods),
+    sources: asSources(passages, foods),
   });
 }
 
