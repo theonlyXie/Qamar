@@ -374,7 +374,7 @@ answers gets recorded once you have it.
 
 ---
 
-## 4b. Status — `0007`–`0023` applied, 2026-08-15
+## 4b. Status — `0007`–`0024` applied, 2026-08-15
 
 52 tables, RLS on every one of them.
 
@@ -395,6 +395,7 @@ answers gets recorded once you have it.
 | `0021` self-harm rule | ninth `red_flag_rules` row; detection text filled in on three others |
 | `0022` cost and rule selection | `model_prices` (9 rows), `qamar_token_cost`, pricing trigger on `ai_stage_costs`, `ai_cost_daily`, `stage_budget_pressure`, `qamar_rule_selection` |
 | `0023` hardening | `security_invoker` on the four earlier views, staff views revoked from `anon`/`authenticated`, `search_path` pinned on the `0018` resolver functions |
+| `0024` verifier views | `verifier_activity`, `verifier_failures`, `verifier_revisions` |
 
 The gateway now writes an `evidence_packets` row and a set of `ai_stage_costs`
 rows for every request, including the ones that fail to parse — a call that
@@ -403,8 +404,19 @@ find out the prompt has drifted. `cost_usd` is filled by the `0022` trigger from
 `model_prices`, so a price correction is one `UPDATE` and does not need the
 edge function redeployed.
 
-`verifier_results` remains empty: `claims_to_verify` is now recorded in a
-checkable form on every packet, but nothing checks it yet.
+`verifier_results` is now written on every request. The verifier is arithmetic
+rather than a second model — every finding recomputes a number from figures
+already in the packet, which is why `model` is null on those rows — and it only
+claims to check what is genuinely checkable: meal-plan totals and hard
+constraints, meal-analysis macros against kcal at 4/4/9, a restricted food
+merely *mentioned* in chat as advisory. Body scans get no verifier row at all,
+because re-reading the image would mean a second vision call, and a model
+checking a model is the thing this design refuses to do.
+
+The revision cap is enforced by the schema, not by the gateway: `unique
+(task_id, revision_number)` plus `revision_number <= 2` mean a second correction
+round cannot be written even by a caller that tries. Verified by trying — a
+duplicate revision 0, a revision 3 and an invalid verdict were all rejected.
 
 Four constraints were tested by trying to violate them: an unapproved module
 would not activate, the one live module did, a 600 kcal energy step was refused
@@ -424,8 +436,9 @@ role bypasses RLS, so the gateway reads them normally. Anything here that later
 needs a human-facing view wants a separate authenticated staff role, not a
 policy loosened on these tables.
 
-The same applies to the five staff views — `safety_rule_activity`, `safety_daily`,
-`clinician_queue`, `ai_cost_daily`, `stage_budget_pressure`. `0023` revoked
+The same applies to the eight staff views — `safety_rule_activity`, `safety_daily`,
+`clinician_queue`, `ai_cost_daily`, `stage_budget_pressure`, `verifier_activity`,
+`verifier_failures`, `verifier_revisions`. `0023` revoked
 `select` on all of them from `anon` and `authenticated` and switched every view
 in the schema to `security_invoker`. Before that, a view in `public` ran with
 its owner's rights and was reachable through PostgREST by anyone with an

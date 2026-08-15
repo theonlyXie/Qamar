@@ -22,7 +22,7 @@ scratch is the only fix.
 
 ## 1. Apply the migrations
 
-`0001`–`0023` are all live on `stqirjlqzchcoeegumoq` as of 2026-08-15. This
+`0001`–`0024` are all live on `stqirjlqzchcoeegumoq` as of 2026-08-15. This
 section is kept for rebuilding the project from scratch, and for the next
 migration.
 
@@ -100,17 +100,17 @@ and makes the deployed bundle provably identical to the repository.
 
 **The running version is that first deploy, and it is now well behind the
 repository.** The food resolver, the safety recording, the self-harm and
-severe-symptom guards, and the evidence packets are all in `supabase/functions/`
-and none of them are live until the command above is run. The function is five
-files bigger than the deployed one (`graph.ts`, `safety.ts`, `packet.ts` and
-their tests), which is the other reason to deploy from a checkout rather than
-file by file.
+severe-symptom guards, the evidence packets and the verifier are all in
+`supabase/functions/` and none of them are live until the command above is run.
+The function is seven files bigger than the deployed one (`graph.ts`,
+`safety.ts`, `packet.ts`, `verify.ts` and their tests), which is the other
+reason to deploy from a checkout rather than file by file.
 
 Before deploying, from `supabase/functions/ai-gateway/`:
 
 ```sh
 deno check index.ts     # types
-deno test               # scope guard and packet extraction, 25 tests
+deno test               # scope guard, packet extraction, verifier — 46 tests
 ```
 
 Verify it is up. A 401 is the correct answer to an unauthenticated call — it
@@ -274,12 +274,54 @@ The seeded prices are published list rates entered by hand and are a budgeting
 estimate, not an invoice. Reconcile against the provider's own billing before
 anyone makes a decision on them.
 
-Two things are worth knowing about what is *not* there yet. `applicable_rules`
-is empty on every packet because `clinical_rules` is empty — no rule has been
-curated, which is different from the population filter rejecting them all.
-And `verifier_results` is empty because nothing checks `claims_to_verify` yet;
-the claims are recorded in a checkable shape so that a verifier can be added
-without re-running history.
+`applicable_rules` is empty on every packet because `clinical_rules` is empty —
+no rule has been curated, which is different from the population filter
+rejecting them all.
+
+## 6d. The verifier
+
+Every answer is now checked before it goes out, and the check is arithmetic, not
+a second model. Nothing here is anyone's opinion: each finding recomputes a
+number from figures already in the packet, which is why `verifier_results.model`
+is null on every row.
+
+```sql
+select * from public.verifier_activity;    -- verdicts per day and per pass
+select * from public.verifier_failures;    -- what is actually failing, commonest first
+select * from public.verifier_revisions;   -- whether the correction round earns its cost
+```
+
+What each route can honestly check:
+
+| Route | Checked | Not checked |
+|---|---|---|
+| `plan` | meal totals against the target, every portion has a kcal, alternatives near their meal, **and no restricted food in the output** | — |
+| `meal/analyze` | macros reconcile with kcal at 4/4/9, kcal plausible | restrictions: the user is reporting what they ate, not being offered it |
+| `chat/reply` | a restricted food is *mentioned* — advisory only | the numbers, because prose does not attach them to a resolved food |
+| `scan/read` | nothing | re-reading the image needs another vision call, which is the trap this avoids. The plausibility filter in the route is the whole check |
+
+Three verdicts, and they do different things:
+
+- **PASS** — the response carries `verification.verified: true`.
+- **REVISE** — one bounded correction. The model is re-asked with the specific
+  failures and its own previous answer, and the new version is accepted **only
+  if it has strictly fewer failures**. A meal-photo revision drops the image and
+  uses the text prompt, because fixing a sum needs no picture.
+- **ESCALATE** — either a safety failure, or a revision that did not land. The
+  cap is enforced by the `unique (task_id, revision_number)` constraint from
+  `0015`, not by the gateway remembering.
+
+**An ESCALATE does not always block.** A day of food still 9% off target is
+returned with `verification.verified: false` and the recomputed total attached —
+withholding someone's meals over an energy sum would be worse for them than
+showing it with the correction. What is never returned is a plan naming a food
+the person has recorded as an allergy: that is refused with 409, written to
+`safety_events` as a `hard_block`, and not re-asked for, because the model has
+already been told once and a second round of the same model is not a control.
+
+That last check is the one that is not redundant with anything upstream. The
+route already removes restricted foods from the list the model is *shown*;
+nothing stops it naming one that was never on that list.
 
 ## 7. Sign-in: what is actually switched on
 

@@ -50,6 +50,7 @@ import {
   loadUserFacts,
   numericClaims,
   recordStages,
+  recordVerification,
   resolutionUncertainty,
   ruleSelection,
   targetsFrom,
@@ -59,6 +60,19 @@ import {
   type PacketInput,
   type StageCost,
 } from "./packet.ts";
+import {
+  blocks,
+  finalVerdict,
+  isImprovement,
+  isRevisable,
+  revisionInstruction,
+  verifyChat,
+  verifyMeal,
+  verifyPlan,
+  type Meal,
+  type MealItem,
+  type Verification,
+} from "./verify.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -218,7 +232,9 @@ async function trace(
   kind: Kind,
   packet: Omit<PacketInput, "userId" | "interactionId" | "kind">,
   stages: StageCost[],
-): Promise<void> {
+  /** One entry per verification pass, in order: index 0 is the first check. */
+  verifications: Verification[] = [],
+): Promise<string | null> {
   const taskId = await writePacket(SUPABASE_URL, SERVICE_KEY, {
     userId,
     interactionId,
@@ -226,6 +242,23 @@ async function trace(
     ...packet,
   });
   await recordStages(SUPABASE_URL, SERVICE_KEY, { taskId, interactionId, userId }, stages);
+  for (let i = 0; i < verifications.length; i++) {
+    await recordVerification(SUPABASE_URL, SERVICE_KEY, taskId, verifications[i], i);
+  }
+  return taskId;
+}
+
+/** The verification, in the shape the app can act on. */
+function verificationSummary(v: Verification) {
+  return {
+    verdict: v.verdict,
+    // The plain question the client actually asks. An ESCALATE that reached the
+    // user is an answer worth showing with its correction attached, not one
+    // worth presenting as checked.
+    verified: v.verdict === "PASS",
+    recomputed: v.recomputed,
+    findings: v.failures.map((f) => ({ type: f.failure_type, detail: f.detail })),
+  };
 }
 
 /** Candidate food names to look up, from free text. Crude on purpose. */
@@ -283,6 +316,14 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
     maxTokens: 600,
   });
 
+  // The only thing checkable in prose is whether it named something the person
+  // cannot have — and even that is advisory, because a reply that mentions
+  // sesame in order to refuse it looks identical to one suggesting it.
+  const [constraints, verifyMs] = await timed(() =>
+    loadHardConstraints(SUPABASE_URL, SERVICE_KEY, userId)
+  );
+  const verification = verifyChat(text, constraints);
+
   const sources = resolvedSources(passages, resolved);
   const id = await record(userId, "chat", {
     inScope: true,
@@ -326,7 +367,8 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
     { stage: "retrieval", externalCalls: 1, latencyMs: retrievalMs },
     { stage: "food_resolver", externalCalls: externalCallsIn(resolved), latencyMs: resolveMs },
     { stage: "reasoner", model, usage, latencyMs },
-  ]);
+    { stage: "verifier", latencyMs: verifyMs },
+  ], [verification]);
   return json({ reply: text, sources, refused: false });
 }
 
@@ -351,19 +393,6 @@ function readImage(body: { imageBase64?: string; imageMediaType?: string }): Ima
   const mediaType = (body.imageMediaType ?? "image/jpeg").toLowerCase();
   if (!ALLOWED_MEDIA.includes(mediaType)) return `unsupported image type ${mediaType}`;
   return { data, mediaType };
-}
-
-/** One line of a meal analysis, in the shape the prompt asks for. */
-interface MealItem {
-  ar?: string;
-  en?: string;
-  portionAr?: string;
-  portionEn?: string;
-  confidence?: string;
-  kcal?: number;
-  proteinG?: number;
-  carbsG?: number;
-  fatG?: number;
 }
 
 /**
@@ -469,11 +498,42 @@ async function analyzeMeal(
     return json({ error: "could not analyse" }, 502);
   }
 
+  // Check the arithmetic, and spend the one allowed correction if it fails.
+  // The revision deliberately drops the photo and uses the text prompt: the
+  // task has changed from "read this plate" to "fix these numbers in this
+  // JSON", which needs no image and costs a fraction of the input tokens.
+  let items = parsed.items;
+  let verification = verifyMeal(items);
+  const verifications: Verification[] = [verification];
+
+  if (isRevisable(verification)) {
+    const [retry, retryMs] = await timed(() =>
+      callModel({
+        system: mealAnalysisSystemPrompt(ctx, passages, foodBlock),
+        user: revisionInstruction(verification, { items }),
+        maxTokens: 900,
+        prefill: "{",
+      })
+    );
+    stages.push({ stage: "extractor", model: retry.model, usage: retry.usage, latencyMs: retryMs });
+    const again = parseJson<{ items: MealItem[] }>(retry.text);
+    const after = again?.items?.length ? finalVerdict(verifyMeal(again.items)) : null;
+    if (after) verifications.push(after);
+    if (after && isImprovement(verification, after)) {
+      items = again!.items;
+      verification = after;
+    } else {
+      // The correction did not land. The cap is spent either way, so the
+      // original answer stands and the verdict says it was not fixed.
+      verification = finalVerdict(verification);
+    }
+  }
+
   const sources = resolvedSources(passages, resolved);
   const id = await record(userId, "meal_analysis", {
     inScope: true,
     question: image ? `[photo] ${ask}` : ask,
-    answer: JSON.stringify(parsed.items).slice(0, 2000),
+    answer: JSON.stringify(items).slice(0, 2000),
     sources,
     model,
   });
@@ -500,28 +560,32 @@ async function analyzeMeal(
     calculatedTargets: targetsFrom(ctx),
     applicableRules: rules.applicable,
     excludedRules: rules.excluded,
-    candidateDecision: { items: parsed.items, input: image ? "photo" : "text" },
+    candidateDecision: { items, input: image ? "photo" : "text" },
     safetyFlags: flags,
     uncertainty: {
       foods: resolutionUncertainty(resolved),
       passages_retrieved: passages.length,
       // Every item the model itself marked uncertain. This is what the
-      // confirmation screen is for, and what a verifier would recompute first.
-      low_confidence_items: parsed.items
+      // confirmation screen is for, and what the verifier recomputes first.
+      low_confidence_items: items
         .filter((i) => i?.confidence !== "high")
         .map((i) => i?.en ?? i?.ar ?? "unnamed"),
     },
-    claimsToVerify: mealClaims(parsed.items),
-  }, stages);
+    claimsToVerify: mealClaims(items),
+  }, stages, verifications);
 
   return json({
-    items: parsed.items,
+    items,
     note: (lang === "ar" ? parsed.note_ar : parsed.note_en) ?? null,
     sources,
     // What the graph made of each phrase: the canonical food, the portion it
     // assumed, and every reason it is unsure. The confirmation screen needs
     // this to ask a specific question rather than a vague one.
     resolutions: toPacketFacts(resolved),
+    // Whether the numbers reconcile. An item whose macros do not match its kcal
+    // is one of the two figures being wrong, and the app should not present
+    // that as settled.
+    verification: verificationSummary(verification),
   });
 }
 
@@ -614,7 +678,7 @@ async function readBodyScan(
 }
 
 interface PlanShape {
-  meals: unknown[];
+  meals: Meal[];
   rationale_ar?: string;
   rationale_en?: string;
 }
@@ -676,7 +740,7 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
   // it obeying an instruction.
   const constraints = await loadHardConstraints(SUPABASE_URL, SERVICE_KEY, userId);
   const excludedFoods: { food: string; restriction: string }[] = [];
-  const resolved = [];
+  const resolved: Resolution[] = [];
   for (const r of resolvedAll) {
     const hit = r.facts
       ? violatesConstraint(constraints, {
@@ -718,14 +782,77 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
     return json({ error: "could not generate a plan" }, 502);
   }
 
+  // Verification happens before the plan is saved or shown. The constraint
+  // check here is not the same as the filtering above: that removed restricted
+  // foods from the list the model was *shown*, and nothing stopped it naming
+  // one that was never on the list. This is the difference between asking it
+  // not to and checking that it did not.
+  let meals = parsed.meals;
+  let verification = verifyPlan(meals, ctx.targetKcal, constraints);
+  const verifications: Verification[] = [verification];
+
+  if (isRevisable(verification)) {
+    const [retry, retryMs] = await timed(() =>
+      callModel({
+        system: planSystemPrompt(ctx, passages, renderResolutions(resolved)),
+        user: revisionInstruction(verification, { meals }),
+        maxTokens: 2000,
+        prefill: "{",
+      })
+    );
+    stages.push({ stage: "reasoner", model: retry.model, usage: retry.usage, latencyMs: retryMs });
+    const again = parseJson<PlanShape>(retry.text);
+    const after = again?.meals?.length
+      ? finalVerdict(verifyPlan(again.meals, ctx.targetKcal, constraints))
+      : null;
+    if (after) verifications.push(after);
+    if (after && isImprovement(verification, after)) {
+      meals = again!.meals;
+      verification = after;
+    } else {
+      verification = finalVerdict(verification);
+    }
+  }
+
+  const flags = constraints.length ? [`hard_constraints:${constraints.length}`] : [];
+  const blocking = blocks(verification);
   const sources = resolvedSources(passages, resolved);
+
+  if (blocking.length > 0) {
+    // A plan naming something the person is allergic to is not a draft to
+    // improve. It is not saved, not returned, and not re-asked for: the model
+    // has already been told and has already ignored it once, so another round
+    // of the same model is not a control. The user gets a plain refusal and a
+    // human gets a row to look at.
+    await recordHardBlock(SUPABASE_URL, SERVICE_KEY, userId, null, "restricted_food_in_generated_plan", {
+      failures: blocking,
+      restrictions: constraints.map((c) => c.label),
+      stage: "plan_verification",
+    });
+    await trace(userId, null, "plan", {
+      userFacts: await loadUserFacts(SUPABASE_URL, SERVICE_KEY, userId, ctx),
+      foodFacts: toPacketFacts(resolved),
+      calculatedTargets: targetsFrom(ctx),
+      candidateDecision: { meals, plan_date: day, rejected: true },
+      safetyFlags: [...flags, "restricted_food_in_output"],
+      uncertainty: { staples_withheld: excludedFoods },
+    }, stages, verifications);
+    return json({
+      error: lang === "ar"
+        ? "الخطة اللي اتولدت فيها حاجة مش مفروض تاكلها، فمنفعش أعرضهالك. جرّب تاني من فضلك."
+        : "The generated plan included something you have told me you cannot eat, so I am not showing it. Please try again.",
+      refused: true,
+      reason: "failed_safety_verification",
+    }, 409);
+  }
+
   const saved = await db("meal_plans?on_conflict=user_id,plan_date", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify({
       user_id: userId,
       plan_date: day,
-      meals: parsed.meals,
+      meals,
       target_kcal: ctx.targetKcal,
       rationale_ar: parsed.rationale_ar ?? null,
       rationale_en: parsed.rationale_en ?? null,
@@ -738,11 +865,10 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
   const planId = await record(userId, "plan", {
     inScope: true,
     question: brief,
-    answer: JSON.stringify(parsed.meals).slice(0, 2000),
+    answer: JSON.stringify(meals).slice(0, 2000),
     sources,
     model,
   });
-  const flags = constraints.length ? [`hard_constraints:${constraints.length}`] : [];
   await recordAllowed(
     SUPABASE_URL,
     SERVICE_KEY,
@@ -763,7 +889,7 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
     calculatedTargets: targetsFrom(ctx),
     applicableRules: rules.applicable,
     excludedRules: rules.excluded,
-    candidateDecision: { meals: parsed.meals, plan_date: day },
+    candidateDecision: { meals, plan_date: day },
     safetyFlags: excludedFoods.length ? [...flags, "restricted_food_excluded"] : flags,
     uncertainty: {
       foods: resolutionUncertainty(resolved),
@@ -780,8 +906,18 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
       target_kcal: ctx.targetKcal,
       check: "sum_portion_kcal_against_target",
     }],
-  }, stages);
-  return json({ plan: parsed, date: day, sources });
+  }, stages, verifications);
+
+  // An energy sum that is still off after its one correction is returned, not
+  // withheld — refusing a whole day of food over a 9% miss would be worse for
+  // the person than showing it. What must not happen is presenting it as
+  // checked, so the recomputed total travels with it and `verified` is false.
+  return json({
+    plan: { ...parsed, meals },
+    date: day,
+    sources,
+    verification: verificationSummary(verification),
+  });
 }
 
 // ---- entry --------------------------------------------------------------

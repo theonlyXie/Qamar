@@ -138,6 +138,49 @@ export async function writePacket(
   }
 }
 
+/**
+ * Records one verification pass against its packet.
+ *
+ * `model` is left null on purpose: the verifier is arithmetic, so there is no
+ * model behind the verdict and naming one would misrepresent where it came
+ * from. `revision_number` is the pass — 0 for the first check, 1 for the check
+ * after the one allowed correction — and the unique constraint from 0015 is
+ * what actually enforces the cap.
+ *
+ * A packet that failed to write means no task_id, and verifier_results.task_id
+ * is NOT NULL, so there is nothing to attach the result to. That is logged
+ * rather than swallowed: a verification that happened and was not recorded is
+ * exactly the thing this table exists to make impossible.
+ */
+export async function recordVerification(
+  url: string,
+  key: string,
+  taskId: string | null,
+  v: { verdict: string; failures: unknown[]; recomputed: Record<string, unknown> },
+  revision: number,
+): Promise<void> {
+  if (!taskId) {
+    console.error("verification not recorded: no packet to attach it to", v.verdict);
+    return;
+  }
+  try {
+    const res = await db(url, key, "verifier_results", {
+      method: "POST",
+      body: JSON.stringify({
+        task_id: taskId,
+        verdict: v.verdict,
+        failures: v.failures,
+        recomputed: v.recomputed,
+        revision_number: revision,
+        model: null,
+      }),
+    });
+    if (!res.ok) console.error("verifier result write failed:", res.status, await res.text());
+  } catch (e) {
+    console.error("verifier result write failed (request continues):", e);
+  }
+}
+
 // ---- cost ---------------------------------------------------------------
 
 export interface StageCost {
