@@ -22,12 +22,17 @@ scratch is the only fix.
 
 ## 1. Apply the migrations
 
-`0001`–`0003` are already live. `0004` (the 100-point signup bonus) and `0005`
-(the knowledge base, meal plans and AI audit log) are not.
+`0001`–`0006` are all live on `stqirjlqzchcoeegumoq` as of 2026-08-15. This
+section is kept for rebuilding the project from scratch, and for the next
+migration.
 
 The quickest path is the SQL editor in the dashboard: open each file, paste,
-run, in order. Both are idempotent — `create table if not exists`, `create or
-replace function` — so re-running one is harmless.
+run, in order. They are idempotent — `create table if not exists`, `create or
+replace function`, and every `create policy` is preceded by a `drop policy if
+exists` — so re-running one is harmless.
+
+Run them in order and do not skip `0006`: `0004` alone leaves a signup bonus
+that looks installed and never pays out. See the header of `0006` for why.
 
 With the CLI instead:
 
@@ -52,7 +57,16 @@ select tgname from pg_trigger where tgname = 'qamar_on_auth_user_created';
 -- expect 1 row (the 100-point signup bonus)
 ```
 
-`0004` also backfills the bonus for users who already exist, so the wallet on
+The trigger existing is not evidence the bonus works — that was exactly the
+`0004` failure. Check the payout itself, which is what `0006` fixed:
+
+```sql
+select count(*) from public.su_point_ledger where reason = 'signup_bonus';
+-- expect one row per user; zero means the credit is being refused and
+-- swallowed, and the warning is in the Postgres logs
+```
+
+`0006` also backfills the bonus for users who already exist, so the wallet on
 your test account should jump to 100 the moment it runs.
 
 ## 2. Set the function's secrets
