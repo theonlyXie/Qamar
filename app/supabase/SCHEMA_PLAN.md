@@ -90,38 +90,61 @@ anaphylaxis risk are the same string today. Split them.
 
 Ten migrations. The order is a dependency order, not a preference.
 
-### `0007` — schema corrections
-Everything in section 2. No new concepts. Do this before any data accumulates
-in the wrong shape.
+### `0007` — schema corrections ✅ applied 2026-08-15
+Everything in section 2. No new concepts.
 
-**Exit:** weight and body fat hold decimals; `body_scan` is a valid kind;
-life stage and allergy severity are columns.
+`weight_kg` is `numeric(5,2)` and `body_fat_pct` is `numeric(4,1)`; 73.55 and
+22.4 round-trip. `body_scan` is a valid `ai_interactions.kind` and the gateway
+uses it. `profiles.life_stage` records pregnancy and lactation — deliberately
+*not* wired to `eligibility_status`, because those values block an account and
+this scope refuses a topic. `food_restrictions` separates allergy from dislike
+and carries severity; the old `food_exclusions` array was migrated in as
+allergies of unknown severity, and is retained as a deprecated projection
+because the app and gateway still read it.
+
+One consequence worth knowing: `profiles` columns now serialize as JSON
+doubles, so `row['weight_kg'] as int?` throws. `supabase_repositories.dart` was
+casting exactly that way, and `QamarConfig.useSupabase` turns itself on as soon
+as the dart-defines in DEPLOY.md step 5 are set — so it would have crashed on
+first real use. Now read as `num` and rounded.
+
+**Remaining:** `Profile` models weight and fat as `int`, so the decimal is kept
+in the database and in `weight_entries` — which is what the trend engine reads
+— but rounded for display. Carrying it end to end means changing the model, the
+steppers and the formatters, and belongs with the adaptation work in `0016`.
 
 ---
 
-### `0008` — source registry
+### `0008` — source registry ✅ applied 2026-08-15
 §35, and a prerequisite for everything that ingests anything.
 
-`source_registry` — `source_id`, `name`, `official_docs_url`, `api_base_url`,
-`auth_method`, `pricing_url`, `terms_url`, `license_class`, `storage_rights`,
-`ai_advice_rights`, `regions_languages`, `rate_limits`, `last_manual_review`,
-`last_healthcheck`, `expected_schema_hash`, `owner`,
-`status ∈ active|degraded|blocked|deprecated`.
+`source_registry` holds the §35 fields, with the three rights kept separate on
+purpose: `license_class`, `storage_rights` and `ai_advice_rights` answer
+different questions, and "free to read" answers none of them.
 
-This is small and unglamorous and it goes early because Appendix C requires
-*"FatSecret is blocked from dietitian-advice production use unless a
-Qamar-compatible contract is signed"* — and a checklist item that lives only in
-a document is not enforcement. With this table, `ai_advice_rights = false`
-makes that a query the food resolver runs, and §35's *"Source Registry can
-immediately block that source from prohibited workflows"* becomes true rather
-than aspirational.
+The enforcement point is `qamar_source_usable_for_advice(source_id)`, which
+fails closed on every axis — unknown source, unknown licence, unanswered rights
+question and merely-`degraded` status all return `false`. Verified: `usda_fdc`
+→ true; `fatsecret`, an uncleared candidate, and an unknown id → all false.
 
-Seed it with the sources already in use — USDA FDC, Open Food Facts — and with
-every provider in Appendix A you intend to evaluate, `status = 'deprecated'`
-until procurement clears them.
+17 sources seeded. USDA FDC, Open Food Facts and Anthropic are `active`.
+**FatSecret is `blocked`** with `ai_advice_rights = false`, which is Appendix
+C's requirement expressed as a row the resolver can query rather than a line in
+a document. Everything else is `deprecated`, meaning *not cleared* — nothing
+may depend on it until someone does the procurement and updates the row.
+
+Scoped to consumer wellness: the disease-specific guideline bodies (ADA, KDIGO,
+ESPEN, ASPEN, NICE) are deliberately absent rather than listed as `deprecated`,
+because listing them would imply a decision nobody has made. General population
+guidance is in, because the requirement engine needs it.
+
+RLS is on with no client policy — this table holds contract terms, pricing
+pages and owner names, and has no user-facing use. The service role bypasses
+RLS, so the gateway reads it normally.
 
 **Exit:** no ingestion path writes a food or a rule without a `source_id` that
-resolves here, and the two live sources have their real licence terms recorded.
+resolves here. Not yet enforced — that constraint lands with `0009`, the first
+migration that ingests anything.
 
 ---
 
@@ -372,15 +395,22 @@ evals every source update is a leap of faith.
 
 ## 6. Decisions only you can make
 
-1. **Scope of claim.** Consumer wellness, or condition-aware care? This decides
-   whether `0014` is a small table or a regulated programme, and §Phase 0 says
-   it precedes the build.
+1. ~~**Scope of claim.**~~ **Settled 2026-08-15: consumer wellness.** `0014`
+   stays small — a risk tier and a module table, no regulated programme — and
+   pregnancy, lactation, pediatrics and disease-specific nutrition therapy stay
+   out of scope and refuse rather than answer. Revisit before any Phase 4 work.
 2. **Which commercial resolver**, if any — and whether its terms permit
-   nutrition advice. This changes what `0009` may cache.
-3. **Egypt FCT and ODbL rights**, before seeding `0009` from them.
-4. **Who owns each source** (§37 wants source owners, not just API-key owners).
+   nutrition advice. This changes what `0009` may cache. FatSecret is recorded
+   as blocked until a contract exists; Nutritionix, Edamam, Passio, LogMeal and
+   CHOMP sit at `deprecated` awaiting a decision.
+3. **Egypt FCT and ODbL rights**, before seeding `0009` from them. Open Food
+   Facts is `open_share_alike`, and whether those obligations reach a derived
+   Qamar food graph is a legal answer, not an engineering one.
+4. **Who owns each source** — `source_registry.owner` is null on all 17 rows.
+   §37 wants source owners, not just API-key owners.
 5. **Who the licensed clinician reviewer is.** `0014` and `0016` both assume one
    exists; neither can be finished without a name.
 
-Items 1–3 gate real work. I would settle them before `0009` starts, because
-re-seeding a food graph under different licence terms means starting it again.
+Items 2 and 3 now gate the next real work. Settle them before `0009` starts,
+because re-seeding a food graph under different licence terms means starting it
+again.

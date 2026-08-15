@@ -125,7 +125,7 @@ async function loadContext(userId: string, lang: string): Promise<{ ctx: UserCon
 
 async function record(
   userId: string,
-  kind: "chat" | "meal_analysis" | "plan",
+  kind: "chat" | "meal_analysis" | "plan" | "body_scan",
   fields: { inScope: boolean; refusal?: string; question?: string; answer?: string; sources?: Source[]; model?: string },
 ): Promise<void> {
   try {
@@ -308,9 +308,10 @@ interface BodyScanShape {
  * misread "1.74" as 174 kg has to fail closed, because these numbers set the
  * person's calorie target and nobody re-checks them afterwards.
  */
-function plausible(v: unknown, min: number, max: number): number | null {
+function plausible(v: unknown, min: number, max: number, decimals = 0): number | null {
   if (typeof v !== "number" || !Number.isFinite(v)) return null;
-  const n = Math.round(v);
+  const factor = 10 ** decimals;
+  const n = Math.round(v * factor) / factor;
   return n >= min && n <= max ? n : null;
 }
 
@@ -334,15 +335,18 @@ async function readBodyScan(
   const parsed = parseJson<BodyScanShape>(text);
   if (!parsed) return json({ error: "could not read the report" }, 502);
 
+  // Weight and body fat keep one decimal: the profile columns are numeric, and
+  // a smoothed weight trend cannot see a change smaller than the rounding it
+  // was stored with. Height and age are whole numbers on the page anyway.
   const result = {
     heightCm: plausible(parsed.heightCm, 120, 230),
-    weightKg: plausible(parsed.weightKg, 30, 300),
-    bodyFatPct: plausible(parsed.bodyFatPct, 3, 70),
+    weightKg: plausible(parsed.weightKg, 30, 300, 1),
+    bodyFatPct: plausible(parsed.bodyFatPct, 3, 70, 1),
     age: plausible(parsed.age, 13, 100),
     note: typeof parsed.note === "string" ? parsed.note : null,
   };
 
-  await record(userId, "meal_analysis", {
+  await record(userId, "body_scan", {
     inScope: true,
     question: "[body scan]",
     answer: JSON.stringify(result),
