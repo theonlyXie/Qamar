@@ -46,10 +46,14 @@ create index if not exists kb_chunks_document_idx on public.kb_chunks (document_
 -- only by the service role during ingestion.
 alter table public.kb_documents enable row level security;
 alter table public.kb_chunks enable row level security;
+-- Postgres has no `create policy if not exists`, so each one is dropped first
+-- to keep this file re-runnable.
+drop policy if exists kb_documents_read on public.kb_documents;
 create policy kb_documents_read on public.kb_documents for select to authenticated using (true);
+drop policy if exists kb_chunks_read on public.kb_chunks;
 create policy kb_chunks_read on public.kb_chunks for select to authenticated using (true);
 
-/// Vector search used by the gateway.
+-- Vector search used by the gateway.
 create or replace function public.match_kb_chunks(
   query_embedding vector(1024),
   match_domain text default null,
@@ -110,8 +114,11 @@ create table if not exists public.meal_plans (
 create index if not exists meal_plans_user_idx on public.meal_plans (user_id, plan_date desc);
 
 alter table public.meal_plans enable row level security;
+drop policy if exists meal_plans_select_own on public.meal_plans;
 create policy meal_plans_select_own on public.meal_plans for select using (auth.uid() = user_id);
+drop policy if exists meal_plans_insert_own on public.meal_plans;
 create policy meal_plans_insert_own on public.meal_plans for insert with check (auth.uid() = user_id);
+drop policy if exists meal_plans_update_own on public.meal_plans;
 create policy meal_plans_update_own on public.meal_plans for update using (auth.uid() = user_id);
 
 -- ---------------------------------------------------------------------
@@ -135,4 +142,5 @@ create table if not exists public.ai_interactions (
 create index if not exists ai_interactions_user_idx on public.ai_interactions (user_id, created_at desc);
 
 alter table public.ai_interactions enable row level security;
+drop policy if exists ai_interactions_select_own on public.ai_interactions;
 create policy ai_interactions_select_own on public.ai_interactions for select using (auth.uid() = user_id);

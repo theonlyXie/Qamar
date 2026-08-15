@@ -165,3 +165,33 @@ What the answers mean:
 - **`404`** — not deployed.
 
 Then rebuild the APK with `AI_GATEWAY_URL` set, per the README.
+
+## 7. Sign-in: what is actually switched on
+
+Anonymous sign-in works today, and it is the only path that does. Everything
+below is a dashboard job. Check the live answer at any time with:
+
+```sh
+curl -s https://stqirjlqzchcoeegumoq.supabase.co/auth/v1/settings \
+  -H 'apikey: <publishable key>'
+```
+
+**Email needs an SMTP provider.** `email` is enabled, but the project is still
+on Supabase's built-in sender, which only delivers to project team members and
+allows a couple of messages an hour. A real signup gets
+`429 over_email_send_rate_limit`, or a confirmation mail that never arrives.
+Set a custom SMTP provider under **Authentication → Emails → SMTP Settings**
+before treating email signup as working.
+
+`mailer_autoconfirm` is off, so a new account cannot sign in until it has
+confirmed. That is the right setting for production, but it means SMTP is a
+hard dependency and not a nicety.
+
+**Google, Apple and Facebook are all `false`.** The app ships the buttons and
+`SOCIAL_SIGNIN.md` has the per-provider steps, but until the credentials are
+pasted in, every one of them reports "not switched on yet on the server".
+
+**A note on the address validator.** Supabase rejects addresses whose domain
+has no MX record — `example.com` and unrouted vanity domains come back as
+`email_address_invalid`. That is the validator, not the signup flow, so do not
+use such an address to test whether signup works.
