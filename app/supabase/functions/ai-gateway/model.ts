@@ -11,9 +11,27 @@ import type { FoodFacts, Passage } from "./retrieval.ts";
 const ANTHROPIC_VERSION = "2023-06-01";
 const DEFAULT_MODEL = "claude-sonnet-5";
 
+/**
+ * What the call consumed.
+ *
+ * The three token counts are additive — Anthropic reports cache reads
+ * separately from input_tokens rather than inside them — so summing them is
+ * correct and does not double-count. Null when the response carried no usage
+ * block, which is a "we do not know" and must not be recorded as zero.
+ */
+export interface Usage {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  cacheWriteTokens: number;
+}
+
 export interface ModelResult {
   text: string;
   model: string;
+  usage: Usage | null;
+  /** Wall clock around the HTTP call, which is what a user waits for. */
+  latencyMs: number;
 }
 
 /** A photo to reason about, as the model expects it. */
@@ -54,6 +72,7 @@ export async function callModel({ system, user, maxTokens = 1024, prefill, image
   // stop a model wrapping JSON in prose.
   if (prefill) messages.push({ role: "assistant", content: prefill });
 
+  const started = performance.now();
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -68,8 +87,28 @@ export async function callModel({ system, user, maxTokens = 1024, prefill, image
     throw new Error(`model call failed: ${res.status} ${await res.text()}`);
   }
   const json = await res.json();
+  const latencyMs = Math.round(performance.now() - started);
   const text = (json.content ?? []).map((b: { text?: string }) => b.text ?? "").join("");
-  return { text: prefill ? prefill + text : text, model };
+  return { text: prefill ? prefill + text : text, model, usage: readUsage(json), latencyMs };
+}
+
+/** The usage block, tolerating its absence rather than assuming zeros. */
+function readUsage(json: {
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_read_input_tokens?: number;
+    cache_creation_input_tokens?: number;
+  };
+}): Usage | null {
+  const u = json.usage;
+  if (!u || typeof u.input_tokens !== "number") return null;
+  return {
+    inputTokens: u.input_tokens,
+    outputTokens: u.output_tokens ?? 0,
+    cachedInputTokens: u.cache_read_input_tokens ?? 0,
+    cacheWriteTokens: u.cache_creation_input_tokens ?? 0,
+  };
 }
 
 // ---- prompts ------------------------------------------------------------

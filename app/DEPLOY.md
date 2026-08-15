@@ -22,7 +22,7 @@ scratch is the only fix.
 
 ## 1. Apply the migrations
 
-`0001`–`0006` are all live on `stqirjlqzchcoeegumoq` as of 2026-08-15. This
+`0001`–`0023` are all live on `stqirjlqzchcoeegumoq` as of 2026-08-15. This
 section is kept for rebuilding the project from scratch, and for the next
 migration.
 
@@ -97,6 +97,21 @@ That first deploy went up through the Supabase MCP connector, which uploads
 file contents rather than a directory, so run the command above once from a
 checkout when convenient. It republishes straight from `supabase/functions/`
 and makes the deployed bundle provably identical to the repository.
+
+**The running version is that first deploy, and it is now well behind the
+repository.** The food resolver, the safety recording, the self-harm and
+severe-symptom guards, and the evidence packets are all in `supabase/functions/`
+and none of them are live until the command above is run. The function is five
+files bigger than the deployed one (`graph.ts`, `safety.ts`, `packet.ts` and
+their tests), which is the other reason to deploy from a checkout rather than
+file by file.
+
+Before deploying, from `supabase/functions/ai-gateway/`:
+
+```sh
+deno check index.ts     # types
+deno test               # scope guard and packet extraction, 25 tests
+```
 
 Verify it is up. A 401 is the correct answer to an unauthenticated call — it
 means the function is running and rejecting you, which is what you want. A 404
@@ -200,23 +215,71 @@ select * from public.safety_daily;          -- tier mix per day, with a denomina
 select * from public.clinician_queue;       -- what is waiting on a human
 ```
 
-**Three of the eight rules have no detection wired and will sit at
-`times_fired = 0` forever.** They are defined so the escalation route and tier
-are agreed, not because anything triggers them yet:
+All nine rules now have detection behind them. Five are keyword sets in
+`scope.ts` — `self_harm`, `severe_symptom`, `medical_question`,
+`eating_disorder`, `minor`, `pregnancy_declared` and `prompt_injection` — and
+two are database triggers, so they fire on a weight or a lab arriving from any
+path, not only from the app:
 
-- `severe_symptom` — needs a symptom keyword set in `scope.ts`.
-- `rapid_weight_change` — needs the weight-trend engine.
-- `critical_lab` — needs `user_labs` to actually be populated.
+- `rapid_weight_change` — trigger on `weight_entries`: 5% of body weight inside
+  30 days, needing at least three measurements over at least 14 days, debounced
+  to one review a week.
+- `critical_lab` — trigger on `user_labs`, on `critical_low` / `critical_high`.
 
-The other five are live: `medical_question`, `eating_disorder`, `minor`,
-`pregnancy_declared` and `prompt_injection`. `eating_disorder` is the one that
-escalates rather than merely refusing, so it queues a clinician review — check
-`clinician_queue` has an owner before relying on that.
+Four rules escalate rather than merely refusing, so they queue a clinician
+review: `self_harm` and `severe_symptom` as urgent, `eating_disorder` and
+`rapid_weight_change` as routine. **Check `clinician_queue` has an owner before
+relying on any of that** — an urgent row ageing in that queue is the exact
+failure the escalation design exists to prevent.
 
 A rule at zero is either never triggered or quietly broken, and from inside the
 application those look identical. `safety_rule_activity` is where the
 difference becomes visible, so it is worth reading after the first week of real
 traffic rather than assuming silence means safety.
+
+These views are staff surfaces. `0023` revoked them from `anon` and
+`authenticated`, so they are reachable with the service role or from the SQL
+editor, and not through the app's API.
+
+## 6c. The evidence trail and what it costs
+
+Every request now writes an `evidence_packets` row — the facts about the person
+that were in play, what the food resolver made of each phrase and how sure it
+was, the target, which curated rules applied and which were excluded and why,
+and the claims the answer made in a form something could later check.
+
+```sql
+-- The last few answers, and what each of them stood on
+select created_at, kind, jsonb_array_length(food_facts) as foods,
+       jsonb_array_length(claims_to_verify) as claims, uncertainty
+from public.evidence_packets order by created_at desc limit 20;
+
+select * from public.ai_cost_daily;           -- spend and latency per stage
+select * from public.stage_budget_pressure;   -- stages running over their 0015 ceiling
+```
+
+`cost_usd` is computed on insert by a trigger from `model_prices`, not by the
+gateway. **If a price changes, update `model_prices` — do not redeploy the
+function.** A model with no row there records its tokens and leaves `cost_usd`
+null, which reads as "unpriced", not "free":
+
+```sql
+insert into public.model_prices
+  (model, effective_from, input_usd_per_mtok, output_usd_per_mtok, cached_input_usd_per_mtok, note)
+values ('some-new-model', current_date, 3.0, 15.0, 0.3, 'list')
+on conflict (model, effective_from) do nothing;
+```
+
+The seeded prices are published list rates entered by hand and are a budgeting
+estimate, not an invoice. Reconcile against the provider's own billing before
+anyone makes a decision on them.
+
+Two things are worth knowing about what is *not* there yet. `applicable_rules`
+is empty on every packet because `clinical_rules` is empty — no rule has been
+curated, which is different from the population filter rejecting them all.
+And `verifier_results` is empty because nothing checks `claims_to_verify` yet;
+the claims are recorded in a checkable shape so that a verifier can be added
+without re-running history.
 
 ## 7. Sign-in: what is actually switched on
 

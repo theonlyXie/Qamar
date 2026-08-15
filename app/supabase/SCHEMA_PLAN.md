@@ -374,9 +374,9 @@ answers gets recorded once you have it.
 
 ---
 
-## 4b. Status — all sixteen applied, 2026-08-15
+## 4b. Status — `0007`–`0023` applied, 2026-08-15
 
-`0007`–`0016` are live. 51 tables, RLS on every one of them.
+52 tables, RLS on every one of them.
 
 | Migration | Landed |
 |---|---|
@@ -388,6 +388,23 @@ answers gets recorded once you have it.
 | `0014` risk and modules | `clinical_modules` (12 seeded, 1 live), `user_active_modules`, `risk_assessments`, `red_flag_rules` (8), `safety_events` |
 | `0015` evidence and cost | `evidence_packets`, `verifier_results`, `ai_stage_costs`, `stage_budgets` (8) |
 | `0016` adaptation and oversight | `personal_energy_estimates`, `clinician_reviews`, `eval_cases`, `eval_runs`, `eval_results` |
+| `0017` Egyptian food seed | 131 foods, 481 aliases, 69 portions (all `estimated`), 6 recipes, 36 ingredients. No nutrient values yet |
+| `0018` resolver | `qamar_resolve_food`, `qamar_resolve_portion`, `qamar_nutrients_per_100g`, `food_graph_coverage` |
+| `0019` safety views | `safety_rule_activity`, `safety_daily`, `clinician_queue` |
+| `0020` red flag detection | `qamar_weight_trend`, triggers on `weight_entries` and `user_labs` |
+| `0021` self-harm rule | ninth `red_flag_rules` row; detection text filled in on three others |
+| `0022` cost and rule selection | `model_prices` (9 rows), `qamar_token_cost`, pricing trigger on `ai_stage_costs`, `ai_cost_daily`, `stage_budget_pressure`, `qamar_rule_selection` |
+| `0023` hardening | `security_invoker` on the four earlier views, staff views revoked from `anon`/`authenticated`, `search_path` pinned on the `0018` resolver functions |
+
+The gateway now writes an `evidence_packets` row and a set of `ai_stage_costs`
+rows for every request, including the ones that fail to parse — a call that
+produced nothing usable still cost what it cost, and a run of them is how you
+find out the prompt has drifted. `cost_usd` is filled by the `0022` trigger from
+`model_prices`, so a price correction is one `UPDATE` and does not need the
+edge function redeployed.
+
+`verifier_results` remains empty: `claims_to_verify` is now recorded in a
+checkable form on every packet, but nothing checks it yet.
 
 Four constraints were tested by trying to violate them: an unapproved module
 would not activate, the one live module did, a 600 kcal energy step was refused
@@ -398,14 +415,23 @@ from the NASEM report, because a value without a citable edition does not
 belong in a table that promises traceability. `eval_cases` waits on the first
 frozen set.
 
-**Nine tables have RLS on with no policy, which is intentional**: `source_registry`,
+**Ten tables have RLS on with no policy, which is intentional**: `source_registry`,
 `red_flag_rules`, `verifier_results`, `ai_stage_costs`, `stage_budgets`,
-`clinician_reviews`, `eval_cases`, `eval_runs`, `eval_results`. These are staff
+`model_prices`, `clinician_reviews`, `eval_cases`, `eval_runs`, `eval_results`. These are staff
 and operational surfaces — a user must not read a clinician's notes about them
 through the public API, and eval expectations are not user data. The service
 role bypasses RLS, so the gateway reads them normally. Anything here that later
 needs a human-facing view wants a separate authenticated staff role, not a
 policy loosened on these tables.
+
+The same applies to the five staff views — `safety_rule_activity`, `safety_daily`,
+`clinician_queue`, `ai_cost_daily`, `stage_budget_pressure`. `0023` revoked
+`select` on all of them from `anon` and `authenticated` and switched every view
+in the schema to `security_invoker`. Before that, a view in `public` ran with
+its owner's rights and was reachable through PostgREST by anyone with an
+account, which meant `clinician_queue` — other people's escalations, and the
+questions asked about them — was readable by any signed-in user. `service_role`
+still reads all of them, which is how the founder console should reach them.
 
 ## 5. Order of work
 
