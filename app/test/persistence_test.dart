@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/models/meal.dart';
+import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/auth_service.dart';
@@ -119,6 +120,17 @@ class FakeGateway implements AiGateway {
   Future<BodyScan> readBodyScan({required String imagePath, required String lang}) async {
     imagePaths.add(imagePath);
     return scan;
+  }
+
+  int planCalls = 0;
+  Object? planFailsWith;
+  DayPlan plan = const DayPlan(date: '2026-08-15', slots: []);
+
+  @override
+  Future<DayPlan> generatePlan({required String date, required String lang}) async {
+    planCalls++;
+    if (planFailsWith != null) throw planFailsWith!;
+    return plan;
   }
 }
 
@@ -403,6 +415,63 @@ void main() {
 
       expect(state.authError, isNotNull);
       expect(state.hasAccount, isFalse);
+    });
+  });
+
+  group('plan', () {
+    const meal = (
+      id: 'lunch', slotAr: 'غدا', slotEn: 'Lunch',
+      nameAr: 'كشري', nameEn: 'Koshary', noteAr: '', noteEn: '',
+      portions: <PlanPortion>[(ar: 'كشري', en: 'Koshary', amountAr: 'طبق', amountEn: '1 bowl', kcal: 520)],
+    );
+
+    test('a generated plan replaces nothing until it arrives', () async {
+      final ai = FakeGateway()..plan = const DayPlan(date: '2026-08-15', slots: [(meal, meal)]);
+      final state = backed(ai: ai);
+      await settle();
+
+      expect(state.hasPlan, isFalse, reason: 'no plan exists before one is asked for');
+
+      await state.ensurePlan();
+      expect(ai.planCalls, 1);
+      expect(state.planMeals().single.nameEn, 'Koshary');
+    });
+
+    test('the plan is fetched once a day, not on every visit', () async {
+      final ai = FakeGateway()..plan = const DayPlan(date: '2026-08-15', slots: [(meal, meal)]);
+      final state = backed(ai: ai);
+      await settle();
+
+      await state.ensurePlan();
+      await state.ensurePlan();
+      await state.ensurePlan();
+      expect(ai.planCalls, 1, reason: 'every Plan screen visit must not spend a model call');
+
+      await state.ensurePlan(force: true);
+      expect(ai.planCalls, 2, reason: 'an explicit rebuild must still work');
+    });
+
+    test('a refusal is explained, and no plan is invented to fill the gap', () async {
+      final ai = FakeGateway()..planFailsWith = AiGatewayException('generatePlan failed: 409 no target yet');
+      final state = backed(ai: ai);
+      await settle();
+      state.setLang(AppLang.en);
+
+      await state.ensurePlan();
+
+      expect(state.hasPlan, isFalse);
+      expect(state.planMeals(), isEmpty);
+      expect(state.planError, contains('target'));
+    });
+
+    test('with no assistant the plan says so rather than showing a stock menu', () async {
+      final state = backed();
+      await settle();
+
+      await state.ensurePlan();
+
+      expect(state.hasPlan, isFalse);
+      expect(state.planError, isNotNull);
     });
   });
 

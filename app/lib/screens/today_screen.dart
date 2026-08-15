@@ -21,8 +21,9 @@ class TodayScreen extends StatelessWidget {
     final con = state.consumed();
     final remaining = (tg.kcal - con.kcal).clamp(0, 1 << 30);
     final nameOr = state.profile.name.isNotEmpty ? state.profile.name : (state.isAr ? 'يا صاحبي' : 'friend');
-    final (nextBase, nextAlt) = kPlanSlots[kNextMealSlot];
-    final nextMeal = state.isSlotSwapped(nextBase.id) ? nextAlt : nextBase;
+    // Null until a plan has been generated for this person. The card is then
+    // hidden entirely rather than showing a meal nobody chose for them.
+    final nextMeal = state.nextMeal();
 
     double pct(int a, int b) => b == 0 ? 0 : (a / b).clamp(0, 1).toDouble();
 
@@ -134,34 +135,38 @@ class TodayScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        Explainable(
-          id: 'next_meal',
-          explanation: mealExplanation(nextMeal),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.green.withOpacity(0.4), radius: QRadii.xl),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(t.nextMeal, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.green, letterSpacing: 0.4)),
-                Text(state.isAr ? nextMeal.nameAr : nextMeal.nameEn,
-                    style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.textPrimary)),
-                Text(
-                  state.isAr
-                      ? 'حوالي ${state.iso('${mealKcal(nextMeal)}')} سعر · متاح بديل'
-                      : 'About ${mealKcal(nextMeal)} kcal · swap available',
-                  style: QText.body(size: 13, color: QColors.textMuted),
-                ),
-                const SizedBox(height: 8),
-                Row(children: [
-                  QOutlineButton(label: t.swap, onTap: () => state.toggleSlotSwap(nextMeal.id), height: 34, color: QColors.textMid),
-                  const SizedBox(width: 8),
-                  QOutlineButton(label: t.openPlan, onTap: () => state.go(AppScreen.plan), height: 34, color: QColors.textMid),
-                ]),
-              ],
+        if (nextMeal != null)
+          Explainable(
+            id: 'next_meal',
+            explanation: mealExplanation(nextMeal),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: QDecor.card(color: QColors.cardDeep, border: QColors.green.withOpacity(0.4), radius: QRadii.xl),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(t.nextMeal, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.green, letterSpacing: 0.4)),
+                  Text(state.isAr ? nextMeal.nameAr : nextMeal.nameEn,
+                      style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.textPrimary)),
+                  Text(
+                    state.isAr
+                        ? 'حوالي ${state.iso('${mealKcal(nextMeal)}')} سعر'
+                        : 'About ${mealKcal(nextMeal)} kcal',
+                    style: QText.body(size: 13, color: QColors.textMuted),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    // Only offered when the slot really has somewhere else to go.
+                    if (state.slotHasAlternative(nextMeal.id)) ...[
+                      QOutlineButton(label: t.swap, onTap: () => state.toggleSlotSwap(nextMeal.id), height: 34, color: QColors.textMid),
+                      const SizedBox(width: 8),
+                    ],
+                    QOutlineButton(label: t.openPlan, onTap: () => state.go(AppScreen.plan), height: 34, color: QColors.textMid),
+                  ]),
+                ],
+              ),
             ),
           ),
-        ),
         const SizedBox(height: 14),
         Explainable(
           id: 'quest',

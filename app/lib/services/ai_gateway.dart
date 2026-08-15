@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 
 import '../models/meal.dart';
+import '../models/plan.dart';
 
 /// A meal analysis result — candidate items with confidence, before the
 /// user confirms (MealDraft in spec_mvp.txt Part 28). Never auto-written.
@@ -32,6 +34,15 @@ class BodyScan {
   bool get isEmpty => heightCm == null && weightKg == null && bodyFatPct == null && age == null;
 }
 
+/// A generated day of eating, plus why it was built that way.
+class DayPlan {
+  /// Each slot's meal and the alternative offered for it, in slot order.
+  final List<(PlanMeal, PlanMeal)> slots;
+  final String? rationale;
+  final String date;
+  const DayPlan({required this.slots, required this.date, this.rationale});
+}
+
 /// Server-gateway boundary for anything model-backed: meal photo/voice/text
 /// analysis, and the Ask-Qamar chat reply. Per spec_mvp.txt §29.1 the app
 /// never holds a model API key — every call here is a plain HTTPS request to
@@ -56,6 +67,10 @@ abstract class AiGateway {
 
   /// Reads an InBody or similar body-composition printout.
   Future<BodyScan> readBodyScan({required String imagePath, required String lang});
+
+  /// Builds the day's meals around the person's target and exclusions.
+  /// [date] is ISO yyyy-MM-dd; the gateway stores the result against it.
+  Future<DayPlan> generatePlan({required String date, required String lang});
 }
 
 /// Talks to your own server gateway (supabase/functions/ai-gateway). The
@@ -170,6 +185,75 @@ class HttpAiGateway implements AiGateway {
   }
 
   static int? _nullableInt(Object? v) => v is num ? v.round() : null;
+
+  @override
+  Future<DayPlan> generatePlan({required String date, required String lang}) async {
+    final res = await _client.post(
+      Uri.parse('$baseUrl/plan/generate'),
+      headers: _headers,
+      body: jsonEncode({'date': date, 'lang': lang}),
+    );
+    if (res.statusCode != 200) {
+      throw AiGatewayException('generatePlan failed: ${res.statusCode} ${res.body}');
+    }
+    return planFromBody(utf8.decode(res.bodyBytes), lang, date);
+  }
+
+  /// Parses a `plan/generate` response. Separate from the request so the
+  /// shape the gateway promises can be tested without a network.
+  @visibleForTesting
+  DayPlan planFromBody(String body, String lang, String fallbackDate) {
+    final json = jsonDecode(body) as Map<String, dynamic>;
+    final plan = json['plan'] as Map<String, dynamic>;
+    final meals = (plan['meals'] as List).cast<Map<String, dynamic>>();
+
+    return DayPlan(
+      date: json['date'] as String? ?? fallbackDate,
+      rationale: (lang == 'ar' ? plan['rationale_ar'] : plan['rationale_en']) as String?,
+      slots: [
+        for (final m in meals)
+          (
+            _mealFromJson(m, m),
+            // A meal without an alternative falls back to itself. The UI then
+            // hides that slot's swap button rather than offering a swap to
+            // the same dish.
+            _mealFromJson((m['alt'] as Map<String, dynamic>?) ?? m, m),
+          ),
+      ],
+    );
+  }
+
+  static const _slotLabels = {
+    'breakfast': ('فطار', 'Breakfast'),
+    'lunch': ('غدا', 'Lunch'),
+    'dinner': ('عشا', 'Dinner'),
+    'snack': ('سناك', 'Snack'),
+  };
+
+  /// [source] carries the slot, which an `alt` object does not repeat.
+  static PlanMeal _mealFromJson(Map<String, dynamic> m, Map<String, dynamic> source) {
+    final slot = (source['slot'] as String? ?? 'meal').toLowerCase();
+    final labels = _slotLabels[slot] ?? (slot, slot);
+    return (
+      id: slot,
+      slotAr: labels.$1,
+      slotEn: labels.$2,
+      nameAr: (m['name_ar'] ?? m['name_en'] ?? '') as String,
+      nameEn: (m['name_en'] ?? m['name_ar'] ?? '') as String,
+      noteAr: (m['note_ar'] ?? '') as String,
+      noteEn: (m['note_en'] ?? '') as String,
+      portions: [
+        for (final p in ((m['portions'] as List?) ?? const []).cast<Map<String, dynamic>>())
+          (
+            ar: (p['ar'] ?? p['en'] ?? '') as String,
+            en: (p['en'] ?? p['ar'] ?? '') as String,
+            amountAr: (p['amount_ar'] ?? '') as String,
+            amountEn: (p['amount_en'] ?? '') as String,
+            kcal: _int(p['kcal']),
+          ),
+      ],
+    );
+  }
 
   /// Tolerant on purpose: a missing macro is a zero, not a crash mid-meal.
   ConfirmItemDef _itemFromJson(Map<String, dynamic> j) => ConfirmItemDef(

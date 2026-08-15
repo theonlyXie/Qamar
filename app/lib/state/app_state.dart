@@ -7,6 +7,7 @@ import '../l10n/strings.dart';
 import '../models/meal.dart';
 import '../models/messages.dart';
 import '../models/onboarding.dart';
+import '../models/plan.dart';
 import '../services/ai_gateway.dart';
 import '../services/auth_service.dart';
 import '../services/dictation.dart';
@@ -1465,12 +1466,123 @@ class AppState extends ChangeNotifier {
   }
 
   // ---- plan -------------------------------------------------
+  //
+  // The day's meals are generated for this person, from their target and
+  // their exclusions. There is no default plan to fall back on: a fixed menu
+  // shown to everyone is not a plan, it is a picture of one, and someone who
+  // cannot eat what is on it has no way to tell that it was never about them.
+
+  /// The generated day, or null before one exists.
+  DayPlan? plan;
+
+  /// The date [plan] was built for, so a day rolling over is noticed.
+  String? planDate;
+
+  bool planLoading = false;
+  String? planError;
+
+  bool get hasPlan => plan != null && plan!.slots.isNotEmpty;
+
+  /// Each slot's meal, with the user's swaps applied.
+  List<PlanMeal> planMeals() => [
+        for (final (base, alt) in plan?.slots ?? const <(PlanMeal, PlanMeal)>[])
+          isSlotSwapped(base.id) ? alt : base,
+      ];
+
+  /// True when the slot actually has somewhere else to go. A meal whose
+  /// alternative came back identical gets no swap button rather than a button
+  /// that appears to do nothing.
+  bool slotHasAlternative(String slotId) {
+    for (final (base, alt) in plan?.slots ?? const <(PlanMeal, PlanMeal)>[]) {
+      if (base.id == slotId) return base.nameEn != alt.nameEn || base.nameAr != alt.nameAr;
+    }
+    return false;
+  }
+
+  /// The meal to put in front of the user right now, or null with no plan.
+  ///
+  /// Chosen by the clock rather than by a fixed index: the Today screen used
+  /// to show lunch at every hour of the day, including at ten at night.
+  PlanMeal? nextMeal() {
+    final meals = planMeals();
+    if (meals.isEmpty) return null;
+
+    final hour = DateTime.now().hour;
+    final wanted = hour < 11
+        ? 'breakfast'
+        : hour < 17
+            ? 'lunch'
+            : 'dinner';
+    for (final m in meals) {
+      if (m.id == wanted) return m;
+    }
+    return meals.first;
+  }
 
   bool isSlotSwapped(String slotId) => swappedSlots.contains(slotId);
 
   void toggleSlotSwap(String slotId) {
     if (!swappedSlots.remove(slotId)) swappedSlots.add(slotId);
     _notify();
+  }
+
+  static String _today() => DateTime.now().toIso8601String().substring(0, 10);
+
+  /// Builds today's plan. Safe to call on every visit to the Plan screen:
+  /// it returns immediately if today's plan is already in hand.
+  Future<void> ensurePlan({bool force = false}) async {
+    final today = _today();
+    if (!force && planDate == today && hasPlan) return;
+    if (planLoading) return;
+
+    final gateway = _ai;
+    if (gateway == null) {
+      planError = isAr
+          ? 'الخطة بتتكتب لك إنت بالذات، وده محتاج اتصال بالمساعد.'
+          : 'The plan is written for you specifically, which needs a connection to the assistant.';
+      _notify();
+      return;
+    }
+
+    planLoading = true;
+    planError = null;
+    _notify();
+    try {
+      final built = await gateway.generatePlan(date: today, lang: lang.code);
+      if (_disposed) return;
+      plan = built;
+      planDate = built.date;
+      // A new day's meals are not the old day's meals; carrying the swaps
+      // over would apply yesterday's choices to dishes that are not there.
+      swappedSlots.clear();
+    } catch (e) {
+      if (_disposed) return;
+      planError = _planMessage(e);
+    }
+    planLoading = false;
+    _notify();
+  }
+
+  /// The gateway refuses to guess, and its refusals are actionable — say what
+  /// they mean rather than showing a raw HTTP status.
+  String _planMessage(Object e) {
+    final raw = '$e';
+    if (raw.contains('409') || raw.contains('no target')) {
+      return isAr
+          ? 'محتاج أعرف هدفك الأول. كمّل الأسئلة وهعملك الخطة.'
+          : 'I need your target first. Finish the questions and I will build the plan.';
+    }
+    if (raw.contains('503') || raw.contains('no grounded guidance')) {
+      return isAr
+          ? 'مفيش مصادر موثوقة متسجلة لسه، ومش هألّف خطة من دماغي.'
+          : 'There is no trusted guidance loaded yet, and I will not invent a plan.';
+    }
+    if (raw.contains('403') || raw.contains('not eligible')) {
+      return isAr ? 'الحساب ده مش مؤهل للخطط.' : 'This account is not eligible for plans.';
+    }
+    return isAr
+        ? 'مقدرتش أعمل الخطة دلوقتي. جرّب تاني بعد شوية.'
+        : 'I could not build the plan just now. Try again in a moment.';
   }
 
   // ---- ask qamar (companion overlay) -------------------------------------------------

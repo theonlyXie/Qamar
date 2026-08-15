@@ -170,6 +170,11 @@ Write one day of eating: breakfast, lunch and dinner. Requirements:
   the kcal for that portion, computed from the FOOD DATA per-100g figures.
 - Ordinary Egyptian home cooking. Nothing the person excluded.
 - Every name and note in both Egyptian Arabic and English.
+- Every meal also carries one "alt": a genuinely different swap for that slot
+  within 10% of the same kcal — a different main ingredient, not the same dish
+  with a portion changed. This is what the user taps when they do not have the
+  ingredients or do not fancy it, so "foul with less bread" is a useless
+  alternative to "foul"; "eggs and cheese" is a useful one.
 
 Return ONLY JSON of this exact shape, no prose:
 {
@@ -180,7 +185,14 @@ Return ONLY JSON of this exact shape, no prose:
       "note_ar": "", "note_en": "",
       "portions": [
         {"ar": "", "en": "", "amount_ar": "", "amount_en": "", "kcal": 0}
-      ]
+      ],
+      "alt": {
+        "name_ar": "", "name_en": "",
+        "note_ar": "", "note_en": "",
+        "portions": [
+          {"ar": "", "en": "", "amount_ar": "", "amount_en": "", "kcal": 0}
+        ]
+      }
     }
   ],
   "rationale_ar": "one sentence on why this suits them",

@@ -10,6 +10,7 @@ import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/state/chat_replies.dart';
@@ -18,6 +19,37 @@ import 'package:qamar/widgets/tree_overlay.dart';
 
 /// Long enough for answerStep's 260ms hand-off plus a margin.
 Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 500));
+
+/// A plan as the gateway actually returns it, parsed by the real client code.
+///
+/// Testing the constants that used to live in models/plan.dart proved only
+/// that they had been typed correctly. This exercises the path a real plan
+/// takes: JSON off the wire, through HttpAiGateway's parser, into the app.
+/// Dinner deliberately arrives with no "alt" — the gateway is allowed to omit
+/// one, and the app has to notice rather than offer a swap to nothing.
+const _planJson = '''
+{"date":"2026-08-15","plan":{
+  "rationale_ar":"مناسب لهدفك","rationale_en":"Fits your target",
+  "meals":[
+    {"slot":"breakfast","name_ar":"فول","name_en":"Foul","note_ar":"","note_en":"",
+     "portions":[{"ar":"فول","en":"Foul","amount_ar":"١٥٠ جم","amount_en":"150 g","kcal":180},
+                 {"ar":"عيش","en":"Bread","amount_ar":"رغيف","amount_en":"1 loaf","kcal":140}],
+     "alt":{"name_ar":"بيض وجبنة","name_en":"Eggs and cheese","note_ar":"","note_en":"",
+            "portions":[{"ar":"بيض","en":"Eggs","amount_ar":"٢","amount_en":"2","kcal":160},
+                        {"ar":"جبنة","en":"Cheese","amount_ar":"٣٠ جم","amount_en":"30 g","kcal":160}]}},
+    {"slot":"dinner","name_ar":"تونة","name_en":"Tuna","note_ar":"","note_en":"",
+     "portions":[{"ar":"تونة","en":"Tuna","amount_ar":"علبة","amount_en":"1 tin","kcal":130}]}
+  ]}}
+''';
+
+DayPlan parsedPlan() => PlanOnlyGateway().parse(_planJson);
+
+/// Reuses the shipping parser rather than reimplementing it in the test.
+class PlanOnlyGateway extends HttpAiGateway {
+  PlanOnlyGateway() : super(baseUrl: 'http://test', authTokenProvider: _noToken);
+  static String _noToken() => '';
+  DayPlan parse(String body) => planFromBody(body, 'en', '2026-08-15');
+}
 
 void main() {
   group('Mifflin-St Jeor', () {
@@ -181,16 +213,20 @@ void secondRound() {
       expect(state.isSlotSwapped('dinner'), isTrue);
     });
 
-    test('every slot has a distinct alternative under the same id', () {
-      for (final (base, alt) in kPlanSlots) {
+    test('a parsed plan keeps each alternative in its own slot', () {
+      final plan = parsedPlan();
+
+      expect(plan.slots.length, 2);
+      for (final (base, alt) in plan.slots) {
         expect(alt.id, base.id, reason: 'the alternative must fill the same slot');
-        expect(alt.nameEn, isNot(base.nameEn));
-        expect(mealKcal(alt), greaterThan(0));
+        expect(mealKcal(base), greaterThan(0));
       }
+      expect(plan.slots.first.$1.id, 'breakfast');
+      expect(plan.slots.first.$2.nameEn, isNot(plan.slots.first.$1.nameEn));
     });
 
     test('meal totals equal the sum of their portions', () {
-      for (final (base, alt) in kPlanSlots) {
+      for (final (base, alt) in parsedPlan().slots) {
         for (final m in [base, alt]) {
           var sum = 0;
           for (final p in m.portions) {
@@ -199,6 +235,22 @@ void secondRound() {
           expect(mealKcal(m), sum);
         }
       }
+    });
+
+    test('a meal with no alternative offered gets no swap button', () async {
+      final state = AppState(ai: PlanOnlyGateway(), userId: null);
+      // dinner comes back without an "alt", so it must not offer a swap.
+      state.plan = parsedPlan();
+      expect(state.slotHasAlternative('breakfast'), isTrue);
+      expect(state.slotHasAlternative('dinner'), isFalse,
+          reason: 'a slot whose alternative is itself must not pretend to swap');
+    });
+
+    test('with no plan there are no meals, and none are invented', () {
+      final state = AppState();
+      expect(state.hasPlan, isFalse);
+      expect(state.planMeals(), isEmpty);
+      expect(state.nextMeal(), isNull);
     });
   });
 
@@ -322,7 +374,7 @@ void secondRound() {
 
   group('explanations', () {
     test('a meal explanation names every portion and its amount', () {
-      final (lunch, _) = kPlanSlots[1];
+      final (lunch, _) = parsedPlan().slots.first;
       final ex = mealExplanation(lunch);
 
       for (final p in lunch.portions) {

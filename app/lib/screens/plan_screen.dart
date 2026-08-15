@@ -9,17 +9,36 @@ import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/explain.dart';
 
-class PlanScreen extends StatelessWidget {
+/// The day's meals, generated for this person.
+///
+/// The screen used to render a fixed three-meal menu that was identical for
+/// every user, target and allergy. It now shows the plan the assistant built
+/// from their own numbers, and when there isn't one it says so and offers to
+/// build it — an empty plan is recoverable, a plausible wrong one is not.
+class PlanScreen extends StatefulWidget {
   const PlanScreen({super.key});
+
+  @override
+  State<PlanScreen> createState() => _PlanScreenState();
+}
+
+class _PlanScreenState extends State<PlanScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // After the first frame: ensurePlan notifies listeners, and doing that
+    // during build would rebuild the tree mid-build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<AppState>().ensurePlan();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final t = state.t;
 
-    final meals = [
-      for (final (base, alternative) in kPlanSlots) state.isSlotSwapped(base.id) ? alternative : base,
-    ];
+    final meals = state.planMeals();
     final dayTotal = meals.fold(0, (sum, m) => sum + mealKcal(m));
 
     return ListView(
@@ -29,14 +48,22 @@ class PlanScreen extends StatelessWidget {
         const SizedBox(height: 4),
         Text(t.planSub, style: QText.body(size: 14, height: 22, color: QColors.textMuted)),
         const SizedBox(height: 10),
-        Explainable(id: 'plan_total', child: _DayTotal(state: state, kcal: dayTotal)),
-        const SizedBox(height: 14),
-        for (final m in meals)
-          Explainable(
-            id: 'plan_meal_${m.id}',
-            explanation: mealExplanation(m),
-            child: _MealCard(state: state, meal: m),
-          ),
+        if (!state.hasPlan) ...[
+          _PlanEmpty(state: state),
+        ] else ...[
+          Explainable(id: 'plan_total', child: _DayTotal(state: state, kcal: dayTotal)),
+          if (state.plan?.rationale case final why? when why.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(why, style: QText.body(size: 13, height: 20, color: QColors.textMuted)),
+          ],
+          const SizedBox(height: 14),
+          for (final m in meals)
+            Explainable(
+              id: 'plan_meal_${m.id}',
+              explanation: mealExplanation(m),
+              child: _MealCard(state: state, meal: m),
+            ),
+        ],
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -65,6 +92,49 @@ class PlanScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Shown when there is no plan: building, refused, or simply not built yet.
+class _PlanEmpty extends StatelessWidget {
+  final AppState state;
+  const _PlanEmpty({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final busy = state.planLoading;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
+        border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(QRadii.xl),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            busy
+                ? (isAr ? 'بكتب خطة اليوم…' : 'Writing today’s plan…')
+                : state.planError ??
+                    (isAr
+                        ? 'لسه مفيش خطة لليوم. هبنيها على هدفك واللي بتتجنبه.'
+                        : 'No plan for today yet. I’ll build it around your target and what you avoid.'),
+            style: QText.body(size: 14, height: 22, color: QColors.textHigh),
+          ),
+          const SizedBox(height: 14),
+          QPrimaryButton(
+            label: busy
+                ? (isAr ? 'ثانية…' : 'One moment…')
+                : (isAr ? 'اعملي خطة النهاردة' : 'Build today’s plan'),
+            onTap: busy ? null : () => state.ensurePlan(force: true),
+            height: 48,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -169,12 +239,17 @@ class _MealCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 10),
           // Only "swap" here: logging a meal is the orb's job now, not a
-          // button that pushes the user into another page.
-          Row(children: [
-            QOutlineButton(label: t.swap, onTap: () => state.toggleSlotSwap(meal.id), height: 34, color: QColors.textMid),
-          ]),
+          // button that pushes the user into another page. And only when the
+          // slot actually has an alternative — the gateway may return a meal
+          // without one, and a button that swaps a dish for itself is worse
+          // than no button.
+          if (state.slotHasAlternative(meal.id)) ...[
+            const SizedBox(height: 10),
+            Row(children: [
+              QOutlineButton(label: t.swap, onTap: () => state.toggleSlotSwap(meal.id), height: 34, color: QColors.textMid),
+            ]),
+          ],
         ],
       ),
     );
