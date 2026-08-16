@@ -21,7 +21,7 @@ jobs:
       run:
         working-directory: app/supabase/functions/ai-gateway
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: denoland/setup-deno@v2
         with:
