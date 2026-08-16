@@ -1,0 +1,66 @@
+# Publishes the gateway. A button, because there is no terminal on an iPad.
+#
+# Run it from the Actions tab: "Deploy Qamar" → "Run workflow".
+#
+# The tests run first and the deploy is skipped if any fail. That gate is the
+# reason this workflow exists rather than a bare deploy command: a broken build
+# reaching real users is the failure mode worth spending two minutes of CI on.
+
+name: Deploy Qamar
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: "Deploy even if the tests fail (emergency only)"
+        type: boolean
+        default: false
+
+env:
+  PROJECT_REF: stqirjlqzchcoeegumoq
+
+jobs:
+  deploy:
+    name: Test and deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Run the test suite
+        if: ${{ !inputs.skip_tests }}
+        working-directory: app/supabase/functions/ai-gateway
+        run: |
+          deno check index.ts
+          deno test
+
+      - name: Warn when the gate was skipped
+        if: ${{ inputs.skip_tests }}
+        run: echo "::warning::Tests were skipped for this deploy."
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy the ai-gateway function
+        working-directory: app
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy ai-gateway --project-ref "$PROJECT_REF"
+
+      - name: What to check next
+        run: |
+          echo "### Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The gateway is live. Two things to confirm:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Its secrets are set in the Supabase dashboard under" >> $GITHUB_STEP_SUMMARY
+          echo "   **Project Settings → Edge Functions → Secrets**." >> $GITHUB_STEP_SUMMARY
+          echo "   \`ANTHROPIC_API_KEY\` is read by the running function, not by" >> $GITHUB_STEP_SUMMARY
+          echo "   this workflow, so it is never a GitHub secret." >> $GITHUB_STEP_SUMMARY
+          echo "2. Run **Load Qamar's data** if you have not yet — without it the" >> $GITHUB_STEP_SUMMARY
+          echo "   assistant refuses every question as ungrounded, which is the" >> $GITHUB_STEP_SUMMARY
+          echo "   safety rule working rather than a fault." >> $GITHUB_STEP_SUMMARY
