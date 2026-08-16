@@ -374,9 +374,9 @@ answers gets recorded once you have it.
 
 ---
 
-## 4b. Status — `0007`–`0025` applied, 2026-08-15
+## 4b. Status — `0007`–`0029` applied, 2026-08-15
 
-53 tables, RLS on every one of them.
+54 tables, RLS on every one of them.
 
 | Migration | Landed |
 |---|---|
@@ -396,6 +396,7 @@ answers gets recorded once you have it.
 | `0022` cost and rule selection | `model_prices` (9 rows), `qamar_token_cost`, pricing trigger on `ai_stage_costs`, `ai_cost_daily`, `stage_budget_pressure`, `qamar_rule_selection` |
 | `0023` hardening | `security_invoker` on the four earlier views, staff views revoked from `anon`/`authenticated`, `search_path` pinned on the `0018` resolver functions |
 | `0024` verifier views | `verifier_activity`, `verifier_failures`, `verifier_revisions` |
+| `0026`–`0029` eval suite |52 frozen cases, `qamar_run_eval`, `eval_latest`/`eval_failures`/`eval_coverage`; resolver tie-break, contested-alias levelling, raw-ingredient aliases |
 | `0025` requirement engine | RMR coefficients seeded into `equation_versions`, `requirement_policy` (16 constants), `qamar_estimate_rmr`, `qamar_compute_targets`, `qamar_set_target`, `qamar_assert_self` |
 
 The gateway now writes an `evidence_packets` row and a set of `ai_stage_costs`
@@ -425,8 +426,8 @@ where 100 kcal passed, and the verifier revision cap held.
 
 Two seeded tables are deliberately empty. `dri_reference` waits on ingestion
 from the NASEM report, because a value without a citable edition does not
-belong in a table that promises traceability. `eval_cases` waits on the first
-frozen set.
+belong in a table that promises traceability. `eval_cases` is no longer empty: `0026` froze 52 cases and
+`0027`–`0029` are the first three fixes it forced.
 
 `0025` closed the half of that gap that could be closed honestly. The
 resting-metabolic-rate equations are four coefficients each and checkable digit

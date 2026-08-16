@@ -22,7 +22,7 @@ scratch is the only fix.
 
 ## 1. Apply the migrations
 
-`0001`–`0025` are all live on `stqirjlqzchcoeegumoq` as of 2026-08-15. This
+`0001`–`0029` are all live on `stqirjlqzchcoeegumoq` as of 2026-08-15. This
 section is kept for rebuilding the project from scratch, and for the next
 migration.
 
@@ -110,7 +110,7 @@ Before deploying, from `supabase/functions/ai-gateway/`:
 
 ```sh
 deno check index.ts     # types
-deno test               # scope guard, packet extraction, verifier — 46 tests
+deno test               # scope, packet, verifier, eval dispatcher — 66 tests
 ```
 
 Verify it is up. A 401 is the correct answer to an unauthenticated call — it
@@ -322,6 +322,46 @@ already been told once and a second round of the same model is not a control.
 That last check is the one that is not redundant with anything upstream. The
 route already removes restricted foods from the list the model is *shown*;
 nothing stops it naming one that was never on that list.
+
+## 6e. The eval suite
+
+52 frozen cases. Every tolerance in this system — the 0.35 fuzzy-match floor,
+the verifier's 20% Atwater band, the 5% plan target — was a number chosen with
+no way to tell whether it was right. This is what makes them measurable.
+
+Half runs in the database with **no API key at all**:
+
+```sql
+select public.qamar_run_eval('before the deploy');   -- returns a run id
+select * from public.eval_latest limit 5;            -- pass rate per run
+select * from public.eval_failures;                  -- what broke, with detail
+select * from public.eval_coverage;                  -- which families have cases
+```
+
+The other half is pure TypeScript — the scope guard and the verifier — and runs
+from a checkout, writing into the same tables so there is one pass rate:
+
+```sh
+cd supabase/functions/ai-gateway
+SUPABASE_URL=https://stqirjlqzchcoeegumoq.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=... \
+  deno run --allow-net --allow-env eval.ts "pre-release"
+```
+
+It exits non-zero on any failure, so it can gate a deploy. Nothing in it calls a
+model, so it costs nothing and gives the same answer every time.
+
+**The first run found a real bug, which is the argument for having it.** "ملوخية"
+resolved to the raw leaf rather than the cooked dish — someone logging a bowl
+would have been priced against a leafy green. Underneath it, the resolver's
+ordering was not a total order at all, so the same phrase could resolve
+differently between two runs. `0027`–`0029` are the three fixes that forced,
+and the suite went 32/33 → 36/36 across them.
+
+**Four families are deliberately empty**: `evidence_grounding`,
+`meal_optimization`, `longitudinal_adaptation` and `cost_tokens` need a deployed
+gateway and an ingested corpus. Seeding cases nothing can run would teach
+everyone to ignore the failures. `eval_coverage` shows the gap on purpose.
 
 ## 7. Sign-in: what is actually switched on
 
