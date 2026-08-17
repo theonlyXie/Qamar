@@ -12,6 +12,8 @@ class LivingOrb extends StatefulWidget {
   final bool wander;
   final bool sparks;
   final bool activeRings; // extra pulsing rings, used while "listening"
+  final bool gold;
+  final bool calm;
   final Duration breathDuration;
   final Duration haloDuration;
   final Duration wanderDuration;
@@ -23,6 +25,8 @@ class LivingOrb extends StatefulWidget {
     this.wander = false,
     this.sparks = false,
     this.activeRings = false,
+    this.gold = false,
+    this.calm = false,
     this.breathDuration = const Duration(milliseconds: 4600),
     this.haloDuration = const Duration(milliseconds: 5200),
     this.wanderDuration = const Duration(milliseconds: 11000),
@@ -82,7 +86,11 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
         final haloT = _halo.value;
         final haloScale = 1.0 + 0.22 * haloT;
         final haloOpacity = 0.32 + 0.40 * haloT;
-        final offset = widget.wander ? Offset(_wanderOffset.value.dx * s, _wanderOffset.value.dy * s) : Offset.zero;
+        final offset = (!widget.calm && widget.wander) ? Offset(_wanderOffset.value.dx * s, _wanderOffset.value.dy * s) : Offset.zero;
+        final haloColors = widget.gold
+            ? const [Color(0x8CD4AF37), Color(0x1FF2E4C6), Colors.transparent]
+            : const [Color(0x8C7B6CFF), Color(0x1F4F7CFF), Colors.transparent];
+        final glow = widget.gold ? QColors.gold : QColors.violet;
 
         return Transform.translate(
           offset: offset,
@@ -99,17 +107,17 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
                     child: Container(
                       width: s * 1.55,
                       height: s * 1.55,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
-                          colors: [Color(0x8C7B6CFF), Color(0x1F4F7CFF), Colors.transparent],
-                          stops: [0.0, 0.45, 0.7],
+                          colors: haloColors,
+                          stops: const [0.0, 0.45, 0.7],
                         ),
                       ),
                     ),
                   ),
                 ),
-                if (widget.sparks) ..._buildSparks(s),
+                if (widget.sparks && !widget.calm) ..._buildSparks(s),
                 if (widget.activeRings) ..._buildActiveRings(s),
                 Transform.scale(
                   scale: scale,
@@ -119,7 +127,7 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
-                        BoxShadow(color: QColors.violet.withOpacity(0.55), blurRadius: s * 0.5),
+                        BoxShadow(color: glow.withOpacity(0.55), blurRadius: s * 0.5),
                       ],
                     ),
                     child: QamarMoon(size: s),

@@ -88,7 +88,7 @@ for you to connect:
 
 | File | What it is | To activate |
 |---|---|---|
-| `supabase/migrations/0001_core_schema.sql` | Full Postgres schema (profiles, consents, targets, meal_drafts/logs, wallet + ledger, quests, weight entries) with RLS, scoped to the MVP subset of spec_mvp.txt Part 28 | `supabase db push` (or run in the SQL editor) against a real project |
+| `supabase/migrations/0001_core_schema.sql` … `0038_mvp_closeout.sql` | Schema through Su awards, Plus helper, quests, wipe, reports. Filenames are unique — do not restore the old duplicate `0031`–`0033` names. | `supabase db push` |
 | `supabase/migrations/0032_water_logs.sql` | Drinking-water log: one row per glass (250 ml) or bottle (500 ml) | same |
 | `supabase/migrations/0002_wallet_functions.sql` | Atomic, idempotent `qamar_wallet_credit` / `qamar_wallet_redeem` RPCs (ledger insert + balance update in one transaction) | same |
 | `lib/services/repositories.dart` | Abstract `ProfileRepository` / `MealRepository` / `WaterRepository` / `WalletRepository` | — |
@@ -114,11 +114,10 @@ Two rules the wiring keeps:
   `main.dart` falls back to a fully offline `AppState` if Supabase cannot be
   reached or sign-in fails.
 - **Su Points are never minted by the client.** `qamar_wallet_credit` is
-  EXECUTE-revoked from `anon` and `authenticated`, so the client cannot award
-  points even if it tried; `SupabaseWalletRepository.credit` throws to say so
-  in a legible place. Balances shown locally reconcile to the server's number
-  on the next hydrate. Awarding must move to an Edge Function using the
-  service role once earning actions are verified server-side.
+  EXECUTE-revoked from `anon` and `authenticated`. Meal logs, the first
+  target, and the daily quest credit through database triggers / RPCs using
+  `qamar_wallet_credit_internal`. The phone shows a local balance offline and
+  hydrates from `wallet_accounts` when backed.
 
 Run against the live project with:
 
@@ -131,16 +130,14 @@ flutter run \
 **Anonymous sign-in must be enabled first** (Authentication → Providers →
 Anonymous). Until it is, the app starts, logs the reason, and runs offline.
 
-## Explicitly out of scope here
+## What's still ops, not code
 
-`spec_mvp.txt` describes a full 30-day production build — App Store Server
-API / Google Play Billing reconciliation, RevenueCat or native store-server
-notifications, the Egyptian food RAG + pgvector knowledge base, USDA/Open
-Food Facts/FatSecret integrations, the founder ops console, the safety
-moderation classifier, and reminders/export/delete flows are all real
-engineering projects in their own right and are not attempted here. The
-data model migration is written so adding them later is additive, not a
-rewrite.
+These cannot be finished in the repository: Paymob merchant verification, API
+secrets (Anthropic, Voyage/OpenAI, USDA, Paymob), ingesting `supabase/knowledge/`
+and the food graph, social-login dashboard credentials, store signing and
+listings, vendored store-review of Arabic fonts, and deploying the latest
+`ai-gateway` + `billing` Edge Functions to the live project. `DEPLOY.md` is
+the checklist.
 
 ## Known simplifications vs. the prototype
 

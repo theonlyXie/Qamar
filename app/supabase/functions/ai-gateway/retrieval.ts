@@ -193,3 +193,121 @@ export async function lookupFood(query: string): Promise<FoodFacts | null> {
 // it resolves against the Qamar graph first and calls lookupFood() only for
 // what the graph cannot answer. Two entry points into food resolution would be
 // two places for the source-router rule to be forgotten, so there is one.
+
+const OFF_UA = "Qamar/0.6 (https://dr-qamar.com; contact: support@dr-qamar.com)";
+
+export interface BarcodeProduct {
+  code: string;
+  name: string;
+  nameAr: string | null;
+  servingGrams: number;
+  per100g: { kcal: number; protein: number; carbs: number; fat: number };
+  url: string | null;
+}
+
+/** Household serving, or 100 g when Open Food Facts has no serving weight. */
+export function servingGramsFromOff(product: {
+  serving_quantity?: unknown;
+  serving_size?: unknown;
+}): number {
+  const qty = Number(product.serving_quantity);
+  if (Number.isFinite(qty) && qty > 0 && qty <= 2000) return Math.round(qty);
+  const size = String(product.serving_size ?? "");
+  const fromSize = size.match(/(\d+(?:\.\d+)?)\s*g/i);
+  if (fromSize) {
+    const g = Number(fromSize[1]);
+    if (Number.isFinite(g) && g > 0 && g <= 2000) return Math.round(g);
+  }
+  return 100;
+}
+
+export function scalePer100g(
+  per100g: { kcal: number; protein: number; carbs: number; fat: number },
+  grams: number,
+): { kcal: number; protein: number; carbs: number; fat: number } {
+  const factor = grams / 100;
+  return {
+    kcal: Math.round(per100g.kcal * factor),
+    protein: Math.round(per100g.protein * factor),
+    carbs: Math.round(per100g.carbs * factor),
+    fat: Math.round(per100g.fat * factor),
+  };
+}
+
+export function barcodeProductFromOff(json: {
+  status?: number;
+  product?: {
+    code?: string;
+    product_name?: string;
+    product_name_en?: string;
+    product_name_ar?: string;
+    nutriments?: Record<string, unknown>;
+    serving_quantity?: unknown;
+    serving_size?: unknown;
+  };
+}): BarcodeProduct | null {
+  const p = json.product;
+  const n = p?.nutriments;
+  if (json.status === 0 || !p || !n || n["energy-kcal_100g"] == null) return null;
+  const kcal = Number(n["energy-kcal_100g"]);
+  if (!Number.isFinite(kcal) || kcal <= 0) return null;
+  const code = String(p.code ?? "").replace(/\D/g, "");
+  const name = (p.product_name_en || p.product_name || code).trim();
+  const nameAr = typeof p.product_name_ar === "string" && p.product_name_ar.trim()
+    ? p.product_name_ar.trim()
+    : null;
+  return {
+    code,
+    name,
+    nameAr,
+    servingGrams: servingGramsFromOff(p),
+    per100g: {
+      kcal: Math.round(kcal),
+      protein: Math.round(Number(n["proteins_100g"] ?? 0) || 0),
+      carbs: Math.round(Number(n["carbohydrates_100g"] ?? 0) || 0),
+      fat: Math.round(Number(n["fat_100g"] ?? 0) || 0),
+    },
+    url: code ? `https://world.openfoodfacts.org/product/${code}` : null,
+  };
+}
+
+export function itemsFromBarcode(product: BarcodeProduct, lang: "ar" | "en") {
+  const macros = scalePer100g(product.per100g, product.servingGrams);
+  const ar = product.nameAr ?? product.name;
+  const en = product.name;
+  const portionAr = `${product.servingGrams} جم`;
+  const portionEn = `${product.servingGrams} g`;
+  return [{
+    ar: lang === "ar" ? ar : product.nameAr ?? ar,
+    en,
+    portionAr,
+    portionEn,
+    confidence: "high" as const,
+    kcal: macros.kcal,
+    proteinG: macros.protein,
+    carbsG: macros.carbs,
+    fatG: macros.fat,
+    grams: product.servingGrams,
+    portion_matched: true,
+  }];
+}
+
+/**
+ * Packaged-goods barcode lookup. No model, no daily AI use. Returns null
+ * when Open Food Facts has no usable per-100 g energy for the code.
+ */
+export async function lookupBarcode(code: string): Promise<BarcodeProduct | null> {
+  const digits = code.replace(/\D/g, "");
+  if (digits.length < 8 || digits.length > 14) return null;
+  try {
+    const res = await fetch(
+      `https://world.openfoodfacts.org/api/v2/product/${digits}.json` +
+        `?fields=code,product_name,product_name_en,product_name_ar,nutriments,serving_quantity,serving_size`,
+      { headers: { "User-Agent": OFF_UA } },
+    );
+    if (!res.ok) return null;
+    return barcodeProductFromOff(await res.json());
+  } catch {
+    return null;
+  }
+}

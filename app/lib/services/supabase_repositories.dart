@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/account.dart';
 import '../models/meal.dart';
 import '../models/profile.dart';
 import '../models/water.dart';
@@ -79,6 +80,106 @@ class SupabaseProfileRepository implements ProfileRepository {
       },
     });
     return target;
+  }
+
+  @override
+  Future<AccountSettings> loadSettings(String userId) async {
+    final row = await _client
+        .from('profiles')
+        .select('calm_mode, orb_cosmetic, insight_unlocks, achievements')
+        .eq('user_id', userId)
+        .maybeSingle();
+    if (row == null) return const AccountSettings();
+    return AccountSettings(
+      calmMode: row['calm_mode'] == true,
+      orbCosmetic: (row['orb_cosmetic'] as String?) ?? 'default',
+      insightUnlocks: (row['insight_unlocks'] as num?)?.round() ?? 0,
+      achievements: (row['achievements'] as List?)?.cast<String>() ?? const [],
+    );
+  }
+
+  @override
+  Future<void> saveSettings(String userId, AccountSettings settings) async {
+    await _client.from('profiles').update({
+      'calm_mode': settings.calmMode,
+      'orb_cosmetic': settings.orbCosmetic,
+      'insight_unlocks': settings.insightUnlocks,
+      'achievements': settings.achievements,
+    }).eq('user_id', userId);
+  }
+
+  @override
+  Future<List<MemoryFact>> loadMemory(String userId) async {
+    final rows = await _client
+        .from('profile_facts')
+        .select('id, field, value_text, value_num, unit, domain, superseded_by')
+        .eq('user_id', userId)
+        .order('recorded_at', ascending: false)
+        .limit(40);
+    return (rows as List).where((r) => r['superseded_by'] == null).map((r) {
+      final numVal = r['value_num'];
+      final text = (r['value_text'] as String?)?.trim();
+      final unit = (r['unit'] as String?) ?? '';
+      final value = (text != null && text.isNotEmpty)
+          ? text
+          : numVal == null
+              ? ''
+              : '${numVal is num ? (numVal.truncateToDouble() == numVal ? numVal.round() : numVal) : numVal}${unit.isEmpty ? '' : ' $unit'}';
+      return MemoryFact(
+        id: r['id'] as String,
+        field: (r['field'] as String?) ?? (r['domain'] as String?) ?? 'fact',
+        value: value.toString(),
+        fromServer: true,
+      );
+    }).toList();
+  }
+
+  @override
+  Future<void> deleteMemoryFact(String userId, String id) async {
+    await _client.from('profile_facts').delete().eq('id', id).eq('user_id', userId);
+  }
+
+  @override
+  Future<MealReminders> loadReminders(String userId) async {
+    final row = await _client.from('user_reminders').select().eq('user_id', userId).maybeSingle();
+    if (row == null) return const MealReminders();
+    return MealReminders(
+      breakfastHhmm: (row['breakfast_hhmm'] as String?) ?? '08:00',
+      lunchHhmm: (row['lunch_hhmm'] as String?) ?? '13:00',
+      dinnerHhmm: (row['dinner_hhmm'] as String?) ?? '19:00',
+      enabled: row['enabled'] != false,
+    );
+  }
+
+  @override
+  Future<void> saveReminders(String userId, MealReminders reminders) async {
+    await _client.from('user_reminders').upsert({
+      'user_id': userId,
+      'breakfast_hhmm': reminders.breakfastHhmm,
+      'lunch_hhmm': reminders.lunchHhmm,
+      'dinner_hhmm': reminders.dinnerHhmm,
+      'enabled': reminders.enabled,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  @override
+  Future<void> submitReport(String userId, {required String kind, required String detail}) async {
+    await _client.from('food_reports').insert({
+      'user_id': userId,
+      'kind': kind,
+      'detail': detail,
+    });
+  }
+
+  @override
+  Future<void> trackEvent(String userId, String name) async {
+    await _client.from('app_events').insert({'user_id': userId, 'name': name});
+  }
+
+  @override
+  Future<void> deleteMyData(String userId) async {
+    await _client.rpc('qamar_delete_my_data');
   }
 
   Goal _goalFromDb(String? v) => switch (v) {
@@ -172,7 +273,15 @@ class SupabaseMealRepository implements MealRepository {
     final end = DateTime(day.year, day.month, day.day + 1).toIso8601String();
     final rows = await _client.from('meal_logs').select().eq('user_id', userId).gte('logged_at', start).lt('logged_at', end).order('logged_at');
     return (rows as List)
-        .map((r) => LoggedMeal(name: r['name'] as String, sub: r['source'] as String, kcal: r['kcal'] as int, p: r['protein_g'] as int, c: r['carbs_g'] as int, f: r['fat_g'] as int))
+        .map((r) => LoggedMeal(
+              name: r['name'] as String,
+              sub: r['source'] as String,
+              kcal: r['kcal'] as int,
+              p: r['protein_g'] as int,
+              c: r['carbs_g'] as int,
+              f: r['fat_g'] as int,
+              items: mealLinesFromLogJson(r['items']),
+            ))
         .toList();
   }
 
@@ -230,6 +339,26 @@ class SupabaseMealRepository implements MealRepository {
       'value_kg': kg,
       if (at != null) 'measured_at': at.toIso8601String(),
     });
+  }
+
+  @override
+  Future<List<NutrientGap>> nutrientGaps(String userId, {int days = 7}) async {
+    final rows = await _client.rpc('qamar_nutrient_gaps', params: {
+      'p_user_id': userId,
+      'p_days': days,
+    });
+    return (rows as List).map((r) {
+      final m = Map<String, dynamic>.from(r as Map);
+      return NutrientGap(
+        code: (m['nutrient_code'] as String?) ?? '',
+        nameAr: (m['name_ar'] as String?) ?? '',
+        nameEn: (m['name_en'] as String?) ?? '',
+        unit: (m['unit'] as String?) ?? '',
+        status: (m['status'] as String?) ?? 'unknown',
+        pctOfTarget: (m['pct_of_target'] as num?)?.toDouble(),
+        coveragePct: (m['nutrient_coverage_pct'] as num?)?.toDouble(),
+      );
+    }).toList();
   }
 }
 
@@ -322,5 +451,16 @@ class SupabaseWalletRepository implements WalletRepository {
     return (rows as List)
         .map((r) => LedgerEntry(label: r['reason'] as String, amount: r['delta'] as int, when: (r['created_at'] as String)))
         .toList();
+  }
+
+  @override
+  Future<QuestCredit> completeDailyQuest(String userId) async {
+    final raw = await _client.rpc('qamar_complete_daily_quest');
+    final map = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+    return QuestCredit(
+      credited: map['credited'] == true,
+      cairoDay: '${map['cairo_day'] ?? ''}',
+      amount: (map['amount'] as num?)?.round() ?? 250,
+    );
   }
 }

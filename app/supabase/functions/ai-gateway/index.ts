@@ -8,8 +8,10 @@
 //   POST /ai-gateway/chat/reply     { message, lang, date?, current_plan?, swapped_slots? }
 //   POST /ai-gateway/meal/analyze   { inputType, text?, imageBase64?, imageMediaType? }
 //     text/voice: food graph only — no model, no daily AI use
-//     photo: takeAiUse + vision model (Qamar+ on the client)
+//     photo/label: takeAiUse + vision model; Qamar+ required (server-enforced)
+//   POST /ai-gateway/meal/barcode   { code, lang } — Open Food Facts, no model
 //   POST /ai-gateway/plan/generate  { date?, lang?, force?, instruction? }
+//     today's plan is free (still spends the 5/day cap). Other dates are Qamar+.
 //   POST /ai-gateway/scan/read      { imageBase64, imageMediaType, lang }
 //   POST /ai-gateway/quota          {}
 //
@@ -33,7 +35,8 @@ import {
   type ImageInput,
   type UserContext,
 } from "./model.ts";
-import { retrieve, type FoodFacts, type Passage, type Source } from "./retrieval.ts";
+import { retrieve, lookupBarcode, itemsFromBarcode, type FoodFacts, type Passage, type Source } from "./retrieval.ts";
+import { entitlementIsActive, isCairoToday, plusRequiredBody } from "./plus.ts";
 import {
   identifyItems,
   itemsFromResolutions,
@@ -164,6 +167,19 @@ async function authenticate(req: Request): Promise<string | null> {
   if (!res.ok) return null;
   const user = await res.json();
   return user?.id ?? null;
+}
+
+/** Current Qamar+ period. Missing or expired entitlement is not Plus. */
+async function isPlusActive(userId: string): Promise<boolean> {
+  try {
+    const res = await db(`entitlements?user_id=eq.${userId}&select=status,period_end`);
+    if (!res.ok) return false;
+    const rows = await res.json();
+    return entitlementIsActive(rows?.[0] ?? null);
+  } catch (e) {
+    console.error("ai-gateway plus check", e);
+    return false;
+  }
 }
 
 async function db(path: string, init: RequestInit = {}): Promise<Response> {
@@ -755,9 +771,13 @@ async function analyzeMeal(
   // Typed and spoken logs are the food graph: aliases, portions, per-100 g
   // numbers. No embeddings, no model, no daily AI use. A photo is the one
   // meal path that still needs vision, and that is what the five-a-day cap
-  // is for.
+  // is for. Nutrition-label photos use this same vision path.
   if (!image) {
     return await analyzeMealFromGraph(userId, lang, described, ctx, lifeStage, target);
+  }
+
+  if (!await isPlusActive(userId)) {
+    return json(plusRequiredBody(lang, "meal_photo"), 403);
   }
 
   // Free text names foods we can resolve; a photo does not, so resolution is
@@ -1064,11 +1084,56 @@ interface PlanShape {
   rationale_en?: string;
 }
 
+async function lookupBarcodeMeal(
+  userId: string,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const lang = asString(body.lang) === "ar" ? "ar" : "en";
+  const code = (asString(body.code) ?? "").replace(/\D/g, "");
+  if (code.length < 8 || code.length > 14) {
+    return json({ error: lang === "ar" ? "الباركود مش مظبوط." : "That barcode does not look right.", items: [] }, 400);
+  }
+
+  const { blocked } = await loadContext(userId, lang);
+  if (blocked) return json({ error: "not eligible" }, 403);
+
+  const product = await lookupBarcode(code);
+  if (!product) {
+    return json({
+      items: [],
+      note: lang === "ar"
+        ? "مفيش المنتج ده في Open Food Facts. جرّب تكتب الاسم، أو صوّر الملصق من Qamar+."
+        : "Open Food Facts does not have this product. Type the name, or photograph the label with Qamar+.",
+    });
+  }
+
+  const id = await record(userId, "meal_analysis", {
+    inScope: true,
+    question: `barcode:${product.code}`,
+  });
+  await trace(userId, id, "meal_analysis", {
+    candidateDecision: { barcode: product.code, origin: "open_food_facts" },
+    uncertainty: {},
+  }, [{ stage: "food_resolver", externalCalls: 1, latencyMs: 0 }]);
+
+  return json({
+    items: itemsFromBarcode(product, lang),
+    note: lang === "ar"
+      ? `من Open Food Facts · ${product.servingGrams} جم للحصة.`
+      : `From Open Food Facts · ${product.servingGrams} g serving.`,
+    sources: product.url ? [{ source: "Open Food Facts", title: product.name, url: product.url }] : [],
+  });
+}
+
 async function generatePlan(userId: string, body: Record<string, unknown>): Promise<Response> {
   const lang = asString(body.lang) === "ar" ? "ar" : "en";
   const day = asString(body.date) ?? new Date().toISOString().slice(0, 10);
   const force = truthy(body.force);
   const instruction = (asString(body.instruction) ?? "").trim();
+
+  if (!isCairoToday(day) && !await isPlusActive(userId)) {
+    return json(plusRequiredBody(lang, "week_plan"), 403);
+  }
 
   const { ctx, blocked, lifeStage, target } = await loadContext(userId, lang);
   if (blocked) {
@@ -1397,6 +1462,8 @@ Deno.serve(async (req) => {
           imageMediaType?: string;
           lang?: string;
         });
+      case "/meal/barcode":
+        return await lookupBarcodeMeal(userId, body);
       case "/plan/generate":
         return await generatePlan(userId, body);
       case "/scan/read":

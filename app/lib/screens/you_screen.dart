@@ -190,6 +190,14 @@ class YouScreen extends StatelessWidget {
             ]),
           ),
         ],
+        _MemoryCard(state: state),
+        const SizedBox(height: 10),
+        _RemindersCard(state: state),
+        const SizedBox(height: 10),
+        _CalmCard(state: state),
+        const SizedBox(height: 10),
+        _ReportCard(state: state),
+        const SizedBox(height: 10),
         // Both of these are store requirements, and the second is a legal
         // obligation — they cannot stay as decoration.
         Container(
@@ -210,13 +218,34 @@ class YouScreen extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Flexible(
-              child: Text(isAr ? 'تصدير أو حذف بياناتي' : 'Export or delete my data',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(isAr ? 'تصدير أو حذف بياناتي' : 'Export or delete my data',
                   style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
-            ),
-            QLegalLink(label: isAr ? 'افتح' : 'Open', url: QamarConfig.deleteDataUrl, size: 12),
-          ]),
+              const SizedBox(height: 8),
+              Row(children: [
+                QOutlineButton(
+                  label: isAr ? 'نسخ JSON' : 'Copy JSON',
+                  height: 36,
+                  onTap: () async {
+                    await Clipboard.setData(ClipboardData(text: state.exportDataJson()));
+                  },
+                ),
+                const SizedBox(width: 8),
+                QOutlineButton(
+                  label: isAr ? 'حذف' : 'Delete',
+                  height: 36,
+                  color: QColors.red,
+                  onTap: state.deleteMyData,
+                ),
+              ]),
+              if (state.dataNotice != null) ...[
+                const SizedBox(height: 8),
+                Text(state.dataNotice!, style: QText.body(size: 12, color: QColors.amberSoft)),
+              ],
+            ],
+          ),
         ),
         Container(
           margin: const EdgeInsets.only(bottom: 10),
@@ -333,6 +362,166 @@ class _AffiliateCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(state.affiliateNotice!, style: QText.body(size: 12, height: 18, color: QColors.amberSoft)),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MemoryCard extends StatelessWidget {
+  final AppState state;
+  const _MemoryCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final items = state.memoryList();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(isAr ? 'ذاكرة قمر' : 'Qamar memory', style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+          const SizedBox(height: 8),
+          if (items.isEmpty)
+            Text(isAr ? 'فاضية لسه.' : 'Empty for now.', style: QText.body(size: 13, color: QColors.textMuted))
+          else
+            for (final f in items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text('${f.field}: ${f.value}', style: QText.body(size: 13, color: QColors.textHigh)),
+                    ),
+                    QOutlineButton(label: isAr ? 'مسح' : 'Remove', height: 32, onTap: () => state.deleteMemory(f)),
+                  ],
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RemindersCard extends StatelessWidget {
+  final AppState state;
+  const _RemindersCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final r = state.reminders;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(isAr ? 'تذكير الوجبات' : 'Meal reminders', style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh))),
+              Switch(
+                value: r.enabled,
+                onChanged: (v) => state.setReminders(r.copyWith(enabled: v)),
+              ),
+            ],
+          ),
+          Text(
+            isAr
+                ? 'فطار ${r.breakfastHhmm} · غدا ${r.lunchHhmm} · عشا ${r.dinnerHhmm}'
+                : 'Breakfast ${r.breakfastHhmm} · lunch ${r.lunchHhmm} · dinner ${r.dinnerHhmm}',
+            style: QText.body(size: 12, color: QColors.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalmCard extends StatelessWidget {
+  final AppState state;
+  const _CalmCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(isAr ? 'وضع هادئ' : 'Calm Mode', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+          ),
+          Switch(value: state.calmMode, onChanged: state.setCalmMode),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReportCard extends StatefulWidget {
+  final AppState state;
+  const _ReportCard({required this.state});
+  @override
+  State<_ReportCard> createState() => _ReportCardState();
+}
+
+class _ReportCardState extends State<_ReportCard> {
+  final _ctrl = TextEditingController();
+  String _kind = 'food';
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = widget.state.isAr;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(isAr ? 'بلّغ عن خطأ' : 'Report an error', style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final k in const ['food', 'advice', 'app'])
+                QPillChip(
+                  label: k,
+                  selected: _kind == k,
+                  onTap: () => setState(() => _kind = k),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _ctrl,
+            maxLines: 3,
+            style: QText.body(size: 13, color: QColors.textPrimary),
+            decoration: InputDecoration(
+              hintText: isAr ? 'إيه اللي غلط في الأكل أو النصيحة؟' : 'What was wrong with the food or the advice?',
+              hintStyle: QText.body(size: 13, color: QColors.textFaint),
+              filled: true,
+              fillColor: QColors.cardNavy,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 8),
+          QOutlineButton(
+            label: isAr ? 'إرسال' : 'Send',
+            height: 36,
+            onTap: () {
+              widget.state.submitReport(kind: _kind, detail: _ctrl.text);
+              _ctrl.clear();
+            },
+          ),
         ],
       ),
     );

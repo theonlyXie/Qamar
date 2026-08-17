@@ -186,6 +186,17 @@ class _TodayScreenState extends State<TodayScreen> {
             ),
           ),
         const SizedBox(height: 14),
+        if (state.reminderDue() != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: QColors.gold.withValues(alpha: 0.1),
+              border: Border.all(color: QColors.gold.withValues(alpha: 0.35)),
+              borderRadius: BorderRadius.circular(QRadii.xl),
+            ),
+            child: Text(state.reminderDue()!, style: QText.body(size: 13, height: 20, color: const Color(0xFFF2E4C6))),
+          ),
         Explainable(
           id: 'quest',
           child: Container(
@@ -205,11 +216,15 @@ class _TodayScreenState extends State<TodayScreen> {
                   ]),
                 ],
               ),
-              Text(state.isAr ? 'سجّل الغدا قبل ٤ العصر' : 'Log lunch before 4pm', style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),
+              Text(state.isAr ? 'سجّل وجبة النهاردة' : 'Log a meal today', style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),
               Text(
-                state.isAr ? 'لما تسجّل بدري بقدر أعدّل العشا قبل ما اليوم يخلص.' : 'Logging early lets me adjust dinner before the day ends.',
+                state.isAr ? 'المهمة بتتكسب مرة في اليوم، بعد ما تسجّل وجبة بجد.' : 'The quest pays once a day, after you actually log a meal.',
                 style: QText.body(size: 13, color: QColors.textMuted),
               ),
+              if (state.questNotice != null) ...[
+                const SizedBox(height: 6),
+                Text(state.questNotice!, style: QText.body(size: 12, color: QColors.amberSoft)),
+              ],
               const SizedBox(height: 8),
               Row(children: [
                 Material(
@@ -235,6 +250,34 @@ class _TodayScreenState extends State<TodayScreen> {
         // No "log a meal" button: hold the orb and pick speak / type (free)
         // or photo (Qamar+).
         _OrbLogHint(state: state),
+        const SizedBox(height: 14),
+        _BarcodeCard(state: state),
+        if (state.recentMeals.any((m) => m.canReplay)) ...[
+          const SizedBox(height: 18),
+          Text(state.isAr ? 'وجبات سابقة' : 'Recent meals', style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+          const SizedBox(height: 8),
+          for (final m in state.recentMeals.where((m) => m.canReplay).take(5))
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(m.name, style: QText.body(size: 14, weight: FontWeight.w600, color: QColors.textPrimary)),
+                      Text('${m.kcal} kcal', style: QText.number(size: 12, color: QColors.textMuted)),
+                    ]),
+                  ),
+                  QOutlineButton(
+                    label: state.isAr ? 'سجّل تاني' : 'Log again',
+                    height: 34,
+                    onTap: () => state.replayMeal(m),
+                  ),
+                ],
+              ),
+            ),
+        ],
         if (state.meals.isNotEmpty) ...[
           const SizedBox(height: 18),
           Text(t.loggedToday, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
@@ -455,6 +498,57 @@ class _OrbLogHint extends StatelessWidget {
                   : 'To log a meal: hold the moon, sweep to Log, then speak or type — free, and it does not spend a Qamar use. Photographing a plate is Qamar+.',
               style: QText.body(size: 12, height: 18, color: QColors.textMid),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BarcodeCard extends StatelessWidget {
+  final AppState state;
+  const _BarcodeCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(isAr ? 'باركود' : 'Barcode', style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.textHigh)),
+          const SizedBox(height: 4),
+          Text(
+            isAr ? 'اكتب الأرقام. مفيش موديل ومش بيخصم استخدام.' : 'Type the digits. No model, and it does not spend a use.',
+            style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  keyboardType: TextInputType.number,
+                  onChanged: state.onBarcodeDraftChanged,
+                  style: QText.number(size: 16, color: QColors.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: isAr ? '٦٢٢٣٠٠١٨٧٠٠٢١' : '6223001870021',
+                    hintStyle: QText.number(size: 14, color: QColors.textFaint),
+                    isDense: true,
+                    filled: true,
+                    fillColor: QColors.cardNavy,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              QOutlineButton(
+                label: isAr ? 'ابحث' : 'Look up',
+                height: 40,
+                onTap: state.lookupBarcodeMeal,
+              ),
+            ],
           ),
         ],
       ),

@@ -10,6 +10,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qamar/l10n/strings.dart';
+import 'package:qamar/models/account.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
@@ -28,6 +29,12 @@ class FakeProfileRepo implements ProfileRepository {
   int saves = 0;
   int targetSaves = 0;
   Object? failWith;
+  AccountSettings settings = const AccountSettings();
+  MealReminders reminders = const MealReminders();
+  final List<MemoryFact> memory = [];
+  final List<String> events = [];
+  final List<({String kind, String detail})> reports = [];
+  int deletes = 0;
 
   @override
   Future<Profile?> loadProfile(String userId) async => stored;
@@ -44,6 +51,38 @@ class FakeProfileRepo implements ProfileRepository {
     if (failWith != null) throw failWith!;
     targetSaves++;
     return target;
+  }
+
+  @override
+  Future<AccountSettings> loadSettings(String userId) async => settings;
+
+  @override
+  Future<void> saveSettings(String userId, AccountSettings next) async => settings = next;
+
+  @override
+  Future<List<MemoryFact>> loadMemory(String userId) async => List.of(memory);
+
+  @override
+  Future<void> deleteMemoryFact(String userId, String id) async => memory.removeWhere((f) => f.id == id);
+
+  @override
+  Future<MealReminders> loadReminders(String userId) async => reminders;
+
+  @override
+  Future<void> saveReminders(String userId, MealReminders next) async => reminders = next;
+
+  @override
+  Future<void> submitReport(String userId, {required String kind, required String detail}) async {
+    reports.add((kind: kind, detail: detail));
+  }
+
+  @override
+  Future<void> trackEvent(String userId, String name) async => events.add(name);
+
+  @override
+  Future<void> deleteMyData(String userId) async {
+    deletes++;
+    stored = null;
   }
 }
 
@@ -77,7 +116,15 @@ class FakeMealRepo implements MealRepository {
   Future<List<WeightReading>> weightHistory(String userId, {int days = 60}) async => weights;
 
   @override
-  Future<void> recordWeight(String userId, {required double kg, DateTime? at}) async => recorded.add(kg);
+  Future<void> recordWeight(String userId, {required double kg, DateTime? at}) async {
+    recorded.add(kg);
+    weights.add(WeightReading(at: at ?? DateTime.now(), kg: kg));
+  }
+
+  List<NutrientGap> gaps = [];
+
+  @override
+  Future<List<NutrientGap>> nutrientGaps(String userId, {int days = 7}) async => gaps;
 }
 
 class FakeWaterRepo implements WaterRepository {
@@ -105,6 +152,9 @@ class FakeWaterRepo implements WaterRepository {
 class FakeWalletRepo implements WalletRepository {
   ({int available, int lifetime}) stored = (available: 0, lifetime: 0);
   final List<String> redemptions = [];
+  final List<LedgerEntry> entries = [];
+  bool questClaimed = false;
+  Object? questFailsWith;
 
   @override
   Future<({int available, int lifetime})> balance(String userId) async => stored;
@@ -120,7 +170,19 @@ class FakeWalletRepo implements WalletRepository {
   }
 
   @override
-  Future<List<LedgerEntry>> ledger(String userId) async => [];
+  Future<List<LedgerEntry>> ledger(String userId) async => List.of(entries);
+
+  @override
+  Future<QuestCredit> completeDailyQuest(String userId) async {
+    if (questFailsWith != null) throw questFailsWith!;
+    if (questClaimed) {
+      return const QuestCredit(credited: false, cairoDay: '2026-08-17', amount: 250);
+    }
+    questClaimed = true;
+    stored = (available: stored.available + 250, lifetime: stored.lifetime + 250);
+    entries.insert(0, const LedgerEntry(label: 'daily_quest', amount: 250, when: 'now'));
+    return const QuestCredit(credited: true, cairoDay: '2026-08-17', amount: 250);
+  }
 }
 
 /// Stands in for the gateway. It returns what a real one returns — items to
@@ -152,11 +214,29 @@ class FakeGateway implements AiGateway {
     quota = quota.consumed();
   }
 
+  Object? analyzeFailsWith;
+  Object? barcodeFailsWith;
+  String? lastBarcode;
+  MealAnalysis barcodeResult = const MealAnalysis([
+    ConfirmItemDef(
+      ar: 'لبن',
+      en: 'Milk',
+      portionAr: '200 جم',
+      portionEn: '200 g',
+      conf: Confidence.high,
+      kcal: 124,
+      p: 6,
+      c: 10,
+      f: 7,
+    ),
+  ]);
+
   @override
   Future<MealAnalysis> analyzeMeal({required String inputType, String? text, String? imagePath, String lang = 'ar'}) async {
     imagePaths.add(imagePath);
+    if (analyzeFailsWith != null) throw analyzeFailsWith!;
     // Typed and spoken logs are the food graph. Only a photo spends a use.
-    if (inputType == 'photo' || (imagePath != null && imagePath.isNotEmpty)) {
+    if (inputType == 'photo' || inputType == 'label' || (imagePath != null && imagePath.isNotEmpty)) {
       _useAi();
     }
     return result;
@@ -189,6 +269,7 @@ class FakeGateway implements AiGateway {
 
   String? lastInstruction;
   bool? lastForce;
+  String? lastPlanDate;
 
   @override
   Future<DayPlan> generatePlan({
@@ -200,6 +281,7 @@ class FakeGateway implements AiGateway {
     planCalls++;
     lastForce = force;
     lastInstruction = instruction;
+    lastPlanDate = date;
     if (planFailsWith != null) throw planFailsWith!;
     _useAi();
     // Stamp the requested date so ensurePlan can cache "today" instead of
@@ -209,6 +291,13 @@ class FakeGateway implements AiGateway {
 
   @override
   Future<AiQuota> quotaStatus() async => quota;
+
+  @override
+  Future<MealAnalysis> lookupBarcode({required String code, String lang = 'ar'}) async {
+    lastBarcode = code;
+    if (barcodeFailsWith != null) throw barcodeFailsWith!;
+    return barcodeResult;
+  }
 }
 
 class FakeAccount implements Account {
@@ -261,6 +350,12 @@ class FakeAccount implements Account {
 
   @override
   Future<void> confirmSignIn({required String email, required String token}) async => linked = true;
+
+  @override
+  Future<void> signOut() async {
+    linked = false;
+    _changes.add(null);
+  }
 }
 
 AppState backed({
@@ -554,13 +649,20 @@ void main() {
   });
 
   test('the ledger records points as they are earned, not reconstructed', () async {
-    final state = backed(ai: FakeGateway());
+    final wallet = FakeWalletRepo();
+    final state = backed(ai: FakeGateway(), wallet: wallet);
     await settle();
     expect(state.ledger(), isEmpty, reason: 'a new user has earned nothing');
 
-    state.completeQuest();
+    state.meals.add(const LoggedMeal(name: 'Foul', sub: 'text', kcal: 400, p: 20, c: 50, f: 12));
+    await state.completeQuest();
     expect(state.ledger().single.amount, SuEconomy.dailyQuest);
     expect(state.suAvailable, SuEconomy.dailyQuest);
+
+    state.questDone = false;
+    await state.completeQuest();
+    expect(state.suAvailable, SuEconomy.dailyQuest, reason: 'the Cairo-day key pays once');
+    expect(wallet.entries, hasLength(1));
   });
 
   test('the sixth Qamar use in a day is refused, and the wallet is the way out', () async {
@@ -955,6 +1057,116 @@ void main() {
     await state.onReturnedFromPaymob();
     expect(state.plusActive, isTrue);
     expect(state.screen, AppScreen.subscription);
+  });
+
+  test('a barcode lookup proposes items without spending a Qamar use', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+    state.setLang(AppLang.en);
+    state.onBarcodeDraftChanged('6223001870021');
+    await state.lookupBarcodeMeal();
+    await settle();
+
+    expect(ai.lastBarcode, '6223001870021');
+    expect(ai.quota.remaining, SuEconomy.dailyAiUses);
+    expect(state.hasProposal, isTrue);
+    expect(state.proposalInput, 'barcode');
+  });
+
+  test('log again rebuilds the same confirmable items', () async {
+    final state = AppState()..setLang(AppLang.en);
+    const line = MealLine(
+      def: ConfirmItemDef(
+        ar: 'فول',
+        en: 'Foul',
+        portionAr: 'طبق',
+        portionEn: 'bowl',
+        conf: Confidence.high,
+        kcal: 400,
+        p: 20,
+        c: 50,
+        f: 12,
+      ),
+      qty: 1,
+    );
+    final meal = LoggedMeal(name: 'Foul', sub: 'text', kcal: 400, p: 20, c: 50, f: 12, items: const [line]);
+    state.replayMeal(meal);
+
+    expect(state.hasProposal, isTrue);
+    expect(state.proposal!.items.single.en, 'Foul');
+    expect(state.proposalQty, [1]);
+    expect(state.chatOpen, isTrue);
+  });
+
+  test('a weigh-in is stored on the trend', () async {
+    final meals = FakeMealRepo();
+    final state = backed(meals: meals)..setLang(AppLang.en);
+    await settle();
+    await state.recordWeighIn(81.5);
+    await settle();
+    expect(meals.recorded, [81.5]);
+    expect(state.weightHistory, isNotEmpty);
+  });
+
+  test('a plan for a day that is not today is Qamar+', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai)..setLang(AppLang.en);
+    await settle();
+    await state.ensurePlan(date: '2099-01-01');
+    await settle();
+    expect(state.screen, AppScreen.subscription);
+    expect(ai.planCalls, 0);
+    expect(state.plusNotice, contains('Qamar+'));
+  });
+
+  test('a later-day plan is generated when Plus is active', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai)..plusActive = true;
+    await settle();
+    await state.ensurePlan(date: '2099-01-01');
+    await settle();
+    expect(ai.lastPlanDate, '2099-01-01');
+    expect(ai.planCalls, 1);
+  });
+
+  test('spending the cosmetic changes the orb, not nutrition', () {
+    final state = AppState()
+      ..suAvailable = SuEconomy.cosmetic
+      ..setLang(AppLang.en);
+    final item = kSpendCatalog.firstWhere((e) => e.id == 'cosmetic');
+    state.redeem(item);
+    expect(state.goldOrb, isTrue);
+    expect(state.target().kcal, greaterThan(0));
+  });
+
+  test('a server-gated photo 403 still opens the paywall', () async {
+    final ai = FakeGateway()
+      ..analyzeFailsWith = AiPlusException('Photographing a meal is Qamar+.', feature: 'meal_photo');
+    final state = backed(ai: ai)..plusActive = true;
+    await settle();
+    state.setLang(AppLang.en);
+    state.logPhotoTaken('/tmp/meal.jpg');
+    await settle();
+    expect(state.screen, AppScreen.subscription);
+    expect(state.hasProposal, isFalse);
+  });
+
+  test('backed meal confirm does not mint Su on the phone', () async {
+    final meals = FakeMealRepo();
+    final wallet = FakeWalletRepo()..stored = (available: 10, lifetime: 10);
+    final state = backed(meals: meals, wallet: wallet, ai: FakeGateway());
+    await settle();
+    expect(state.suAvailable, 10);
+
+    state.quickLog(QuickLog.text);
+    await state.sendChatMsg('koshary');
+    await settle();
+    state.confirmProposal();
+    await settle();
+
+    expect(state.suAvailable, 10, reason: 'the trigger credits the server; hydrate keeps the wallet');
+    expect(meals.saved, isNotEmpty);
   });
 }
 

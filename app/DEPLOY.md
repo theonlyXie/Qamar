@@ -22,9 +22,14 @@ scratch is the only fix.
 
 ## 1. Apply the migrations
 
-`0001`–`0029` are all live on `stqirjlqzchcoeegumoq` as of 2026-08-15. This
-section is kept for rebuilding the project from scratch, and for the next
-migration.
+`0001`–`0038` live in `supabase/migrations/`. Version numbers are unique: the
+Paymob, pricing, and micronutrient files that once shared `0031`–`0033` were
+renamed to `0033`–`0037` so `supabase db push` cannot skip a file. `0038` is
+the MVP closeout (server Su awards, daily quest, Plus helper, wipe, reports).
+
+If a live database already applied a file under an old duplicate name, the new
+filename is a new version — objects use `IF NOT EXISTS` / `create or replace`
+so re-applying the SQL is safe. Do not skip `0006`.
 
 The quickest path is the SQL editor in the dashboard: open each file, paste,
 run, in order. They are idempotent — `create table if not exists`, `create or
@@ -119,7 +124,7 @@ Before deploying, from `supabase/functions/ai-gateway/`:
 
 ```sh
 deno check index.ts     # types
-deno test               # scope, packet, verifier, eval dispatcher — 66 tests
+deno test               # scope, packet, verifier, plus gate, barcode scale
 ```
 
 Verify it is up. A 401 is the correct answer to an unauthenticated call — it
