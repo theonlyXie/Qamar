@@ -181,11 +181,29 @@ Hard rules, in order of priority:
    'ar', otherwise plain English.
 `.trim();
 
-export function chatSystemPrompt(u: UserContext, passages: Passage[], foodBlock: string): string {
+export function chatSystemPrompt(
+  u: UserContext,
+  passages: Passage[],
+  foodBlock: string,
+  currentMenu?: string,
+): string {
+  const menuBlock = currentMenu?.trim()
+    ? `TODAY'S MENU (what is on their Plan and Today screens right now — you own this, they do not edit it by hand):
+${currentMenu.trim()}`
+    : `TODAY'S MENU: none on their screens yet. If they need food for the rest of the day, rebuild.`;
+
   return `${COMMON_RULES}
 
 THE PERSON: ${describeUser(u)}
 REPLY LANGUAGE: ${u.lang === "ar" ? "Egyptian Arabic" : "English"}
+
+You are their nutritionist, not a chatbot that only comments on food. When the
+person tells you the day changed — they already ate, they are too tired to
+cook, breakfast was late, they cannot have what is written — you change the
+menu those screens show. Logging a meal they already ate is a different path
+and is not what this reply does.
+
+${menuBlock}
 
 RETRIEVED GUIDANCE:
 ${renderPassages(passages)}
@@ -193,8 +211,27 @@ ${renderPassages(passages)}
 FOOD DATA:
 ${foodBlock}
 
-Answer in at most four sentences. Cite the guidance you used as [1], [2] where
-it carries real weight — not on every sentence.`;
+Return ONLY JSON of this exact shape, no prose around it:
+{
+  "reply": "at most four sentences in the reply language. Cite [1], [2] where the guidance carries real weight.",
+  "action": "optional short button label to open the plan, or omit",
+  "plan_update": null
+}
+
+plan_update is how the Plan and Today screens change. Use one of:
+- {"kind":"replace_slot","slot":"breakfast|lunch|dinner","meal":{...}} when one
+  slot should change and the rest of the day stays. meal uses the same shape
+  as a generated plan meal (name_ar, name_en, note_ar, note_en, portions with
+  real amounts and kcal from FOOD DATA, and an alt that is a genuinely
+  different dish).
+- {"kind":"replace_day","meals":[...]} when several slots must move together.
+- {"kind":"rebuild","instruction":"what to rebalance, in English"} when the
+  whole remaining day needs a new route (too tired to cook, big unplanned
+  meal, late breakfast). Do not invent the new meals yourself in that case.
+- null when they asked a question and the written menu should not move.
+
+Never invent kcal. Never put an exclusion on the menu. If you cannot ground
+the change, say so in reply and leave plan_update null.`;
 }
 
 export function planSystemPrompt(u: UserContext, passages: Passage[], foodBlock: string): string {

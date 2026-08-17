@@ -10,8 +10,21 @@ import '../widgets/common.dart';
 import '../widgets/explain.dart';
 import '../widgets/moon.dart';
 
-class TodayScreen extends StatelessWidget {
+class TodayScreen extends StatefulWidget {
   const TodayScreen({super.key});
+
+  @override
+  State<TodayScreen> createState() => _TodayScreenState();
+}
+
+class _TodayScreenState extends State<TodayScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<AppState>().ensurePlan();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

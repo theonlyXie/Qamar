@@ -5,9 +5,9 @@
 // calls the model, and records what happened.
 //
 // Routes:
-//   POST /ai-gateway/chat/reply     { message, lang }
+//   POST /ai-gateway/chat/reply     { message, lang, date?, current_plan?, swapped_slots? }
 //   POST /ai-gateway/meal/analyze   { inputType, text?, imageBase64?, imageMediaType? }
-//   POST /ai-gateway/plan/generate  { date? }
+//   POST /ai-gateway/plan/generate  { date?, lang?, force?, instruction? }
 //   POST /ai-gateway/scan/read      { imageBase64, imageMediaType, lang }
 //
 // Secrets (supabase secrets set ...):
@@ -74,6 +74,11 @@ import {
   type MealItem,
   type Verification,
 } from "./verify.ts";
+import {
+  foodTermsFromMeals,
+  mergePlanUpdate,
+  type PlanUpdate,
+} from "./plan_edit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -276,11 +281,73 @@ function foodTerms(text: string): string[] {
     .slice(0, 8);
 }
 
+function asString(v: unknown): string | undefined {
+  return typeof v === "string" ? v : undefined;
+}
+
+function truthy(v: unknown): boolean {
+  return v === true || v === "true";
+}
+
+interface SavedPlan {
+  meals: Meal[];
+  rationale_ar?: string | null;
+  rationale_en?: string | null;
+  sources?: unknown;
+  model?: string | null;
+}
+
+/** The menu already written for this person today, or null if none. */
+async function loadSavedPlan(userId: string, day: string): Promise<SavedPlan | null> {
+  const res = await db(
+    `meal_plans?user_id=eq.${userId}&plan_date=eq.${day}&select=meals,rationale_ar,rationale_en,sources,model`,
+  );
+  if (!res.ok) return null;
+  const rows = await res.json();
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row || !Array.isArray(row.meals) || row.meals.length === 0) return null;
+  return row as SavedPlan;
+}
+
+async function saveMealPlan(
+  userId: string,
+  day: string,
+  meals: Meal[],
+  targetKcal: number,
+  rationaleAr: string | null,
+  rationaleEn: string | null,
+  sources: unknown,
+  model: string | null,
+): Promise<Response> {
+  return await db("meal_plans?on_conflict=user_id,plan_date", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify({
+      user_id: userId,
+      plan_date: day,
+      meals,
+      target_kcal: targetKcal,
+      rationale_ar: rationaleAr,
+      rationale_en: rationaleEn,
+      sources,
+      model,
+    }),
+  });
+}
+
+function mealsFromBody(plan: unknown): Meal[] | null {
+  if (!plan || typeof plan !== "object") return null;
+  const meals = (plan as { meals?: unknown }).meals;
+  if (!Array.isArray(meals) || meals.length === 0) return null;
+  return meals as Meal[];
+}
+
 // ---- routes -------------------------------------------------------------
 
-async function chatReply(userId: string, body: { message?: string; lang?: string }): Promise<Response> {
-  const message = (body.message ?? "").trim();
-  const lang = body.lang === "ar" ? "ar" : "en";
+async function chatReply(userId: string, body: Record<string, unknown>): Promise<Response> {
+  const message = (asString(body.message) ?? "").trim();
+  const lang = asString(body.lang) === "ar" ? "ar" : "en";
+  const day = (asString(body.date) ?? new Date().toISOString().slice(0, 10));
 
   const verdict = classify(message);
   if (!verdict.allowed) {
@@ -300,6 +367,15 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
     return json({ reply: refusalText("minor", lang), refused: true, reason: "minor" });
   }
 
+  const saved = await loadSavedPlan(userId, day);
+  const currentMeals = saved?.meals ?? mealsFromBody(body.current_plan);
+  const swapped = Array.isArray(body.swapped_slots)
+    ? (body.swapped_slots as unknown[]).filter((s): s is string => typeof s === "string")
+    : [];
+  const menuJson = currentMeals
+    ? JSON.stringify({ date: day, meals: currentMeals, swapped_slots: swapped })
+    : "";
+
   const [passages, retrievalMs] = await timed(() =>
     retrieve(SUPABASE_URL, SERVICE_KEY, message, verdict.domain)
   );
@@ -313,14 +389,32 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
     return json({ reply, refused: true, reason: "no_grounding" });
   }
 
+  const lookup = [...foodTerms(message), ...foodTermsFromMeals(currentMeals)].slice(0, 16);
   const [resolved, resolveMs] = await timed(() =>
-    resolveFoods(SUPABASE_URL, SERVICE_KEY, foodTerms(message))
+    resolveFoods(SUPABASE_URL, SERVICE_KEY, lookup)
   );
   const { text, model, usage, latencyMs } = await callModel({
-    system: chatSystemPrompt(ctx, passages, renderResolutions(resolved)),
+    system: chatSystemPrompt(ctx, passages, renderResolutions(resolved), menuJson),
     user: message,
-    maxTokens: 600,
+    maxTokens: 1600,
+    prefill: "{",
   });
+
+  const parsed = parseJson<{ reply?: string; action?: string; plan_update?: PlanUpdate | null }>(text);
+  let reply: string;
+  if (parsed && typeof parsed.reply === "string" && parsed.reply.trim()) {
+    reply = parsed.reply.trim();
+  } else if (!parsed && text.trim() && !text.trim().startsWith("{")) {
+    reply = text.trim();
+  } else {
+    reply = lang === "ar"
+      ? "فاهمة. قولي تاني وأنا أظبط اليوم."
+      : "I heard you. Say that again and I will adjust the day.";
+  }
+  let action = (parsed?.action ?? "").trim() || undefined;
+  let planUpdate = parsed?.plan_update ?? null;
+  let plan: { meals: Meal[]; rationale_ar?: string | null; rationale_en?: string | null } | undefined;
+  const verifications: Verification[] = [];
 
   // The only thing checkable in prose is whether it named something the person
   // cannot have — and even that is advisory, because a reply that mentions
@@ -328,17 +422,62 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
   const [constraints, verifyMs] = await timed(() =>
     loadHardConstraints(SUPABASE_URL, SERVICE_KEY, userId)
   );
-  const verification = verifyChat(text, constraints);
+  verifications.push(verifyChat(reply, constraints));
+
+  const merged = planUpdate ? mergePlanUpdate(currentMeals, planUpdate) : null;
+  if (merged?.kind === "rebuild") {
+    planUpdate = {
+      kind: "rebuild",
+      instruction: merged.instruction || message,
+    };
+    if (!action) action = lang === "ar" ? "شوفي الخطة" : "See the plan";
+  } else if (merged && (merged.kind === "replace_slot" || merged.kind === "replace_day")) {
+    const planCheck = verifyPlan(merged.meals, ctx.targetKcal ?? null, constraints);
+    verifications.push(planCheck);
+    if (blocks(planCheck).length > 0) {
+      // A restricted food does not land on the menu. The spoken reply still
+      // goes out — they asked a question — but Plan/Today do not change.
+      planUpdate = null;
+    } else if (ctx.targetKcal) {
+      const savedPlan = await saveMealPlan(
+        userId,
+        day,
+        merged.meals,
+        ctx.targetKcal,
+        saved?.rationale_ar ?? null,
+        saved?.rationale_en ?? (merged.instruction ?? null),
+        resolvedSources(passages, resolved),
+        model,
+      );
+      if (savedPlan.ok) {
+        plan = {
+          meals: merged.meals,
+          rationale_ar: saved?.rationale_ar,
+          rationale_en: saved?.rationale_en ?? merged.instruction,
+        };
+        planUpdate = { kind: merged.kind };
+        if (!action) action = lang === "ar" ? "شوفي الخطة" : "See the plan";
+      } else {
+        planUpdate = null;
+      }
+    } else {
+      planUpdate = null;
+    }
+  } else {
+    planUpdate = null;
+  }
 
   const sources = resolvedSources(passages, resolved);
   const id = await record(userId, "chat", {
     inScope: true,
     question: message,
-    answer: text,
+    answer: reply,
     sources,
     model,
   });
-  const flags = lifeStage === "none" ? [] : [`life_stage:${lifeStage}`];
+  const flags: string[] = lifeStage === "none" ? [] : [`life_stage:${lifeStage}`];
+  if (plan) flags.push("plan_updated");
+  if (merged?.kind === "rebuild") flags.push("plan_rebuild");
   // Allowed requests are recorded too. A safety log that only holds refusals
   // cannot answer what proportion of traffic was high-risk, which is the
   // question an audit actually asks.
@@ -349,7 +488,7 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
     id,
     lifeStage === "none" ? "general_wellness" : "condition_aware",
     flags,
-    ["answer_grounded"],
+    plan ? ["answer_grounded", "update_plan"] : ["answer_grounded"],
   );
 
   const [facts, rules] = await Promise.all([
@@ -362,20 +501,32 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
     calculatedTargets: targetsFrom(ctx, target),
     applicableRules: rules.applicable,
     excludedRules: rules.excluded,
-    candidateDecision: { reply: text.slice(0, 2000), domain: verdict.domain, sources },
+    candidateDecision: {
+      reply: reply.slice(0, 2000),
+      domain: verdict.domain,
+      sources,
+      plan_update: planUpdate,
+    },
     safetyFlags: flags,
     uncertainty: {
       foods: resolutionUncertainty(resolved),
       passages_retrieved: passages.length,
     },
-    claimsToVerify: numericClaims(text),
+    claimsToVerify: numericClaims(reply),
   }, [
     { stage: "retrieval", externalCalls: 1, latencyMs: retrievalMs },
     { stage: "food_resolver", externalCalls: externalCallsIn(resolved), latencyMs: resolveMs },
     { stage: "reasoner", model, usage, latencyMs },
     { stage: "verifier", latencyMs: verifyMs },
-  ], [verification]);
-  return json({ reply: text, sources, refused: false });
+  ], verifications);
+  return json({
+    reply,
+    action,
+    plan_update: planUpdate,
+    ...(plan ? { plan, date: day } : {}),
+    sources,
+    refused: false,
+  });
 }
 
 /**
@@ -689,9 +840,11 @@ interface PlanShape {
   rationale_en?: string;
 }
 
-async function generatePlan(userId: string, body: { date?: string; lang?: string }): Promise<Response> {
-  const lang = body.lang === "ar" ? "ar" : "en";
-  const day = body.date ?? new Date().toISOString().slice(0, 10);
+async function generatePlan(userId: string, body: Record<string, unknown>): Promise<Response> {
+  const lang = asString(body.lang) === "ar" ? "ar" : "en";
+  const day = asString(body.date) ?? new Date().toISOString().slice(0, 10);
+  const force = truthy(body.force);
+  const instruction = (asString(body.instruction) ?? "").trim();
 
   const { ctx, blocked, lifeStage, target } = await loadContext(userId, lang);
   if (blocked) {
@@ -719,12 +872,34 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
 
   if (!ctx.targetKcal) return json({ error: "no target yet — finish onboarding first" }, 409);
 
+  // Stored rather than regenerated so talking to Qamar can edit today's menu
+  // without the next visit to Plan silently replacing it. force and a
+  // nutritionist instruction are the two ways a new day of eating is written.
+  if (!force && !instruction) {
+    const existing = await loadSavedPlan(userId, day);
+    if (existing) {
+      return json({
+        plan: {
+          meals: existing.meals,
+          rationale_ar: existing.rationale_ar,
+          rationale_en: existing.rationale_en,
+        },
+        date: day,
+        reused: true,
+        sources: existing.sources ?? [],
+      });
+    }
+  }
+
   const brief =
     `daily meal plan for ${ctx.targetKcal} kcal, goal ${ctx.goal ?? "maintain"}, ` +
     `Egyptian home cooking, avoiding ${ctx.exclusions?.join(", ") || "nothing"}`;
+  const user = instruction
+    ? `${brief}\n\nNutritionist adjustment — rewrite today's meals for this, keeping exclusions and the calorie target:\n${instruction}`
+    : brief;
 
   const [passages, retrievalMs] = await timed(() =>
-    retrieve(SUPABASE_URL, SERVICE_KEY, brief, "nutrition", 8)
+    retrieve(SUPABASE_URL, SERVICE_KEY, instruction ? `${brief} ${instruction}` : brief, "nutrition", 8)
   );
   if (passages.length === 0) return json({ error: "no grounded guidance available" }, 503);
 
@@ -769,7 +944,7 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
 
   const { text, model, usage, latencyMs } = await callModel({
     system: planSystemPrompt(ctx, passages, renderResolutions(resolved)),
-    user: brief,
+    user,
     maxTokens: 2000,
     prefill: "{",
   });
@@ -852,25 +1027,21 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
     }, 409);
   }
 
-  const saved = await db("meal_plans?on_conflict=user_id,plan_date", {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-    body: JSON.stringify({
-      user_id: userId,
-      plan_date: day,
-      meals,
-      target_kcal: ctx.targetKcal,
-      rationale_ar: parsed.rationale_ar ?? null,
-      rationale_en: parsed.rationale_en ?? null,
-      sources,
-      model,
-    }),
-  });
+  const saved = await saveMealPlan(
+    userId,
+    day,
+    meals,
+    ctx.targetKcal,
+    parsed.rationale_ar ?? null,
+    parsed.rationale_en ?? null,
+    sources,
+    model,
+  );
   if (!saved.ok) return json({ error: `could not save plan: ${await saved.text()}` }, 500);
 
   const planId = await record(userId, "plan", {
     inScope: true,
-    question: brief,
+    question: user,
     answer: JSON.stringify(meals).slice(0, 2000),
     sources,
     model,
@@ -935,7 +1106,7 @@ Deno.serve(async (req) => {
   const userId = await authenticate(req);
   if (!userId) return json({ error: "unauthorized" }, 401);
 
-  let body: Record<string, string> = {};
+  let body: Record<string, unknown> = {};
   try {
     body = await req.json();
   } catch {
@@ -948,11 +1119,21 @@ Deno.serve(async (req) => {
       case "/chat/reply":
         return await chatReply(userId, body);
       case "/meal/analyze":
-        return await analyzeMeal(userId, body);
+        return await analyzeMeal(userId, body as {
+          inputType?: string;
+          text?: string;
+          imageBase64?: string;
+          imageMediaType?: string;
+          lang?: string;
+        });
       case "/plan/generate":
         return await generatePlan(userId, body);
       case "/scan/read":
-        return await readBodyScan(userId, body);
+        return await readBodyScan(userId, body as {
+          imageBase64?: string;
+          imageMediaType?: string;
+          lang?: string;
+        });
       default:
         return json({ error: `unknown route ${route}` }, 404);
     }

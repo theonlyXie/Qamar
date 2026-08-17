@@ -104,7 +104,10 @@ class FakeGateway implements AiGateway {
   MealAnalysis result = const MealAnalysis([
     ConfirmItemDef(ar: 'كشري', en: 'Koshary', portionAr: 'طبق وسط', portionEn: '1 medium bowl', conf: Confidence.low, kcal: 520, p: 16, c: 96, f: 9),
   ]);
+  ChatResult chatResult = const ChatResult(reply: 'grounded answer');
   String reply = 'grounded answer';
+  final List<String> chatMessages = [];
+  Map<String, dynamic>? lastCurrentPlan;
   final List<String?> imagePaths = [];
 
   @override
@@ -114,7 +117,20 @@ class FakeGateway implements AiGateway {
   }
 
   @override
-  Future<String> chatReply({required String message, required String lang}) async => reply;
+  Future<ChatResult> chatReply({
+    required String message,
+    required String lang,
+    String? date,
+    Map<String, dynamic>? currentPlan,
+    List<String>? swappedSlots,
+  }) async {
+    chatMessages.add(message);
+    lastCurrentPlan = currentPlan;
+    if (chatResult.reply == 'grounded answer' && reply != 'grounded answer') {
+      return ChatResult(reply: reply);
+    }
+    return chatResult;
+  }
 
   BodyScan scan = const BodyScan(heightCm: 174, weightKg: 86, bodyFatPct: 29, age: 31);
 
@@ -127,12 +143,21 @@ class FakeGateway implements AiGateway {
   int planCalls = 0;
   Object? planFailsWith;
   DayPlan plan = const DayPlan(date: '2026-08-15', slots: []);
+  String? lastInstruction;
+  bool? lastForce;
 
   @override
-  Future<DayPlan> generatePlan({required String date, required String lang}) async {
+  Future<DayPlan> generatePlan({
+    required String date,
+    required String lang,
+    bool force = false,
+    String? instruction,
+  }) async {
     planCalls++;
+    lastForce = force;
+    lastInstruction = instruction;
     if (planFailsWith != null) throw planFailsWith!;
-    return plan;
+    return DayPlan(date: date, slots: plan.slots, rationale: plan.rationale);
   }
 }
 
@@ -495,6 +520,87 @@ void main() {
 
       expect(state.hasPlan, isFalse);
       expect(state.planError, isNotNull);
+    });
+
+    test('talking to Qamar writes dinner onto Plan and Today, not only into chat', () async {
+      const breakfast = (
+        id: 'breakfast',
+        slotAr: 'فطار',
+        slotEn: 'Breakfast',
+        nameAr: 'فول',
+        nameEn: 'Foul',
+        noteAr: '',
+        noteEn: '',
+        portions: <PlanPortion>[(ar: 'فول', en: 'Foul', amountAr: '١٥٠ جم', amountEn: '150 g', kcal: 180)],
+      );
+      const tuna = (
+        id: 'dinner',
+        slotAr: 'عشا',
+        slotEn: 'Dinner',
+        nameAr: 'تونة',
+        nameEn: 'Tuna',
+        noteAr: '',
+        noteEn: '',
+        portions: <PlanPortion>[(ar: 'تونة', en: 'Tuna', amountAr: 'علبة', amountEn: '1 tin', kcal: 130)],
+      );
+      const eggs = (
+        id: 'dinner',
+        slotAr: 'عشا',
+        slotEn: 'Dinner',
+        nameAr: 'بيض وزبادي',
+        nameEn: 'Eggs and yogurt',
+        noteAr: 'من غير طبخ',
+        noteEn: 'no cooking',
+        portions: <PlanPortion>[(ar: 'بيض', en: 'Eggs', amountAr: '٢', amountEn: '2', kcal: 160)],
+      );
+      final original = const DayPlan(date: '2026-08-15', slots: [(breakfast, breakfast), (tuna, tuna)]);
+      final rewritten = DayPlan(date: original.date, slots: [(breakfast, breakfast), (eggs, eggs)]);
+      final ai = FakeGateway()
+        ..plan = original
+        ..chatResult = ChatResult(
+          reply: 'I’ll change dinner so you do not cook.',
+          action: 'See the plan',
+          plan: rewritten,
+        );
+      final state = backed(ai: ai);
+      await settle();
+      state.setLang(AppLang.en);
+      await state.ensurePlan();
+      expect(state.planMeals().last.nameEn, 'Tuna');
+
+      await state.sendChatMsg("I'm tired and not cooking");
+
+      expect(state.planMeals().last.nameEn, 'Eggs and yogurt',
+          reason: 'the written menu must move when Qamar says it does');
+      expect(state.chat.last.text, contains('dinner'));
+      expect(state.chat.last.action, 'See the plan');
+      expect(ai.lastCurrentPlan, isNotNull);
+      expect((ai.lastCurrentPlan!['meals'] as List).length, 2);
+
+      state.chatActionTap();
+      expect(state.screen, AppScreen.plan);
+      expect(state.chatOpen, isFalse);
+      expect(state.planMeals().last.nameEn, 'Eggs and yogurt');
+    });
+
+    test('a rebuild from chat is a real generatePlan, with Qamar’s instruction', () async {
+      final ai = FakeGateway()
+        ..plan = const DayPlan(date: '2026-08-15', slots: [(meal, meal)])
+        ..chatResult = const ChatResult(
+          reply: 'I’ll rewrite the rest of the day.',
+          rebuildInstruction: 'tired, no cooking tonight',
+        );
+      final state = backed(ai: ai);
+      await settle();
+      await state.ensurePlan();
+      final before = ai.planCalls;
+
+      await state.sendChatMsg("I'm tired");
+
+      expect(ai.lastInstruction, 'tired, no cooking tonight');
+      expect(ai.lastForce, isTrue);
+      expect(ai.planCalls, before + 1);
+      expect(state.hasPlan, isTrue);
     });
   });
 
