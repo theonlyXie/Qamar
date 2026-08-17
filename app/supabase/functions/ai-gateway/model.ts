@@ -197,7 +197,50 @@ Answer in at most four sentences. Cite the guidance you used as [1], [2] where
 it carries real weight — not on every sentence.`;
 }
 
-export function planSystemPrompt(u: UserContext, passages: Passage[], foodBlock: string): string {
+/**
+ * The nutrients this person has been running short on, ready to put in a
+ * prompt. Empty when nothing is short or nothing is known.
+ */
+export interface NutrientGap {
+  nameEn: string;
+  nameAr: string;
+  unit: string;
+  target: number;
+  meanDaily: number;
+  pctOfTarget: number;
+  kind: string;
+}
+
+/**
+ * What separates a plan from a calorie allocation.
+ *
+ * A day of eating that hits the target and leaves someone on 40% of their iron
+ * is not a good plan, and until this block existed the model had no way to know
+ * that — it was told a kcal figure and three macro figures and nothing else. A
+ * dietitian looks at the week before writing the day.
+ *
+ * The RDA/AI distinction is passed through rather than flattened, because
+ * missing an AI is a weaker claim than missing an RDA and the plan should not
+ * spend the whole day chasing it.
+ */
+function renderGaps(gaps: NutrientGap[]): string {
+  if (gaps.length === 0) {
+    return "(no shortfall data — either nothing logged yet, or nothing short)";
+  }
+  return gaps
+    .map((g) =>
+      `${g.nameEn} (${g.nameAr}): averaging ${g.meanDaily} of ${g.target} ${g.unit} ` +
+      `— ${g.pctOfTarget}% of the ${g.kind}`
+    )
+    .join("\n");
+}
+
+export function planSystemPrompt(
+  u: UserContext,
+  passages: Passage[],
+  foodBlock: string,
+  gaps: NutrientGap[] = [],
+): string {
   return `${COMMON_RULES}
 
 THE PERSON: ${describeUser(u)}
@@ -208,8 +251,18 @@ ${renderPassages(passages)}
 FOOD DATA (use these figures; do not invent others):
 ${foodBlock}
 
+WHAT THEY HAVE BEEN SHORT ON (from their own logged meals, last 7 days):
+${renderGaps(gaps)}
+
 Write one day of eating: breakfast, lunch and dinner. Requirements:
 - The three meals must total within 5% of the daily target.
+- Where a shortfall is listed above, choose foods that close it — but only from
+  the FOOD DATA, and never at the cost of the calorie target or an exclusion.
+  Say so in the rationale when a choice was made for that reason ("عشان الحديد",
+  "for the iron"), because a person who knows why they are eating liver eats it.
+- Do not name a nutrient as short unless it appears in that list. If the list
+  says nothing is known, write the day on the calorie and macro targets alone
+  and do not speculate about deficiencies.
 - Every meal lists its portions with a real amount (grams, loaves, spoons) and
   the kcal for that portion, computed from the FOOD DATA per-100g figures.
 - Ordinary Egyptian home cooking. Nothing the person excluded.

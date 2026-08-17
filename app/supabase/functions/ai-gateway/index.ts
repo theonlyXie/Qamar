@@ -49,6 +49,7 @@ import {
 import {
   externalCallsIn,
   loadUserFacts,
+  nutrientGaps,
   numericClaims,
   recordStages,
   recordVerification,
@@ -804,8 +805,14 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
     resolved.push(r);
   }
 
+  // What the last week of their own logging says they are short on. A plan
+  // built on a calorie number alone is an allocation; this is the part that
+  // makes it advice. Empty is a normal answer — nothing logged, or nothing
+  // short — and the prompt says explicitly not to speculate when it is.
+  const [gaps, gapsMs] = await timed(() => nutrientGaps(SUPABASE_URL, SERVICE_KEY, userId, 7));
+
   const { text, model, usage, latencyMs } = await callModel({
-    system: planSystemPrompt(ctx, passages, renderResolutions(resolved)),
+    system: planSystemPrompt(ctx, passages, renderResolutions(resolved), gaps),
     user: brief,
     maxTokens: 2000,
     prefill: "{",
@@ -813,6 +820,7 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
   const stages: StageCost[] = [
     { stage: "retrieval", externalCalls: 1, latencyMs: retrievalMs },
     { stage: "food_resolver", externalCalls: externalCallsIn(resolvedAll), latencyMs: resolveMs },
+    { stage: "requirement", externalCalls: 1, latencyMs: gapsMs },
     { stage: "reasoner", model, usage, latencyMs },
   ];
 
@@ -837,7 +845,7 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
   if (isRevisable(verification)) {
     const [retry, retryMs] = await timed(() =>
       callModel({
-        system: planSystemPrompt(ctx, passages, renderResolutions(resolved)),
+        system: planSystemPrompt(ctx, passages, renderResolutions(resolved), gaps),
         user: revisionInstruction(verification, { meals }),
         maxTokens: 2000,
         prefill: "{",
@@ -932,7 +940,19 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
     calculatedTargets: targetsFrom(ctx, target),
     applicableRules: rules.applicable,
     excludedRules: rules.excluded,
-    candidateDecision: { meals, plan_date: day },
+    // The shortfalls this plan was asked to close, and how much of the week's
+    // logging they were computed from. Without the coverage figure a reviewer
+    // cannot tell a real iron gap from three days of unidentified meals.
+    candidateDecision: {
+      meals,
+      plan_date: day,
+      addressed_gaps: gaps.map((g) => ({
+        nutrient: g.nameEn,
+        pct_of_target: g.pctOfTarget,
+        kind: g.kind,
+        log_coverage_pct: g.coveragePct,
+      })),
+    },
     safetyFlags: excludedFoods.length ? [...flags, "restricted_food_excluded"] : flags,
     uncertainty: {
       foods: resolutionUncertainty(resolved),

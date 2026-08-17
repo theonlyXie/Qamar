@@ -510,3 +510,86 @@ function asciiDigits(s: string): string {
     return String(c >= 0x06f0 ? c - 0x06f0 : c - 0x0660);
   });
 }
+
+// ---- nutrient shortfalls ------------------------------------------------
+
+interface RawGap {
+  nutrient_code: string;
+  name_ar: string;
+  name_en: string;
+  unit: string;
+  kind: string;
+  target: number;
+  mean_daily: number;
+  pct_of_target: number | null;
+  status: string;
+  coverage_pct: number;
+  items_total: number;
+  items_resolved: number;
+}
+
+/**
+ * What this person has actually been short on, from their own logged meals.
+ *
+ * Only rows the database is willing to stand behind are returned. A status of
+ * "unknown" means no logged item resolved to a known food, and it is dropped
+ * here rather than passed along as a zero — the whole point of that column is
+ * that an unmeasured intake and an intake of nothing are different claims, and
+ * a prompt is exactly the place where that distinction gets lost.
+ *
+ * Sodium is dropped too, for the opposite reason: it has an AI, so it appears
+ * as a shortfall whenever someone eats less than 1500 mg, and telling an
+ * Egyptian household to eat more salt is the last advice this app should give.
+ *
+ * Returns [] on any failure. A plan without shortfall data is a worse plan; a
+ * plan that fails to generate because a report was unavailable is no plan.
+ */
+export async function nutrientGaps(
+  url: string,
+  key: string,
+  userId: string,
+  days = 7,
+): Promise<
+  {
+    nameEn: string;
+    nameAr: string;
+    unit: string;
+    target: number;
+    meanDaily: number;
+    pctOfTarget: number;
+    kind: string;
+    coveragePct: number;
+  }[]
+> {
+  try {
+    const res = await db(url, key, "rpc/qamar_nutrient_gaps", {
+      method: "POST",
+      body: JSON.stringify({ p_user_id: userId, p_days: days }),
+    });
+    if (!res.ok) return [];
+    const rows = (await res.json()) as RawGap[];
+    return rows
+      .filter((r) =>
+        (r.status === "short" || r.status === "low") &&
+        r.nutrient_code !== "sodium_mg" &&
+        r.pct_of_target != null
+      )
+      // Worst first, and capped: a prompt listing fifteen shortfalls is asking
+      // the model to fix none of them.
+      .sort((a, b) => (a.pct_of_target ?? 0) - (b.pct_of_target ?? 0))
+      .slice(0, 5)
+      .map((r) => ({
+        nameEn: r.name_en,
+        nameAr: r.name_ar,
+        unit: r.unit,
+        target: Number(r.target),
+        meanDaily: Number(r.mean_daily),
+        pctOfTarget: Number(r.pct_of_target),
+        kind: r.kind,
+        coveragePct: Number(r.coverage_pct),
+      }));
+  } catch (e) {
+    console.error("nutrientGaps", e);
+    return [];
+  }
+}
