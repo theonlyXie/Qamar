@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/meal.dart';
 import '../models/profile.dart';
+import '../models/water.dart';
 import 'repositories.dart';
 
 /// Supabase-backed repositories matching supabase/migrations/0001_core_schema.sql.
@@ -199,6 +200,53 @@ class SupabaseMealRepository implements MealRepository {
       'value_kg': kg,
       if (at != null) 'measured_at': at.toIso8601String(),
     });
+  }
+}
+
+class SupabaseWaterRepository implements WaterRepository {
+  final SupabaseClient _client;
+  const SupabaseWaterRepository(this._client);
+
+  @override
+  Future<String> addSip(String userId, WaterSip sip) async {
+    final row = await _client
+        .from('water_logs')
+        .insert({
+          'user_id': userId,
+          'amount_ml': sip.ml,
+          'unit': sip.unit.name,
+          'logged_at': sip.at.toUtc().toIso8601String(),
+        })
+        .select('id')
+        .single();
+    return row['id'] as String;
+  }
+
+  @override
+  Future<void> removeSip(String userId, String id) async {
+    await _client.from('water_logs').delete().eq('id', id).eq('user_id', userId);
+  }
+
+  @override
+  Future<List<WaterSip>> sipsForDay(String userId, DateTime day) async {
+    final start = DateTime(day.year, day.month, day.day).toIso8601String();
+    final end = DateTime(day.year, day.month, day.day + 1).toIso8601String();
+    final rows = await _client
+        .from('water_logs')
+        .select()
+        .eq('user_id', userId)
+        .gte('logged_at', start)
+        .lt('logged_at', end)
+        .order('logged_at');
+    return (rows as List).map((r) {
+      final unit = (r['unit'] as String?) == 'bottle' ? WaterUnit.bottle : WaterUnit.glass;
+      return WaterSip(
+        id: r['id'] as String?,
+        unit: unit,
+        ml: (r['amount_ml'] as num).round(),
+        at: DateTime.parse(r['logged_at'] as String).toLocal(),
+      );
+    }).toList();
   }
 }
 

@@ -114,6 +114,16 @@ const kExplanations = <String, Explanation>{
     soWhatAr: 'لو المهمة مش مناسبة لظروف يومك، اضغط «غيّرها» — ده مش فشل.',
     soWhatEn: 'If it does not fit your day, tap Replace — that is not a failure.',
   ),
+  'water': Explanation(
+    titleAr: 'الماء',
+    titleEn: 'Water',
+    bodyAr:
+        'كوبتين لتلاتة لتر في اليوم بداية معقولة لشخص بالغ. الحر في مصر بيخلي الرقم أقرب للتلاتة. الكوباية ٢٥٠ مل، الزجاجة ٥٠٠ مل. الشاي والأكل فيه مية بتحسب، العصير المسكر لأ.',
+    bodyEn:
+        'Two to three litres a day is a reasonable start for an adult. Egyptian heat sits at the top of that range. A glass is 250 ml, a bottle is 500 ml. Tea and watery food count; sugary drinks do not.',
+    soWhatAr: 'العطش دليل كويس. البول الفاتح أحسن. لو حر أو بتتحرك أكتر، زوّد من غير ما تستنى الرقم يوصل صفر.',
+    soWhatEn: 'Thirst is a decent guide. Pale urine is a better one. In heat or on an active day, drink more — do not wait for the leftover to hit zero.',
+  ),
   'plan_total': Explanation(
     titleAr: 'إجمالي الخطة',
     titleEn: 'Plan total',

@@ -15,9 +15,11 @@ import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/models/billing.dart';
+import 'package:qamar/models/water.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/auth_service.dart';
 import 'package:qamar/services/payments.dart';
+import 'package:qamar/services/quick_invoke.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
 
@@ -78,6 +80,28 @@ class FakeMealRepo implements MealRepository {
   Future<void> recordWeight(String userId, {required double kg, DateTime? at}) async => recorded.add(kg);
 }
 
+class FakeWaterRepo implements WaterRepository {
+  final List<WaterSip> saved = [];
+  List<WaterSip> today = [];
+  int adds = 0;
+
+  @override
+  Future<String> addSip(String userId, WaterSip sip) async {
+    adds++;
+    final id = 'water-$adds';
+    saved.add(sip.copyWith(id: id));
+    return id;
+  }
+
+  @override
+  Future<void> removeSip(String userId, String id) async {
+    saved.removeWhere((s) => s.id == id);
+  }
+
+  @override
+  Future<List<WaterSip>> sipsForDay(String userId, DateTime day) async => today;
+}
+
 class FakeWalletRepo implements WalletRepository {
   ({int available, int lifetime}) stored = (available: 0, lifetime: 0);
   final List<String> redemptions = [];
@@ -131,7 +155,10 @@ class FakeGateway implements AiGateway {
   @override
   Future<MealAnalysis> analyzeMeal({required String inputType, String? text, String? imagePath, String lang = 'ar'}) async {
     imagePaths.add(imagePath);
-    _useAi();
+    // Typed and spoken logs are the food graph. Only a photo spends a use.
+    if (inputType == 'photo' || (imagePath != null && imagePath.isNotEmpty)) {
+      _useAi();
+    }
     return result;
   }
 
@@ -239,6 +266,7 @@ class FakeAccount implements Account {
 AppState backed({
   FakeProfileRepo? profiles,
   FakeMealRepo? meals,
+  FakeWaterRepo? water,
   FakeWalletRepo? wallet,
   FakeGateway? ai,
   FakeAccount? auth,
@@ -246,6 +274,7 @@ AppState backed({
     AppState(
       profileRepo: profiles ?? FakeProfileRepo(),
       mealRepo: meals ?? FakeMealRepo(),
+      waterRepo: water ?? FakeWaterRepo(),
       walletRepo: wallet ?? FakeWalletRepo(),
       ai: ai,
       auth: auth,
@@ -275,6 +304,39 @@ void main() {
     expect(state.meals.single.name, 'Foul');
     expect(state.suAvailable, 45);
     expect(state.suLifetime, 120);
+  });
+
+  test('hydrate pulls today\'s water over the empty default', () async {
+    final water = FakeWaterRepo()
+      ..today = [
+        WaterSip(id: 'w1', unit: WaterUnit.glass, ml: 250, at: DateTime(2026, 8, 17, 9)),
+        WaterSip(id: 'w2', unit: WaterUnit.bottle, ml: 500, at: DateTime(2026, 8, 17, 12)),
+      ];
+    final state = backed(water: water);
+    await settle();
+
+    expect(state.water.ml, 750);
+    expect(state.water.glasses, 3);
+    expect(state.water.bottles, 1.5);
+  });
+
+  test('logging water writes a sip, and undo deletes it', () async {
+    final water = FakeWaterRepo();
+    final state = backed(water: water);
+    await settle();
+
+    state.logWater(WaterUnit.glass);
+    expect(state.water.ml, 250);
+    await settle();
+
+    expect(water.saved, hasLength(1));
+    expect(water.saved.single.ml, 250);
+    expect(state.waterToday.single.id, 'water-1');
+
+    state.undoWater();
+    await settle();
+    expect(state.water.isEmpty, isTrue);
+    expect(water.saved, isEmpty);
   });
 
   test('an empty backend leaves the local defaults intact', () async {
@@ -308,7 +370,7 @@ void main() {
 
   test('a photo is sent to the assistant, not merely displayed', () async {
     final ai = FakeGateway();
-    final state = backed(ai: ai);
+    final state = backed(ai: ai)..plusActive = true;
     await settle();
 
     state.logPhotoTaken('/tmp/meal.jpg');
@@ -321,7 +383,7 @@ void main() {
   test('an unreadable photo proposes nothing rather than inventing a meal', () async {
     final meals = FakeMealRepo();
     final ai = FakeGateway()..result = const MealAnalysis([], note: 'too dark to read');
-    final state = backed(meals: meals, ai: ai);
+    final state = backed(meals: meals, ai: ai)..plusActive = true;
     await settle();
 
     state.logPhotoTaken('/tmp/dark.jpg');
@@ -334,7 +396,7 @@ void main() {
 
   test('with no gateway a meal cannot be analysed, and says so', () async {
     final meals = FakeMealRepo();
-    final state = backed(meals: meals);
+    final state = backed(meals: meals)..plusActive = true;
     await settle();
 
     state.logPhotoTaken('/tmp/meal.jpg');
@@ -342,6 +404,78 @@ void main() {
 
     expect(state.hasProposal, isFalse);
     expect(meals.saved, isEmpty, reason: 'an unconnected app must never log invented food');
+  });
+
+  test('typed meal logging does not spend a Qamar use', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+
+    state.quickLog(QuickLog.text);
+    await state.sendChatMsg('koshary');
+    await settle();
+
+    expect(state.hasProposal, isTrue);
+    expect(ai.quota.remaining, SuEconomy.dailyAiUses);
+  });
+
+  test('typed meal logging still works after today’s five Qamar uses', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+    state.setLang(AppLang.en);
+
+    for (var i = 0; i < SuEconomy.dailyAiUses; i++) {
+      await state.sendChatMsg('protein?');
+    }
+    expect(ai.quota.remaining, 0);
+
+    state.quickLog(QuickLog.text);
+    await state.sendChatMsg('koshary');
+    await settle();
+
+    expect(state.hasProposal, isTrue);
+    expect(ai.quota.remaining, 0);
+  });
+
+  test('a log shortcut with text does not spend a Qamar use', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+
+    QuickInvoke.apply(state, const QuickAction(kind: 'log', text: 'foul medames'));
+    await settle();
+
+    expect(state.hasProposal, isTrue);
+    expect(ai.quota.remaining, SuEconomy.dailyAiUses);
+  });
+
+  test('photographing a meal spends a Qamar use', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai)..plusActive = true;
+    await settle();
+
+    state.logPhotoTaken('/tmp/meal.jpg');
+    await settle();
+
+    expect(state.hasProposal, isTrue);
+    expect(ai.quota.remaining, SuEconomy.dailyAiUses - 1);
+  });
+
+  test('photographing a meal without Qamar+ opens the paywall and does not analyse', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+    state.setLang(AppLang.en);
+
+    state.logPhotoTaken('/tmp/meal.jpg');
+    await settle();
+
+    expect(ai.imagePaths, isEmpty);
+    expect(state.hasProposal, isFalse);
+    expect(state.screen, AppScreen.subscription);
+    expect(state.plusNotice, contains('Qamar+'));
+    expect(state.lastMealPhotoPath, isNull);
   });
 
   test('an unreadable InBody report prefills nothing and asks instead', () async {

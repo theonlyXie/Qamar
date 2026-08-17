@@ -89,8 +89,9 @@ for you to connect:
 | File | What it is | To activate |
 |---|---|---|
 | `supabase/migrations/0001_core_schema.sql` | Full Postgres schema (profiles, consents, targets, meal_drafts/logs, wallet + ledger, quests, weight entries) with RLS, scoped to the MVP subset of spec_mvp.txt Part 28 | `supabase db push` (or run in the SQL editor) against a real project |
+| `supabase/migrations/0032_water_logs.sql` | Drinking-water log: one row per glass (250 ml) or bottle (500 ml) | same |
 | `supabase/migrations/0002_wallet_functions.sql` | Atomic, idempotent `qamar_wallet_credit` / `qamar_wallet_redeem` RPCs (ledger insert + balance update in one transaction) | same |
-| `lib/services/repositories.dart` | Abstract `ProfileRepository` / `MealRepository` / `WalletRepository` | — |
+| `lib/services/repositories.dart` | Abstract `ProfileRepository` / `MealRepository` / `WaterRepository` / `WalletRepository` | — |
 | `lib/services/supabase_repositories.dart` | Supabase-backed implementations of the above | Re-check each call against your pinned `supabase_flutter` version's query-builder API before use — it has shifted across majors |
 | `lib/services/auth_service.dart` | Anonymous sign-in + Apple/Google identity-linking + email OTP, preserving the anonymous user id | Add `sign_in_with_apple` / `google_sign_in` packages and native config when you wire the sign-in buttons |
 | `lib/services/ai_gateway.dart` | `MockAiGateway` (what the app uses today) + `HttpAiGateway` client for meal analysis / chat replies | Stand up a server endpoint (Edge Function or similar) that holds the OpenAI key server-side — **the client never holds a model API key**, per spec_mvp.txt §29.1 |

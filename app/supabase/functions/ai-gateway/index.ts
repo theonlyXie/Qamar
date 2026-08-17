@@ -7,6 +7,8 @@
 // Routes:
 //   POST /ai-gateway/chat/reply     { message, lang, date?, current_plan?, swapped_slots? }
 //   POST /ai-gateway/meal/analyze   { inputType, text?, imageBase64?, imageMediaType? }
+//     text/voice: food graph only — no model, no daily AI use
+//     photo: takeAiUse + vision model (Qamar+ on the client)
 //   POST /ai-gateway/plan/generate  { date?, lang?, force?, instruction? }
 //   POST /ai-gateway/scan/read      { imageBase64, imageMediaType, lang }
 //   POST /ai-gateway/quota          {}
@@ -33,6 +35,7 @@ import {
 } from "./model.ts";
 import { retrieve, type FoodFacts, type Passage, type Source } from "./retrieval.ts";
 import {
+  itemsFromResolutions,
   renderResolutions,
   resolveFoods,
   toPacketFacts,
@@ -635,6 +638,95 @@ function mealClaims(items: MealItem[]): unknown[] {
   }));
 }
 
+function graphMealNote(lang: "ar" | "en", items: MealItem[]): string {
+  if (items.length === 0) {
+    return lang === "ar"
+      ? "مقدرتش ألاقي الأكل ده في قاعدة البيانات. جرّب اسم أوضح. تصوير الطبق لـ Qamar+."
+      : "I could not match that to a food we know. Try a clearer name. Photographing a plate is Qamar+.";
+  }
+  return lang === "ar"
+    ? "الأرقام من قاعدة الأكل، مش من الموديل. ظبّط الكميات قبل ما تأكد."
+    : "These numbers come from the food database, not the model. Adjust the amounts before you confirm.";
+}
+
+/**
+ * Prices a typed or spoken meal from the food graph only.
+ *
+ * This is the free-tier path. The daily AI counter, Voyage retrieval, and the
+ * model stay off: a miss is an empty list, not a reason to call Claude.
+ */
+async function analyzeMealFromGraph(
+  userId: string,
+  lang: "ar" | "en",
+  described: string,
+  ctx: UserContext,
+  lifeStage: string,
+  target: TargetRow | null,
+): Promise<Response> {
+  const [resolved, resolveMs] = await timed(() =>
+    resolveFoods(SUPABASE_URL, SERVICE_KEY, foodTerms(described))
+  );
+  const items = itemsFromResolutions(resolved);
+  const sources = resolvedSources([], resolved);
+  const verification = verifyMeal(items);
+
+  let quota: Quota;
+  try {
+    quota = await quotaStatus(userId);
+  } catch {
+    quota = { allowed: true, used: 0, limit: 5, extra: 0, remaining: 5 };
+  }
+
+  const id = await record(userId, "meal_analysis", {
+    inScope: true,
+    question: described,
+    answer: JSON.stringify(items).slice(0, 2000),
+    sources,
+    model: "graph",
+  });
+  const flags = lifeStage === "none" ? [] : [`life_stage:${lifeStage}`];
+  await recordAllowed(
+    SUPABASE_URL,
+    SERVICE_KEY,
+    userId,
+    id,
+    "general_wellness",
+    flags,
+    ["analyse_meal_graph"],
+  );
+
+  const [facts, rules] = await Promise.all([
+    loadUserFacts(SUPABASE_URL, SERVICE_KEY, userId, ctx),
+    ruleSelection(SUPABASE_URL, SERVICE_KEY, { age: ctx.age ?? null, sex: ctx.gender ?? null, lifeStage }),
+  ]);
+  await trace(userId, id, "meal_analysis", {
+    userFacts: facts,
+    foodFacts: toPacketFacts(resolved),
+    calculatedTargets: targetsFrom(ctx, target),
+    applicableRules: rules.applicable,
+    excludedRules: rules.excluded,
+    candidateDecision: { items, input: "text", priced_by: "graph" },
+    safetyFlags: flags,
+    uncertainty: {
+      foods: resolutionUncertainty(resolved),
+      passages_retrieved: 0,
+      low_confidence_items: items
+        .filter((i) => i?.confidence !== "high")
+        .map((i) => i?.en ?? i?.ar ?? "unnamed"),
+    },
+    claimsToVerify: mealClaims(items),
+  }, [{ stage: "food_resolver", externalCalls: externalCallsIn(resolved), latencyMs: resolveMs }], [verification]);
+
+  return json({
+    items,
+    note: graphMealNote(lang, items),
+    quota: quotaPayload(quota),
+    sources,
+    resolutions: toPacketFacts(resolved),
+    verification: verificationSummary(verification),
+  });
+}
+
 async function analyzeMeal(
   userId: string,
   body: { inputType?: string; text?: string; imageBase64?: string; imageMediaType?: string; lang?: string },
@@ -657,6 +749,14 @@ async function analyzeMeal(
   if (typeof image === "string") return json({ error: image }, 413);
 
   if (!described && !image) return json({ items: [], note: "nothing to analyse" });
+
+  // Typed and spoken logs are the food graph: aliases, portions, per-100 g
+  // numbers. No embeddings, no model, no daily AI use. A photo is the one
+  // meal path that still needs vision, and that is what the five-a-day cap
+  // is for.
+  if (!image) {
+    return await analyzeMealFromGraph(userId, lang, described, ctx, lifeStage, target);
+  }
 
   // Free text names foods we can resolve; a photo does not, so resolution is
   // driven by whatever the user typed alongside it, if anything. The graph

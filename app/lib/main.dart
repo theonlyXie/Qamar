@@ -59,6 +59,7 @@ Future<AppState> _backedState(Dictation dictation) async {
     return AppState(
       profileRepo: SupabaseProfileRepository(client),
       mealRepo: SupabaseMealRepository(client),
+      waterRepo: SupabaseWaterRepository(client),
       walletRepo: SupabaseWalletRepository(client),
       ai: _gatewayIfConfigured(client),
       billing: _billingIfConfigured(client),
