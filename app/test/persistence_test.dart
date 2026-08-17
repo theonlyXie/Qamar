@@ -770,6 +770,44 @@ void main() {
     expect(state.plusNotice, contains('Paymob'));
   });
 
+  test('a promo code is sent with checkout and still does not mark Plus on the phone', () async {
+    final billing = FakeBilling();
+    final state = AppState(
+      userId: 'user-1',
+      billing: billing,
+      openCheckout: (url) async => true,
+    )..setLang(AppLang.en);
+    await settle();
+
+    state.selectPlusPlan(PlusPlan.monthly);
+    state.setPlusPromoCode('qmr 7k2p');
+    await settle();
+    await state.startPlusPurchase();
+
+    expect(billing.lastPlan, 'monthly');
+    expect(billing.lastPromo, 'QMR7K2P');
+    expect(state.plusActive, isFalse);
+  });
+
+  test('a promo code is sent with checkout and still does not mark Plus on the phone', () async {
+    final billing = FakeBilling();
+    final state = AppState(
+      userId: 'user-1',
+      billing: billing,
+      openCheckout: (url) async => true,
+    )..setLang(AppLang.en);
+    await settle();
+
+    state.selectPlusPlan(PlusPlan.monthly);
+    state.setPlusPromoCode('qmr 7k2p');
+    await settle();
+    await state.startPlusPurchase();
+
+    expect(billing.lastPlan, 'monthly');
+    expect(billing.lastPromo, 'QMR7K2P');
+    expect(state.plusActive, isFalse);
+  });
+
   test('coming back from Paymob reads the server entitlement', () async {
     final billing = FakeBilling()
       ..current = PlusEntitlement(
@@ -788,16 +826,20 @@ void main() {
 
 class FakeBilling implements BillingGateway {
   String? lastPlan;
+  String? lastPromo;
   PlusEntitlement current = PlusEntitlement.free;
+  AffiliateWallet wallet = const AffiliateWallet(code: 'QMRTEST1');
 
   @override
   Future<CheckoutSession> checkout({
     required String plan,
+    String? promoCode,
     String? email,
     String? phone,
     String? firstName,
   }) async {
     lastPlan = plan;
+    lastPromo = promoCode;
     return const CheckoutSession(
       checkoutUrl: 'https://accept.paymob.com/unifiedcheckout/?publicKey=pk_test&clientSecret=csk_test',
       orderId: 'ord-1',
@@ -805,5 +847,30 @@ class FakeBilling implements BillingGateway {
   }
 
   @override
+  Future<PlusQuote> quote({required String plan, String? promoCode}) async {
+    return PlusPricing.quote(
+      plan: plan,
+      firstPurchase: current.firstPurchase,
+      promo: promoCode == null || promoCode.isEmpty
+          ? null
+          : PlusPromo(code: promoCode, kind: 'affiliate', ownerUserId: 'friend'),
+    );
+  }
+
+  @override
   Future<PlusEntitlement> entitlement() async => current;
+
+  @override
+  Future<AffiliateWallet> affiliate() async => wallet;
+
+  @override
+  Future<AffiliateWallet> requestAffiliatePayout({int? amountCents}) async {
+    wallet = AffiliateWallet(
+      code: wallet.code,
+      balanceCents: 0,
+      lifetimeEarnedCents: wallet.lifetimeEarnedCents,
+      pendingPayoutCents: amountCents ?? wallet.balanceCents,
+    );
+    return wallet;
+  }
 }

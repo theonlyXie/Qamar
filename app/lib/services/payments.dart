@@ -9,8 +9,17 @@ import '../models/billing.dart';
 /// Meeza, Vodafone Cash / Orange Cash. The app never holds a Paymob secret
 /// and never marks someone Plus from a browser redirect.
 abstract class BillingGateway {
-  Future<CheckoutSession> checkout({required String plan, String? email, String? phone, String? firstName});
+  Future<PlusQuote> quote({required String plan, String? promoCode});
+  Future<CheckoutSession> checkout({
+    required String plan,
+    String? promoCode,
+    String? email,
+    String? phone,
+    String? firstName,
+  });
   Future<PlusEntitlement> entitlement();
+  Future<AffiliateWallet> affiliate();
+  Future<AffiliateWallet> requestAffiliatePayout({int? amountCents});
 }
 
 class HttpBillingGateway implements BillingGateway {
@@ -30,8 +39,25 @@ class HttpBillingGateway implements BillingGateway {
       };
 
   @override
+  Future<PlusQuote> quote({required String plan, String? promoCode}) async {
+    final res = await _client.post(
+      Uri.parse('$baseUrl/quote'),
+      headers: _headers,
+      body: jsonEncode({
+        'plan': plan,
+        if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
+      }),
+    );
+    if (res.statusCode != 200) {
+      throw BillingException('quote failed: ${res.statusCode} ${res.body}');
+    }
+    return PlusQuote.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+  }
+
+  @override
   Future<CheckoutSession> checkout({
     required String plan,
+    String? promoCode,
     String? email,
     String? phone,
     String? firstName,
@@ -41,6 +67,7 @@ class HttpBillingGateway implements BillingGateway {
       headers: _headers,
       body: jsonEncode({
         'plan': plan,
+        if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
         if (email != null && email.isNotEmpty) 'email': email,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
         if (firstName != null && firstName.isNotEmpty) 'first_name': firstName,
@@ -55,7 +82,11 @@ class HttpBillingGateway implements BillingGateway {
     if (url == null || orderId == null) {
       throw BillingException('checkout returned no Paymob session');
     }
-    return CheckoutSession(checkoutUrl: url, orderId: orderId);
+    return CheckoutSession(
+      checkoutUrl: url,
+      orderId: orderId,
+      amountCents: (json['amount_cents'] as num?)?.toInt(),
+    );
   }
 
   @override
@@ -69,6 +100,34 @@ class HttpBillingGateway implements BillingGateway {
       throw BillingException('entitlement failed: ${res.statusCode} ${res.body}');
     }
     return PlusEntitlement.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<AffiliateWallet> affiliate() async {
+    final res = await _client.post(
+      Uri.parse('$baseUrl/affiliate'),
+      headers: _headers,
+      body: jsonEncode({}),
+    );
+    if (res.statusCode != 200) {
+      throw BillingException('affiliate failed: ${res.statusCode} ${res.body}');
+    }
+    return AffiliateWallet.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<AffiliateWallet> requestAffiliatePayout({int? amountCents}) async {
+    final res = await _client.post(
+      Uri.parse('$baseUrl/affiliate/payout'),
+      headers: _headers,
+      body: jsonEncode({
+        if (amountCents != null) 'amount_cents': amountCents,
+      }),
+    );
+    if (res.statusCode != 200) {
+      throw BillingException('payout failed: ${res.statusCode} ${res.body}');
+    }
+    return AffiliateWallet.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
   }
 }
 

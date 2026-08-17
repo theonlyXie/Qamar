@@ -50,7 +50,7 @@ jobs:
           deno-version: v2.x
 
       - name: Type check
-        run: deno check index.ts hmac.ts
+        run: deno check index.ts hmac.ts pricing.ts
 
       - name: Lint
         run: deno lint

@@ -21,7 +21,7 @@ import '../models/profile.dart';
 import 'chat_replies.dart';
 
 /// Qamar+ billing period.
-enum PlusPlan { monthly, annual }
+enum PlusPlan { monthly, quarterly, annual }
 
 /// How a meal gets logged straight from the orb, with no page in between.
 enum QuickLog { voice, text, photo }
@@ -137,6 +137,7 @@ class AppState extends ChangeNotifier {
 
       await _refreshQuota();
       await _refreshPlus();
+      await _refreshAffiliate();
 
       final history = await _mealRepo?.dailyTotals(uid, days: 7);
       if (history != null) {
@@ -262,6 +263,11 @@ class AppState extends ChangeNotifier {
     plusUntil = null;
     plusNotice = null;
     plusPlan = PlusPlan.annual;
+    plusPromoCode = '';
+    plusQuote = null;
+    plusFirstPurchase = true;
+    affiliateWallet = AffiliateWallet.empty;
+    affiliateNotice = null;
     improve = false;
     questDone = false;
     proposal = null;
@@ -1208,16 +1214,74 @@ class AppState extends ChangeNotifier {
   /// Set when checkout cannot start, or while Paymob's page is open.
   String? plusNotice;
 
+  /// Typed promo / affiliate code. The server stamps the price from this.
+  String plusPromoCode = '';
+
+  /// Last server (or local) quote for the selected plan. Display only.
+  PlusQuote? plusQuote;
+  bool plusFirstPurchase = true;
+  int _plusQuoteGen = 0;
+
+  /// Affiliate cash wallet (EGP we send the marketer). Not Su Points.
+  AffiliateWallet affiliateWallet = AffiliateWallet.empty;
+  String? affiliateNotice;
+
+  PlusQuote get displayPlusQuote =>
+      plusQuote ??
+      PlusPricing.quote(plan: plusPlan.name, firstPurchase: plusFirstPurchase);
+
   void openSubscription() {
     screen = AppScreen.subscription;
     treeOpen = false;
     plusNotice = null;
     _notify();
+    refreshPlusQuote();
   }
 
   void selectPlusPlan(PlusPlan p) {
     plusPlan = p;
     plusNotice = null;
+    plusQuote = PlusPricing.quote(
+      plan: p.name,
+      firstPurchase: plusFirstPurchase,
+    );
+    _notify();
+    refreshPlusQuote();
+  }
+
+  void setPlusPromoCode(String code) {
+    plusPromoCode = PlusPricing.normalizeCode(code);
+    plusNotice = null;
+    _notify();
+    refreshPlusQuote();
+  }
+
+  Future<void> refreshPlusQuote() async {
+    final billing = _billing;
+    final gen = ++_plusQuoteGen;
+    if (billing == null) {
+      plusQuote = PlusPricing.quote(
+        plan: plusPlan.name,
+        firstPurchase: plusFirstPurchase,
+      );
+      _notify();
+      return;
+    }
+    try {
+      final quoted = await billing.quote(
+        plan: plusPlan.name,
+        promoCode: plusPromoCode.isEmpty ? null : plusPromoCode,
+      );
+      if (gen != _plusQuoteGen) return;
+      plusQuote = quoted;
+      plusFirstPurchase = quoted.firstPurchase;
+    } catch (_) {
+      if (gen != _plusQuoteGen) return;
+      plusQuote = PlusPricing.quote(
+        plan: plusPlan.name,
+        firstPurchase: plusFirstPurchase,
+      );
+    }
     _notify();
   }
 
@@ -1231,7 +1295,8 @@ class AppState extends ChangeNotifier {
       _notify();
       return;
     }
-    if (!isBacked || _billing == null) {
+    final billing = _billing;
+    if (!isBacked || billing == null) {
       plusNotice = isAr
           ? 'الدفع في مصر عن طريق Paymob. اربط حسابك الأول، وبعدين نفتح صفحة الدفع بالجنيه المصري (فيزا، محفظة، أو Meeza).'
           : 'Egypt billing runs through Paymob. Link your account first, then we open checkout in EGP (card, wallet, or Meeza).';
@@ -1242,9 +1307,9 @@ class AppState extends ChangeNotifier {
     plusNotice = isAr ? 'بنفتح صفحة Paymob…' : 'Opening Paymob…';
     _notify();
     try {
-      final product = plusPlan == PlusPlan.annual ? PlusCatalog.annual : PlusCatalog.monthly;
-      final session = await _billing!.checkout(
-        plan: product.id,
+      final session = await billing.checkout(
+        plan: plusPlan.name,
+        promoCode: plusPromoCode.isEmpty ? null : plusPromoCode,
         email: _auth?.email,
         firstName: profile.name.isEmpty ? null : profile.name.split(' ').first,
       );
@@ -1273,6 +1338,7 @@ class AppState extends ChangeNotifier {
   /// Called when Paymob sends the person back to the app.
   Future<void> onReturnedFromPaymob() async {
     await _refreshPlus(announce: true);
+    await _refreshAffiliate();
     if (screen != AppScreen.subscription) go(AppScreen.subscription);
   }
 
@@ -1283,6 +1349,7 @@ class AppState extends ChangeNotifier {
       final ent = await billing.entitlement();
       plusActive = ent.active;
       plusUntil = ent.periodEnd;
+      plusFirstPurchase = ent.firstPurchase;
       if (announce) {
         plusNotice = plusActive
             ? (isAr ? 'قمر+ اشتغل. شكراً.' : 'Qamar+ is on. Thank you.')
@@ -1291,6 +1358,7 @@ class AppState extends ChangeNotifier {
                 : 'Paymob has not confirmed a payment yet. If you just finished, wait a moment and tap Restore.');
       }
       _notify();
+      await refreshPlusQuote();
     } catch (e) {
       if (announce) {
         plusNotice = isAr
@@ -1299,6 +1367,46 @@ class AppState extends ChangeNotifier {
         _notify();
       }
     }
+  }
+
+  Future<void> _refreshAffiliate() async {
+    final billing = _billing;
+    if (billing == null || !isBacked) return;
+    try {
+      affiliateWallet = await billing.affiliate();
+      _notify();
+    } catch (_) {
+      // The paywall still works without the affiliate card.
+    }
+  }
+
+  Future<void> requestAffiliatePayout() async {
+    final billing = _billing;
+    if (billing == null || !isBacked) {
+      affiliateNotice = isAr
+          ? 'اربط حسابك الأول عشان نقدر نحوللك العمولة.'
+          : 'Link your account first so we can send the commission.';
+      _notify();
+      return;
+    }
+    if (!affiliateWallet.canRedeem) {
+      affiliateNotice = isAr
+          ? 'أقل تحويل ٥٠ ج.م. لما محفظة العمولة توصل للمبلغ ده، نقدر نبعتهالك.'
+          : 'The smallest payout is EGP 50. When the affiliate wallet reaches that, we can send it.';
+      _notify();
+      return;
+    }
+    try {
+      affiliateWallet = await billing.requestAffiliatePayout();
+      affiliateNotice = isAr
+          ? 'طلب التحويل اتسجل. هنبعتهالك بالجنيه من طرفنا — مش نقاط Su.'
+          : 'Payout requested. We will send the EGP from our end — this is not Su Points.';
+    } catch (_) {
+      affiliateNotice = isAr
+          ? 'مقدرتش أسجّل طلب التحويل دلوقتي.'
+          : 'Could not request that payout just now.';
+    }
+    _notify();
   }
 
   void showSpend() {

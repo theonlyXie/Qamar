@@ -3,9 +3,12 @@
 // decides that someone has paid — Paymob posts a signed callback here.
 //
 // Routes:
-//   POST /billing/checkout     { plan: "monthly"|"annual" }   JWT
-//   POST /billing/entitlement  {}                             JWT
-//   POST /billing/webhook      Paymob transaction callback    HMAC
+//   POST /billing/quote          { plan, promo_code? }                 JWT
+//   POST /billing/checkout       { plan, promo_code?, first_name? }    JWT
+//   POST /billing/entitlement    {}                                    JWT
+//   POST /billing/affiliate      {}                                    JWT
+//   POST /billing/affiliate/payout { amount_cents? }                   JWT
+//   POST /billing/webhook        Paymob transaction callback           HMAC
 //
 // Secrets:
 //   PAYMOB_SECRET_KEY
@@ -15,6 +18,16 @@
 //   PAYMOB_BASE_URL          optional, defaults to https://accept.paymob.com
 
 import { verifyPaymobHmac } from "./hmac.ts";
+import {
+  MIN_PAYOUT_CENTS,
+  PLANS,
+  isPlanId,
+  normalizePromoCode,
+  quotePlus,
+  type PlanId,
+  type Promo,
+  type Quote,
+} from "./pricing.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -28,13 +41,6 @@ const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-
-const CATALOG = {
-  monthly: { amountCents: 19900, days: 30, nameAr: "قمر+ شهري", nameEn: "Qamar+ monthly" },
-  annual: { amountCents: 159000, days: 365, nameAr: "قمر+ سنوي", nameEn: "Qamar+ annual" },
-} as const;
-
-type PlanId = keyof typeof CATALOG;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -85,22 +91,105 @@ function configured(): string | null {
   return null;
 }
 
+function quoteJson(q: Quote) {
+  return {
+    plan: q.plan,
+    days: q.days,
+    list_cents: q.listCents,
+    amount_cents: q.amountCents,
+    currency: "EGP",
+    pricing_reason: q.pricingReason,
+    first_purchase: q.firstPurchase,
+    promo_code: q.promoCode,
+    promo_kind: q.promoKind,
+    affiliate_commission_cents: q.affiliateCommissionCents,
+    promo_note: q.promoNote,
+    promo_error: q.promoError,
+  };
+}
+
+async function firstPurchase(userId: string): Promise<boolean> {
+  const paid = await rpc("qamar_has_paid_plus", { p_user_id: userId });
+  return paid !== true;
+}
+
+async function loadPromo(code: string): Promise<Promo | null> {
+  const res = await db(`promo_codes?code=eq.${encodeURIComponent(code)}&select=*`);
+  if (!res.ok) return null;
+  const rows = await res.json() as Array<Record<string, unknown>>;
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) return null;
+  const kind = row.kind === "campaign" ? "campaign" : row.kind === "affiliate" ? "affiliate" : null;
+  if (!kind) return null;
+  const plansRaw = row.applies_to_plans;
+  const applies = Array.isArray(plansRaw)
+    ? plansRaw.filter((p): p is PlanId => typeof p === "string" && isPlanId(p))
+    : null;
+  return {
+    id: typeof row.id === "string" ? row.id : undefined,
+    code: String(row.code),
+    kind,
+    ownerUserId: typeof row.owner_user_id === "string" ? row.owner_user_id : null,
+    percentOff: typeof row.percent_off === "number" ? row.percent_off : null,
+    amountCents: typeof row.amount_cents === "number" ? row.amount_cents : null,
+    appliesToPlans: applies && applies.length > 0 ? applies : null,
+    active: row.active !== false,
+    startsAt: typeof row.starts_at === "string" ? new Date(row.starts_at) : null,
+    endsAt: typeof row.ends_at === "string" ? new Date(row.ends_at) : null,
+    maxRedemptions: typeof row.max_redemptions === "number" ? row.max_redemptions : null,
+    redemptionCount: typeof row.redemption_count === "number" ? row.redemption_count : 0,
+  };
+}
+
+async function buildQuote(userId: string, planRaw: unknown, codeRaw: unknown): Promise<Quote | Response> {
+  if (typeof planRaw !== "string" || !isPlanId(planRaw)) {
+    return json({ error: "choose monthly, 3 months, or 1 year" }, 400);
+  }
+  const code = normalizePromoCode(typeof codeRaw === "string" ? codeRaw : "");
+  let promo: Promo | null = null;
+  if (code) {
+    promo = await loadPromo(code);
+    if (!promo) {
+      const first = await firstPurchase(userId);
+      const q = quotePlus({ plan: planRaw, firstPurchase: first, buyerUserId: userId, promo: null });
+      q.promoError = "This code was not found";
+      q.promoCode = code;
+      return q;
+    }
+  }
+  const first = await firstPurchase(userId);
+  return quotePlus({ plan: planRaw, firstPurchase: first, buyerUserId: userId, promo });
+}
+
+async function quoteRoute(userId: string, body: Record<string, unknown>): Promise<Response> {
+  const built = await buildQuote(userId, body.plan, body.promo_code);
+  if (built instanceof Response) return built;
+  return json(quoteJson(built));
+}
+
 async function checkout(user: { id: string; email?: string }, body: Record<string, unknown>): Promise<Response> {
   const missing = configured();
   if (missing) return json({ error: missing }, 503);
 
-  const plan = body.plan === "annual" ? "annual" : body.plan === "monthly" ? "monthly" : null;
-  if (!plan) return json({ error: "choose monthly or annual" }, 400);
-  const product = CATALOG[plan as PlanId];
+  const built = await buildQuote(user.id, body.plan, body.promo_code);
+  if (built instanceof Response) return built;
+  if (built.promoError) return json({ error: built.promoError, quote: quoteJson(built) }, 400);
+
+  const plan = built.plan;
+  const product = PLANS[plan];
 
   const created = await db("billing_orders", {
     method: "POST",
     body: JSON.stringify({
       user_id: user.id,
       plan,
-      amount_cents: product.amountCents,
+      amount_cents: built.amountCents,
       currency: "EGP",
       status: "pending",
+      pricing_reason: built.pricingReason,
+      promo_code_id: built.promoId,
+      affiliate_user_id: built.affiliateUserId,
+      affiliate_commission_cents: built.affiliateCommissionCents,
     }),
   });
   if (!created.ok) return json({ error: `could not open an order: ${await created.text()}` }, 500);
@@ -122,12 +211,12 @@ async function checkout(user: { id: string; email?: string }, body: Record<strin
       Authorization: `Token ${PAYMOB_SECRET}`,
     },
     body: JSON.stringify({
-      amount: product.amountCents,
+      amount: built.amountCents,
       currency: "EGP",
       payment_methods: paymentMethods(),
       items: [{
         name: product.nameEn,
-        amount: product.amountCents,
+        amount: built.amountCents,
         description: product.nameAr,
         quantity: 1,
       }],
@@ -145,7 +234,12 @@ async function checkout(user: { id: string; email?: string }, body: Record<strin
         state: "Cairo",
         postal_code: "NA",
       },
-      extras: { qamar_order_id: orderId, qamar_user_id: user.id, qamar_plan: plan },
+      extras: {
+        qamar_order_id: orderId,
+        qamar_user_id: user.id,
+        qamar_plan: plan,
+        qamar_pricing_reason: built.pricingReason,
+      },
       special_reference: orderId,
       notification_url: notify,
       redirection_url: redirect,
@@ -185,15 +279,45 @@ async function checkout(user: { id: string; email?: string }, body: Record<strin
     checkout_url: checkoutUrl,
     order_id: orderId,
     plan,
-    amount_cents: product.amountCents,
+    amount_cents: built.amountCents,
     currency: "EGP",
     provider: "paymob",
+    pricing_reason: built.pricingReason,
   });
 }
 
 async function entitlement(userId: string): Promise<Response> {
   const snap = await rpc("qamar_entitlement_snapshot", { p_user_id: userId });
+  const first = await firstPurchase(userId);
+  const body = snap && typeof snap === "object" ? { ...(snap as Record<string, unknown>), first_purchase: first } : { first_purchase: first };
+  return json(body);
+}
+
+async function affiliate(userId: string): Promise<Response> {
+  await rpc("qamar_ensure_affiliate_code", { p_user_id: userId });
+  const snap = await rpc("qamar_affiliate_snapshot", { p_user_id: userId });
   return json(snap);
+}
+
+async function affiliatePayout(userId: string, body: Record<string, unknown>): Promise<Response> {
+  const raw = body.amount_cents;
+  const amount = typeof raw === "number" && Number.isFinite(raw) ? Math.floor(raw) : null;
+  try {
+    const snap = await rpc("qamar_request_affiliate_payout", {
+      p_user_id: userId,
+      p_amount_cents: amount,
+    });
+    return json(snap);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "payout failed";
+    if (message.includes("minimum payout")) {
+      return json({ error: `Minimum payout is EGP ${MIN_PAYOUT_CENTS / 100}` }, 400);
+    }
+    if (message.includes("not enough")) {
+      return json({ error: "Not enough affiliate balance to redeem" }, 400);
+    }
+    throw e;
+  }
 }
 
 function txnObject(body: unknown): Record<string, unknown> | null {
@@ -291,10 +415,16 @@ Deno.serve(async (req) => {
 
   try {
     switch (route) {
+      case "/quote":
+        return await quoteRoute(user.id, body);
       case "/checkout":
         return await checkout(user, body);
       case "/entitlement":
         return await entitlement(user.id);
+      case "/affiliate":
+        return await affiliate(user.id);
+      case "/affiliate/payout":
+        return await affiliatePayout(user.id, body);
       default:
         return json({ error: `unknown route ${route}` }, 404);
     }

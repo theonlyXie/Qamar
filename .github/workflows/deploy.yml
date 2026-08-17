@@ -41,7 +41,7 @@ jobs:
         if: ${{ !inputs.skip_tests }}
         working-directory: app/supabase/functions/billing
         run: |
-          deno check index.ts hmac.ts
+          deno check index.ts hmac.ts pricing.ts
           deno test
 
       - name: Warn when the gate was skipped
