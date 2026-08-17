@@ -2,18 +2,21 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 
 import '../l10n/strings.dart';
 import '../models/meal.dart';
 import '../models/messages.dart';
 import '../models/onboarding.dart';
 import '../models/plan.dart';
+import '../models/su_economy.dart';
 import '../services/ai_gateway.dart';
 import '../services/auth_service.dart';
 import '../services/dictation.dart';
 import '../services/repositories.dart';
 import '../widgets/explain.dart';
 import '../models/profile.dart';
+import '../models/water.dart';
 import 'chat_replies.dart';
 
 /// Qamar+ billing period.
@@ -41,6 +44,7 @@ class AppState extends ChangeNotifier {
   AppState({
     ProfileRepository? profileRepo,
     MealRepository? mealRepo,
+    WaterRepository? waterRepo,
     WalletRepository? walletRepo,
     AiGateway? ai,
     Dictation? dictation,
@@ -48,6 +52,7 @@ class AppState extends ChangeNotifier {
     String? userId,
   })  : _profileRepo = profileRepo,
         _mealRepo = mealRepo,
+        _waterRepo = waterRepo,
         _walletRepo = walletRepo,
         _ai = ai,
         _dictation = dictation,
@@ -59,6 +64,7 @@ class AppState extends ChangeNotifier {
 
   final ProfileRepository? _profileRepo;
   final MealRepository? _mealRepo;
+  final WaterRepository? _waterRepo;
   final WalletRepository? _walletRepo;
 
   /// The real assistant, when AI_GATEWAY_URL is configured. Null means the
@@ -115,11 +121,20 @@ class AppState extends ChangeNotifier {
           ..addAll(today);
       }
 
+      final water = await _waterRepo?.sipsForDay(uid, DateTime.now());
+      if (water != null) {
+        waterToday
+          ..clear()
+          ..addAll(water);
+      }
+
       final bal = await _walletRepo?.balance(uid);
       if (bal != null) {
         suAvailable = bal.available;
         suLifetime = bal.lifetime;
       }
+
+      await _refreshQuota();
 
       final history = await _mealRepo?.dailyTotals(uid, days: 7);
       if (history != null) {
@@ -161,6 +176,12 @@ class AppState extends ChangeNotifier {
 
   final List<LoggedMeal> meals = [];
 
+  /// Glasses and bottles drunk today. One running millilitre total.
+  final List<WaterSip> waterToday = [];
+
+  WaterStatus get water =>
+      WaterStatus(waterToday.fold<int>(0, (sum, s) => sum + s.ml));
+
   /// Days that actually have logged meals behind them, from the backend.
   /// Empty offline and empty for a new user — the Progress screen says so
   /// rather than drawing a week that never happened.
@@ -187,6 +208,7 @@ class AppState extends ChangeNotifier {
   bool treeOpen = false;
   int suAvailable = 0;
   int suLifetime = 0;
+  AiQuota aiQuota = AiQuota.empty;
   bool questDone = false;
   /// Meal slots the user has swapped to their alternative, keyed by slot id
   /// ('breakfast' | 'lunch' | 'dinner'). Previously a single bool, which meant
@@ -221,6 +243,9 @@ class AppState extends ChangeNotifier {
   /// like the prototype's `iso()` — keeps "٨٢ كجم" reading correctly in RTL.
   String iso(String x) => '⁦$x⁩';
 
+  /// Thousands separators so 2,500 looks like a score, not a calorie leftover.
+  String formatSu(int n) => NumberFormat.decimalPattern(isAr ? 'ar' : 'en').format(n);
+
   void setLang(AppLang l) {
     lang = l;
     _notify();
@@ -231,6 +256,7 @@ class AppState extends ChangeNotifier {
     step = 0;
     msgs.clear();
     meals.clear();
+    waterToday.clear();
     chat.clear();
     blocked = false;
     minor = false;
@@ -250,6 +276,7 @@ class AppState extends ChangeNotifier {
     scanReading = false;
     suAvailable = 0;
     suLifetime = 0;
+    aiQuota = AiQuota.empty;
     redeemed.clear();
     ledgerExtra.clear();
     serverLedger.clear();
@@ -904,7 +931,7 @@ class AppState extends ChangeNotifier {
       // Awarded locally for now: crediting Su Points is server-only (see
       // SupabaseWalletRepository.credit), so the balance reconciles to the
       // server's number on the next hydrate once the Edge Function exists.
-      _credit(20, ar: 'إكمال التهيئة', en: 'Onboarding completed');
+      _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
       _notify();
 
       if (isBacked) {
@@ -961,6 +988,43 @@ class AppState extends ChangeNotifier {
       f += m.f;
     }
     return Totals(kcal: kcal, p: p, c: c, f: f);
+  }
+
+  // ---- water ----------------------------------------------------------
+  //
+  // Two taps: a glass or a bottle. The card shows glasses, bottles, litres,
+  // and litres left. Nothing goes through the assistant.
+
+  void logWater(WaterUnit unit) {
+    final sip = WaterSip(
+      unit: unit,
+      ml: Water.mlFor(unit),
+      at: DateTime.now(),
+    );
+    waterToday.add(sip);
+    _notify();
+    if (!isBacked) return;
+    final repo = _waterRepo;
+    if (repo == null) return;
+    _push('log water', (uid) async {
+      final id = await repo.addSip(uid, sip);
+      final i = waterToday.indexOf(sip);
+      if (i >= 0) {
+        waterToday[i] = sip.copyWith(id: id);
+        _notify();
+      }
+    });
+  }
+
+  void undoWater() {
+    if (waterToday.isEmpty) return;
+    final last = waterToday.removeLast();
+    _notify();
+    final id = last.id;
+    if (!isBacked || id == null) return;
+    final repo = _waterRepo;
+    if (repo == null) return;
+    _push('undo water', (uid) => repo.removeSip(uid, id));
   }
 
   // ---- logging a meal -------------------------------------------------
@@ -1057,17 +1121,22 @@ class AppState extends ChangeNotifier {
         lang: lang.code,
       );
       if (_disposed) return;
+      await _pullQuota(gateway);
       chatState = ChatState.idle;
 
       if (result.items.isEmpty) {
-        // An empty reading is a real answer — usually a photo too dark or too
-        // crowded to trust. Saying so beats inventing a plate of food.
+        // An empty reading is a real answer — a name the graph does not carry,
+        // or a photo too dark to trust. Saying so beats inventing a plate.
+        final fallback = inputType == 'photo'
+            ? (isAr
+                ? 'مقدرتش أقرأ الوجبة من الصورة دي. جرّب صورة أوضح، أو احكيلي أكلت إيه.'
+                : 'I could not read this meal. Try a clearer photo, or tell me what you ate.')
+            : (isAr
+                ? 'مقدرتش ألاقي الأكل ده. جرّب اسم أوضح، أو صوّر الطبق من Qamar+.'
+                : 'I could not match that food. Try a clearer name, or photograph the plate with Qamar+.');
         chat.add(ChatTurn(
           who: ChatWho.q,
-          text: result.note ??
-              (isAr
-                  ? 'مقدرتش أقرأ الوجبة من الصورة دي. جرّب صورة أوضح، أو احكيلي أكلت إيه.'
-                  : 'I could not read this meal. Try a clearer photo, or tell me what you ate.'),
+          text: result.note ?? fallback,
         ));
         proposal = null;
         proposalQty = [];
@@ -1080,6 +1149,9 @@ class AppState extends ChangeNotifier {
           sub: result.note,
         ));
       }
+    } on AiQuotaException catch (e) {
+      if (_disposed) return;
+      _onQuotaHit(e);
     } catch (e) {
       if (_disposed) return;
       chatState = ChatState.idle;
@@ -1117,12 +1189,14 @@ class AppState extends ChangeNotifier {
     final drafted = items.map((it) => (def: it.def, qty: it.q)).toList();
     final raw = proposalRaw;
 
+    final first = meals.isEmpty;
     meals.add(meal);
-    _credit(10, ar: 'تأكيد وجبة', en: 'Meal confirmed');
+    final award = first ? SuEconomy.firstMeal : SuEconomy.mealLogged;
+    _credit(award, ar: first ? 'أول وجبة' : 'تأكيد وجبة', en: first ? 'First meal logged' : 'Meal confirmed');
     chat.add(ChatTurn(
       who: ChatWho.q,
       text: isAr ? 'اتسجّلت: ${totals.kcal} سعرة.' : 'Logged: ${totals.kcal} kcal.',
-      sub: isAr ? '+١٠ نقطة' : '+10 Su',
+      sub: isAr ? '+${formatSu(award)} نقطة' : '+${formatSu(award)} Su',
     ));
     proposal = null;
     proposalQty = [];
@@ -1149,7 +1223,7 @@ class AppState extends ChangeNotifier {
 
   void completeQuest() {
     questDone = true;
-    _credit(5, ar: 'مهمة اليوم', en: 'Primary daily quest');
+    _credit(SuEconomy.dailyQuest, ar: 'مهمة اليوم', en: 'Primary daily quest');
     _notify();
   }
 
@@ -1178,7 +1252,21 @@ class AppState extends ChangeNotifier {
 
   /// Set when a purchase is attempted with no store products configured, which
   /// is the expected state until App Store Connect / Play Console are set up.
+  /// Also set when a free-tier user tries to photograph a meal.
   String? plusNotice;
+
+  /// Photographing a plate uses the vision model, so it is Qamar+. Typing and
+  /// speaking a meal stay on the free tier and do not spend the daily AI cap.
+  void refusePhotoLog() {
+    treeHold = false;
+    treeHoverNode = null;
+    treeHoverSub = null;
+    treeLogIndex = null;
+    plusNotice = isAr
+        ? 'تصوير الوجبة تحليل بالذكاء الاصطناعي، وده لـ Qamar+. الكتابة والصوت مجاناً ومش بيخصموا من استخدامات قمر.'
+        : 'Photographing a meal uses the model, so it is Qamar+. Typing and speaking are free and do not spend Qamar uses.';
+    go(AppScreen.subscription);
+  }
 
   void openSubscription() {
     screen = AppScreen.subscription;
@@ -1222,22 +1310,61 @@ class AppState extends ChangeNotifier {
 
   bool isRedeemed(String id) => redeemed.contains(id);
 
-  void _pushRedeem(SpendItemDef item) {
-    _push('redeem', (uid) => _walletRepo!.redeem(uid, item: item, idempotencyKey: '${uid}_redeem_${item.id}'));
+  /// Remaining Qamar uses today, from the last gateway response or /quota.
+  Future<void> _pullQuota(AiGateway gateway) async {
+    if (gateway is HttpAiGateway && gateway.lastQuota != null) {
+      aiQuota = gateway.lastQuota!;
+      return;
+    }
+    try {
+      aiQuota = await gateway.quotaStatus();
+    } catch (_) {}
+  }
+
+  Future<void> _refreshQuota() async {
+    final gateway = _ai;
+    if (gateway == null) return;
+    try {
+      aiQuota = await gateway.quotaStatus();
+      _notify();
+    } catch (_) {
+      // A missing counter is not worth blocking Today. The next AI call
+      // will 429 if they are actually out.
+    }
+  }
+
+  void _onQuotaHit(AiQuotaException e) {
+    aiQuota = e.quota;
+    chatState = ChatState.idle;
+    chat.add(ChatTurn(
+      who: ChatWho.q,
+      text: e.message,
+      action: isAr ? 'افتح المحفظة' : 'Open the wallet',
+      openWallet: true,
+    ));
+    _notify();
   }
 
   void redeem(SpendItemDef item) {
-    final done = isRedeemed(item.id);
+    final done = item.once && isRedeemed(item.id);
     final afford = suAvailable >= item.price && !done;
     if (!afford) return;
     suAvailable -= item.price;
-    redeemed.add(item.id);
+    if (item.once) redeemed.add(item.id);
+    if (item.grantsAiUses > 0) {
+      aiQuota = aiQuota.withExtra(item.grantsAiUses);
+    }
     ledgerExtra.insert(0, LedgerEntry(label: isAr ? item.nameAr : item.nameEn, amount: -item.price, when: isAr ? 'دلوقتي' : 'Just now'));
     _notify();
 
     // The database is the authority on the balance: the RPC re-checks the
     // price and refuses if the points are not really there.
-    if (isBacked) _pushRedeem(item);
+    if (isBacked) {
+      final key = item.once
+          ? '${_userId}_redeem_${item.id}'
+          : '${_userId}_redeem_${item.id}_${DateTime.now().millisecondsSinceEpoch}';
+      _push('redeem', (uid) => _walletRepo!.redeem(uid, item: item, idempotencyKey: key));
+    }
   }
 
   /// Every entry here is written when the thing it describes actually
@@ -1536,8 +1663,8 @@ class AppState extends ChangeNotifier {
     return n;
   }
 
-  int level() => math.min(20, 1 + (suLifetime / 25).floor());
-  double levelPct() => math.min(100, ((suLifetime % 25) / 25 * 100)).toDouble();
+  int level() => SuEconomy.levelFor(suLifetime);
+  double levelPct() => SuEconomy.levelPctFor(suLifetime);
 
   void openWhy() {
     whyOpen = true;
@@ -1612,11 +1739,25 @@ class AppState extends ChangeNotifier {
 
   static String _today() => DateTime.now().toIso8601String().substring(0, 10);
 
+  void _installPlan(DayPlan built) {
+    plan = built;
+    planDate = built.date;
+    planError = null;
+    // A rewritten menu is not the old one; carrying swaps would apply
+    // yesterday's (or the previous dish's) choice to meals that are not there.
+    swappedSlots.clear();
+  }
+
   /// Builds today's plan. Safe to call on every visit to the Plan screen:
   /// it returns immediately if today's plan is already in hand.
-  Future<void> ensurePlan({bool force = false}) async {
+  ///
+  /// [instruction] is Qamar speaking as the nutritionist — a rebuild of the
+  /// written menu, not a comment on it. The Plan and Today screens then show
+  /// whatever comes back.
+  Future<void> ensurePlan({bool force = false, String? instruction}) async {
     final today = _today();
-    if (!force && planDate == today && hasPlan) return;
+    final note = instruction?.trim();
+    if (!force && (note == null || note.isEmpty) && planDate == today && hasPlan) return;
     if (planLoading) return;
 
     final gateway = _ai;
@@ -1632,13 +1773,19 @@ class AppState extends ChangeNotifier {
     planError = null;
     _notify();
     try {
-      final built = await gateway.generatePlan(date: today, lang: lang.code);
+      final built = await gateway.generatePlan(
+        date: today,
+        lang: lang.code,
+        force: force,
+        instruction: (note == null || note.isEmpty) ? null : note,
+      );
       if (_disposed) return;
-      plan = built;
-      planDate = built.date;
-      // A new day's meals are not the old day's meals; carrying the swaps
-      // over would apply yesterday's choices to dishes that are not there.
-      swappedSlots.clear();
+      await _pullQuota(gateway);
+      _installPlan(built);
+    } on AiQuotaException catch (e) {
+      if (_disposed) return;
+      aiQuota = e.quota;
+      planError = e.message;
     } catch (e) {
       if (_disposed) return;
       planError = _planMessage(e);
@@ -1664,6 +1811,11 @@ class AppState extends ChangeNotifier {
     if (raw.contains('403') || raw.contains('not eligible')) {
       return isAr ? 'الحساب ده مش مؤهل للخطط.' : 'This account is not eligible for plans.';
     }
+    if (raw.contains('429') || raw.toLowerCase().contains('quota')) {
+      return isAr
+          ? 'خلصت استخدامات قمر النهارده. افتح المحفظة وصرف نقاط Su على استخدام زيادة.'
+          : 'That’s today’s Qamar uses. Open the wallet and spend Su Points on another use.';
+    }
     return isAr
         ? 'مقدرتش أعمل الخطة دلوقتي. جرّب تاني بعد شوية.'
         : 'I could not build the plan just now. Try again in a moment.';
@@ -1682,6 +1834,7 @@ class AppState extends ChangeNotifier {
         sub: isAr ? 'اكتب أو ادوس على القمر واحكي.' : 'Type, or tap the moon and speak.',
       ));
     }
+    _refreshQuota();
     _notify();
   }
 
@@ -1736,11 +1889,38 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      final reply = await gateway.chatReply(message: text, lang: lang.code);
+      final result = await gateway.chatReply(
+        message: text,
+        lang: lang.code,
+        date: _today(),
+        currentPlan: plan == null ? null : planToWire(plan!),
+        swappedSlots: swappedSlots.toList(),
+      );
       if (_disposed) return;
+
+      var menuMoved = false;
+      if (result.plan != null) {
+        _installPlan(result.plan!);
+        menuMoved = true;
+      } else if (result.rebuildInstruction != null && result.rebuildInstruction!.trim().isNotEmpty) {
+        while (planLoading && !_disposed) {
+          await Future<void>.delayed(const Duration(milliseconds: 40));
+        }
+        if (_disposed) return;
+        await ensurePlan(force: true, instruction: result.rebuildInstruction);
+        menuMoved = hasPlan;
+      }
+
+      if (_disposed) return;
+      await _pullQuota(gateway);
       chatState = ChatState.idle;
       turn += 1;
-      chat.add(ChatTurn(who: ChatWho.q, text: reply));
+      final action = result.action ??
+          (menuMoved ? (isAr ? 'شوفي الخطة' : 'See the plan') : null);
+      chat.add(ChatTurn(who: ChatWho.q, text: result.reply, action: action));
+    } on AiQuotaException catch (e) {
+      if (_disposed) return;
+      _onQuotaHit(e);
     } catch (e) {
       if (_disposed) return;
       chatState = ChatState.idle;
@@ -1831,8 +2011,9 @@ class AppState extends ChangeNotifier {
   void chatSuggestionTap(String label) => sendChatMsg(label);
 
   void chatActionTap() {
+    final toWallet = chat.isNotEmpty && chat.last.openWallet;
     chatOpen = false;
-    screen = AppScreen.plan;
+    screen = toWallet ? AppScreen.wallet : AppScreen.plan;
     _notify();
   }
 
@@ -1936,6 +2117,10 @@ class AppState extends ChangeNotifier {
   ///  * photo — the caller opens the camera first and hands the shot back
   ///    through [logPhotoTaken].
   void quickLog(QuickLog kind) {
+    if (kind == QuickLog.photo && !plusActive) {
+      refusePhotoLog();
+      return;
+    }
     treeOpen = false;
     treeHold = false;
     treeHoverNode = null;
@@ -1963,8 +2148,12 @@ class AppState extends ChangeNotifier {
 
   /// A meal photographed from the orb. The picture is sent to the assistant,
   /// which reads it and proposes items — all inside the conversation, with no
-  /// analysing page and no confirm page.
+  /// analysing page and no confirm page. Qamar+ only: vision spends a daily use.
   void logPhotoTaken(String path) {
+    if (!plusActive) {
+      refusePhotoLog();
+      return;
+    }
     lastMealPhotoPath = path;
     _loggingMeal = false;
     proposalInput = 'photo';

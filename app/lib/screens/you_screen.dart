@@ -32,7 +32,7 @@ class YouScreen extends StatelessWidget {
             ? (isAr ? 'فاضية' : 'Empty')
             : (isAr ? '${state.iso('$remembered')} عناصر' : '$remembered items')
       ),
-      (isAr ? 'محفظة نقاط Su' : 'Su Points wallet', state.iso('${state.suAvailable}')),
+      (isAr ? 'محفظة نقاط Su' : 'Su Points wallet', state.iso(state.formatSu(state.suAvailable))),
       (isAr ? 'موافقة تحسين الخدمة' : 'Service-improvement consent', state.improve ? (isAr ? 'مفعّلة' : 'On') : (isAr ? 'موقوفة' : 'Off')),
       (isAr ? 'الموافقات' : 'Consents', isAr ? 'الإصدار ١.١' : 'v1.1'),
     ];
@@ -117,7 +117,7 @@ class YouScreen extends StatelessWidget {
                     Text(
                       state.plusActive
                           ? (isAr ? 'شكراً إنك معانا' : 'Thanks for supporting Qamar')
-                          : (isAr ? 'الخطة الكاملة والتحليل بالصورة من غير حد' : 'The full plan and unlimited photo analysis'),
+                          : (isAr ? 'تحليل الوجبة بالصورة، وخطة أعمق' : 'Photo meal analysis and a deeper plan'),
                       style: QText.body(size: 12, height: 18, color: QColors.textMuted),
                     ),
                   ]),
@@ -125,6 +125,34 @@ class YouScreen extends StatelessWidget {
                 const Icon(Icons.chevron_right, size: 20, color: QColors.textFaint),
               ]),
             ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(isAr ? 'كلم قمر من برّه التطبيق' : 'Talk to Qamar without opening the app',
+                  style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+              const SizedBox(height: 6),
+              Text(
+                isAr
+                    ? 'آيفون: الإعدادات ← تسهيلات الاستخدام ← لمس ← الضغط على الخلف ← اربط «Ask Qamar» أو «Log a meal with Qamar».\n'
+                      'أندرويد: اضغط مطوّلاً على أيقونة قمر واختار اسأل / سجّل وجبة. على Pixel: الإيماءات ← Quick Tap ← افتح قمر، أو نفس الاختصار.'
+                    : 'iPhone: Settings → Accessibility → Touch → Back Tap → assign “Ask Qamar” or “Log a meal with Qamar”.\n'
+                      'Android: long-press the Qamar icon and choose Ask / Log a meal. On Pixel: Gestures → Quick Tap → open Qamar, or the same shortcut.',
+                style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isAr
+                    ? 'سيري: «Ask Qamar» أو «Log a meal with Qamar». تسجيل الوجبة من الاختصار مجاناً ومش بيخصم استخدام. سؤال قمر بيستخدم من الخمس استخدامات في اليوم.'
+                    : 'Siri: “Ask Qamar” or “Log a meal with Qamar”. Logging a meal from a shortcut is free and does not spend a use. Asking Qamar still uses the daily five.',
+                style: QText.body(size: 12, height: 18, color: QColors.textFaint),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 14),
@@ -138,7 +166,7 @@ class YouScreen extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(t.walletTitle, style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFF2E4C6))),
                 Text(
-                  isAr ? '${state.iso('${state.suAvailable}')} متاح · ${state.iso('${state.suLifetime}')} مكتسب' : '${state.suAvailable} available · ${state.suLifetime} lifetime',
+                  isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح · ${state.iso(state.formatSu(state.suLifetime))} مكتسب' : '${state.formatSu(state.suAvailable)} available · ${state.formatSu(state.suLifetime)} lifetime',
                   style: QText.body(size: 12, color: const Color(0xFFB9A57C)),
                 ),
               ]),

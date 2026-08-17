@@ -1,5 +1,6 @@
 import '../models/meal.dart';
 import '../models/profile.dart';
+import '../models/water.dart';
 
 /// Repository interfaces mirroring the Supabase schema in
 /// supabase/migrations/0001_core_schema.sql. These are the seam a real
@@ -33,6 +34,12 @@ abstract class MealRepository {
   Future<List<WeightReading>> weightHistory(String userId, {int days = 60});
 
   Future<void> recordWeight(String userId, {required double kg, DateTime? at});
+}
+
+abstract class WaterRepository {
+  Future<String> addSip(String userId, WaterSip sip);
+  Future<void> removeSip(String userId, String id);
+  Future<List<WaterSip>> sipsForDay(String userId, DateTime day);
 }
 
 abstract class WalletRepository {

@@ -55,12 +55,13 @@ const _tiers = <PlusTier>[
 typedef PlusFeature = ({String ar, String en, bool inFree});
 
 const _features = <PlusFeature>[
-  (ar: 'تسجيل الوجبات بالكتابة', en: 'Log meals by typing', inFree: true),
+  (ar: 'تسجيل الوجبات بالكتابة أو الصوت', en: 'Log meals by typing or speaking', inFree: true),
   (ar: 'هدف يومي وخطة أساسية', en: 'Daily target and a basic plan', inFree: true),
+  (ar: '٥ استخدامات لقمر في اليوم — سؤال أو خطة', en: '5 Qamar uses a day — chat or the plan', inFree: true),
   (ar: 'نقاط Su والمهام اليومية', en: 'Su Points and daily quests', inFree: true),
-  (ar: 'تحليل الوجبة بالصورة من غير حد', en: 'Unlimited photo meal analysis', inFree: false),
+  (ar: 'استخدام زيادة من المحفظة بنقاط Su', en: 'Buy extra uses from the wallet with Su Points', inFree: true),
+  (ar: 'تحليل الوجبة بالصورة', en: 'Photograph a meal and have Qamar read it', inFree: false),
   (ar: 'خطة أسبوعية كاملة بالمقادير', en: 'Full weekly plan with portions', inFree: false),
-  (ar: 'أسئلة غير محدودة لقمر', en: 'Unlimited questions to Qamar', inFree: false),
   (ar: 'تقارير تقدم أعمق', en: 'Deeper progress reports', inFree: false),
   (ar: 'أولوية في المزايا الجديدة', en: 'Early access to new features', inFree: false),
 ];
@@ -105,8 +106,8 @@ class SubscriptionScreen extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           isAr
-              ? 'قمر بيشتغل معاك من غير اشتراك. Qamar+ بيشيل الحدود ويفتح الخطة الكاملة والتحليل بالصورة.'
-              : 'Qamar works without a subscription. Qamar+ removes the limits and unlocks the full plan and photo analysis.',
+              ? 'قمر بيشتغل معاك من غير اشتراك. الكتابة والصوت مجاناً ومش بيخصموا استخدامات. Qamar+ بيفتح تحليل الوجبة بالصورة والخطة الكاملة.'
+              : 'Qamar works without a subscription. Typing and speaking a meal are free and do not spend Qamar uses. Qamar+ unlocks photo analysis and the full plan.',
           textAlign: TextAlign.center,
           style: QText.body(size: 14, height: 22, color: QColors.textMuted),
         ),

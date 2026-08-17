@@ -65,6 +65,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSSiriUsageDescription</key>
+	<string>Qamar uses Siri so you can ask a question or log a meal from a shortcut or by double-tapping the back of the iPhone.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Qamar uses the microphone so you can log a meal by speaking instead of typing.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

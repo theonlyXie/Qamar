@@ -74,6 +74,24 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      if (state.hasAssistant)
+                        Padding(
+                          padding: const EdgeInsetsDirectional.only(end: 10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xB3111827),
+                              border: Border.all(color: QColors.borderStrong),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              state.isAr
+                                  ? '${state.aiQuota.remaining} من ${state.aiQuota.limit + state.aiQuota.extra} النهارده'
+                                  : '${state.aiQuota.remaining} of ${state.aiQuota.limit + state.aiQuota.extra} today',
+                              style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.textMid),
+                            ),
+                          ),
+                        ),
                       Material(
                         color: const Color(0xB3111827),
                         shape: const CircleBorder(side: BorderSide(color: QColors.borderStrong)),

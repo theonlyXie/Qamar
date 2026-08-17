@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/plan.dart';
+import '../models/su_economy.dart';
+import '../models/water.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
@@ -10,8 +13,21 @@ import '../widgets/common.dart';
 import '../widgets/explain.dart';
 import '../widgets/moon.dart';
 
-class TodayScreen extends StatelessWidget {
+class TodayScreen extends StatefulWidget {
   const TodayScreen({super.key});
+
+  @override
+  State<TodayScreen> createState() => _TodayScreenState();
+}
+
+class _TodayScreenState extends State<TodayScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<AppState>().ensurePlan();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +73,7 @@ class TodayScreen extends StatelessWidget {
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
                           const SuCoinIcon(size: 16),
                           const SizedBox(width: 6),
-                          Text('${state.suAvailable}', style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.gold)),
+                          Text('${state.formatSu(state.suAvailable)}', style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.gold)),
                         ]),
                       ),
                     ),
@@ -135,6 +151,8 @@ class TodayScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
+        const _WaterCard(),
+        const SizedBox(height: 14),
         if (nextMeal != null)
           Explainable(
             id: 'next_meal',
@@ -183,7 +201,7 @@ class TodayScreen extends StatelessWidget {
                   Row(mainAxisSize: MainAxisSize.min, children: [
                     const SuCoinIcon(size: 15),
                     const SizedBox(width: 5),
-                    Text('+5', style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.gold)),
+                    Text('+${state.formatSu(SuEconomy.dailyQuest)}', style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.gold)),
                   ]),
                 ],
               ),
@@ -214,7 +232,8 @@ class TodayScreen extends StatelessWidget {
         ),
         ),
         const SizedBox(height: 14),
-        // No "log a meal" button: hold the orb and pick speak / type / photo.
+        // No "log a meal" button: hold the orb and pick speak / type (free)
+        // or photo (Qamar+).
         _OrbLogHint(state: state),
         if (state.meals.isNotEmpty) ...[
           const SizedBox(height: 18),
@@ -239,6 +258,141 @@ class TodayScreen extends StatelessWidget {
           ],
         ],
       ],
+    );
+  }
+}
+
+class _WaterCard extends StatelessWidget {
+  const _WaterCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final isAr = state.isAr;
+    final w = state.water;
+    final litres = WaterStatus.qty(w.litres);
+    final left = WaterStatus.qty(w.litresLeft);
+    final glasses = WaterStatus.qty(w.glasses);
+    final bottles = WaterStatus.qty(w.bottles);
+
+    return Explainable(
+      id: 'water',
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: QDecor.card(
+          color: QColors.cardDeep,
+          border: QColors.borderFaint,
+          radius: QRadii.xl,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(isAr ? 'الماء' : 'Water',
+                style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                ShaderMask(
+                  shaderCallback: (r) => QColors.blueCyanGradient.createShader(r),
+                  child: Text(
+                    isAr ? '${state.iso(litres)} لتر' : '$litres L',
+                    style: QText.number(size: 28, weight: FontWeight.w600, color: Colors.white),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  isAr ? '${state.iso(left)} لتر باقي' : '$left L left',
+                  style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              isAr
+                  ? '${state.iso(glasses)} كوباية  ·  ${state.iso(bottles)} زجاجة'
+                  : '$glasses glasses  ·  $bottles bottles',
+              style: QText.body(size: 13, color: QColors.textMid),
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: w.progress,
+                minHeight: 6,
+                backgroundColor: QColors.borderFaint,
+                valueColor: const AlwaysStoppedAnimation(QColors.cyan),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _WaterAdd(
+                    label: isAr ? 'كوباية' : 'Glass',
+                    onTap: () => state.logWater(WaterUnit.glass),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _WaterAdd(
+                    label: isAr ? 'زجاجة' : 'Bottle',
+                    onTap: () => state.logWater(WaterUnit.bottle),
+                  ),
+                ),
+              ],
+            ),
+            if (!w.isEmpty) ...[
+              const SizedBox(height: 4),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton(
+                  onPressed: state.undoWater,
+                  child: Text(
+                    isAr ? 'تراجع' : 'Undo',
+                    style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textFaint),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WaterAdd extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _WaterAdd({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(QRadii.md),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            onTap();
+          },
+          child: Ink(
+            decoration: BoxDecoration(
+              color: QColors.cyan.withValues(alpha: 0.10),
+              border: Border.all(color: QColors.cyan.withValues(alpha: 0.35)),
+              borderRadius: BorderRadius.circular(QRadii.md),
+            ),
+            child: Center(
+              child: Text('+  $label',
+                  style: QText.body(size: 14, weight: FontWeight.w600, color: QColors.cyan)),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -297,8 +451,8 @@ class _OrbLogHint extends StatelessWidget {
           Expanded(
             child: Text(
               isAr
-                  ? 'عشان تسجّل وجبة: استمر ضاغط على القمر، اسحب لـ«سجّل»، واختار تتكلم أو تكتب أو تصوّر.'
-                  : 'To log a meal: hold the moon, sweep to Log, then pick speak, type or photo.',
+                  ? 'عشان تسجّل وجبة: استمر ضاغط على القمر، اسحب لـ«سجّل»، واختار تتكلم أو تكتب — مجاناً. تصوير الطبق لـ Qamar+.'
+                  : 'To log a meal: hold the moon, sweep to Log, then speak or type — free, and it does not spend a Qamar use. Photographing a plate is Qamar+.',
               style: QText.body(size: 12, height: 18, color: QColors.textMid),
             ),
           ),

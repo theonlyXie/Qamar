@@ -2,6 +2,7 @@
 // matter most: the calorie maths, the eligibility gate, and the orb's
 // hit-testing. All pure Dart — no widgets, no network.
 
+import 'dart:convert';
 import 'dart:ui' show Offset, Rect;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +11,8 @@ import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/models/su_economy.dart';
+import 'package:qamar/models/water.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/state/app_state.dart';
@@ -80,6 +83,71 @@ void main() {
       final t = (AppState()..profile = const Profile()).target();
       final fromMacros = t.protein * 4 + t.carbs * 4 + t.fat * 9;
       expect(fromMacros, closeTo(t.kcal, 12));
+    });
+  });
+
+  group('Su Points scale', () {
+    test('a new wallet is level 1, a 2,500 signup is already level 3', () {
+      expect(SuEconomy.levelFor(0), 1);
+      expect(SuEconomy.levelFor(SuEconomy.signupBonus), 3);
+      expect(SuEconomy.levelFor(99 * SuEconomy.levelXp), 99);
+      expect(SuEconomy.levelFor(200000), SuEconomy.maxLevel);
+    });
+
+    test('the earn and spend table is in hundreds, not 3 / 5 / 20', () {
+      expect(SuEconomy.dailyQuest, greaterThanOrEqualTo(100));
+      expect(SuEconomy.mealLogged, greaterThanOrEqualTo(100));
+      expect(SuEconomy.extraAiUse, greaterThanOrEqualTo(SuEconomy.mealLogged));
+      expect(SuEconomy.signupBonus, greaterThanOrEqualTo(1000));
+    });
+  });
+
+  group('water', () {
+    test('a glass is 250 ml and a bottle is two glasses', () {
+      expect(Water.glassMl, 250);
+      expect(Water.bottleMl, 500);
+      expect(Water.goalMl, 3000);
+      expect(Water.mlFor(WaterUnit.bottle), Water.glassMl * 2);
+    });
+
+    test('the card reads glasses, bottles, litres, and litres left from one total', () {
+      const empty = WaterStatus(0);
+      expect(empty.glasses, 0);
+      expect(empty.bottles, 0);
+      expect(empty.litres, 0);
+      expect(empty.litresLeft, 3);
+
+      const oneGlass = WaterStatus(250);
+      expect(oneGlass.glasses, 1);
+      expect(oneGlass.bottles, 0.5);
+      expect(oneGlass.litres, 0.25);
+      expect(oneGlass.litresLeft, 2.75);
+
+      const goal = WaterStatus(3000);
+      expect(goal.glasses, 12);
+      expect(goal.bottles, 6);
+      expect(goal.litres, 3);
+      expect(goal.litresLeft, 0);
+      expect(WaterStatus.qty(goal.litres), '3');
+      expect(WaterStatus.qty(oneGlass.litres), '0.25');
+    });
+
+    test('logging a glass then a bottle adds, and undo takes the last sip off', () {
+      final state = AppState();
+      expect(state.water.isEmpty, isTrue);
+
+      state.logWater(WaterUnit.glass);
+      state.logWater(WaterUnit.bottle);
+
+      expect(state.water.ml, 750);
+      expect(state.water.glasses, 3);
+      expect(state.water.bottles, 1.5);
+      expect(state.water.litresLeft, 2.25);
+
+      state.undoWater();
+      expect(state.water.ml, 250);
+      state.undoWater();
+      expect(state.water.isEmpty, isTrue);
     });
   });
 
@@ -178,7 +246,7 @@ void main() {
     test('every explainable id used in the UI has copy behind it', () {
       // Guards against wiring up an Explainable whose id has no entry, which
       // would open an empty sheet.
-      for (final id in ['kcal_remaining', 'protein', 'carbs', 'fat', 'su_points', 'level', 'plan_total', 'target_kcal']) {
+      for (final id in ['kcal_remaining', 'protein', 'carbs', 'fat', 'su_points', 'level', 'plan_total', 'target_kcal', 'water']) {
         expect(kExplanations[id], isNotNull, reason: 'missing explanation for "$id"');
       }
     });
@@ -223,6 +291,32 @@ void secondRound() {
       }
       expect(plan.slots.first.$1.id, 'breakfast');
       expect(plan.slots.first.$2.nameEn, isNot(plan.slots.first.$1.nameEn));
+    });
+
+    test('a chat reply that rewrote dinner is the same shape Plan already parses', () {
+      final result = chatResultFromJson(
+        jsonDecode('''
+{"reply":"I’ll change dinner.","action":"See the plan","date":"2026-08-15",
+ "plan":{"rationale_en":"Fits your target","meals":[
+   {"slot":"dinner","name_ar":"بيض","name_en":"Eggs","note_ar":"","note_en":"",
+    "portions":[{"ar":"بيض","en":"Eggs","amount_ar":"٢","amount_en":"2","kcal":160}]}
+ ]}}
+''') as Map<String, dynamic>,
+        lang: 'en',
+        date: '2026-08-15',
+      );
+      expect(result.changedPlan, isTrue);
+      expect(result.plan!.slots.single.$1.nameEn, 'Eggs');
+      expect(mealKcal(result.plan!.slots.single.$1), 160);
+    });
+
+    test('a rebuild instruction is read even when the meals are not in the reply', () {
+      final result = chatResultFromJson({
+        'reply': 'I’ll rewrite the day.',
+        'plan_update': {'kind': 'rebuild', 'instruction': 'no cooking tonight'},
+      }, lang: 'en', date: '2026-08-17');
+      expect(result.plan, isNull);
+      expect(result.rebuildInstruction, 'no cooking tonight');
     });
 
     test('meal totals equal the sum of their portions', () {
@@ -318,7 +412,7 @@ void secondRound() {
     });
 
     test('a photographed meal lands in the conversation, not a confirm page', () {
-      final state = AppState();
+      final state = AppState()..plusActive = true;
       final before = state.screen;
       state.quickLog(QuickLog.photo);
       state.logPhotoTaken('/tmp/meal.jpg');
@@ -327,6 +421,17 @@ void secondRound() {
       expect(state.chatOpen, isTrue);
       expect(state.lastMealPhotoPath, '/tmp/meal.jpg');
       expect(state.chat.any((c) => c.who == ChatWho.u), isTrue);
+    });
+
+    test('photographing a meal without Qamar+ opens the paywall', () {
+      final state = AppState();
+      state.setLang(AppLang.en);
+      state.quickLog(QuickLog.photo);
+
+      expect(state.screen, AppScreen.subscription);
+      expect(state.plusNotice, contains('Qamar+'));
+      expect(state.chatOpen, isFalse);
+      expect(state.lastMealPhotoPath, isNull);
     });
 
     test('the log methods sit on distinct ring positions', () {

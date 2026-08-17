@@ -13,8 +13,11 @@ import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/models/su_economy.dart';
+import 'package:qamar/models/water.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/auth_service.dart';
+import 'package:qamar/services/quick_invoke.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
 
@@ -75,6 +78,28 @@ class FakeMealRepo implements MealRepository {
   Future<void> recordWeight(String userId, {required double kg, DateTime? at}) async => recorded.add(kg);
 }
 
+class FakeWaterRepo implements WaterRepository {
+  final List<WaterSip> saved = [];
+  List<WaterSip> today = [];
+  int adds = 0;
+
+  @override
+  Future<String> addSip(String userId, WaterSip sip) async {
+    adds++;
+    final id = 'water-$adds';
+    saved.add(sip.copyWith(id: id));
+    return id;
+  }
+
+  @override
+  Future<void> removeSip(String userId, String id) async {
+    saved.removeWhere((s) => s.id == id);
+  }
+
+  @override
+  Future<List<WaterSip>> sipsForDay(String userId, DateTime day) async => today;
+}
+
 class FakeWalletRepo implements WalletRepository {
   ({int available, int lifetime}) stored = (available: 0, lifetime: 0);
   final List<String> redemptions = [];
@@ -104,17 +129,53 @@ class FakeGateway implements AiGateway {
   MealAnalysis result = const MealAnalysis([
     ConfirmItemDef(ar: 'كشري', en: 'Koshary', portionAr: 'طبق وسط', portionEn: '1 medium bowl', conf: Confidence.low, kcal: 520, p: 16, c: 96, f: 9),
   ]);
+  ChatResult chatResult = const ChatResult(reply: 'grounded answer');
   String reply = 'grounded answer';
+  final List<String> chatMessages = [];
+  Map<String, dynamic>? lastCurrentPlan;
   final List<String?> imagePaths = [];
+
+  int planCalls = 0;
+  Object? planFailsWith;
+  DayPlan plan = const DayPlan(date: '2026-08-15', slots: []);
+  AiQuota quota = AiQuota.empty;
+
+  void _useAi() {
+    if (quota.remaining <= 0) {
+      throw AiQuotaException(
+        'That’s today’s five Qamar uses. Log a meal or finish the daily quest to earn Su Points, then spend them on another use from the wallet. They refresh at Cairo midnight.',
+        quota,
+      );
+    }
+    quota = quota.consumed();
+  }
 
   @override
   Future<MealAnalysis> analyzeMeal({required String inputType, String? text, String? imagePath, String lang = 'ar'}) async {
     imagePaths.add(imagePath);
+    // Typed and spoken logs are the food graph. Only a photo spends a use.
+    if (inputType == 'photo' || (imagePath != null && imagePath.isNotEmpty)) {
+      _useAi();
+    }
     return result;
   }
 
   @override
-  Future<String> chatReply({required String message, required String lang}) async => reply;
+  Future<ChatResult> chatReply({
+    required String message,
+    required String lang,
+    String? date,
+    Map<String, dynamic>? currentPlan,
+    List<String>? swappedSlots,
+  }) async {
+    chatMessages.add(message);
+    lastCurrentPlan = currentPlan;
+    _useAi();
+    if (chatResult.reply == 'grounded answer' && reply != 'grounded answer') {
+      return ChatResult(reply: reply);
+    }
+    return chatResult;
+  }
 
   BodyScan scan = const BodyScan(heightCm: 174, weightKg: 86, bodyFatPct: 29, age: 31);
 
@@ -124,16 +185,28 @@ class FakeGateway implements AiGateway {
     return scan;
   }
 
-  int planCalls = 0;
-  Object? planFailsWith;
-  DayPlan plan = const DayPlan(date: '2026-08-15', slots: []);
+  String? lastInstruction;
+  bool? lastForce;
 
   @override
-  Future<DayPlan> generatePlan({required String date, required String lang}) async {
+  Future<DayPlan> generatePlan({
+    required String date,
+    required String lang,
+    bool force = false,
+    String? instruction,
+  }) async {
     planCalls++;
+    lastForce = force;
+    lastInstruction = instruction;
     if (planFailsWith != null) throw planFailsWith!;
-    return plan;
+    _useAi();
+    // Stamp the requested date so ensurePlan can cache "today" instead of
+    // treating a fixture dated 2026-08-15 as a different day forever.
+    return DayPlan(date: date, slots: plan.slots, rationale: plan.rationale);
   }
+
+  @override
+  Future<AiQuota> quotaStatus() async => quota;
 }
 
 class FakeAccount implements Account {
@@ -191,6 +264,7 @@ class FakeAccount implements Account {
 AppState backed({
   FakeProfileRepo? profiles,
   FakeMealRepo? meals,
+  FakeWaterRepo? water,
   FakeWalletRepo? wallet,
   FakeGateway? ai,
   FakeAccount? auth,
@@ -198,6 +272,7 @@ AppState backed({
     AppState(
       profileRepo: profiles ?? FakeProfileRepo(),
       mealRepo: meals ?? FakeMealRepo(),
+      waterRepo: water ?? FakeWaterRepo(),
       walletRepo: wallet ?? FakeWalletRepo(),
       ai: ai,
       auth: auth,
@@ -227,6 +302,39 @@ void main() {
     expect(state.meals.single.name, 'Foul');
     expect(state.suAvailable, 45);
     expect(state.suLifetime, 120);
+  });
+
+  test('hydrate pulls today\'s water over the empty default', () async {
+    final water = FakeWaterRepo()
+      ..today = [
+        WaterSip(id: 'w1', unit: WaterUnit.glass, ml: 250, at: DateTime(2026, 8, 17, 9)),
+        WaterSip(id: 'w2', unit: WaterUnit.bottle, ml: 500, at: DateTime(2026, 8, 17, 12)),
+      ];
+    final state = backed(water: water);
+    await settle();
+
+    expect(state.water.ml, 750);
+    expect(state.water.glasses, 3);
+    expect(state.water.bottles, 1.5);
+  });
+
+  test('logging water writes a sip, and undo deletes it', () async {
+    final water = FakeWaterRepo();
+    final state = backed(water: water);
+    await settle();
+
+    state.logWater(WaterUnit.glass);
+    expect(state.water.ml, 250);
+    await settle();
+
+    expect(water.saved, hasLength(1));
+    expect(water.saved.single.ml, 250);
+    expect(state.waterToday.single.id, 'water-1');
+
+    state.undoWater();
+    await settle();
+    expect(state.water.isEmpty, isTrue);
+    expect(water.saved, isEmpty);
   });
 
   test('an empty backend leaves the local defaults intact', () async {
@@ -260,7 +368,7 @@ void main() {
 
   test('a photo is sent to the assistant, not merely displayed', () async {
     final ai = FakeGateway();
-    final state = backed(ai: ai);
+    final state = backed(ai: ai)..plusActive = true;
     await settle();
 
     state.logPhotoTaken('/tmp/meal.jpg');
@@ -273,7 +381,7 @@ void main() {
   test('an unreadable photo proposes nothing rather than inventing a meal', () async {
     final meals = FakeMealRepo();
     final ai = FakeGateway()..result = const MealAnalysis([], note: 'too dark to read');
-    final state = backed(meals: meals, ai: ai);
+    final state = backed(meals: meals, ai: ai)..plusActive = true;
     await settle();
 
     state.logPhotoTaken('/tmp/dark.jpg');
@@ -286,7 +394,7 @@ void main() {
 
   test('with no gateway a meal cannot be analysed, and says so', () async {
     final meals = FakeMealRepo();
-    final state = backed(meals: meals);
+    final state = backed(meals: meals)..plusActive = true;
     await settle();
 
     state.logPhotoTaken('/tmp/meal.jpg');
@@ -294,6 +402,78 @@ void main() {
 
     expect(state.hasProposal, isFalse);
     expect(meals.saved, isEmpty, reason: 'an unconnected app must never log invented food');
+  });
+
+  test('typed meal logging does not spend a Qamar use', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+
+    state.quickLog(QuickLog.text);
+    await state.sendChatMsg('koshary');
+    await settle();
+
+    expect(state.hasProposal, isTrue);
+    expect(ai.quota.remaining, SuEconomy.dailyAiUses);
+  });
+
+  test('typed meal logging still works after today’s five Qamar uses', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+    state.setLang(AppLang.en);
+
+    for (var i = 0; i < SuEconomy.dailyAiUses; i++) {
+      await state.sendChatMsg('protein?');
+    }
+    expect(ai.quota.remaining, 0);
+
+    state.quickLog(QuickLog.text);
+    await state.sendChatMsg('koshary');
+    await settle();
+
+    expect(state.hasProposal, isTrue);
+    expect(ai.quota.remaining, 0);
+  });
+
+  test('a log shortcut with text does not spend a Qamar use', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+
+    QuickInvoke.apply(state, const QuickAction(kind: 'log', text: 'foul medames'));
+    await settle();
+
+    expect(state.hasProposal, isTrue);
+    expect(ai.quota.remaining, SuEconomy.dailyAiUses);
+  });
+
+  test('photographing a meal spends a Qamar use', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai)..plusActive = true;
+    await settle();
+
+    state.logPhotoTaken('/tmp/meal.jpg');
+    await settle();
+
+    expect(state.hasProposal, isTrue);
+    expect(ai.quota.remaining, SuEconomy.dailyAiUses - 1);
+  });
+
+  test('photographing a meal without Qamar+ opens the paywall and does not analyse', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+    state.setLang(AppLang.en);
+
+    state.logPhotoTaken('/tmp/meal.jpg');
+    await settle();
+
+    expect(ai.imagePaths, isEmpty);
+    expect(state.hasProposal, isFalse);
+    expect(state.screen, AppScreen.subscription);
+    expect(state.plusNotice, contains('Qamar+'));
+    expect(state.lastMealPhotoPath, isNull);
   });
 
   test('an unreadable InBody report prefills nothing and asks instead', () async {
@@ -377,8 +557,40 @@ void main() {
     expect(state.ledger(), isEmpty, reason: 'a new user has earned nothing');
 
     state.completeQuest();
-    expect(state.ledger().single.amount, 5);
-    expect(state.suAvailable, 5);
+    expect(state.ledger().single.amount, SuEconomy.dailyQuest);
+    expect(state.suAvailable, SuEconomy.dailyQuest);
+  });
+
+  test('the sixth Qamar use in a day is refused, and the wallet is the way out', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+    state.setLang(AppLang.en);
+
+    for (var i = 0; i < SuEconomy.dailyAiUses; i++) {
+      await state.sendChatMsg('protein?');
+    }
+    expect(ai.quota.remaining, 0);
+
+    await state.sendChatMsg('and now?');
+    expect(state.chat.last.openWallet, isTrue);
+    expect(state.chat.last.text.toLowerCase(), contains('five'));
+    state.chatActionTap();
+    expect(state.screen, AppScreen.wallet);
+    expect(state.chatOpen, isFalse);
+  });
+
+  test('spending Su lengthens today’s allowance instead of unlocking unlimited AI', () {
+    final state = AppState()
+      ..suAvailable = SuEconomy.extraAiUse
+      ..aiQuota = const AiQuota(used: 5, limit: 5, extra: 0, remaining: 0);
+
+    state.redeem(kSpendCatalog.first);
+
+    expect(kSpendCatalog.first.id, 'ai_extra');
+    expect(state.aiQuota.extra, 1);
+    expect(state.aiQuota.remaining, 1);
+    expect(state.suAvailable, 0);
   });
 
   group('account', () {
@@ -496,6 +708,87 @@ void main() {
       expect(state.hasPlan, isFalse);
       expect(state.planError, isNotNull);
     });
+
+    test('talking to Qamar writes dinner onto Plan and Today, not only into chat', () async {
+      const breakfast = (
+        id: 'breakfast',
+        slotAr: 'فطار',
+        slotEn: 'Breakfast',
+        nameAr: 'فول',
+        nameEn: 'Foul',
+        noteAr: '',
+        noteEn: '',
+        portions: <PlanPortion>[(ar: 'فول', en: 'Foul', amountAr: '١٥٠ جم', amountEn: '150 g', kcal: 180)],
+      );
+      const tuna = (
+        id: 'dinner',
+        slotAr: 'عشا',
+        slotEn: 'Dinner',
+        nameAr: 'تونة',
+        nameEn: 'Tuna',
+        noteAr: '',
+        noteEn: '',
+        portions: <PlanPortion>[(ar: 'تونة', en: 'Tuna', amountAr: 'علبة', amountEn: '1 tin', kcal: 130)],
+      );
+      const eggs = (
+        id: 'dinner',
+        slotAr: 'عشا',
+        slotEn: 'Dinner',
+        nameAr: 'بيض وزبادي',
+        nameEn: 'Eggs and yogurt',
+        noteAr: 'من غير طبخ',
+        noteEn: 'no cooking',
+        portions: <PlanPortion>[(ar: 'بيض', en: 'Eggs', amountAr: '٢', amountEn: '2', kcal: 160)],
+      );
+      final original = const DayPlan(date: '2026-08-15', slots: [(breakfast, breakfast), (tuna, tuna)]);
+      final rewritten = DayPlan(date: original.date, slots: [(breakfast, breakfast), (eggs, eggs)]);
+      final ai = FakeGateway()
+        ..plan = original
+        ..chatResult = ChatResult(
+          reply: 'I’ll change dinner so you do not cook.',
+          action: 'See the plan',
+          plan: rewritten,
+        );
+      final state = backed(ai: ai);
+      await settle();
+      state.setLang(AppLang.en);
+      await state.ensurePlan();
+      expect(state.planMeals().last.nameEn, 'Tuna');
+
+      await state.sendChatMsg("I'm tired and not cooking");
+
+      expect(state.planMeals().last.nameEn, 'Eggs and yogurt',
+          reason: 'the written menu must move when Qamar says it does');
+      expect(state.chat.last.text, contains('dinner'));
+      expect(state.chat.last.action, 'See the plan');
+      expect(ai.lastCurrentPlan, isNotNull);
+      expect((ai.lastCurrentPlan!['meals'] as List).length, 2);
+
+      state.chatActionTap();
+      expect(state.screen, AppScreen.plan);
+      expect(state.chatOpen, isFalse);
+      expect(state.planMeals().last.nameEn, 'Eggs and yogurt');
+    });
+
+    test('a rebuild from chat is a real generatePlan, with Qamar’s instruction', () async {
+      final ai = FakeGateway()
+        ..plan = const DayPlan(date: '2026-08-15', slots: [(meal, meal)])
+        ..chatResult = const ChatResult(
+          reply: 'I’ll rewrite the rest of the day.',
+          rebuildInstruction: 'tired, no cooking tonight',
+        );
+      final state = backed(ai: ai);
+      await settle();
+      await state.ensurePlan();
+      final before = ai.planCalls;
+
+      await state.sendChatMsg("I'm tired");
+
+      expect(ai.lastInstruction, 'tired, no cooking tonight');
+      expect(ai.lastForce, isTrue);
+      expect(ai.planCalls, before + 1);
+      expect(state.hasPlan, isTrue);
+    });
   });
 
   group('one-tap sign-in', () {
@@ -551,7 +844,7 @@ void main() {
   });
 
   test('redeeming calls through to the wallet RPC', () async {
-    final wallet = FakeWalletRepo()..stored = (available: 500, lifetime: 500);
+    final wallet = FakeWalletRepo()..stored = (available: 5000, lifetime: 5000);
     final state = backed(wallet: wallet);
     await settle();
 

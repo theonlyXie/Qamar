@@ -90,17 +90,17 @@ const kExplanations = <String, Explanation>{
     titleAr: 'نقاط Su',
     titleEn: 'Su Points',
     bodyAr:
-        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة، تخلّص مهمة اليوم. بتتصرف على مزايا جوه قمر.',
+        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة (+١٠٠، وأول وجبة +٥٠٠)، تخلّص مهمة اليوم (+٢٥٠). بتتصرف على استخدام زيادة لقمر بعد الخمس استخدامات اليومية.',
     bodyEn:
-        'Earned when you do something useful for yourself — logging a meal, finishing the day’s quest. Spent on features inside Qamar.',
+        'Earned when you do something useful for yourself — logging a meal (+100, first meal +500), finishing the day’s quest (+250). Spent on another Qamar use after today’s five.',
     soWhatAr: 'النقط دي بتتكسب بس. مش بتتشترى بفلوس ومالهاش قيمة نقدية.',
     soWhatEn: 'They are only ever earned. They cannot be bought with money and have no cash value.',
   ),
   'level': Explanation(
     titleAr: 'المستوى',
     titleEn: 'Level',
-    bodyAr: 'بيتحرك مع إجمالي نقاط Su اللي كسبتها من أول ما بدأت — يعني مقياس للاستمرارية مش للوزن.',
-    bodyEn: 'Moves with the total Su Points you have earned since you started — a measure of consistency, not of weight.',
+    bodyAr: 'بيتحرك مع إجمالي نقاط Su اللي كسبتها من أول ما بدأت — كل ١٠٠٠ نقطة مستوى. مقياس للاستمرارية مش للوزن، وهي الرقم اللي هيتقارن في لوحة المتصدرين.',
+    bodyEn: 'Moves with the total Su Points you have earned since you started — 1,000 lifetime Su per level. A measure of consistency, not of weight, and the number a leaderboard will rank.',
     soWhatAr: 'الاستمرار أهم من الكمال. يوم واحد مضبوط أحسن من أسبوع مثالي وبعده انقطاع.',
     soWhatEn: 'Consistency beats perfection. One honest day beats a perfect week followed by quitting.',
   ),
@@ -113,6 +113,16 @@ const kExplanations = <String, Explanation>{
         'One small thing with outsized effect — not a to-do list. It pays Su Points when you finish it, and changes daily based on what you are missing.',
     soWhatAr: 'لو المهمة مش مناسبة لظروف يومك، اضغط «غيّرها» — ده مش فشل.',
     soWhatEn: 'If it does not fit your day, tap Replace — that is not a failure.',
+  ),
+  'water': Explanation(
+    titleAr: 'الماء',
+    titleEn: 'Water',
+    bodyAr:
+        'كوبتين لتلاتة لتر في اليوم بداية معقولة لشخص بالغ. الحر في مصر بيخلي الرقم أقرب للتلاتة. الكوباية ٢٥٠ مل، الزجاجة ٥٠٠ مل. الشاي والأكل فيه مية بتحسب، العصير المسكر لأ.',
+    bodyEn:
+        'Two to three litres a day is a reasonable start for an adult. Egyptian heat sits at the top of that range. A glass is 250 ml, a bottle is 500 ml. Tea and watery food count; sugary drinks do not.',
+    soWhatAr: 'العطش دليل كويس. البول الفاتح أحسن. لو حر أو بتتحرك أكتر، زوّد من غير ما تستنى الرقم يوصل صفر.',
+    soWhatEn: 'Thirst is a decent guide. Pale urine is a better one. In heat or on an active day, drink more — do not wait for the leftover to hit zero.',
   ),
   'plan_total': Explanation(
     titleAr: 'إجمالي الخطة',

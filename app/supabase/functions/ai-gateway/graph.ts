@@ -12,6 +12,7 @@
 // match from reaching the user as a confident number.
 
 import { lookupFood, type FoodFacts } from "./retrieval.ts";
+import type { MealItem } from "./verify.ts";
 
 /** Above this, a fuzzy match is treated as settled. */
 const CONFIDENT = 0.75;
@@ -372,4 +373,56 @@ export function toPacketFacts(items: Resolution[]): unknown[] {
       needs_confirmation: r.needsConfirmation,
       uncertainty: r.uncertainty,
     }));
+}
+
+/** A meal item that knows which food it is, in the keys meal_logs stores. */
+export type IdentifiedMealItem = MealItem & {
+  qamar_food_id: string | null;
+  grams: number | null;
+  food_slug: string | null;
+  portion_matched: boolean;
+};
+
+/**
+ * Turns graph resolutions into the meal-item shape the app confirms.
+ *
+ * Typed and spoken logs use this instead of the model: the numbers are the
+ * per-100 g facts scaled by the resolved portion, so a رغيف is arithmetic
+ * rather than a guess. Phrases the graph could not price are dropped — an
+ * empty list is the honest answer, not a reason to spend a model call.
+ *
+ * The food id and the gram weight travel with the item. On this path they cost
+ * nothing to know — the resolution being converted is already holding both —
+ * and without them a meal logged by typing would price correctly and then be
+ * invisible to every micronutrient question, which is the failure the photo
+ * path was just fixed for.
+ */
+export function itemsFromResolutions(items: Resolution[]): IdentifiedMealItem[] {
+  return items.flatMap((r) => {
+    const facts = r.facts;
+    if (!facts) return [];
+    const grams = r.portion && r.portion.grams > 0 ? r.portion.grams : 100;
+    const scale = grams / 100;
+    const high =
+      !r.needsConfirmation && (r.origin === "graph" || r.origin === "graph_derived");
+    const portionEn = r.portion?.labelEn ?? `${grams} g`;
+    const portionAr = r.portion?.labelAr ?? portionEn;
+    return [{
+      ar: r.food?.nameEg ?? r.food?.nameAr ?? r.phrase,
+      en: r.food?.nameEn ?? facts.name,
+      portionAr,
+      portionEn,
+      confidence: high ? "high" : "low",
+      kcal: Math.round(facts.per100g.kcal * scale),
+      proteinG: Math.round(facts.per100g.protein * scale),
+      carbsG: Math.round(facts.per100g.carbs * scale),
+      fatG: Math.round(facts.per100g.fat * scale),
+      // Null when the graph did not identify the food, even though an external
+      // lookup priced it. A price is not an identity.
+      qamar_food_id: r.food?.qamarFoodId ?? null,
+      grams: r.portion?.grams ?? null,
+      food_slug: r.food?.slug ?? null,
+      portion_matched: r.portion?.matchedInPhrase ?? false,
+    }];
+  });
 }

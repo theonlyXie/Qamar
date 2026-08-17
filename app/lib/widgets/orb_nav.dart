@@ -166,10 +166,15 @@ class _DraggableOrbState extends State<_DraggableOrb> {
   }
 
   /// Photo opens the real camera; the other two drop straight into the
-  /// conversation. Nothing here pushes a screen.
+  /// conversation. Nothing here pushes a screen. The camera is Qamar+:
+  /// typing and speaking never open it.
   Future<void> _runQuickLog(AppState state, QuickLog kind) async {
     if (kind != QuickLog.photo) {
       state.quickLog(kind);
+      return;
+    }
+    if (!state.plusActive) {
+      state.refusePhotoLog();
       return;
     }
     try {
@@ -249,7 +254,7 @@ class _DraggableOrbState extends State<_DraggableOrb> {
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
-                state.isAr ? '${state.iso('${state.suAvailable}')} نقطة Su' : '${state.suAvailable} Su',
+                state.isAr ? '${state.iso(state.formatSu(state.suAvailable))} نقطة Su' : '${state.formatSu(state.suAvailable)} Su',
                 style: QText.number(size: 10, weight: FontWeight.w600, color: QColors.textMuted),
               ),
             ),

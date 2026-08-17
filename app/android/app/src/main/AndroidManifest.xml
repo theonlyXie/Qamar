@@ -54,6 +54,22 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="com.qamar.app" android:host="login-callback"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.qamar.app" android:host="quick"/>
+                <data android:scheme="com.qamar.app" android:host="ask"/>
+                <data android:scheme="com.qamar.app" android:host="log"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.qamar.app.QUICK_ASK"/>
+                <action android:name="com.qamar.app.QUICK_LOG"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
