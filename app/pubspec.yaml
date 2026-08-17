@@ -24,9 +24,6 @@ dependencies:
   # Native camera capture for the InBody scan screen.
   image_picker: ^1.1.2
 
-  # Store billing for the Qamar+ subscription once real product IDs exist.
-  in_app_purchase: ^3.2.0
-
   # Real dictation, using the platform's own recogniser (Android SpeechRecognizer
   # / iOS Speech). No API key and no audio leaves the device except through the
   # OS service the user already trusts.

@@ -30,11 +30,12 @@ class QuickInvoke {
     String? kind;
     if (host == 'quick' && segments.isNotEmpty) {
       kind = segments.first;
-    } else if (host == 'ask' || host == 'log') {
+    } else if (host == 'ask' || host == 'log' || host == 'plus') {
       kind = host;
     } else if (segments.length >= 2 && segments[0] == 'quick') {
       kind = segments[1];
     }
+    if (kind == 'plus') return const QuickAction(kind: 'plus');
     if (kind != 'ask' && kind != 'log') return null;
     final text = uri.queryParameters['q'] ?? uri.queryParameters['text'];
     return QuickAction(kind: kind!, text: (text == null || text.trim().isEmpty) ? null : text.trim());
@@ -43,6 +44,7 @@ class QuickInvoke {
   static QuickAction? parseMap(dynamic raw) {
     if (raw is! Map) return null;
     final kind = raw['action']?.toString() ?? raw['kind']?.toString();
+    if (kind == 'plus') return const QuickAction(kind: 'plus');
     if (kind != 'ask' && kind != 'log') return null;
     final text = raw['text']?.toString() ?? raw['q']?.toString();
     return QuickAction(kind: kind!, text: (text == null || text.trim().isEmpty) ? null : text.trim());
@@ -50,6 +52,10 @@ class QuickInvoke {
 
   /// Applies the action to [state]: opens Ask Qamar, optionally starts listening.
   static void apply(AppState state, QuickAction action) {
+    if (action.kind == 'plus') {
+      state.onReturnedFromPaymob();
+      return;
+    }
     if (action.isLog) {
       if (action.text != null) {
         state.quickLog(QuickLog.text);

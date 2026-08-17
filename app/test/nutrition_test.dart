@@ -12,6 +12,7 @@ import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/su_economy.dart';
+import 'package:qamar/models/billing.dart';
 import 'package:qamar/models/water.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/l10n/strings.dart';
@@ -99,6 +100,71 @@ void main() {
       expect(SuEconomy.mealLogged, greaterThanOrEqualTo(100));
       expect(SuEconomy.extraAiUse, greaterThanOrEqualTo(SuEconomy.mealLogged));
       expect(SuEconomy.signupBonus, greaterThanOrEqualTo(1000));
+    });
+  });
+
+  group('Qamar+ Egypt billing', () {
+    test('is priced in EGP for Paymob, not a foreign store', () {
+      expect(PlusCatalog.currency, 'EGP');
+      expect(PlusCatalog.provider, 'paymob');
+      expect(PlusCatalog.monthly.amountPounds, 500);
+      expect(PlusCatalog.monthly.amountCents, 50000);
+      expect(PlusCatalog.quarterly.amountPounds, 249);
+      expect(PlusCatalog.annual.amountPounds, 249);
+      expect(PlusCatalog.annual.periodDays, 365);
+      expect(PlusCatalog.quarterly.periodDays, 90);
+    });
+
+    test('first users get 30% off the 500 list', () {
+      expect(PlusCatalog.firstUserOffPercent, 30);
+      expect(PlusCatalog.firstUserMonthlyCents, (PlusCatalog.listMonthlyCents * 0.7).round());
+      final q = PlusPricing.quote(plan: 'monthly', firstPurchase: true);
+      expect(q.amountPounds, 350);
+      expect(q.pricingReason, 'first_user');
+    });
+
+    test('an affiliate code is 299 in, 50 to the marketer, 249 net', () {
+      final q = PlusPricing.quote(
+        plan: 'monthly',
+        firstPurchase: true,
+        promo: const PlusPromo(code: 'QMR7K2P', kind: 'affiliate', ownerUserId: 'friend'),
+        buyerUserId: 'buyer',
+      );
+      expect(q.amountPounds, 299);
+      expect(q.affiliateCommissionCents, 5000);
+      expect(q.amountCents - q.affiliateCommissionCents, PlusCatalog.affiliateNetCents);
+      expect(PlusCatalog.affiliateNetCents, PlusCatalog.packCents);
+      expect(q.pricingReason, 'affiliate');
+    });
+
+    test('1 year is 50% off and matches the 3-month cash price', () {
+      final year = PlusPricing.quote(plan: 'annual', firstPurchase: false);
+      final three = PlusPricing.quote(plan: 'quarterly', firstPurchase: false);
+      expect(year.amountPounds, 249);
+      expect(three.amountPounds, 249);
+      expect(year.pricingReason, 'annual_half');
+      expect(three.pricingReason, 'quarterly_pack');
+    });
+
+    test('you cannot use your own affiliate code', () {
+      final q = PlusPricing.quote(
+        plan: 'monthly',
+        firstPurchase: true,
+        promo: const PlusPromo(code: 'QMR7K2P', kind: 'affiliate', ownerUserId: 'me'),
+        buyerUserId: 'me',
+      );
+      expect(q.amountPounds, 350);
+      expect(q.affiliateCommissionCents, 0);
+      expect(q.promoError, isNotNull);
+    });
+
+    test('affiliate cash is not Su Points', () {
+      expect(AffiliateWallet.empty.currency, 'EGP');
+      expect(AffiliateWallet.empty.canRedeem, isFalse);
+      expect(
+        const AffiliateWallet(balanceCents: 5000).canRedeem,
+        isTrue,
+      );
     });
   });
 
