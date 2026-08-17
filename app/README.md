@@ -71,6 +71,11 @@ rebuilt as real Flutter screens rather than copying the prototype's DOM:
   finished, so a user who does not read Arabic had to complete an Arabic
   conversation before they could switch out of it. Switching mid-conversation
   keeps the answers already given and the current step.
+- **System shortcut / Back Tap**: iPhone Settings → Accessibility → Touch →
+  Back Tap can run **Ask Qamar** or **Log a meal with Qamar** (Siri Shortcuts).
+  Android long-press on the icon exposes the same two shortcuts. Either one
+  opens the moon listening immediately instead of walking the in-app menu.
+  Deep links: `com.qamar.app://quick/ask` and `com.qamar.app://quick/log`.
 
 ## What's stubbed (backend/auth/AI/payments)
 

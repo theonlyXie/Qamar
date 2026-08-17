@@ -12,6 +12,7 @@ import 'services/config.dart';
 import 'services/supabase_repositories.dart';
 import 'state/app_state.dart';
 import 'theme/app_theme.dart';
+import 'widgets/quick_invoke_binder.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -106,7 +107,7 @@ class QamarApp extends StatelessWidget {
         textDirection: lang.isRtl ? TextDirection.rtl : TextDirection.ltr,
         child: child!,
       ),
-      home: const HomeShell(),
+      home: const QuickInvokeBinder(child: HomeShell()),
     );
   }
 }
