@@ -14,6 +14,7 @@ import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/su_economy.dart';
+import 'package:qamar/models/water.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/auth_service.dart';
 import 'package:qamar/services/repositories.dart';
@@ -74,6 +75,28 @@ class FakeMealRepo implements MealRepository {
 
   @override
   Future<void> recordWeight(String userId, {required double kg, DateTime? at}) async => recorded.add(kg);
+}
+
+class FakeWaterRepo implements WaterRepository {
+  final List<WaterSip> saved = [];
+  List<WaterSip> today = [];
+  int adds = 0;
+
+  @override
+  Future<String> addSip(String userId, WaterSip sip) async {
+    adds++;
+    final id = 'water-$adds';
+    saved.add(sip.copyWith(id: id));
+    return id;
+  }
+
+  @override
+  Future<void> removeSip(String userId, String id) async {
+    saved.removeWhere((s) => s.id == id);
+  }
+
+  @override
+  Future<List<WaterSip>> sipsForDay(String userId, DateTime day) async => today;
 }
 
 class FakeWalletRepo implements WalletRepository {
@@ -237,6 +260,7 @@ class FakeAccount implements Account {
 AppState backed({
   FakeProfileRepo? profiles,
   FakeMealRepo? meals,
+  FakeWaterRepo? water,
   FakeWalletRepo? wallet,
   FakeGateway? ai,
   FakeAccount? auth,
@@ -244,6 +268,7 @@ AppState backed({
     AppState(
       profileRepo: profiles ?? FakeProfileRepo(),
       mealRepo: meals ?? FakeMealRepo(),
+      waterRepo: water ?? FakeWaterRepo(),
       walletRepo: wallet ?? FakeWalletRepo(),
       ai: ai,
       auth: auth,
@@ -273,6 +298,39 @@ void main() {
     expect(state.meals.single.name, 'Foul');
     expect(state.suAvailable, 45);
     expect(state.suLifetime, 120);
+  });
+
+  test('hydrate pulls today\'s water over the empty default', () async {
+    final water = FakeWaterRepo()
+      ..today = [
+        WaterSip(id: 'w1', unit: WaterUnit.glass, ml: 250, at: DateTime(2026, 8, 17, 9)),
+        WaterSip(id: 'w2', unit: WaterUnit.bottle, ml: 500, at: DateTime(2026, 8, 17, 12)),
+      ];
+    final state = backed(water: water);
+    await settle();
+
+    expect(state.water.ml, 750);
+    expect(state.water.glasses, 3);
+    expect(state.water.bottles, 1.5);
+  });
+
+  test('logging water writes a sip, and undo deletes it', () async {
+    final water = FakeWaterRepo();
+    final state = backed(water: water);
+    await settle();
+
+    state.logWater(WaterUnit.glass);
+    expect(state.water.ml, 250);
+    await settle();
+
+    expect(water.saved, hasLength(1));
+    expect(water.saved.single.ml, 250);
+    expect(state.waterToday.single.id, 'water-1');
+
+    state.undoWater();
+    await settle();
+    expect(state.water.isEmpty, isTrue);
+    expect(water.saved, isEmpty);
   });
 
   test('an empty backend leaves the local defaults intact', () async {
