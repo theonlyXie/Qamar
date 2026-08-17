@@ -20,6 +20,7 @@ const food = (over: Partial<GraphCandidate> = {}): GraphCandidate => ({
   matchedAlias: "كشري",
   matchKind: "exact",
   hasNutrients: true,
+  phraseCoverage: 1,
   ...over,
 });
 
