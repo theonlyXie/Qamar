@@ -228,7 +228,8 @@ class _TodayScreenState extends State<TodayScreen> {
         ),
         ),
         const SizedBox(height: 14),
-        // No "log a meal" button: hold the orb and pick speak / type / photo.
+        // No "log a meal" button: hold the orb and pick speak / type (free)
+        // or photo (Qamar+).
         _OrbLogHint(state: state),
         if (state.meals.isNotEmpty) ...[
           const SizedBox(height: 18),
@@ -311,8 +312,8 @@ class _OrbLogHint extends StatelessWidget {
           Expanded(
             child: Text(
               isAr
-                  ? 'عشان تسجّل وجبة: استمر ضاغط على القمر، اسحب لـ«سجّل»، واختار تتكلم أو تكتب أو تصوّر.'
-                  : 'To log a meal: hold the moon, sweep to Log, then pick speak, type or photo.',
+                  ? 'عشان تسجّل وجبة: استمر ضاغط على القمر، اسحب لـ«سجّل»، واختار تتكلم أو تكتب — مجاناً. تصوير الطبق لـ Qamar+.'
+                  : 'To log a meal: hold the moon, sweep to Log, then speak or type — free, and it does not spend a Qamar use. Photographing a plate is Qamar+.',
               style: QText.body(size: 12, height: 18, color: QColors.textMid),
             ),
           ),

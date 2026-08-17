@@ -37,7 +37,7 @@ class QuickInvoke {
     }
     if (kind != 'ask' && kind != 'log') return null;
     final text = uri.queryParameters['q'] ?? uri.queryParameters['text'];
-    return QuickAction(kind: kind, text: (text == null || text.trim().isEmpty) ? null : text.trim());
+    return QuickAction(kind: kind!, text: (text == null || text.trim().isEmpty) ? null : text.trim());
   }
 
   static QuickAction? parseMap(dynamic raw) {
@@ -45,7 +45,7 @@ class QuickInvoke {
     final kind = raw['action']?.toString() ?? raw['kind']?.toString();
     if (kind != 'ask' && kind != 'log') return null;
     final text = raw['text']?.toString() ?? raw['q']?.toString();
-    return QuickAction(kind: kind, text: (text == null || text.trim().isEmpty) ? null : text.trim());
+    return QuickAction(kind: kind!, text: (text == null || text.trim().isEmpty) ? null : text.trim());
   }
 
   /// Applies the action to [state]: opens Ask Qamar, optionally starts listening.

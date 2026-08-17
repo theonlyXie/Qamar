@@ -16,6 +16,7 @@ import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/auth_service.dart';
+import 'package:qamar/services/quick_invoke.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
 
@@ -129,7 +130,10 @@ class FakeGateway implements AiGateway {
   @override
   Future<MealAnalysis> analyzeMeal({required String inputType, String? text, String? imagePath, String lang = 'ar'}) async {
     imagePaths.add(imagePath);
-    _useAi();
+    // Typed and spoken logs are the food graph. Only a photo spends a use.
+    if (inputType == 'photo' || (imagePath != null && imagePath.isNotEmpty)) {
+      _useAi();
+    }
     return result;
   }
 
@@ -306,7 +310,7 @@ void main() {
 
   test('a photo is sent to the assistant, not merely displayed', () async {
     final ai = FakeGateway();
-    final state = backed(ai: ai);
+    final state = backed(ai: ai)..plusActive = true;
     await settle();
 
     state.logPhotoTaken('/tmp/meal.jpg');
@@ -319,7 +323,7 @@ void main() {
   test('an unreadable photo proposes nothing rather than inventing a meal', () async {
     final meals = FakeMealRepo();
     final ai = FakeGateway()..result = const MealAnalysis([], note: 'too dark to read');
-    final state = backed(meals: meals, ai: ai);
+    final state = backed(meals: meals, ai: ai)..plusActive = true;
     await settle();
 
     state.logPhotoTaken('/tmp/dark.jpg');
@@ -332,7 +336,7 @@ void main() {
 
   test('with no gateway a meal cannot be analysed, and says so', () async {
     final meals = FakeMealRepo();
-    final state = backed(meals: meals);
+    final state = backed(meals: meals)..plusActive = true;
     await settle();
 
     state.logPhotoTaken('/tmp/meal.jpg');
@@ -340,6 +344,78 @@ void main() {
 
     expect(state.hasProposal, isFalse);
     expect(meals.saved, isEmpty, reason: 'an unconnected app must never log invented food');
+  });
+
+  test('typed meal logging does not spend a Qamar use', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+
+    state.quickLog(QuickLog.text);
+    await state.sendChatMsg('koshary');
+    await settle();
+
+    expect(state.hasProposal, isTrue);
+    expect(ai.quota.remaining, SuEconomy.dailyAiUses);
+  });
+
+  test('typed meal logging still works after today’s five Qamar uses', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+    state.setLang(AppLang.en);
+
+    for (var i = 0; i < SuEconomy.dailyAiUses; i++) {
+      await state.sendChatMsg('protein?');
+    }
+    expect(ai.quota.remaining, 0);
+
+    state.quickLog(QuickLog.text);
+    await state.sendChatMsg('koshary');
+    await settle();
+
+    expect(state.hasProposal, isTrue);
+    expect(ai.quota.remaining, 0);
+  });
+
+  test('a log shortcut with text does not spend a Qamar use', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+
+    QuickInvoke.apply(state, const QuickAction(kind: 'log', text: 'foul medames'));
+    await settle();
+
+    expect(state.hasProposal, isTrue);
+    expect(ai.quota.remaining, SuEconomy.dailyAiUses);
+  });
+
+  test('photographing a meal spends a Qamar use', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai)..plusActive = true;
+    await settle();
+
+    state.logPhotoTaken('/tmp/meal.jpg');
+    await settle();
+
+    expect(state.hasProposal, isTrue);
+    expect(ai.quota.remaining, SuEconomy.dailyAiUses - 1);
+  });
+
+  test('photographing a meal without Qamar+ opens the paywall and does not analyse', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+    state.setLang(AppLang.en);
+
+    state.logPhotoTaken('/tmp/meal.jpg');
+    await settle();
+
+    expect(ai.imagePaths, isEmpty);
+    expect(state.hasProposal, isFalse);
+    expect(state.screen, AppScreen.subscription);
+    expect(state.plusNotice, contains('Qamar+'));
+    expect(state.lastMealPhotoPath, isNull);
   });
 
   test('an unreadable InBody report prefills nothing and asks instead', () async {

@@ -36,4 +36,11 @@ void main() {
     QuickInvoke.apply(state, const QuickAction(kind: 'ask'));
     expect(state.chatOpen, isTrue);
   });
+
+  test('apply log with text opens the conversation as a meal, not a question', () {
+    final state = AppState();
+    QuickInvoke.apply(state, const QuickAction(kind: 'log', text: 'foul medames'));
+    expect(state.chatOpen, isTrue);
+    expect(state.screen, isNot(AppScreen.subscription));
+  });
 }

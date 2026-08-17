@@ -1070,14 +1070,18 @@ class AppState extends ChangeNotifier {
       chatState = ChatState.idle;
 
       if (result.items.isEmpty) {
-        // An empty reading is a real answer — usually a photo too dark or too
-        // crowded to trust. Saying so beats inventing a plate of food.
+        // An empty reading is a real answer — a name the graph does not carry,
+        // or a photo too dark to trust. Saying so beats inventing a plate.
+        final fallback = inputType == 'photo'
+            ? (isAr
+                ? 'مقدرتش أقرأ الوجبة من الصورة دي. جرّب صورة أوضح، أو احكيلي أكلت إيه.'
+                : 'I could not read this meal. Try a clearer photo, or tell me what you ate.')
+            : (isAr
+                ? 'مقدرتش ألاقي الأكل ده. جرّب اسم أوضح، أو صوّر الطبق من Qamar+.'
+                : 'I could not match that food. Try a clearer name, or photograph the plate with Qamar+.');
         chat.add(ChatTurn(
           who: ChatWho.q,
-          text: result.note ??
-              (isAr
-                  ? 'مقدرتش أقرأ الوجبة من الصورة دي. جرّب صورة أوضح، أو احكيلي أكلت إيه.'
-                  : 'I could not read this meal. Try a clearer photo, or tell me what you ate.'),
+          text: result.note ?? fallback,
         ));
         proposal = null;
         proposalQty = [];
@@ -1193,7 +1197,21 @@ class AppState extends ChangeNotifier {
 
   /// Set when a purchase is attempted with no store products configured, which
   /// is the expected state until App Store Connect / Play Console are set up.
+  /// Also set when a free-tier user tries to photograph a meal.
   String? plusNotice;
+
+  /// Photographing a plate uses the vision model, so it is Qamar+. Typing and
+  /// speaking a meal stay on the free tier and do not spend the daily AI cap.
+  void refusePhotoLog() {
+    treeHold = false;
+    treeHoverNode = null;
+    treeHoverSub = null;
+    treeLogIndex = null;
+    plusNotice = isAr
+        ? 'تصوير الوجبة تحليل بالذكاء الاصطناعي، وده لـ Qamar+. الكتابة والصوت مجاناً ومش بيخصموا من استخدامات قمر.'
+        : 'Photographing a meal uses the model, so it is Qamar+. Typing and speaking are free and do not spend Qamar uses.';
+    go(AppScreen.subscription);
+  }
 
   void openSubscription() {
     screen = AppScreen.subscription;
@@ -2044,6 +2062,10 @@ class AppState extends ChangeNotifier {
   ///  * photo — the caller opens the camera first and hands the shot back
   ///    through [logPhotoTaken].
   void quickLog(QuickLog kind) {
+    if (kind == QuickLog.photo && !plusActive) {
+      refusePhotoLog();
+      return;
+    }
     treeOpen = false;
     treeHold = false;
     treeHoverNode = null;
@@ -2071,8 +2093,12 @@ class AppState extends ChangeNotifier {
 
   /// A meal photographed from the orb. The picture is sent to the assistant,
   /// which reads it and proposes items — all inside the conversation, with no
-  /// analysing page and no confirm page.
+  /// analysing page and no confirm page. Qamar+ only: vision spends a daily use.
   void logPhotoTaken(String path) {
+    if (!plusActive) {
+      refusePhotoLog();
+      return;
+    }
     lastMealPhotoPath = path;
     _loggingMeal = false;
     proposalInput = 'photo';
