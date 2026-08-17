@@ -57,10 +57,10 @@ typedef PlusFeature = ({String ar, String en, bool inFree});
 const _features = <PlusFeature>[
   (ar: 'تسجيل الوجبات بالكتابة', en: 'Log meals by typing', inFree: true),
   (ar: 'هدف يومي وخطة أساسية', en: 'Daily target and a basic plan', inFree: true),
+  (ar: '٥ استخدامات لقمر في اليوم — سؤال، طبق، أو خطة', en: '5 Qamar uses a day — chat, a plate, or the plan', inFree: true),
   (ar: 'نقاط Su والمهام اليومية', en: 'Su Points and daily quests', inFree: true),
-  (ar: 'تحليل الوجبة بالصورة من غير حد', en: 'Unlimited photo meal analysis', inFree: false),
+  (ar: 'استخدام زيادة من المحفظة بنقاط Su', en: 'Buy extra uses from the wallet with Su Points', inFree: true),
   (ar: 'خطة أسبوعية كاملة بالمقادير', en: 'Full weekly plan with portions', inFree: false),
-  (ar: 'أسئلة غير محدودة لقمر', en: 'Unlimited questions to Qamar', inFree: false),
   (ar: 'تقارير تقدم أعمق', en: 'Deeper progress reports', inFree: false),
   (ar: 'أولوية في المزايا الجديدة', en: 'Early access to new features', inFree: false),
 ];

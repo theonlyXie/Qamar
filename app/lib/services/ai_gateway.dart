@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/meal.dart';
 import '../models/plan.dart';
+import '../models/su_economy.dart';
 
 /// A meal analysis result — candidate items with confidence, before the
 /// user confirms (MealDraft in spec_mvp.txt Part 28). Never auto-written.
@@ -71,6 +72,9 @@ abstract class AiGateway {
   /// Builds the day's meals around the person's target and exclusions.
   /// [date] is ISO yyyy-MM-dd; the gateway stores the result against it.
   Future<DayPlan> generatePlan({required String date, required String lang});
+
+  /// Remaining shared uses for chat, meal analysis and plan today.
+  Future<AiQuota> quotaStatus();
 }
 
 /// Talks to your own server gateway (supabase/functions/ai-gateway). The
@@ -137,12 +141,16 @@ class HttpAiGateway implements AiGateway {
         if (imageMediaType != null) 'imageMediaType': imageMediaType,
       }),
     );
+    if (res.statusCode == 429) {
+      throw AiQuotaException.fromBody(res.bodyBytes);
+    }
     if (res.statusCode != 200) {
       throw AiGatewayException('analyzeMeal failed: ${res.statusCode} ${res.body}');
     }
     // The body carries Arabic, so decode as UTF-8 rather than trusting the
     // latin-1 default http falls back to when a charset is missing.
     final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    _absorbQuota(json);
     final items = ((json['items'] as List?) ?? const [])
         .map((e) => _itemFromJson(e as Map<String, dynamic>))
         .toList();
@@ -156,10 +164,14 @@ class HttpAiGateway implements AiGateway {
       headers: _headers,
       body: jsonEncode({'message': message, 'lang': lang}),
     );
+    if (res.statusCode == 429) {
+      throw AiQuotaException.fromBody(res.bodyBytes);
+    }
     if (res.statusCode != 200) {
       throw AiGatewayException('chatReply failed: ${res.statusCode} ${res.body}');
     }
     final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    _absorbQuota(json);
     return json['reply'] as String;
   }
 
@@ -193,10 +205,16 @@ class HttpAiGateway implements AiGateway {
       headers: _headers,
       body: jsonEncode({'date': date, 'lang': lang}),
     );
+    if (res.statusCode == 429) {
+      throw AiQuotaException.fromBody(res.bodyBytes);
+    }
     if (res.statusCode != 200) {
       throw AiGatewayException('generatePlan failed: ${res.statusCode} ${res.body}');
     }
-    return planFromBody(utf8.decode(res.bodyBytes), lang, date);
+    final decoded = utf8.decode(res.bodyBytes);
+    final json = jsonDecode(decoded) as Map<String, dynamic>;
+    _absorbQuota(json);
+    return planFromBody(decoded, lang, date);
   }
 
   /// Parses a `plan/generate` response. Separate from the request so the
@@ -269,6 +287,56 @@ class HttpAiGateway implements AiGateway {
       );
 
   static int _int(Object? v) => v is num ? v.round() : 0;
+
+  AiQuota? lastQuota;
+
+  void _absorbQuota(Map<String, dynamic> json) {
+    final raw = json['quota'];
+    if (raw is Map) {
+      lastQuota = AiQuota.fromJson(Map<String, dynamic>.from(raw));
+    }
+  }
+
+  @override
+  Future<AiQuota> quotaStatus() async {
+    final res = await _client.post(
+      Uri.parse('$baseUrl/quota'),
+      headers: _headers,
+      body: jsonEncode({}),
+    );
+    if (res.statusCode != 200) {
+      throw AiGatewayException('quotaStatus failed: ${res.statusCode} ${res.body}');
+    }
+    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    lastQuota = AiQuota.fromJson(json);
+    return lastQuota!;
+  }
+}
+
+/// Today's five uses are gone. The wallet is how they buy another, not a paywall.
+class AiQuotaException implements Exception {
+  final String message;
+  final AiQuota quota;
+  AiQuotaException(this.message, this.quota);
+
+  factory AiQuotaException.fromBody(List<int> bytes) {
+    try {
+      final json = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+      final raw = json['quota'];
+      final quota = raw is Map
+          ? AiQuota.fromJson(Map<String, dynamic>.from(raw))
+          : AiQuota.empty;
+      return AiQuotaException(
+        (json['error'] as String?) ?? (json['reply'] as String?) ?? 'quota',
+        quota,
+      );
+    } catch (_) {
+      return AiQuotaException('quota', AiQuota.empty);
+    }
+  }
+
+  @override
+  String toString() => 'AiQuotaException: $message';
 }
 
 class AiGatewayException implements Exception {

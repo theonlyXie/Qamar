@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 
 import '../l10n/strings.dart';
 import '../models/meal.dart';
 import '../models/messages.dart';
 import '../models/onboarding.dart';
 import '../models/plan.dart';
+import '../models/su_economy.dart';
 import '../services/ai_gateway.dart';
 import '../services/auth_service.dart';
 import '../services/dictation.dart';
@@ -121,6 +123,8 @@ class AppState extends ChangeNotifier {
         suLifetime = bal.lifetime;
       }
 
+      await _refreshQuota();
+
       final history = await _mealRepo?.dailyTotals(uid, days: 7);
       if (history != null) {
         dayHistory
@@ -187,6 +191,7 @@ class AppState extends ChangeNotifier {
   bool treeOpen = false;
   int suAvailable = 0;
   int suLifetime = 0;
+  AiQuota aiQuota = AiQuota.empty;
   bool questDone = false;
   /// Meal slots the user has swapped to their alternative, keyed by slot id
   /// ('breakfast' | 'lunch' | 'dinner'). Previously a single bool, which meant
@@ -221,6 +226,9 @@ class AppState extends ChangeNotifier {
   /// like the prototype's `iso()` — keeps "٨٢ كجم" reading correctly in RTL.
   String iso(String x) => '⁦$x⁩';
 
+  /// Thousands separators so 2,500 looks like a score, not a calorie leftover.
+  String formatSu(int n) => NumberFormat.decimalPattern(isAr ? 'ar' : 'en').format(n);
+
   void setLang(AppLang l) {
     lang = l;
     _notify();
@@ -250,6 +258,7 @@ class AppState extends ChangeNotifier {
     scanReading = false;
     suAvailable = 0;
     suLifetime = 0;
+    aiQuota = AiQuota.empty;
     redeemed.clear();
     ledgerExtra.clear();
     serverLedger.clear();
@@ -904,7 +913,7 @@ class AppState extends ChangeNotifier {
       // Awarded locally for now: crediting Su Points is server-only (see
       // SupabaseWalletRepository.credit), so the balance reconciles to the
       // server's number on the next hydrate once the Edge Function exists.
-      _credit(20, ar: 'إكمال التهيئة', en: 'Onboarding completed');
+      _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
       _notify();
 
       if (isBacked) {
@@ -1057,6 +1066,7 @@ class AppState extends ChangeNotifier {
         lang: lang.code,
       );
       if (_disposed) return;
+      await _pullQuota(gateway);
       chatState = ChatState.idle;
 
       if (result.items.isEmpty) {
@@ -1080,6 +1090,9 @@ class AppState extends ChangeNotifier {
           sub: result.note,
         ));
       }
+    } on AiQuotaException catch (e) {
+      if (_disposed) return;
+      _onQuotaHit(e);
     } catch (e) {
       if (_disposed) return;
       chatState = ChatState.idle;
@@ -1117,12 +1130,14 @@ class AppState extends ChangeNotifier {
     final drafted = items.map((it) => (def: it.def, qty: it.q)).toList();
     final raw = proposalRaw;
 
+    final first = meals.isEmpty;
     meals.add(meal);
-    _credit(10, ar: 'تأكيد وجبة', en: 'Meal confirmed');
+    final award = first ? SuEconomy.firstMeal : SuEconomy.mealLogged;
+    _credit(award, ar: first ? 'أول وجبة' : 'تأكيد وجبة', en: first ? 'First meal logged' : 'Meal confirmed');
     chat.add(ChatTurn(
       who: ChatWho.q,
       text: isAr ? 'اتسجّلت: ${totals.kcal} سعرة.' : 'Logged: ${totals.kcal} kcal.',
-      sub: isAr ? '+١٠ نقطة' : '+10 Su',
+      sub: isAr ? '+${formatSu(award)} نقطة' : '+${formatSu(award)} Su',
     ));
     proposal = null;
     proposalQty = [];
@@ -1149,7 +1164,7 @@ class AppState extends ChangeNotifier {
 
   void completeQuest() {
     questDone = true;
-    _credit(5, ar: 'مهمة اليوم', en: 'Primary daily quest');
+    _credit(SuEconomy.dailyQuest, ar: 'مهمة اليوم', en: 'Primary daily quest');
     _notify();
   }
 
@@ -1222,22 +1237,61 @@ class AppState extends ChangeNotifier {
 
   bool isRedeemed(String id) => redeemed.contains(id);
 
-  void _pushRedeem(SpendItemDef item) {
-    _push('redeem', (uid) => _walletRepo!.redeem(uid, item: item, idempotencyKey: '${uid}_redeem_${item.id}'));
+  /// Remaining Qamar uses today, from the last gateway response or /quota.
+  Future<void> _pullQuota(AiGateway gateway) async {
+    if (gateway is HttpAiGateway && gateway.lastQuota != null) {
+      aiQuota = gateway.lastQuota!;
+      return;
+    }
+    try {
+      aiQuota = await gateway.quotaStatus();
+    } catch (_) {}
+  }
+
+  Future<void> _refreshQuota() async {
+    final gateway = _ai;
+    if (gateway == null) return;
+    try {
+      aiQuota = await gateway.quotaStatus();
+      _notify();
+    } catch (_) {
+      // A missing counter is not worth blocking Today. The next AI call
+      // will 429 if they are actually out.
+    }
+  }
+
+  void _onQuotaHit(AiQuotaException e) {
+    aiQuota = e.quota;
+    chatState = ChatState.idle;
+    chat.add(ChatTurn(
+      who: ChatWho.q,
+      text: e.message,
+      action: isAr ? 'افتح المحفظة' : 'Open the wallet',
+      openWallet: true,
+    ));
+    _notify();
   }
 
   void redeem(SpendItemDef item) {
-    final done = isRedeemed(item.id);
+    final done = item.once && isRedeemed(item.id);
     final afford = suAvailable >= item.price && !done;
     if (!afford) return;
     suAvailable -= item.price;
-    redeemed.add(item.id);
+    if (item.once) redeemed.add(item.id);
+    if (item.grantsAiUses > 0) {
+      aiQuota = aiQuota.withExtra(item.grantsAiUses);
+    }
     ledgerExtra.insert(0, LedgerEntry(label: isAr ? item.nameAr : item.nameEn, amount: -item.price, when: isAr ? 'دلوقتي' : 'Just now'));
     _notify();
 
     // The database is the authority on the balance: the RPC re-checks the
     // price and refuses if the points are not really there.
-    if (isBacked) _pushRedeem(item);
+    if (isBacked) {
+      final key = item.once
+          ? '${_userId}_redeem_${item.id}'
+          : '${_userId}_redeem_${item.id}_${DateTime.now().millisecondsSinceEpoch}';
+      _push('redeem', (uid) => _walletRepo!.redeem(uid, item: item, idempotencyKey: key));
+    }
   }
 
   /// Every entry here is written when the thing it describes actually
@@ -1536,8 +1590,8 @@ class AppState extends ChangeNotifier {
     return n;
   }
 
-  int level() => math.min(20, 1 + (suLifetime / 25).floor());
-  double levelPct() => math.min(100, ((suLifetime % 25) / 25 * 100)).toDouble();
+  int level() => SuEconomy.levelFor(suLifetime);
+  double levelPct() => SuEconomy.levelPctFor(suLifetime);
 
   void openWhy() {
     whyOpen = true;
@@ -1634,11 +1688,16 @@ class AppState extends ChangeNotifier {
     try {
       final built = await gateway.generatePlan(date: today, lang: lang.code);
       if (_disposed) return;
+      await _pullQuota(gateway);
       plan = built;
       planDate = built.date;
       // A new day's meals are not the old day's meals; carrying the swaps
       // over would apply yesterday's choices to dishes that are not there.
       swappedSlots.clear();
+    } on AiQuotaException catch (e) {
+      if (_disposed) return;
+      aiQuota = e.quota;
+      planError = e.message;
     } catch (e) {
       if (_disposed) return;
       planError = _planMessage(e);
@@ -1664,6 +1723,11 @@ class AppState extends ChangeNotifier {
     if (raw.contains('403') || raw.contains('not eligible')) {
       return isAr ? 'الحساب ده مش مؤهل للخطط.' : 'This account is not eligible for plans.';
     }
+    if (raw.contains('429') || raw.toLowerCase().contains('quota')) {
+      return isAr
+          ? 'خلصت استخدامات قمر النهارده. افتح المحفظة وصرف نقاط Su على استخدام زيادة.'
+          : 'That’s today’s Qamar uses. Open the wallet and spend Su Points on another use.';
+    }
     return isAr
         ? 'مقدرتش أعمل الخطة دلوقتي. جرّب تاني بعد شوية.'
         : 'I could not build the plan just now. Try again in a moment.';
@@ -1682,6 +1746,7 @@ class AppState extends ChangeNotifier {
         sub: isAr ? 'اكتب أو ادوس على القمر واحكي.' : 'Type, or tap the moon and speak.',
       ));
     }
+    _refreshQuota();
     _notify();
   }
 
@@ -1738,9 +1803,13 @@ class AppState extends ChangeNotifier {
     try {
       final reply = await gateway.chatReply(message: text, lang: lang.code);
       if (_disposed) return;
+      await _pullQuota(gateway);
       chatState = ChatState.idle;
       turn += 1;
       chat.add(ChatTurn(who: ChatWho.q, text: reply));
+    } on AiQuotaException catch (e) {
+      if (_disposed) return;
+      _onQuotaHit(e);
     } catch (e) {
       if (_disposed) return;
       chatState = ChatState.idle;
@@ -1831,8 +1900,9 @@ class AppState extends ChangeNotifier {
   void chatSuggestionTap(String label) => sendChatMsg(label);
 
   void chatActionTap() {
+    final toWallet = chat.isNotEmpty && chat.last.openWallet;
     chatOpen = false;
-    screen = AppScreen.plan;
+    screen = toWallet ? AppScreen.wallet : AppScreen.plan;
     _notify();
   }
 

@@ -32,7 +32,7 @@ class YouScreen extends StatelessWidget {
             ? (isAr ? 'فاضية' : 'Empty')
             : (isAr ? '${state.iso('$remembered')} عناصر' : '$remembered items')
       ),
-      (isAr ? 'محفظة نقاط Su' : 'Su Points wallet', state.iso('${state.suAvailable}')),
+      (isAr ? 'محفظة نقاط Su' : 'Su Points wallet', state.iso(state.formatSu(state.suAvailable))),
       (isAr ? 'موافقة تحسين الخدمة' : 'Service-improvement consent', state.improve ? (isAr ? 'مفعّلة' : 'On') : (isAr ? 'موقوفة' : 'Off')),
       (isAr ? 'الموافقات' : 'Consents', isAr ? 'الإصدار ١.١' : 'v1.1'),
     ];
@@ -117,7 +117,7 @@ class YouScreen extends StatelessWidget {
                     Text(
                       state.plusActive
                           ? (isAr ? 'شكراً إنك معانا' : 'Thanks for supporting Qamar')
-                          : (isAr ? 'الخطة الكاملة والتحليل بالصورة من غير حد' : 'The full plan and unlimited photo analysis'),
+                          : (isAr ? 'خطة أعمق، وتقارير أسبوع أوضح' : 'A deeper plan and a fuller weekly review'),
                       style: QText.body(size: 12, height: 18, color: QColors.textMuted),
                     ),
                   ]),
@@ -138,7 +138,7 @@ class YouScreen extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(t.walletTitle, style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFF2E4C6))),
                 Text(
-                  isAr ? '${state.iso('${state.suAvailable}')} متاح · ${state.iso('${state.suLifetime}')} مكتسب' : '${state.suAvailable} available · ${state.suLifetime} lifetime',
+                  isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح · ${state.iso(state.formatSu(state.suLifetime))} مكتسب' : '${state.formatSu(state.suAvailable)} available · ${state.formatSu(state.suLifetime)} lifetime',
                   style: QText.body(size: 12, color: const Color(0xFFB9A57C)),
                 ),
               ]),
