@@ -266,9 +266,15 @@ class HttpAiGateway implements AiGateway {
         p: _int(j['proteinG']),
         c: _int(j['carbsG']),
         f: _int(j['fatG']),
+        // Snake case because these come straight from the gateway, which named
+        // them after the database columns they end up in.
+        qamarFoodId: j['qamar_food_id'] as String?,
+        grams: _double(j['grams']),
+        portionMatched: j['portion_matched'] == true,
       );
 
   static int _int(Object? v) => v is num ? v.round() : 0;
+  static double? _double(Object? v) => v is num ? v.toDouble() : null;
 }
 
 class AiGatewayException implements Exception {

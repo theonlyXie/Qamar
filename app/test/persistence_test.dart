@@ -54,7 +54,7 @@ class FakeMealRepo implements MealRepository {
   }
 
   @override
-  Future<void> confirmMeal(String userId, {required String draftId, required LoggedMeal meal}) async {
+  Future<void> confirmMeal(String userId, {required String draftId, required LoggedMeal meal, List<({ConfirmItemDef def, int qty})> items = const []}) async {
     saved.add(meal);
   }
 

@@ -32,6 +32,7 @@ import {
 } from "./model.ts";
 import { retrieve, type FoodFacts, type Passage, type Source } from "./retrieval.ts";
 import {
+  identifyItems,
   renderResolutions,
   resolveFoods,
   toPacketFacts,
@@ -535,6 +536,30 @@ async function analyzeMeal(
     }
   }
 
+  // Identify each final item against the graph, and hand the ids back with the
+  // items so that whatever the app writes to meal_logs can be joined to
+  // food_nutrients later. Done after the verifier rather than before, because a
+  // revision can replace the item list and identifying the discarded one would
+  // attach ids to a meal nobody ate.
+  const [identities, identifyMs] = await timed(() =>
+    identifyItems(SUPABASE_URL, SERVICE_KEY, items)
+  );
+  stages.push({
+    stage: "food_resolver",
+    externalCalls: identities.length * 2,
+    latencyMs: identifyMs,
+  });
+
+  const itemsWithIdentity = items.map((item, i) => ({
+    ...item,
+    // Snake case on purpose: these two keys travel through the app into
+    // meal_logs.items, and qamar_nutrient_intake reads them by these names.
+    qamar_food_id: identities[i]?.qamarFoodId ?? null,
+    grams: identities[i]?.grams ?? null,
+    food_slug: identities[i]?.slug ?? null,
+    portion_matched: identities[i]?.portionMatched ?? false,
+  }));
+
   const sources = resolvedSources(passages, resolved);
   const id = await record(userId, "meal_analysis", {
     inScope: true,
@@ -566,11 +591,17 @@ async function analyzeMeal(
     calculatedTargets: targetsFrom(ctx, target),
     applicableRules: rules.applicable,
     excludedRules: rules.excluded,
-    candidateDecision: { items, input: image ? "photo" : "text" },
+    candidateDecision: { items: itemsWithIdentity, input: image ? "photo" : "text" },
     safetyFlags: flags,
     uncertainty: {
       foods: resolutionUncertainty(resolved),
       passages_retrieved: passages.length,
+      // An item with no food id contributes to the calorie total and to nothing
+      // else. Recording which ones is how a thin micronutrient history later
+      // gets explained rather than guessed at.
+      unidentified_items: itemsWithIdentity
+        .filter((i) => !i.qamar_food_id || !i.grams)
+        .map((i) => i.ar ?? i.en ?? "unnamed"),
       // Every item the model itself marked uncertain. This is what the
       // confirmation screen is for, and what the verifier recomputes first.
       low_confidence_items: items
@@ -581,7 +612,13 @@ async function analyzeMeal(
   }, stages, verifications);
 
   return json({
-    items,
+    // These carry qamar_food_id and grams. The app must persist them onto
+    // meal_logs.items unchanged; dropping them costs nothing today and silently
+    // costs every micronutrient answer from then on.
+    items: itemsWithIdentity,
+    // How much of this meal the log will actually be able to speak for. The
+    // confirmation screen should say so when it is not all of it.
+    identified: identities.filter((x) => x.qamarFoodId && x.grams).length,
     note: (lang === "ar" ? parsed.note_ar : parsed.note_en) ?? null,
     sources,
     // What the graph made of each phrase: the canonical food, the portion it

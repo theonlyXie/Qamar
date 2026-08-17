@@ -36,6 +36,20 @@ class ConfirmItemDef {
   final int p;
   final int c;
   final int f;
+
+  /// The row in the food graph this item was matched to, and the weight eaten.
+  ///
+  /// Null when Qamar could not identify the food confidently. That is a normal
+  /// outcome and not an error — but it is the difference between a meal that
+  /// can later answer "was I short on iron" and one that only ever knew its
+  /// calories. Both travel through to the log; nothing downstream may invent
+  /// them.
+  final String? qamarFoodId;
+  final double? grams;
+
+  /// True when the user named the portion, false when Qamar assumed a default.
+  final bool portionMatched;
+
   const ConfirmItemDef({
     required this.ar,
     required this.en,
@@ -46,6 +60,9 @@ class ConfirmItemDef {
     required this.p,
     required this.c,
     required this.f,
+    this.qamarFoodId,
+    this.grams,
+    this.portionMatched = false,
   });
 }
 

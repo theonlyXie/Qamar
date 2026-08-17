@@ -275,6 +275,87 @@ export function renderResolutions(items: Resolution[]): string {
     .join("\n");
 }
 
+/** What an item needs to carry for anything past calories to be computable. */
+export interface FoodIdentity {
+  /** The food this item was matched to, as foods.qamar_food_id. */
+  qamarFoodId: string | null;
+  /** The eaten weight. Null when no portion could be established. */
+  grams: number | null;
+  /** True when the user named the portion; false when Qamar assumed one. */
+  portionMatched: boolean;
+  /** Match score, so a caller can decline to trust a weak identification. */
+  matchScore: number | null;
+  slug: string | null;
+}
+
+/**
+ * Identifies each analysed item against the food graph.
+ *
+ * This exists because of a gap that made the whole micronutrient layer inert.
+ * meal_logs.items has held a name and four macros since 0001 — the model's
+ * reading of the plate — and none of it points at a row in `foods`. So the
+ * moment anything wanted to ask a question calories cannot answer ("has she
+ * been short on iron this week"), there was nothing to join on. Attaching the
+ * food id and the gram weight at analysis time is what turns a log from a
+ * calorie diary into a diet history.
+ *
+ * The identification is per item and on the item's own name, not on the phrase
+ * list the prompt was built from: the model splits "koshary and salad" into two
+ * items, and each of them has to be identified as itself.
+ *
+ * Weak matches are returned as nulls rather than as guesses. A wrong food id is
+ * worse than a missing one — it produces a confident number about an entirely
+ * different meal — and every consumer of this already treats a null as "cannot
+ * say" and reports its coverage.
+ */
+export async function identifyItems(
+  supabaseUrl: string,
+  serviceKey: string,
+  items: { ar?: string; en?: string; portionAr?: string; portionEn?: string }[],
+): Promise<FoodIdentity[]> {
+  return await Promise.all(items.slice(0, 20).map(async (item) => {
+    const none: FoodIdentity = {
+      qamarFoodId: null,
+      grams: null,
+      portionMatched: false,
+      matchScore: null,
+      slug: null,
+    };
+
+    // Arabic first: the graph's aliases are Egyptian Arabic, and the English
+    // name the model produces is a translation of its own making.
+    const name = (item.ar ?? item.en ?? "").trim();
+    if (!name) return none;
+
+    // The portion goes into the phrase because that is how the resolver finds a
+    // named household measure — "رغيف" only becomes 90 g if the word is there.
+    const phrase = [name, item.portionAr ?? item.portionEn ?? ""].join(" ").trim();
+
+    const raw = await rpc<RawCandidate>(supabaseUrl, serviceKey, "qamar_resolve_food", {
+      p_phrase: name,
+      p_limit: 1,
+    });
+    const top = raw[0] ? toCandidate(raw[0]) : null;
+    if (!top || top.matchScore < PLAUSIBLE) return none;
+
+    const portions = await rpc<{
+      grams: number;
+      matched_in_phrase: boolean;
+    }>(supabaseUrl, serviceKey, "qamar_resolve_portion", {
+      p_food_id: top.qamarFoodId,
+      p_phrase: phrase,
+    });
+
+    return {
+      qamarFoodId: top.qamarFoodId,
+      grams: portions[0] ? Number(portions[0].grams) : null,
+      portionMatched: portions[0]?.matched_in_phrase ?? false,
+      matchScore: top.matchScore,
+      slug: top.slug,
+    };
+  }));
+}
+
 /** The food_facts entry of the evidence packet, per the architecture paper. */
 export function toPacketFacts(items: Resolution[]): unknown[] {
   return items

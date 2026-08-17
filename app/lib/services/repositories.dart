@@ -13,7 +13,15 @@ abstract class ProfileRepository {
 
 abstract class MealRepository {
   Future<String> saveDraft(String userId, MealAnalysisDraft draft);
-  Future<void> confirmMeal(String userId, {required String draftId, required LoggedMeal meal});
+  /// Writes the log. [items] is the confirmed item list, and carries the food
+  /// ids and gram weights that let anything past calories be computed later —
+  /// pass it, or the log records four totals and nothing else.
+  Future<void> confirmMeal(
+    String userId, {
+    required String draftId,
+    required LoggedMeal meal,
+    List<({ConfirmItemDef def, int qty})> items,
+  });
   Future<List<LoggedMeal>> mealsForDay(String userId, DateTime day);
 
   /// One entry per day that has any logged meal, most recent last. Days with

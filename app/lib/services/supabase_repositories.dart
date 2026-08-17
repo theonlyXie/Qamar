@@ -121,13 +121,43 @@ class SupabaseMealRepository implements MealRepository {
   }
 
   @override
-  Future<void> confirmMeal(String userId, {required String draftId, required LoggedMeal meal}) async {
+  Future<void> confirmMeal(
+    String userId, {
+    required String draftId,
+    required LoggedMeal meal,
+    List<({ConfirmItemDef def, int qty})> items = const [],
+  }) async {
     await _client.from('meal_logs').insert({
       'user_id': userId,
       'draft_id': draftId,
       'name': meal.name,
       'source': meal.sub,
-      'items': const [],
+      // This used to write an empty array, which threw away everything the
+      // analysis had worked out and left the log holding four totals. It is
+      // why the micronutrient functions could see nothing: there was no food
+      // id to join on, because there were no items at all.
+      //
+      // Keys are snake_case to match qamar_nutrient_intake, which reads
+      // qamar_food_id and grams by name out of this JSON.
+      'items': [
+        for (final it in items)
+          {
+            'name': it.def.ar.isNotEmpty ? it.def.ar : it.def.en,
+            'name_en': it.def.en,
+            'portion': it.def.portionAr.isNotEmpty ? it.def.portionAr : it.def.portionEn,
+            'confidence': it.def.conf.name,
+            'qty': it.qty,
+            'kcal': it.def.kcal * it.qty,
+            'protein_g': it.def.p * it.qty,
+            'carbs_g': it.def.c * it.qty,
+            'fat_g': it.def.f * it.qty,
+            'qamar_food_id': it.def.qamarFoodId,
+            // Scaled by quantity: two loaves is twice the weight, and the
+            // nutrient sum is per gram of what was actually eaten.
+            'grams': it.def.grams == null ? null : it.def.grams! * it.qty,
+            'portion_matched': it.def.portionMatched,
+          },
+      ],
       'kcal': meal.kcal,
       'protein_g': meal.p,
       'carbs_g': meal.c,
