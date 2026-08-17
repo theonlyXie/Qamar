@@ -122,26 +122,44 @@ async function embedRequest(url: string, key: string, body: unknown): Promise<nu
   throw new Error("unreachable");
 }
 
+/**
+ * The model this run will use, named the same way retrieval.ts picks one.
+ *
+ * Voyage wins when both keys are present, which is worth knowing when
+ * switching providers: adding OPENAI_API_KEY does not switch anything while
+ * VOYAGE_API_KEY is still set. The old key has to be removed, in the gateway's
+ * secrets as well as here, or the corpus and the queries end up on different
+ * models and every answer is retrieved by noise.
+ */
+export function currentEmbeddingModel(): string {
+  if (Deno.env.get("VOYAGE_API_KEY")) {
+    return Deno.env.get("EMBEDDING_MODEL") ?? "voyage-3";
+  }
+  if (Deno.env.get("OPENAI_API_KEY")) {
+    return Deno.env.get("EMBEDDING_MODEL") ?? "text-embedding-3-small";
+  }
+  throw new Error("set VOYAGE_API_KEY or OPENAI_API_KEY");
+}
+
 async function embedBatch(texts: string[]): Promise<number[][]> {
+  const model = currentEmbeddingModel();
   const voyage = Deno.env.get("VOYAGE_API_KEY");
   if (voyage) {
     return await embedRequest("https://api.voyageai.com/v1/embeddings", voyage, {
-      model: Deno.env.get("EMBEDDING_MODEL") ?? "voyage-3",
+      model,
       input: texts,
       input_type: "document", // documents, not queries — it matters for Voyage
     });
   }
 
-  const openai = Deno.env.get("OPENAI_API_KEY");
-  if (openai) {
-    return await embedRequest("https://api.openai.com/v1/embeddings", openai, {
-      model: "text-embedding-3-small",
-      input: texts,
-      dimensions: 1024,
-    });
-  }
-
-  throw new Error("set VOYAGE_API_KEY or OPENAI_API_KEY");
+  const openai = Deno.env.get("OPENAI_API_KEY")!;
+  return await embedRequest("https://api.openai.com/v1/embeddings", openai, {
+    model,
+    input: texts,
+    // kb_chunks.embedding is vector(1024). OpenAI returns 1536 by default, so
+    // this is not a preference — the insert fails without it.
+    dimensions: 1024,
+  });
 }
 
 async function db(path: string, init: RequestInit): Promise<Response> {
@@ -158,7 +176,7 @@ async function db(path: string, init: RequestInit): Promise<Response> {
   return res;
 }
 
-type Outcome = "ingested" | "skipped" | "repaired";
+type Outcome = "ingested" | "skipped" | "repaired" | "re-embedded";
 
 /**
  * Ingests one document, or reports why it did not need to be.
@@ -167,21 +185,29 @@ type Outcome = "ingested" | "skipped" | "repaired";
  * only sane response to a half-finished run — run it again — the wrong one.
  * Now the state is read first, and there are exactly three cases:
  *
- *   already there with chunks   nothing to do
- *   there with no chunks        a previous run died between creating the row
- *                               and embedding its text. That row is not
- *                               harmless: it looks ingested and contributes
- *                               nothing to retrieval. Removed and redone.
- *   not there                   ingest it
+ *   chunks, same model         nothing to do
+ *   chunks, a different model  the provider changed. Skipping here would be
+ *                              the worst outcome available: the corpus would
+ *                              hold vectors from two models in one index, and
+ *                              retrieval would rank by noise while every row
+ *                              count still looked healthy. Re-embedded.
+ *   there with no chunks       a previous run died between creating the row
+ *                              and embedding its text. That row is not
+ *                              harmless: it looks ingested and contributes
+ *                              nothing to retrieval. Removed and redone.
+ *   not there                  ingest it
  *
  * The identity is (source, title), which is what a document is called and
  * where it came from. Two documents differing only in body text are the same
  * document revised, and the revision should replace rather than accumulate.
  */
-async function ingest(doc: SourceDoc): Promise<Outcome> {
+async function ingest(doc: SourceDoc, model: string): Promise<Outcome> {
   const q = `kb_documents?source=eq.${encodeURIComponent(doc.source)}` +
-    `&title=eq.${encodeURIComponent(doc.title)}&select=id`;
-  const existing = await (await db(q, { method: "GET" })).json() as { id: string }[];
+    `&title=eq.${encodeURIComponent(doc.title)}&select=id,embedding_model`;
+  const existing = await (await db(q, { method: "GET" })).json() as {
+    id: string;
+    embedding_model: string | null;
+  }[];
 
   let outcome: Outcome = "ingested";
 
@@ -193,13 +219,22 @@ async function ingest(doc: SourceDoc): Promise<Outcome> {
     )).json() as unknown[];
 
     if (counted.length > 0) {
-      console.log(`  ${doc.title}: already ingested, skipping`);
-      return "skipped";
+      const stored = existing.find((r) => r.embedding_model)?.embedding_model ?? null;
+      if (stored === model) {
+        console.log(`  ${doc.title}: already ingested with ${model}, skipping`);
+        return "skipped";
+      }
+      console.log(
+        `  ${doc.title}: embedded with ${stored ?? "an unrecorded model"}, ` +
+          `now using ${model} — re-embedding`,
+      );
+      await db(`kb_documents?id=in.(${ids.join(",")})`, { method: "DELETE" });
+      outcome = "re-embedded";
+    } else {
+      console.log(`  ${doc.title}: found ${ids.length} row(s) with no chunks — repairing`);
+      await db(`kb_documents?id=in.(${ids.join(",")})`, { method: "DELETE" });
+      outcome = "repaired";
     }
-
-    console.log(`  ${doc.title}: found ${ids.length} row(s) with no chunks — repairing`);
-    await db(`kb_documents?id=in.(${ids.join(",")})`, { method: "DELETE" });
-    outcome = "repaired";
   }
 
   const created = await db("kb_documents", {
@@ -211,6 +246,7 @@ async function ingest(doc: SourceDoc): Promise<Outcome> {
       url: doc.url ?? null,
       licence: doc.licence ?? null,
       domain: doc.domain,
+      embedding_model: model,
     }),
   });
   const documentId = (await created.json())[0].id;
@@ -249,17 +285,30 @@ if (import.meta.main) {
   }
 
   const docs: SourceDoc[] = JSON.parse(await Deno.readTextFile(path));
-  console.log(`ingesting ${docs.length} documents`);
+  const model = currentEmbeddingModel();
+  console.log(`ingesting ${docs.length} documents with ${model}`);
 
-  const tally: Record<Outcome, number> = { ingested: 0, skipped: 0, repaired: 0 };
+  const tally: Record<Outcome, number> = {
+    ingested: 0,
+    skipped: 0,
+    repaired: 0,
+    "re-embedded": 0,
+  };
   for (const doc of docs) {
-    tally[await ingest(doc)]++;
+    tally[await ingest(doc, model)]++;
   }
 
   console.log(
-    `\ndone — ${tally.ingested} ingested, ${tally.repaired} repaired, ` +
-      `${tally.skipped} already present`,
+    `\ndone — ${tally.ingested} ingested, ${tally["re-embedded"]} re-embedded, ` +
+      `${tally.repaired} repaired, ${tally.skipped} already present`,
   );
+  if (tally["re-embedded"] > 0) {
+    console.log(
+      `the provider changed, so those documents were rebuilt on ${model}. The ` +
+        "gateway must use the same model to query with, or retrieval compares " +
+        "vectors from two different spaces — check its secrets.",
+    );
+  }
   if (minIntervalMs > 0) {
     console.log(
       "this account is rate limited, so the run was paced. Adding a payment " +
