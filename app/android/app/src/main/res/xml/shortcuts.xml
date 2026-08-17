@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="ask_qamar"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_ask_short"
+        android:shortcutLongLabel="@string/shortcut_ask_long">
+        <intent
+            android:action="com.qamar.app.QUICK_ASK"
+            android:targetPackage="com.qamar.app"
+            android:targetClass="com.qamar.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="log_meal"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_log_short"
+        android:shortcutLongLabel="@string/shortcut_log_long">
+        <intent
+            android:action="com.qamar.app.QUICK_LOG"
+            android:targetPackage="com.qamar.app"
+            android:targetClass="com.qamar.app.MainActivity" />
+    </shortcut>
+</shortcuts>

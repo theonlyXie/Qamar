@@ -130,6 +130,34 @@ class YouScreen extends StatelessWidget {
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(isAr ? 'كلم قمر من برّه التطبيق' : 'Talk to Qamar without opening the app',
+                  style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+              const SizedBox(height: 6),
+              Text(
+                isAr
+                    ? 'آيفون: الإعدادات ← تسهيلات الاستخدام ← لمس ← الضغط على الخلف ← اربط «Ask Qamar» أو «Log a meal with Qamar».\n'
+                      'أندرويد: اضغط مطوّلاً على أيقونة قمر واختار اسأل / سجّل وجبة. على Pixel: الإيماءات ← Quick Tap ← افتح قمر، أو نفس الاختصار.'
+                    : 'iPhone: Settings → Accessibility → Touch → Back Tap → assign “Ask Qamar” or “Log a meal with Qamar”.\n'
+                      'Android: long-press the Qamar icon and choose Ask / Log a meal. On Pixel: Gestures → Quick Tap → open Qamar, or the same shortcut.',
+                style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isAr
+                    ? 'سيري: «Ask Qamar» أو «Log a meal with Qamar». الاختصار بيفتح القمر يسمع على طول.'
+                    : 'Siri: “Ask Qamar” or “Log a meal with Qamar”. The shortcut opens the moon listening immediately.',
+                style: QText.body(size: 12, height: 18, color: QColors.textFaint),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: QColors.gold.withOpacity(0.08), border: Border.all(color: QColors.gold.withOpacity(0.32)), borderRadius: BorderRadius.circular(QRadii.xl)),
           child: Row(children: [
             const SuCoinIcon(size: 30),

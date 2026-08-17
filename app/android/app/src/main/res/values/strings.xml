@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_ask_short">Ask Qamar</string>
+    <string name="shortcut_ask_long">Ask Qamar a question</string>
+    <string name="shortcut_log_short">Log a meal</string>
+    <string name="shortcut_log_long">Tell Qamar what you ate</string>
+</resources>
