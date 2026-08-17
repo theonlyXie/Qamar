@@ -27,6 +27,18 @@ class QamarConfig {
   /// never holds an OpenAI/etc key directly.
   static const aiGatewayUrl = String.fromEnvironment('AI_GATEWAY_URL');
 
+  /// Base URL of the mobile API Edge Function (`api`, spec_mvp.txt §29.6).
+  /// Defaults to `${supabaseUrl}/functions/v1/api` when only Supabase is set.
+  static const apiUrlOverride = String.fromEnvironment('QAMAR_API_URL');
+
+  static String get apiUrl {
+    if (apiUrlOverride.isNotEmpty) return apiUrlOverride;
+    if (supabaseUrl.isEmpty) return '';
+    return '$supabaseUrl/functions/v1/api';
+  }
+
+  static bool get useApi => apiUrl.isNotEmpty;
+
   /// Public site. The store listings require reachable privacy and support
   /// URLs, and the app must link to the same terms the subscription is sold
   /// under.
