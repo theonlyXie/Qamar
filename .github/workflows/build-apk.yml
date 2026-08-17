@@ -1,0 +1,134 @@
+# Builds an installable Android APK wired to the live backend. A button.
+#
+# Run it from the Actions tab: "Build Qamar APK" → "Run workflow". When it
+# finishes, the APK is at the bottom of the run page under "Artifacts" — tap it
+# on the phone to download, then open it to install.
+#
+# The three --dart-define values are the whole point. QamarConfig reads
+# SUPABASE_URL, SUPABASE_ANON_KEY and AI_GATEWAY_URL from the build
+# environment, and useSupabase is false when they are absent — so a build made
+# without them runs entirely on mock data. Every screen renders, nothing
+# reaches the backend, and nothing says so. That is the failure this workflow
+# exists to prevent.
+#
+# On the key below: it is the *publishable* key, the one designed to be handed
+# to client apps. It ships inside the APK however this is built, it grants no
+# access of its own, and row-level security is what actually decides who can
+# read what. It is not the service-role key, which bypasses RLS entirely and
+# must never appear here or in any client.
+
+name: Build Qamar APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      flavour:
+        description: "Which build"
+        type: choice
+        default: release
+        options:
+          - release
+          - debug
+  # Also builds on a push to a working branch, so an APK is waiting without
+  # anyone having to go and ask for one.
+  push:
+    branches:
+      - main
+      - "claude/**"
+    paths:
+      - "app/lib/**"
+      - "app/android/**"
+      - "app/pubspec.yaml"
+      - ".github/workflows/build-apk.yml"
+
+env:
+  SUPABASE_URL: https://stqirjlqzchcoeegumoq.supabase.co
+  SUPABASE_ANON_KEY: sb_publishable_XMpWgfKIB8gGZN4WwopdrA_GXw8Zjl2
+  AI_GATEWAY_URL: https://stqirjlqzchcoeegumoq.supabase.co/functions/v1/ai-gateway
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Fetch packages
+        run: flutter pub get
+
+      # Reported, not enforced. The Dart in this repository has never been
+      # compiled anywhere — there is no Flutter toolchain in the environment
+      # most of it was written in — so the first honest signal about its state
+      # is this step and the build below. Failing here would mean no APK at
+      # all on the run that finally tells us what is wrong.
+      - name: Analyze
+        id: analyze
+        continue-on-error: true
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        id: test
+        continue-on-error: true
+        run: flutter test
+
+      # The build is the real gate: if the Dart does not compile there is
+      # nothing to install, and pretending otherwise helps nobody.
+      - name: Build
+        run: |
+          flutter build apk --${{ inputs.flavour || 'release' }} \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=AI_GATEWAY_URL="$AI_GATEWAY_URL"
+
+      - name: Name it after the commit
+        id: name
+        run: |
+          flavour="${{ inputs.flavour || 'release' }}"
+          src="build/app/outputs/flutter-apk/app-$flavour.apk"
+          out="qamar-$flavour-$(git rev-parse --short HEAD).apk"
+          cp "$src" "$out"
+          echo "path=app/$out" >> $GITHUB_OUTPUT
+          echo "name=${out%.apk}" >> $GITHUB_OUTPUT
+          ls -lh "$out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.name.outputs.name }}
+          path: ${{ steps.name.outputs.path }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: What you have
+        if: always()
+        run: |
+          echo "### Qamar APK" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download it from **Artifacts** at the bottom of this run page." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Wired to \`$SUPABASE_URL\`, gateway at \`/functions/v1/ai-gateway\`." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| flutter analyze | ${{ steps.analyze.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| flutter test | ${{ steps.test.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Installing.** Android will warn that it is from an unknown" >> $GITHUB_STEP_SUMMARY
+          echo "source — this APK is signed with the debug key, because no" >> $GITHUB_STEP_SUMMARY
+          echo "release keystore exists yet (see app/android/RELEASE_SIGNING.md)." >> $GITHUB_STEP_SUMMARY
+          echo "That is fine for testing and cannot be published to Play." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Sign-in is anonymous only.** No email provider is configured," >> $GITHUB_STEP_SUMMARY
+          echo "so an account cannot be recovered if the app is uninstalled." >> $GITHUB_STEP_SUMMARY

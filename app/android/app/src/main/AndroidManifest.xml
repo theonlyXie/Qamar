@@ -10,6 +10,14 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
+    <!-- Every call to Supabase and to the AI gateway needs this, and it was
+         only ever declared in src/debug/AndroidManifest.xml — the manifest
+         Flutter adds for hot reload, which is not merged into a release build.
+         So debug builds could reach the backend and release builds silently
+         could not: no crash, no permission prompt, just every network call
+         failing on a phone where the app otherwise looks fine. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
