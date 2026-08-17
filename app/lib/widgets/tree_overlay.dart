@@ -173,7 +173,9 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
     WidgetsBinding.instance.addPostFrameCallback((_) => _publishGeometry());
 
     final hint = state.treeLogExpanded
-        ? (state.isAr ? 'اختار طريقة التسجيل' : 'Choose how to log')
+        ? (state.isAr
+            ? 'الكتابة والصوت مجاناً · الصورة لـ Qamar+'
+            : 'Type or speak for free · photo is Qamar+')
         : state.treeHold
             ? (state.isAr ? 'اسحب لاختيار وسيب' : 'Drag to choose, then let go')
             : t.treeHint;
@@ -274,6 +276,10 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
       state.quickLog(kind);
       return;
     }
+    if (!state.plusActive) {
+      state.refusePhotoLog();
+      return;
+    }
     try {
       final shot = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 88, maxWidth: 2000);
       if (!context.mounted) return;
@@ -320,6 +326,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
               method: kLogMethods[i],
               label: kLogMethods[i].label(state.isAr),
               hovered: state.treeHoverSub == i,
+              locked: kLogMethods[i].kind == QuickLog.photo && !state.plusActive,
               // Works on a plain tap as well as a hold-and-release.
               onTap: state.treeHold ? null : () => _runMethod(context, state, kLogMethods[i].kind),
             ),
@@ -410,8 +417,15 @@ class _SubIcon extends StatelessWidget {
   final LogMethod method;
   final String label;
   final bool hovered;
+  final bool locked;
   final VoidCallback? onTap;
-  const _SubIcon({required this.method, required this.label, required this.hovered, this.onTap});
+  const _SubIcon({
+    required this.method,
+    required this.label,
+    required this.hovered,
+    this.locked = false,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -438,7 +452,18 @@ class _SubIcon extends StatelessWidget {
                   color: hovered ? Color.lerp(const Color(0xF0101828), QColors.moonlight, 0.18) : const Color(0xF0101828),
                   boxShadow: [BoxShadow(color: QColors.moonlight.withValues(alpha: hovered ? 0.45 : 0.16), blurRadius: hovered ? 26 : 16)],
                 ),
-                child: Icon(method.icon, size: 23, color: QColors.moonlight),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(method.icon, size: 23, color: QColors.moonlight),
+                    if (locked)
+                      const Positioned(
+                        right: 8,
+                        bottom: 8,
+                        child: Icon(Icons.lock, size: 11, color: QColors.gold),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

@@ -362,7 +362,7 @@ void secondRound() {
     });
 
     test('a photographed meal lands in the conversation, not a confirm page', () {
-      final state = AppState();
+      final state = AppState()..plusActive = true;
       final before = state.screen;
       state.quickLog(QuickLog.photo);
       state.logPhotoTaken('/tmp/meal.jpg');
@@ -371,6 +371,17 @@ void secondRound() {
       expect(state.chatOpen, isTrue);
       expect(state.lastMealPhotoPath, '/tmp/meal.jpg');
       expect(state.chat.any((c) => c.who == ChatWho.u), isTrue);
+    });
+
+    test('photographing a meal without Qamar+ opens the paywall', () {
+      final state = AppState();
+      state.setLang(AppLang.en);
+      state.quickLog(QuickLog.photo);
+
+      expect(state.screen, AppScreen.subscription);
+      expect(state.plusNotice, contains('Qamar+'));
+      expect(state.chatOpen, isFalse);
+      expect(state.lastMealPhotoPath, isNull);
     });
 
     test('the log methods sit on distinct ring positions', () {

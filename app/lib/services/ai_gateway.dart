@@ -61,11 +61,11 @@ class DayPlan {
   const DayPlan({required this.slots, required this.date, this.rationale});
 }
 
-/// Server-gateway boundary for anything model-backed: meal photo/voice/text
-/// analysis, and the Ask-Qamar chat reply. Per spec_mvp.txt §29.1 the app
-/// never holds a model API key — every call here is a plain HTTPS request to
-/// your own backend, which then calls the model with server-side credentials
-/// and schema validation.
+/// Server-gateway boundary for anything that talks to the backend about food
+/// or Qamar: photographing a meal (model-backed), typing or speaking a meal
+/// (food graph, no daily AI use), and the Ask-Qamar chat reply. Per
+/// spec_mvp.txt §29.1 the app never holds a model API key — every call here
+/// is a plain HTTPS request to your own backend.
 ///
 /// There is deliberately no mock implementation. An assistant that answers
 /// from a script is indistinguishable from a working one until someone trusts
@@ -103,7 +103,7 @@ abstract class AiGateway {
     String? instruction,
   });
 
-  /// Remaining shared uses for chat, meal analysis and plan today.
+  /// Remaining shared uses for chat, photographing a meal, and the plan today.
   Future<AiQuota> quotaStatus();
 }
 

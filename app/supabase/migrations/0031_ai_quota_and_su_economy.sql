@@ -1,8 +1,9 @@
--- Daily AI allowance for the three model routes (chat, meal analysis, plan),
+-- Daily AI allowance for the three model routes (chat, meal photo, plan),
 -- and a Su Points scale that can sit on a leaderboard.
 --
--- Five uses a day, shared. Talking to Qamar, reading a plate, and writing the
--- menu all spend the same counter. A body scan does not: that is onboarding,
+-- Five uses a day, shared. Talking to Qamar, photographing a plate, and writing
+-- the menu all spend the same counter. Typing or speaking a meal does not: that
+-- is the food graph, not the model. A body scan does not: that is onboarding,
 -- not the nutritionist loop. Extra uses are bought with earned Su, not cash.
 --
 -- The old 20 / 5 / 3 wallet numbers stay in the historic ledger. New grants
@@ -392,6 +393,6 @@ alter table public.quests alter column su_points set default 250;
 update public.quests set su_points = 250 where su_points = 5;
 
 comment on table public.ai_usage_days is
-  'Cairo-day counter for chat + meal analysis + plan. Extra is granted by spending Su.';
+  'Cairo-day counter for chat + meal photo + plan. Typed/spoken logs do not increment it. Extra is granted by spending Su.';
 comment on column public.wallet_catalog_items.grants_ai_uses is
   'How many extra AI uses today this redemption adds. Zero for cosmetics.';

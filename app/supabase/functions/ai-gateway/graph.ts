@@ -12,6 +12,7 @@
 // match from reaching the user as a confident number.
 
 import { lookupFood, type FoodFacts } from "./retrieval.ts";
+import type { MealItem } from "./verify.ts";
 
 /** Above this, a fuzzy match is treated as settled. */
 const CONFIDENT = 0.75;
@@ -291,4 +292,36 @@ export function toPacketFacts(items: Resolution[]): unknown[] {
       needs_confirmation: r.needsConfirmation,
       uncertainty: r.uncertainty,
     }));
+}
+
+/**
+ * Turns graph resolutions into the meal-item shape the app confirms.
+ *
+ * Typed and spoken logs use this instead of the model: the numbers are the
+ * per-100 g facts scaled by the resolved portion, so a رغيف is arithmetic
+ * rather than a guess. Phrases the graph could not price are dropped — an
+ * empty list is the honest answer, not a reason to spend a model call.
+ */
+export function itemsFromResolutions(items: Resolution[]): MealItem[] {
+  return items.flatMap((r) => {
+    const facts = r.facts;
+    if (!facts) return [];
+    const grams = r.portion && r.portion.grams > 0 ? r.portion.grams : 100;
+    const scale = grams / 100;
+    const high =
+      !r.needsConfirmation && (r.origin === "graph" || r.origin === "graph_derived");
+    const portionEn = r.portion?.labelEn ?? `${grams} g`;
+    const portionAr = r.portion?.labelAr ?? portionEn;
+    return [{
+      ar: r.food?.nameEg ?? r.food?.nameAr ?? r.phrase,
+      en: r.food?.nameEn ?? facts.name,
+      portionAr,
+      portionEn,
+      confidence: high ? "high" : "low",
+      kcal: Math.round(facts.per100g.kcal * scale),
+      proteinG: Math.round(facts.per100g.protein * scale),
+      carbsG: Math.round(facts.per100g.carbs * scale),
+      fatG: Math.round(facts.per100g.fat * scale),
+    }];
+  });
 }

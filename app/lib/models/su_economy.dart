@@ -7,8 +7,9 @@
 class SuEconomy {
   SuEconomy._();
 
-  /// Chat, meal analysis and plan generation share this many model calls a day.
-  /// Body scans are onboarding, not this pool. Cairo midnight resets it.
+  /// Chat, photographing a meal, and writing the plan share this many model
+  /// calls a day. Typed and spoken logs use the food graph and do not spend
+  /// this pool. Body scans are onboarding, not this pool. Cairo midnight resets it.
   static const int dailyAiUses = 5;
 
   /// How many extra uses Su can buy in one Cairo day, so a stolen session
@@ -21,7 +22,7 @@ class SuEconomy {
   static const int mealLogged = 100;
   static const int dailyQuest = 250;
 
-  /// One more use of Qamar today, any of the three AI routes.
+  /// One more use of Qamar today — chat, a meal photo, or writing the plan.
   static const int extraAiUse = 400;
 
   static const int weeklyInsight = 600;
@@ -42,7 +43,7 @@ class SuEconomy {
       ((lifetime % levelXp) / levelXp * 100).toDouble();
 }
 
-/// Server-authoritative remaining uses for chat / meal analysis / plan.
+/// Server-authoritative remaining uses for chat / meal photos / plan.
 class AiQuota {
   final int used;
   final int limit;
