@@ -12,6 +12,7 @@ import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/su_economy.dart';
+import 'package:qamar/models/water.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/state/app_state.dart';
@@ -98,6 +99,55 @@ void main() {
       expect(SuEconomy.mealLogged, greaterThanOrEqualTo(100));
       expect(SuEconomy.extraAiUse, greaterThanOrEqualTo(SuEconomy.mealLogged));
       expect(SuEconomy.signupBonus, greaterThanOrEqualTo(1000));
+    });
+  });
+
+  group('water', () {
+    test('a glass is 250 ml and a bottle is two glasses', () {
+      expect(Water.glassMl, 250);
+      expect(Water.bottleMl, 500);
+      expect(Water.goalMl, 3000);
+      expect(Water.mlFor(WaterUnit.bottle), Water.glassMl * 2);
+    });
+
+    test('the card reads glasses, bottles, litres, and litres left from one total', () {
+      const empty = WaterStatus(0);
+      expect(empty.glasses, 0);
+      expect(empty.bottles, 0);
+      expect(empty.litres, 0);
+      expect(empty.litresLeft, 3);
+
+      const oneGlass = WaterStatus(250);
+      expect(oneGlass.glasses, 1);
+      expect(oneGlass.bottles, 0.5);
+      expect(oneGlass.litres, 0.25);
+      expect(oneGlass.litresLeft, 2.75);
+
+      const goal = WaterStatus(3000);
+      expect(goal.glasses, 12);
+      expect(goal.bottles, 6);
+      expect(goal.litres, 3);
+      expect(goal.litresLeft, 0);
+      expect(WaterStatus.qty(goal.litres), '3');
+      expect(WaterStatus.qty(oneGlass.litres), '0.25');
+    });
+
+    test('logging a glass then a bottle adds, and undo takes the last sip off', () {
+      final state = AppState();
+      expect(state.water.isEmpty, isTrue);
+
+      state.logWater(WaterUnit.glass);
+      state.logWater(WaterUnit.bottle);
+
+      expect(state.water.ml, 750);
+      expect(state.water.glasses, 3);
+      expect(state.water.bottles, 1.5);
+      expect(state.water.litresLeft, 2.25);
+
+      state.undoWater();
+      expect(state.water.ml, 250);
+      state.undoWater();
+      expect(state.water.isEmpty, isTrue);
     });
   });
 
@@ -196,7 +246,7 @@ void main() {
     test('every explainable id used in the UI has copy behind it', () {
       // Guards against wiring up an Explainable whose id has no entry, which
       // would open an empty sheet.
-      for (final id in ['kcal_remaining', 'protein', 'carbs', 'fat', 'su_points', 'level', 'plan_total', 'target_kcal']) {
+      for (final id in ['kcal_remaining', 'protein', 'carbs', 'fat', 'su_points', 'level', 'plan_total', 'target_kcal', 'water']) {
         expect(kExplanations[id], isNotNull, reason: 'missing explanation for "$id"');
       }
     });

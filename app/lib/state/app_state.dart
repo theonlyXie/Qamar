@@ -16,6 +16,7 @@ import '../services/dictation.dart';
 import '../services/repositories.dart';
 import '../widgets/explain.dart';
 import '../models/profile.dart';
+import '../models/water.dart';
 import 'chat_replies.dart';
 
 /// Qamar+ billing period.
@@ -43,6 +44,7 @@ class AppState extends ChangeNotifier {
   AppState({
     ProfileRepository? profileRepo,
     MealRepository? mealRepo,
+    WaterRepository? waterRepo,
     WalletRepository? walletRepo,
     AiGateway? ai,
     Dictation? dictation,
@@ -50,6 +52,7 @@ class AppState extends ChangeNotifier {
     String? userId,
   })  : _profileRepo = profileRepo,
         _mealRepo = mealRepo,
+        _waterRepo = waterRepo,
         _walletRepo = walletRepo,
         _ai = ai,
         _dictation = dictation,
@@ -61,6 +64,7 @@ class AppState extends ChangeNotifier {
 
   final ProfileRepository? _profileRepo;
   final MealRepository? _mealRepo;
+  final WaterRepository? _waterRepo;
   final WalletRepository? _walletRepo;
 
   /// The real assistant, when AI_GATEWAY_URL is configured. Null means the
@@ -117,6 +121,13 @@ class AppState extends ChangeNotifier {
           ..addAll(today);
       }
 
+      final water = await _waterRepo?.sipsForDay(uid, DateTime.now());
+      if (water != null) {
+        waterToday
+          ..clear()
+          ..addAll(water);
+      }
+
       final bal = await _walletRepo?.balance(uid);
       if (bal != null) {
         suAvailable = bal.available;
@@ -164,6 +175,12 @@ class AppState extends ChangeNotifier {
   bool scanReading = false;
 
   final List<LoggedMeal> meals = [];
+
+  /// Glasses and bottles drunk today. One running millilitre total.
+  final List<WaterSip> waterToday = [];
+
+  WaterStatus get water =>
+      WaterStatus(waterToday.fold<int>(0, (sum, s) => sum + s.ml));
 
   /// Days that actually have logged meals behind them, from the backend.
   /// Empty offline and empty for a new user — the Progress screen says so
@@ -239,6 +256,7 @@ class AppState extends ChangeNotifier {
     step = 0;
     msgs.clear();
     meals.clear();
+    waterToday.clear();
     chat.clear();
     blocked = false;
     minor = false;
@@ -970,6 +988,43 @@ class AppState extends ChangeNotifier {
       f += m.f;
     }
     return Totals(kcal: kcal, p: p, c: c, f: f);
+  }
+
+  // ---- water ----------------------------------------------------------
+  //
+  // Two taps: a glass or a bottle. The card shows glasses, bottles, litres,
+  // and litres left. Nothing goes through the assistant.
+
+  void logWater(WaterUnit unit) {
+    final sip = WaterSip(
+      unit: unit,
+      ml: Water.mlFor(unit),
+      at: DateTime.now(),
+    );
+    waterToday.add(sip);
+    _notify();
+    if (!isBacked) return;
+    final repo = _waterRepo;
+    if (repo == null) return;
+    _push('log water', (uid) async {
+      final id = await repo.addSip(uid, sip);
+      final i = waterToday.indexOf(sip);
+      if (i >= 0) {
+        waterToday[i] = sip.copyWith(id: id);
+        _notify();
+      }
+    });
+  }
+
+  void undoWater() {
+    if (waterToday.isEmpty) return;
+    final last = waterToday.removeLast();
+    _notify();
+    final id = last.id;
+    if (!isBacked || id == null) return;
+    final repo = _waterRepo;
+    if (repo == null) return;
+    _push('undo water', (uid) => repo.removeSip(uid, id));
   }
 
   // ---- logging a meal -------------------------------------------------
