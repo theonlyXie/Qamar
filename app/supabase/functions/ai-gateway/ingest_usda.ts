@@ -47,11 +47,54 @@ const NUTRIENT_MAP: Record<number, string> = {
   1114: "vitamin_d_ug",
   1178: "vitamin_b12_ug",
   1177: "folate_ug",
+  1190: "folate_ug", // Folate, DFE — see PREFERRED_IDS
   1162: "vitamin_c_mg",
   1106: "vitamin_a_ug",
   1100: "iodine_ug",
   1051: "water_g",
+  // Added with the DRI seed in 0031. A target with no food values behind it is
+  // a number the app can display and never act on, so the importer has to reach
+  // these before the gap report means anything.
+  1090: "magnesium_mg",
+  1103: "selenium_ug",
+  1109: "vitamin_e_mg", // alpha-tocopherol, which is what the DRI is set on
+  1165: "thiamin_mg",
+  1166: "riboflavin_mg",
+  1167: "niacin_mg",
+  1175: "vitamin_b6_mg",
 };
+
+/**
+ * When two USDA fields map to one Qamar code, the one listed here wins
+ * regardless of which arrives first in the response.
+ *
+ * Folate is the case that matters. USDA reports both "Folate, total" (1177, in
+ * µg of folate) and "Folate, DFE" (1190, in dietary folate equivalents), and
+ * the DRI is set in DFE. Fortified flour — Egyptian baladi bread included —
+ * carries folic acid, which is absorbed roughly 1.7 times better than the
+ * natural form, so the two numbers diverge exactly where bread is the staple.
+ * Taking whichever came last in the array would have made the folate column
+ * silently mean different things for different foods.
+ */
+const PREFERRED_IDS = new Set([1190]);
+
+/**
+ * Which set of nutrients this importer knows how to fetch.
+ *
+ * Bump this whenever NUTRIENT_MAP gains a code. It is stored on every row it
+ * writes, and it is how the run below decides a food is done.
+ *
+ * Skipping "foods that already have nutrients" was right exactly once. The
+ * moment the map grew, every food loaded by the old map — all of them — looked
+ * finished while missing the seven nutrients that had just been added, and no
+ * amount of re-running would have fixed it. Same shape as the bug in the
+ * knowledge-base ingest: a skip rule that was true when written and quietly
+ * false after the thing it skipped for changed.
+ *
+ * The write is an upsert on (food, nutrient, basis), so re-fetching a food
+ * updates its rows rather than duplicating them.
+ */
+const NUTRIENT_SET_VERSION = "fdc-2026-08";
 
 /** Below this, we do not claim a match. */
 const SCORE_FLOOR = 0.45;
@@ -139,10 +182,14 @@ async function searchUsda(query: string): Promise<{ fdcId: number; description: 
   }
 
   const nutrients: Record<string, number> = {};
+  const fromPreferred = new Set<string>();
   // deno-lint-ignore no-explicit-any
   for (const n of ((best.raw as any).foodNutrients ?? [])) {
     const code = NUTRIENT_MAP[n.nutrientId];
-    if (code && typeof n.value === "number") nutrients[code] = n.value;
+    if (!code || typeof n.value !== "number") continue;
+    if (fromPreferred.has(code)) continue; // a preferred field already won
+    nutrients[code] = n.value;
+    if (PREFERRED_IDS.has(n.nutrientId)) fromPreferred.add(code);
   }
   if (!nutrients.energy_kcal) {
     console.log(`  match has no energy value, skipping: "${best.description}"`);
@@ -154,21 +201,26 @@ async function searchUsda(query: string): Promise<{ fdcId: number; description: 
 async function main() {
   await assertStorageAllowed("usda_fdc");
 
-  // Only foods with no nutrients yet, and never recipes: a dish is computed
-  // from its ingredients, not looked up, because no food table contains
-  // koshary.
+  // Never recipes: a dish is computed from its ingredients, not looked up,
+  // because no food table contains koshary.
   const res = await db(
     "foods?is_recipe=eq.false&select=qamar_food_id,slug,name_en,food_state&order=slug",
   );
   const all: Food[] = await res.json();
 
-  const haveRes = await db("food_nutrients?select=qamar_food_id");
+  // Done means "loaded by this version of the map", not "has some nutrients".
+  const haveRes = await db(
+    `food_nutrients?select=qamar_food_id&nutrient_definition_version=eq.${NUTRIENT_SET_VERSION}`,
+  );
   const have = new Set((await haveRes.json()).map((r: { qamar_food_id: string }) => r.qamar_food_id));
 
   let todo = all.filter((f) => !have.has(f.qamar_food_id));
   if (LIMIT > 0) todo = todo.slice(0, LIMIT);
 
-  console.log(`${todo.length} foods to resolve\n`);
+  console.log(
+    `${todo.length} of ${all.length} foods to resolve ` +
+      `(${have.size} already at nutrient set ${NUTRIENT_SET_VERSION})\n`,
+  );
 
   let matched = 0;
   const unmatched: string[] = [];
@@ -197,7 +249,7 @@ async function main() {
       amount,
       per_basis: "per_100g",
       source_id: "usda_fdc",
-      nutrient_definition_version: "fdc-sr-legacy",
+      nutrient_definition_version: NUTRIENT_SET_VERSION,
       confidence: 0.9,
     }));
 
