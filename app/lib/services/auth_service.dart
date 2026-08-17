@@ -40,6 +40,7 @@ abstract class Account {
   /// The email on the current session, once linked.
   String? get email;
   bool get isAnonymous;
+  Future<void> signOut();
 }
 
 class AuthService implements Account {
@@ -113,6 +114,11 @@ class AuthService implements Account {
     await _client.auth.verifyOTP(type: OtpType.email, email: email, token: token);
   }
 
+  @override
+  Future<void> signOut() async {
+    await _client.auth.signOut();
+  }
+
   /// Starts (or resumes) a session. Anonymous sign-in requires anonymous
   /// sign-ins to be enabled in the Supabase project's Auth settings.
   Future<User> ensureSignedIn() async {
@@ -139,6 +145,4 @@ class AuthService implements Account {
   Future<void> linkGoogle({required String idToken, String? accessToken}) async {
     await _client.auth.signInWithIdToken(provider: OAuthProvider.google, idToken: idToken, accessToken: accessToken);
   }
-
-  Future<void> signOut() => _client.auth.signOut();
 }

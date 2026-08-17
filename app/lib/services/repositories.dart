@@ -1,3 +1,4 @@
+import '../models/account.dart';
 import '../models/meal.dart';
 import '../models/profile.dart';
 import '../models/water.dart';
@@ -10,6 +11,15 @@ abstract class ProfileRepository {
   Future<Profile?> loadProfile(String userId);
   Future<void> saveProfile(String userId, Profile profile);
   Future<Target> saveTarget(String userId, Target target, {required Profile inputs});
+  Future<AccountSettings> loadSettings(String userId);
+  Future<void> saveSettings(String userId, AccountSettings settings);
+  Future<List<MemoryFact>> loadMemory(String userId);
+  Future<void> deleteMemoryFact(String userId, String id);
+  Future<MealReminders> loadReminders(String userId);
+  Future<void> saveReminders(String userId, MealReminders reminders);
+  Future<void> submitReport(String userId, {required String kind, required String detail});
+  Future<void> trackEvent(String userId, String name);
+  Future<void> deleteMyData(String userId);
 }
 
 abstract class MealRepository {
@@ -34,6 +44,8 @@ abstract class MealRepository {
   Future<List<WeightReading>> weightHistory(String userId, {int days = 60});
 
   Future<void> recordWeight(String userId, {required double kg, DateTime? at});
+
+  Future<List<NutrientGap>> nutrientGaps(String userId, {int days = 7});
 }
 
 abstract class WaterRepository {
@@ -47,6 +59,7 @@ abstract class WalletRepository {
   Future<void> credit(String userId, {required int amount, required String reason, required String idempotencyKey});
   Future<void> redeem(String userId, {required SpendItemDef item, required String idempotencyKey});
   Future<List<LedgerEntry>> ledger(String userId);
+  Future<QuestCredit> completeDailyQuest(String userId);
 }
 
 /// A day's logged intake, as recorded — never estimated or back-filled.

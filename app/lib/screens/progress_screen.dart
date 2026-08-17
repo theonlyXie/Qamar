@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
+import '../widgets/common.dart';
 
 /// Progress, drawn from what was actually logged.
 ///
@@ -135,6 +136,10 @@ class ProgressScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
+        _WeighInCard(state: state),
+        const SizedBox(height: 14),
+        _GapsCard(state: state),
+        const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -155,9 +160,7 @@ class ProgressScreen extends StatelessWidget {
                     ? (isAr
                         ? 'رأي الأسبوع بيظهر بعد ٣ أيام مسجلة. لسه ${state.iso('${3 - active}')} ${3 - active == 1 ? 'يوم' : 'أيام'}.'
                         : 'The weekly insight appears after 3 logged days — ${3 - active} to go.')
-                    : (isAr
-                        ? 'من ${state.iso('$active')} أيام مسجلة، ${state.iso('$inRange')} قربوا من هدفك. المتوسط ${state.iso('${_average(week)}')} سعرة في اليوم المسجّل.'
-                        : 'Across $active logged days, $inRange landed near your target. Your average on a logged day is ${_average(week)} kcal.'),
+                    : state.weeklyInsight().text(isAr),
                 style: QText.body(size: 14, height: 22, color: QColors.textHigh),
               ),
             ],
@@ -165,12 +168,6 @@ class ProgressScreen extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  static int _average(List<DayTotals> week) {
-    final logged = week.where((d) => d.meals > 0).toList();
-    if (logged.isEmpty) return 0;
-    return (logged.fold(0, (s, d) => s + d.kcal) / logged.length).round();
   }
 
   static String _trendLine(bool isAr, List<WeightReading> w) {
@@ -185,6 +182,112 @@ class ProgressScreen extends StatelessWidget {
       return '${delta < 0 ? 'نزلت' : 'زدت'} $amount كجم $span. قياس واحد مش دليل.';
     }
     return '${delta < 0 ? 'Down' : 'Up'} $amount kg $span. A single reading is not evidence.';
+  }
+}
+
+class _WeighInCard extends StatefulWidget {
+  final AppState state;
+  const _WeighInCard({required this.state});
+  @override
+  State<_WeighInCard> createState() => _WeighInCardState();
+}
+
+class _WeighInCardState extends State<_WeighInCard> {
+  final _ctrl = TextEditingController();
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = widget.state.isAr;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(isAr ? 'وزن جديد' : 'New weigh-in', style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.textHigh)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _ctrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: QText.number(size: 16, color: QColors.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: isAr ? 'كجم' : 'kg',
+                    hintStyle: QText.number(size: 14, color: QColors.textFaint),
+                    isDense: true,
+                    filled: true,
+                    fillColor: QColors.cardNavy,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              QOutlineButton(
+                label: isAr ? 'سجّل' : 'Save',
+                height: 40,
+                onTap: () {
+                  final kg = double.tryParse(_ctrl.text.replaceAll(',', '.'));
+                  if (kg == null) return;
+                  widget.state.recordWeighIn(kg);
+                  _ctrl.clear();
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GapsCard extends StatelessWidget {
+  final AppState state;
+  const _GapsCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final gaps = state.nutrientGaps.where((g) => g.isShortfall).take(6).toList();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(isAr ? 'نواقص المغذيات' : 'Micronutrient gaps', style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.textHigh)),
+          const SizedBox(height: 6),
+          if (gaps.isEmpty)
+            Text(
+              isAr
+                  ? 'هتظهر هنا لما الوجبات المسجّلة تتعرف على أكل في الرسم البياني.'
+                  : 'These appear once logged meals resolve to foods in the graph.',
+              style: QText.body(size: 13, height: 20, color: QColors.textMuted),
+            )
+          else
+            for (final g in gaps)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: Text(isAr ? g.nameAr : g.nameEn, style: QText.body(size: 13, color: QColors.textHigh))),
+                    Text(
+                      g.pctOfTarget == null ? g.status : '${g.pctOfTarget!.round()}%',
+                      style: QText.number(size: 12, color: QColors.amberSoft),
+                    ),
+                  ],
+                ),
+              ),
+        ],
+      ),
+    );
   }
 }
 
