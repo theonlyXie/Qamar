@@ -14,19 +14,31 @@ class QamarProductIds {
 
 /// Thin wrapper over `in_app_purchase`. Per spec_mvp.txt §29.1, this client
 /// never decides entitlement on its own — every completed purchase must be
-/// verified server-side (App Store Server API / Google Play Developer API,
-/// or a RevenueCat webhook) before the app is told Qamar+ is active. Not
-/// wired into the You/paywall screens yet.
+/// verified server-side via `QamarApiClient.billingSync` (or a RevenueCat
+/// webhook hitting `POST /webhooks/revenuecat`) before the app treats Qamar+
+/// as active. Not wired into the You/paywall screens yet.
 class PaymentsService {
   final InAppPurchase _iap = InAppPurchase.instance;
   StreamSubscription<List<PurchaseDetails>>? _sub;
 
   /// Called once you have a backend endpoint to verify a completed purchase
   /// and flip the user's Entitlement row (spec_mvp.txt Part 28).
+  /// Prefer posting to `/billing/sync` through [QamarApiClient].
   final Future<void> Function(PurchaseDetails purchase) onVerifyPurchase;
 
   PaymentsService({required this.onVerifyPurchase});
 
+  /// Helper that builds the payload expected by `POST /billing/sync`.
+  static Map<String, dynamic> syncPayload(PurchaseDetails purchase, {required String store}) {
+    return {
+      'store': store,
+      'product_id': purchase.productID,
+      'transaction_id': purchase.purchaseID ?? purchase.verificationData.serverVerificationData,
+      'verification_data': purchase.verificationData.serverVerificationData,
+      'local_verification_data': purchase.verificationData.localVerificationData,
+      'source': purchase.verificationData.source,
+    };
+  }
   Future<bool> isAvailable() => _iap.isAvailable();
 
   Future<List<ProductDetails>> loadProducts() async {

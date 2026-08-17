@@ -83,10 +83,23 @@ supabase secrets set USDA_API_KEY=...             # free from api.data.gov, and 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically —
 do not set them yourself.
 
-## 3. Deploy the function
+## 3. Deploy the functions
 
 ```sh
 supabase functions deploy ai-gateway
+supabase functions deploy api
+```
+
+`ai-gateway` holds model credentials and answers AI routes. `api` is the
+§29.6 mobile contract (bootstrap, meals, foods, wallet, billing webhooks,
+privacy, admin). See `supabase/functions/api/README.md`. After
+`0007_api_surface.sql` is applied, create a private Storage bucket
+`private-media` and optionally set:
+
+```sh
+supabase secrets set REVENUECAT_WEBHOOK_SECRET=...
+# non-production only — records client purchases without store verification:
+# supabase secrets set VERIFY_PURCHASES=trust_client
 ```
 
 `ai-gateway` is already deployed and ACTIVE (`verify_jwt` on), and answers an
@@ -94,18 +107,21 @@ unauthenticated call with 401. It has no secrets yet, so every route that
 reaches the model returns 500 until section 2 is done.
 
 That first deploy went up through the Supabase MCP connector, which uploads
-file contents rather than a directory, so run the command above once from a
-checkout when convenient. It republishes straight from `supabase/functions/`
-and makes the deployed bundle provably identical to the repository.
+file contents rather than a directory, so run the commands above once from a
+checkout when convenient. They republish straight from `supabase/functions/`
+and make the deployed bundle provably identical to the repository.
 
-Verify it is up. A 401 is the correct answer to an unauthenticated call — it
-means the function is running and rejecting you, which is what you want. A 404
-means it is not deployed.
+Verify they are up. A 401 is the correct answer to an unauthenticated AI call —
+it means the function is running and rejecting you. A 404 means it is not
+deployed. `GET /api/config` should return a JSON envelope without auth.
 
 ```sh
 curl -i -X POST \
   https://stqirjlqzchcoeegumoq.supabase.co/functions/v1/ai-gateway/chat/reply \
   -H 'Content-Type: application/json' -d '{}'
+
+curl -i \
+  https://stqirjlqzchcoeegumoq.supabase.co/functions/v1/api/config
 ```
 
 ## 4. Fill the knowledge base

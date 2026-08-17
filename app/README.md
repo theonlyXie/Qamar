@@ -88,9 +88,10 @@ for you to connect:
 | `lib/services/repositories.dart` | Abstract `ProfileRepository` / `MealRepository` / `WalletRepository` | — |
 | `lib/services/supabase_repositories.dart` | Supabase-backed implementations of the above | Re-check each call against your pinned `supabase_flutter` version's query-builder API before use — it has shifted across majors |
 | `lib/services/auth_service.dart` | Anonymous sign-in + Apple/Google identity-linking + email OTP, preserving the anonymous user id | Add `sign_in_with_apple` / `google_sign_in` packages and native config when you wire the sign-in buttons |
-| `lib/services/ai_gateway.dart` | `MockAiGateway` (what the app uses today) + `HttpAiGateway` client for meal analysis / chat replies | Stand up a server endpoint (Edge Function or similar) that holds the OpenAI key server-side — **the client never holds a model API key**, per spec_mvp.txt §29.1 |
-| `lib/services/payments.dart` | `in_app_purchase` wrapper for the Qamar+ subscription (Su Points are earned only — see `walletTerms` copy — never a paid product) | Create `qamar_plus_monthly`/`qamar_plus_annual` in App Store Connect / Play Console, and a server endpoint to verify receipts before flipping entitlement |
-| `lib/services/config.dart` | `--dart-define` driven flags (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `AI_GATEWAY_URL`) | `flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...` |
+| `lib/services/api_client.dart` | Typed client for the §29.6 mobile API Edge Function (`api`) — bootstrap, auth helpers, meals, foods, wallet, billing sync, privacy, analytics | Deploy `api` + apply `0007`; set `SUPABASE_URL` (or `QAMAR_API_URL`) |
+| `lib/services/ai_gateway.dart` | `HttpAiGateway` client for meal analysis / chat replies / plan / scan | Stand up `ai-gateway` — **the client never holds a model API key**, per spec_mvp.txt §29.1 |
+| `lib/services/payments.dart` | `in_app_purchase` wrapper; `PaymentsService.syncPayload` feeds `POST /billing/sync` | Create store products; verify via `api` webhooks or `/billing/sync` |
+| `lib/services/config.dart` | `--dart-define` flags (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `AI_GATEWAY_URL`, `QAMAR_API_URL`) | `flutter run --dart-define=SUPABASE_URL=...` |
 
 **Wiring — done.** `AppState` now takes optional repositories plus a user id.
 With none supplied (the default, and what every test uses) it behaves exactly
