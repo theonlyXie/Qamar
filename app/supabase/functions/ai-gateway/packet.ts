@@ -524,6 +524,7 @@ interface RawGap {
   pct_of_target: number | null;
   status: string;
   coverage_pct: number;
+  nutrient_coverage_pct: number;
   items_total: number;
   items_resolved: number;
 }
@@ -559,6 +560,8 @@ export async function nutrientGaps(
     pctOfTarget: number;
     kind: string;
     coveragePct: number;
+    /** How much of what they ate carried a value for this nutrient at all. */
+    nutrientCoveragePct: number;
   }[]
 > {
   try {
@@ -572,7 +575,12 @@ export async function nutrientGaps(
       .filter((r) =>
         (r.status === "short" || r.status === "low") &&
         r.nutrient_code !== "sodium_mg" &&
-        r.pct_of_target != null
+        r.pct_of_target != null &&
+        // A shortfall computed from under half the plate is not a finding worth
+        // planning against. The database already refuses to call an unmeasured
+        // nutrient short; this is the weaker version of the same judgement, and
+        // it is the gateway's to make because it is the one writing advice.
+        r.nutrient_coverage_pct >= 50
       )
       // Worst first, and capped: a prompt listing fifteen shortfalls is asking
       // the model to fix none of them.
@@ -587,6 +595,7 @@ export async function nutrientGaps(
         pctOfTarget: Number(r.pct_of_target),
         kind: r.kind,
         coveragePct: Number(r.coverage_pct),
+        nutrientCoveragePct: Number(r.nutrient_coverage_pct),
       }));
   } catch (e) {
     console.error("nutrientGaps", e);
