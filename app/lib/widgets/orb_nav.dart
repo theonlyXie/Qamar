@@ -249,7 +249,7 @@ class _DraggableOrbState extends State<_DraggableOrb> {
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
-                state.isAr ? '${state.iso('${state.suAvailable}')} نقطة Su' : '${state.suAvailable} Su',
+                state.isAr ? '${state.iso(state.formatSu(state.suAvailable))} نقطة Su' : '${state.formatSu(state.suAvailable)} Su',
                 style: QText.number(size: 10, weight: FontWeight.w600, color: QColors.textMuted),
               ),
             ),

@@ -25,5 +25,7 @@ class ChatTurn {
   final String text;
   final String? sub;
   final String? action;
-  const ChatTurn({required this.who, required this.text, this.sub, this.action});
+  /// The action button opens the wallet (buy another Qamar use) instead of Plan.
+  final bool openWallet;
+  const ChatTurn({required this.who, required this.text, this.sub, this.action, this.openWallet = false});
 }

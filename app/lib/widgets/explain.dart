@@ -90,17 +90,17 @@ const kExplanations = <String, Explanation>{
     titleAr: 'نقاط Su',
     titleEn: 'Su Points',
     bodyAr:
-        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة، تخلّص مهمة اليوم. بتتصرف على مزايا جوه قمر.',
+        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة (+١٠٠، وأول وجبة +٥٠٠)، تخلّص مهمة اليوم (+٢٥٠). بتتصرف على استخدام زيادة لقمر بعد الخمس استخدامات اليومية.',
     bodyEn:
-        'Earned when you do something useful for yourself — logging a meal, finishing the day’s quest. Spent on features inside Qamar.',
+        'Earned when you do something useful for yourself — logging a meal (+100, first meal +500), finishing the day’s quest (+250). Spent on another Qamar use after today’s five.',
     soWhatAr: 'النقط دي بتتكسب بس. مش بتتشترى بفلوس ومالهاش قيمة نقدية.',
     soWhatEn: 'They are only ever earned. They cannot be bought with money and have no cash value.',
   ),
   'level': Explanation(
     titleAr: 'المستوى',
     titleEn: 'Level',
-    bodyAr: 'بيتحرك مع إجمالي نقاط Su اللي كسبتها من أول ما بدأت — يعني مقياس للاستمرارية مش للوزن.',
-    bodyEn: 'Moves with the total Su Points you have earned since you started — a measure of consistency, not of weight.',
+    bodyAr: 'بيتحرك مع إجمالي نقاط Su اللي كسبتها من أول ما بدأت — كل ١٠٠٠ نقطة مستوى. مقياس للاستمرارية مش للوزن، وهي الرقم اللي هيتقارن في لوحة المتصدرين.',
+    bodyEn: 'Moves with the total Su Points you have earned since you started — 1,000 lifetime Su per level. A measure of consistency, not of weight, and the number a leaderboard will rank.',
     soWhatAr: 'الاستمرار أهم من الكمال. يوم واحد مضبوط أحسن من أسبوع مثالي وبعده انقطاع.',
     soWhatEn: 'Consistency beats perfection. One honest day beats a perfect week followed by quitting.',
   ),

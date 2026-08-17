@@ -41,12 +41,12 @@ class WalletScreen extends StatelessWidget {
                 const SizedBox(width: 14),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(t.suAvailable, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
-                  Text('${state.suAvailable}', style: QText.number(size: 34, weight: FontWeight.w600, color: const Color(0xFFF2E4C6))),
+                  Text('${state.formatSu(state.suAvailable)}', style: QText.number(size: 34, weight: FontWeight.w600, color: const Color(0xFFF2E4C6))),
                 ]),
                 const Spacer(),
                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Text(t.suLifetime, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
-                  Text('${state.suLifetime}', style: QText.number(size: 18, weight: FontWeight.w600, color: QColors.textMid)),
+                  Text('${state.formatSu(state.suLifetime)}', style: QText.number(size: 18, weight: FontWeight.w600, color: QColors.textMid)),
                 ]),
               ]),
               const SizedBox(height: 16),
@@ -144,7 +144,7 @@ class _SpendCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final isAr = state.isAr;
-    final done = state.isRedeemed(item.id);
+    final done = item.once && state.isRedeemed(item.id);
     final afford = state.suAvailable >= item.price && !done;
     final after = state.suAvailable - item.price < 0 ? 0 : state.suAvailable - item.price;
 
@@ -156,7 +156,7 @@ class _SpendCard extends StatelessWidget {
         children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Expanded(child: Text(isAr ? item.nameAr : item.nameEn, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textPrimary))),
-            Text('${item.price} Su', style: QText.number(size: 13, weight: FontWeight.w600, color: QColors.gold)),
+            Text('${state.formatSu(item.price)} Su', style: QText.number(size: 13, weight: FontWeight.w600, color: QColors.gold)),
           ]),
           const SizedBox(height: 6),
           Text(isAr ? item.whatAr : item.whatEn, style: QText.body(size: 13, height: 20, color: QColors.textMuted)),
@@ -164,7 +164,7 @@ class _SpendCard extends StatelessWidget {
           Text(isAr ? item.limitAr : item.limitEn, style: QText.body(size: 11, height: 17, color: QColors.textFaint)),
           const SizedBox(height: 8),
           Row(children: [
-            Text('${state.t.balanceAfter}: $after', style: QText.body(size: 11, color: QColors.textMuted)),
+            Text('${state.t.balanceAfter}: ${state.formatSu(after)}', style: QText.body(size: 11, color: QColors.textMuted)),
             const Spacer(),
             Material(
               color: Colors.transparent,
