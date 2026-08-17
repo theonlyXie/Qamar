@@ -23,7 +23,28 @@ class LoggedMeal {
   final int p;
   final int c;
   final int f;
-  const LoggedMeal({required this.name, required this.sub, required this.kcal, required this.p, required this.c, required this.f});
+
+  /// Confirmed items, kept so “log again” can rebuild the same proposal.
+  /// Empty for older rows that only stored four totals.
+  final List<MealLine> items;
+
+  const LoggedMeal({
+    required this.name,
+    required this.sub,
+    required this.kcal,
+    required this.p,
+    required this.c,
+    required this.f,
+    this.items = const [],
+  });
+
+  bool get canReplay => items.isNotEmpty;
+}
+
+class MealLine {
+  final ConfirmItemDef def;
+  final int qty;
+  const MealLine({required this.def, required this.qty});
 }
 
 enum Confidence { high, med, low }
@@ -66,6 +87,63 @@ class ConfirmItemDef {
     this.grams,
     this.portionMatched = false,
   });
+
+  ConfirmItemDef copyWith({int? kcal, int? p, int? c, int? f, double? grams}) => ConfirmItemDef(
+        ar: ar,
+        en: en,
+        portionAr: portionAr,
+        portionEn: portionEn,
+        conf: conf,
+        kcal: kcal ?? this.kcal,
+        p: p ?? this.p,
+        c: c ?? this.c,
+        f: f ?? this.f,
+        qamarFoodId: qamarFoodId,
+        grams: grams ?? this.grams,
+        portionMatched: portionMatched,
+      );
+}
+
+Confidence confidenceFromName(String? v) => switch (v) {
+      'high' => Confidence.high,
+      'med' => Confidence.med,
+      _ => Confidence.low,
+    };
+
+ConfirmItemDef confirmItemFromLogJson(Map<String, dynamic> j) {
+  final qty = (j['qty'] is num && (j['qty'] as num) > 0) ? (j['qty'] as num).round() : 1;
+  final kcal = (j['kcal'] as num?)?.round() ?? 0;
+  final p = (j['protein_g'] as num?)?.round() ?? 0;
+  final c = (j['carbs_g'] as num?)?.round() ?? 0;
+  final f = (j['fat_g'] as num?)?.round() ?? 0;
+  final grams = (j['grams'] as num?)?.toDouble();
+  return ConfirmItemDef(
+    ar: (j['name'] ?? j['name_ar'] ?? j['ar'] ?? '') as String,
+    en: (j['name_en'] ?? j['en'] ?? j['name'] ?? '') as String,
+    portionAr: (j['portion'] ?? j['portion_ar'] ?? j['portionAr'] ?? '') as String,
+    portionEn: (j['portion_en'] ?? j['portionEn'] ?? '') as String,
+    conf: confidenceFromName(j['confidence'] as String?),
+    kcal: qty == 0 ? kcal : (kcal / qty).round(),
+    p: qty == 0 ? p : (p / qty).round(),
+    c: qty == 0 ? c : (c / qty).round(),
+    f: qty == 0 ? f : (f / qty).round(),
+    qamarFoodId: j['qamar_food_id'] as String?,
+    grams: grams == null || qty == 0 ? grams : grams / qty,
+    portionMatched: j['portion_matched'] == true,
+  );
+}
+
+List<MealLine> mealLinesFromLogJson(Object? raw) {
+  if (raw is! List) return const [];
+  final out = <MealLine>[];
+  for (final e in raw) {
+    if (e is! Map) continue;
+    final j = Map<String, dynamic>.from(e);
+    final qty = (j['qty'] as num?)?.round() ?? 1;
+    if (qty <= 0) continue;
+    out.add(MealLine(def: confirmItemFromLogJson(j), qty: qty));
+  }
+  return out;
 }
 
 class LedgerEntry {

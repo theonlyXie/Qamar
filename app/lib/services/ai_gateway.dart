@@ -105,6 +105,9 @@ abstract class AiGateway {
 
   /// Remaining shared uses for chat, photographing a meal, and the plan today.
   Future<AiQuota> quotaStatus();
+
+  /// Packaged barcode via Open Food Facts. No model, no daily AI use.
+  Future<MealAnalysis> lookupBarcode({required String code, String lang = 'ar'});
 }
 
 /// Talks to your own server gateway (supabase/functions/ai-gateway). The
@@ -173,6 +176,9 @@ class HttpAiGateway implements AiGateway {
     );
     if (res.statusCode == 429) {
       throw AiQuotaException.fromBody(res.bodyBytes);
+    }
+    if (res.statusCode == 403) {
+      throw AiPlusException.fromBody(res.bodyBytes, fallback: 'analyzeMeal failed: ${res.statusCode} ${res.body}');
     }
     if (res.statusCode != 200) {
       throw AiGatewayException('analyzeMeal failed: ${res.statusCode} ${res.body}');
@@ -261,6 +267,9 @@ class HttpAiGateway implements AiGateway {
     if (res.statusCode == 429) {
       throw AiQuotaException.fromBody(res.bodyBytes);
     }
+    if (res.statusCode == 403) {
+      throw AiPlusException.fromBody(res.bodyBytes, fallback: 'generatePlan failed: ${res.statusCode} ${res.body}');
+    }
     if (res.statusCode != 200) {
       throw AiGatewayException('generatePlan failed: ${res.statusCode} ${res.body}');
     }
@@ -320,6 +329,23 @@ class HttpAiGateway implements AiGateway {
     final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
     lastQuota = AiQuota.fromJson(json);
     return lastQuota!;
+  }
+
+  @override
+  Future<MealAnalysis> lookupBarcode({required String code, String lang = 'ar'}) async {
+    final res = await _client.post(
+      Uri.parse('$baseUrl/meal/barcode'),
+      headers: _headers,
+      body: jsonEncode({'code': code, 'lang': lang}),
+    );
+    if (res.statusCode != 200) {
+      throw AiGatewayException('lookupBarcode failed: ${res.statusCode} ${res.body}');
+    }
+    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final items = ((json['items'] as List?) ?? const [])
+        .map((e) => _itemFromJson(e as Map<String, dynamic>))
+        .toList();
+    return MealAnalysis(items, note: json['note'] as String?);
   }
 }
 
@@ -472,4 +498,28 @@ class AiGatewayException implements Exception {
   AiGatewayException(this.message);
   @override
   String toString() => 'AiGatewayException: $message';
+}
+
+/// Photographing a plate, or a plan for a day that is not today, needs Qamar+.
+class AiPlusException implements Exception {
+  final String message;
+  final String feature;
+  AiPlusException(this.message, {this.feature = 'plus'});
+
+  factory AiPlusException.fromBody(List<int> bytes, {required String fallback}) {
+    try {
+      final json = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+      final reason = json['reason'] as String?;
+      if (reason == 'plus_required') {
+        return AiPlusException(
+          (json['error'] as String?) ?? fallback,
+          feature: (json['feature'] as String?) ?? 'plus',
+        );
+      }
+    } catch (_) {}
+    throw AiGatewayException(fallback);
+  }
+
+  @override
+  String toString() => 'AiPlusException: $message';
 }

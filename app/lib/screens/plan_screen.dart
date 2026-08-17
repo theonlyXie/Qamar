@@ -48,6 +48,8 @@ class _PlanScreenState extends State<PlanScreen> {
         const SizedBox(height: 4),
         Text(t.planSub, style: QText.body(size: 14, height: 22, color: QColors.textMuted)),
         const SizedBox(height: 10),
+        _PlanWeekStrip(state: state),
+        const SizedBox(height: 10),
         if (!state.hasPlan) ...[
           _PlanEmpty(state: state),
         ] else ...[
@@ -251,6 +253,54 @@ class _MealCard extends StatelessWidget {
             ]),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _PlanWeekStrip extends StatelessWidget {
+  final AppState state;
+  const _PlanWeekStrip({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final days = state.planWeekDates();
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: days.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final d = days[i];
+          final selected = d == state.planViewDate;
+          final locked = d != today && !state.plusActive;
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () => state.selectPlanDate(d),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: selected ? QColors.violet.withValues(alpha: 0.2) : QColors.cardDeep,
+                  border: Border.all(color: selected ? QColors.violet : QColors.borderFaint),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  children: [
+                    Text(d.substring(5), style: QText.number(size: 12, color: QColors.textHigh)),
+                    if (locked) ...[
+                      const SizedBox(width: 4),
+                      const Icon(Icons.lock, size: 11, color: QColors.gold),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

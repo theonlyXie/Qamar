@@ -126,6 +126,8 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> {
                             LivingOrb(
                               size: 78,
                               activeRings: orbActive,
+                              gold: state.goldOrb,
+                              calm: state.calmMode,
                               breathDuration: const Duration(milliseconds: 5500),
                               haloDuration: const Duration(milliseconds: 5400),
                               onTap: state.tapOrbListen,

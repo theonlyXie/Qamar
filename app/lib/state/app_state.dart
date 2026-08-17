@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
 import '../l10n/strings.dart';
+import '../models/account.dart';
 import '../models/meal.dart';
 import '../models/messages.dart';
 import '../models/onboarding.dart';
@@ -118,6 +120,44 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  void _event(String name) {
+    if (!isBacked) return;
+    final repo = _profileRepo;
+    if (repo == null) return;
+    _push('event', (uid) => repo.trackEvent(uid, name));
+  }
+
+  Future<void> _hydrateWallet() async {
+    final uid = _userId;
+    if (uid == null) return;
+    try {
+      final bal = await _walletRepo?.balance(uid);
+      if (bal != null) {
+        suAvailable = bal.available;
+        suLifetime = bal.lifetime;
+      }
+      final entries = await _walletRepo?.ledger(uid);
+      if (entries != null) {
+        serverLedger
+          ..clear()
+          ..addAll(entries);
+      }
+    } catch (e) {
+      syncError = 'wallet: $e';
+    }
+  }
+
+  void _rememberMeals(Iterable<LoggedMeal> incoming) {
+    for (final m in incoming) {
+      if (!m.canReplay) continue;
+      recentMeals.removeWhere((e) => e.name == m.name && e.kcal == m.kcal);
+      recentMeals.insert(0, m);
+    }
+    if (recentMeals.length > 8) {
+      recentMeals.removeRange(8, recentMeals.length);
+    }
+  }
+
   /// Pulls the server's copy over the local defaults on start.
   Future<void> hydrate() async {
     final uid = _userId;
@@ -170,6 +210,28 @@ class AppState extends ChangeNotifier {
           ..clear()
           ..addAll(entries);
       }
+
+      final flags = await _profileRepo?.loadSettings(uid);
+      if (flags != null) settings = flags;
+
+      final rem = await _profileRepo?.loadReminders(uid);
+      if (rem != null) reminders = rem;
+
+      final mem = await _profileRepo?.loadMemory(uid);
+      if (mem != null) {
+        memoryFacts
+          ..clear()
+          ..addAll(mem);
+      }
+
+      final gaps = await _mealRepo?.nutrientGaps(uid);
+      if (gaps != null) {
+        nutrientGaps
+          ..clear()
+          ..addAll(gaps);
+      }
+
+      _rememberMeals(meals);
       _notify();
     } catch (e) {
       syncError = 'load: $e';
@@ -203,6 +265,19 @@ class AppState extends ChangeNotifier {
 
   /// Recorded weigh-ins, oldest first.
   final List<WeightReading> weightHistory = [];
+
+  AccountSettings settings = const AccountSettings();
+  MealReminders reminders = const MealReminders();
+  final List<MemoryFact> memoryFacts = [];
+  final List<NutrientGap> nutrientGaps = [];
+  final List<LoggedMeal> recentMeals = [];
+  String? questNotice;
+  String? dataNotice;
+  String? barcodeDraft;
+  String planViewDate = DateTime.now().toIso8601String().substring(0, 10);
+
+  bool get calmMode => settings.calmMode;
+  bool get goldOrb => settings.goldOrb;
 
   /// The wallet ledger as the database has it. Authoritative when present;
   /// [ledgerExtra] covers the offline case.
@@ -302,6 +377,15 @@ class AppState extends ChangeNotifier {
     serverLedger.clear();
     dayHistory.clear();
     weightHistory.clear();
+    settings = const AccountSettings();
+    reminders = const MealReminders();
+    memoryFacts.clear();
+    nutrientGaps.clear();
+    recentMeals.clear();
+    questNotice = null;
+    dataNotice = null;
+    barcodeDraft = null;
+    planViewDate = _today();
     walletTab = WalletTab.spend;
     whyOpen = false;
     _notify();
@@ -948,17 +1032,21 @@ class AppState extends ChangeNotifier {
         const ObMessage.target(),
         const ObMessage.save(),
       ]);
-      // Awarded locally for now: crediting Su Points is server-only (see
-      // SupabaseWalletRepository.credit), so the balance reconciles to the
-      // server's number on the next hydrate once the Edge Function exists.
-      _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
+      // Offline: credit locally. Backed: the first-target trigger pays 1,000 Su.
+      if (!isBacked) {
+        _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
+      }
       _notify();
 
       if (isBacked) {
         final p = profile;
         final t = target();
         _push('save profile', (uid) => _profileRepo!.saveProfile(uid, p));
-        _push('save target', (uid) => _profileRepo!.saveTarget(uid, t, inputs: p));
+        _push('save target', (uid) async {
+          await _profileRepo!.saveTarget(uid, t, inputs: p);
+          await _hydrateWallet();
+          _notify();
+        });
         // The weight they just gave is the first real point on the trend.
         // Without it the Progress chart has nothing to draw from for weeks.
         _push('record weight', (uid) async {
@@ -1172,6 +1260,11 @@ class AppState extends ChangeNotifier {
     } on AiQuotaException catch (e) {
       if (_disposed) return;
       _onQuotaHit(e);
+    } on AiPlusException catch (_) {
+      if (_disposed) return;
+      chatState = ChatState.idle;
+      refusePhotoLog();
+      return;
     } catch (e) {
       if (_disposed) return;
       chatState = ChatState.idle;
@@ -1199,20 +1292,33 @@ class AppState extends ChangeNotifier {
     final how = switch (proposalInput) {
       'photo' => isAr ? 'بالصورة' : 'by photo',
       'voice' => isAr ? 'بالصوت' : 'by voice',
+      'barcode' => isAr ? 'بالباركود' : 'by barcode',
+      'recent' => isAr ? 'من وجبة سابقة' : 'from a recent meal',
       _ => isAr ? 'بالكتابة' : 'by text',
     };
     final anyLow = items.any((it) => it.def.conf != Confidence.high);
     final sub = isAr
         ? 'مسجّل $how${anyLow ? ' · تقدير' : ''}'
         : 'Logged $how${anyLow ? ' · estimate' : ''}';
-    final meal = LoggedMeal(name: name, sub: sub, kcal: totals.kcal, p: totals.p, c: totals.c, f: totals.f);
+    final meal = LoggedMeal(
+      name: name,
+      sub: sub,
+      kcal: totals.kcal,
+      p: totals.p,
+      c: totals.c,
+      f: totals.f,
+      items: items.map((it) => MealLine(def: it.def, qty: it.q)).toList(),
+    );
     final drafted = items.map((it) => (def: it.def, qty: it.q)).toList();
     final raw = proposalRaw;
 
     final first = meals.isEmpty;
     meals.add(meal);
+    _rememberMeals([meal]);
     final award = first ? SuEconomy.firstMeal : SuEconomy.mealLogged;
-    _credit(award, ar: first ? 'أول وجبة' : 'تأكيد وجبة', en: first ? 'First meal logged' : 'Meal confirmed');
+    if (!isBacked) {
+      _credit(award, ar: first ? 'أول وجبة' : 'تأكيد وجبة', en: first ? 'First meal logged' : 'Meal confirmed');
+    }
     chat.add(ChatTurn(
       who: ChatWho.q,
       text: isAr ? 'اتسجّلت: ${totals.kcal} سعرة.' : 'Logged: ${totals.kcal} kcal.',
@@ -1235,13 +1341,42 @@ class AppState extends ChangeNotifier {
           MealAnalysisDraft(inputType: input, items: drafted, rawText: raw),
         );
         await repo.confirmMeal(uid, draftId: draftId, meal: meal, items: drafted);
+        await _hydrateWallet();
+        _event('meal_confirmed');
+        _notify();
       });
     }
   }
 
   // ---- quest / wallet -------------------------------------------------
 
-  void completeQuest() {
+  Future<void> completeQuest() async {
+    if (questDone) return;
+    if (meals.isEmpty) {
+      questNotice = isAr ? 'سجّل وجبة النهاردة الأول.' : 'Log a meal today first.';
+      _notify();
+      return;
+    }
+    questNotice = null;
+
+    final wallet = _walletRepo;
+    if (isBacked && wallet != null) {
+      try {
+        final result = await wallet.completeDailyQuest(_userId!);
+        questDone = true;
+        if (result.credited) {
+          await _hydrateWallet();
+          _event('quest_completed');
+        }
+        _notify();
+        return;
+      } catch (e) {
+        syncError = 'quest: $e';
+        _notify();
+        return;
+      }
+    }
+
     questDone = true;
     _credit(SuEconomy.dailyQuest, ar: 'مهمة اليوم', en: 'Primary daily quest');
     _notify();
@@ -1300,6 +1435,14 @@ class AppState extends ChangeNotifier {
     plusNotice = isAr
         ? 'تصوير الوجبة تحليل بالذكاء الاصطناعي، وده لـ Qamar+. الكتابة والصوت مجاناً ومش بيخصموا من استخدامات قمر.'
         : 'Photographing a meal uses the model, so it is Qamar+. Typing and speaking are free and do not spend Qamar uses.';
+    go(AppScreen.subscription);
+  }
+
+  void refuseWeekPlan() {
+    plusNotice = isAr
+        ? 'خطة النهاردة مجاناً. باقي أيام الأسبوع من Qamar+.'
+        : 'Today’s plan is free. The rest of the week is Qamar+.';
+    planError = plusNotice;
     go(AppScreen.subscription);
   }
 
@@ -1540,6 +1683,17 @@ class AppState extends ChangeNotifier {
     }
     ledgerExtra.insert(0, LedgerEntry(label: isAr ? item.nameAr : item.nameEn, amount: -item.price, when: isAr ? 'دلوقتي' : 'Just now'));
     _notify();
+
+    if (item.id == 'cosmetic') {
+      settings = settings.copyWith(orbCosmetic: 'gold');
+      _persistSettings();
+    }
+    if (item.id == 'insight') {
+      settings = settings.copyWith(insightUnlocks: settings.insightUnlocks + 1);
+      _persistSettings();
+      _openInsightFollowUp();
+    }
+    _event('wallet_redeem_${item.id}');
 
     // The database is the authority on the balance: the RPC re-checks the
     // price and refuses if the points are not really there.
@@ -1831,6 +1985,38 @@ class AppState extends ChangeNotifier {
     return week().where((d) => d.meals > 0 && (d.kcal - tgt).abs() <= tgt * 0.1).length;
   }
 
+  WeeklyInsight weeklyInsight() {
+    final days = week().where((d) => d.meals > 0).toList();
+    final inRange = daysInRange();
+    final avg = days.isEmpty ? 0 : (days.fold(0, (s, d) => s + d.kcal) / days.length).round();
+    final tgt = target().kcal;
+    final over = days.where((d) => d.kcal > tgt * 1.1).length;
+    final under = days.where((d) => d.kcal < tgt * 0.9).length;
+    final nextAr = meals.isEmpty
+        ? 'المهمة الجاية: سجّل وجبة النهاردة.'
+        : 'المهمة الجاية: سجّل الغدا بدري عشان أعدّل العشا.';
+    final nextEn = meals.isEmpty
+        ? 'Next quest: log a meal today.'
+        : 'Next quest: log lunch early so I can adjust dinner.';
+
+    return WeeklyInsight(
+      winAr: inRange > 0
+          ? 'كسبت $inRange ${inRange == 1 ? 'يوم' : 'أيام'} قربوا من هدفك.'
+          : 'لسه مفيش يوم داخل النطاق — أول واحد هو المكسب.',
+      winEn: inRange > 0
+          ? 'Win: $inRange ${inRange == 1 ? 'day' : 'days'} landed near your target.'
+          : 'Win: no in-range day yet — the first one is the prize.',
+      patternAr: over >= under
+          ? 'النمط: المتوسط $avg سعرة، و$over أيام فوق الهدف.'
+          : 'النمط: المتوسط $avg سعرة، و$under أيام تحت الهدف.',
+      patternEn: over >= under
+          ? 'Pattern: average $avg kcal, with $over days over target.'
+          : 'Pattern: average $avg kcal, with $under days under target.',
+      nextAr: nextAr,
+      nextEn: nextEn,
+    );
+  }
+
   /// How much Qamar actually holds about this person. Only things the user
   /// gave it count — the defaults a fresh Profile carries do not.
   int rememberedCount() {
@@ -1938,11 +2124,18 @@ class AppState extends ChangeNotifier {
   /// [instruction] is Qamar speaking as the nutritionist — a rebuild of the
   /// written menu, not a comment on it. The Plan and Today screens then show
   /// whatever comes back.
-  Future<void> ensurePlan({bool force = false, String? instruction}) async {
+  Future<void> ensurePlan({bool force = false, String? instruction, String? date}) async {
     final today = _today();
+    final day = (date == null || date.isEmpty) ? today : date;
+    planViewDate = day;
     final note = instruction?.trim();
-    if (!force && (note == null || note.isEmpty) && planDate == today && hasPlan) return;
+    if (!force && (note == null || note.isEmpty) && planDate == day && hasPlan) return;
     if (planLoading) return;
+
+    if (day != today && !plusActive) {
+      refuseWeekPlan();
+      return;
+    }
 
     final gateway = _ai;
     if (gateway == null) {
@@ -1958,7 +2151,7 @@ class AppState extends ChangeNotifier {
     _notify();
     try {
       final built = await gateway.generatePlan(
-        date: today,
+        date: day,
         lang: lang.code,
         force: force,
         instruction: (note == null || note.isEmpty) ? null : note,
@@ -1970,6 +2163,9 @@ class AppState extends ChangeNotifier {
       if (_disposed) return;
       aiQuota = e.quota;
       planError = e.message;
+    } on AiPlusException catch (_) {
+      if (_disposed) return;
+      refuseWeekPlan();
     } catch (e) {
       if (_disposed) return;
       planError = _planMessage(e);
@@ -1992,8 +2188,10 @@ class AppState extends ChangeNotifier {
           ? 'مفيش مصادر موثوقة متسجلة لسه، ومش هألّف خطة من دماغي.'
           : 'There is no trusted guidance loaded yet, and I will not invent a plan.';
     }
-    if (raw.contains('403') || raw.contains('not eligible')) {
-      return isAr ? 'الحساب ده مش مؤهل للخطط.' : 'This account is not eligible for plans.';
+    if (raw.contains('403') || raw.contains('not eligible') || raw.contains('plus_required')) {
+      return isAr
+          ? 'خطة النهاردة مجاناً. الأيام التانية من Qamar+.'
+          : 'Today’s plan is free. Other days are Qamar+.';
     }
     if (raw.contains('429') || raw.toLowerCase().contains('quota')) {
       return isAr
@@ -2344,6 +2542,250 @@ class AppState extends ChangeNotifier {
     chat.add(ChatTurn(who: ChatWho.u, text: isAr ? 'صوّرت الوجبة دي' : 'I photographed this meal'));
     _notify();
     _analyseMeal(inputType: 'photo', imagePath: path);
+  }
+
+  void onBarcodeDraftChanged(String v) {
+    barcodeDraft = v.replaceAll(RegExp(r'\D'), '');
+    _notify();
+  }
+
+  Future<void> lookupBarcodeMeal() async {
+    final code = (barcodeDraft ?? '').replaceAll(RegExp(r'\D'), '');
+    if (code.length < 8) return;
+    final gateway = _ai;
+    openChat();
+    proposalInput = 'barcode';
+    _loggingMeal = false;
+    chat.add(ChatTurn(who: ChatWho.u, text: isAr ? 'باركود $code' : 'Barcode $code'));
+    if (gateway == null) {
+      chat.add(ChatTurn(
+        who: ChatWho.q,
+        text: isAr
+            ? 'لسه مش متوصل بالمساعد، فمش هقدر أقرأ الباركود دلوقتي.'
+            : 'I am not connected to the assistant yet, so I cannot read this barcode.',
+      ));
+      _notify();
+      return;
+    }
+    chatState = ChatState.thinking;
+    _notify();
+    try {
+      final result = await gateway.lookupBarcode(code: code, lang: lang.code);
+      if (_disposed) return;
+      chatState = ChatState.idle;
+      if (result.items.isEmpty) {
+        chat.add(ChatTurn(who: ChatWho.q, text: result.note ?? (isAr ? 'مفيش المنتج ده.' : 'No product for that code.')));
+        proposal = null;
+      } else {
+        proposal = result;
+        proposalQty = List.filled(result.items.length, 1);
+        proposalRaw = code;
+        chat.add(ChatTurn(
+          who: ChatWho.q,
+          text: isAr ? 'شايف كده. ظبّط الكمية وأكّد.' : 'Here is what I see. Adjust the amount and confirm.',
+          sub: result.note,
+        ));
+      }
+      _event('barcode_lookup');
+    } catch (e) {
+      if (_disposed) return;
+      chatState = ChatState.idle;
+      chat.add(ChatTurn(
+        who: ChatWho.q,
+        text: isAr ? 'مقدرتش أقرأ الباركود دلوقتي.' : 'I could not read that barcode just now.',
+        sub: '$e'.length > 120 ? null : '$e',
+      ));
+    }
+    _notify();
+  }
+
+  void replayMeal(LoggedMeal meal) {
+    if (!meal.canReplay) return;
+    openChat();
+    proposalInput = 'recent';
+    proposal = MealAnalysis(meal.items.map((l) => l.def).toList());
+    proposalQty = meal.items.map((l) => l.qty).toList();
+    proposalRaw = meal.name;
+    chat.add(ChatTurn(
+      who: ChatWho.q,
+      text: isAr ? 'نفس الوجبة دي تاني؟ ظبّط وأكّد.' : 'Log this meal again? Adjust and confirm.',
+      sub: meal.name,
+    ));
+    _event('meal_replay');
+    _notify();
+  }
+
+  Future<void> recordWeighIn(double kg) async {
+    if (kg < 30 || kg > 250) return;
+    final reading = WeightReading(at: DateTime.now(), kg: kg);
+    weightHistory.add(reading);
+    profile = profile.copyWith(weight: kg.round());
+    _notify();
+    if (!isBacked) return;
+    _push('record weight', (uid) async {
+      await _mealRepo?.recordWeight(uid, kg: kg);
+      await _profileRepo?.saveProfile(uid, profile);
+      final w = await _mealRepo?.weightHistory(uid);
+      if (w != null) {
+        weightHistory
+          ..clear()
+          ..addAll(w);
+        _notify();
+      }
+    });
+    _event('weight_logged');
+  }
+
+  void setCalmMode(bool on) {
+    settings = settings.copyWith(calmMode: on);
+    _persistSettings();
+    _notify();
+  }
+
+  void _persistSettings() {
+    if (!isBacked) return;
+    final next = settings;
+    _push('settings', (uid) => _profileRepo!.saveSettings(uid, next));
+  }
+
+  void setReminders(MealReminders next) {
+    reminders = next;
+    _notify();
+    if (!isBacked) return;
+    _push('reminders', (uid) => _profileRepo!.saveReminders(uid, next));
+  }
+
+  String? reminderDue() {
+    if (!reminders.enabled) return null;
+    final hour = DateTime.now().hour;
+    final min = DateTime.now().minute;
+    bool near(String hhmm) {
+      final parts = hhmm.split(':');
+      if (parts.length < 2) return false;
+      final h = int.tryParse(parts[0]) ?? -1;
+      final m = int.tryParse(parts[1]) ?? 0;
+      final now = hour * 60 + min;
+      final at = h * 60 + m;
+      return (now - at).abs() <= 30;
+    }
+
+    if (meals.isEmpty && near(reminders.breakfastHhmm)) {
+      return isAr ? 'وقت الفطار — سجّل اللي أكلته.' : 'Breakfast time — log what you ate.';
+    }
+    if (near(reminders.lunchHhmm)) {
+      return isAr ? 'وقت الغدا — سجّل الوجبة.' : 'Lunch time — log the meal.';
+    }
+    if (near(reminders.dinnerHhmm)) {
+      return isAr ? 'وقت العشا — سجّل الوجبة.' : 'Dinner time — log the meal.';
+    }
+    return null;
+  }
+
+  List<MemoryFact> memoryList() {
+    final local = <MemoryFact>[
+      if (profile.name.isNotEmpty) MemoryFact(id: 'profile:name', field: isAr ? 'الاسم' : 'Name', value: profile.name),
+      MemoryFact(id: 'profile:height', field: isAr ? 'الطول' : 'Height', value: '${profile.height} cm'),
+      MemoryFact(id: 'profile:weight', field: isAr ? 'الوزن' : 'Weight', value: '${profile.weight} kg'),
+      MemoryFact(id: 'profile:goal', field: isAr ? 'الهدف' : 'Goal', value: profile.goal.name),
+      if (profile.prefs.isNotEmpty)
+        MemoryFact(id: 'profile:prefs', field: isAr ? 'التجنب' : 'Avoid', value: profile.prefs.join(', ')),
+    ];
+    return [...local, ...memoryFacts];
+  }
+
+  void deleteMemory(MemoryFact fact) {
+    if (fact.id == 'profile:name') {
+      profile = profile.copyWith(name: '');
+    } else if (fact.id == 'profile:prefs') {
+      profile = profile.copyWith(prefs: const []);
+    } else if (fact.fromServer) {
+      memoryFacts.removeWhere((f) => f.id == fact.id);
+      if (isBacked) {
+        _push('delete memory', (uid) => _profileRepo!.deleteMemoryFact(uid, fact.id));
+      }
+    }
+    if (fact.id.startsWith('profile:') && isBacked) {
+      _push('save profile', (uid) => _profileRepo!.saveProfile(uid, profile));
+    }
+    _notify();
+  }
+
+  String exportDataJson() {
+    return const JsonEncoder.withIndent('  ').convert({
+      'profile': {
+        'name': profile.name,
+        'height_cm': profile.height,
+        'weight_kg': profile.weight,
+        'goal': profile.goal.name,
+        'prefs': profile.prefs,
+      },
+      'target': {
+        'kcal': target().kcal,
+        'protein': target().protein,
+        'carbs': target().carbs,
+        'fat': target().fat,
+      },
+      'meals_today': [
+        for (final m in meals) {'name': m.name, 'kcal': m.kcal, 'protein': m.p, 'carbs': m.c, 'fat': m.f},
+      ],
+      'water_ml': water.ml,
+      'weight_history': [
+        for (final w in weightHistory) {'at': w.at.toIso8601String(), 'kg': w.kg},
+      ],
+      'su_available': suAvailable,
+      'su_lifetime': suLifetime,
+    });
+  }
+
+  Future<void> deleteMyData() async {
+    if (isBacked) {
+      try {
+        await _profileRepo?.deleteMyData(_userId!);
+        await _auth?.signOut();
+      } catch (e) {
+        dataNotice = '$e';
+        _notify();
+        return;
+      }
+    }
+    restart();
+    dataNotice = isAr ? 'اتمسحت بياناتك من على الجهاز.' : 'Your data on this device has been cleared.';
+    _notify();
+  }
+
+  Future<void> submitReport({required String kind, required String detail}) async {
+    final trimmed = detail.trim();
+    if (trimmed.isEmpty) return;
+    dataNotice = isAr ? 'وصل التقرير. شكراً.' : 'Report received. Thank you.';
+    _notify();
+    if (!isBacked) return;
+    _push('report', (uid) => _profileRepo!.submitReport(uid, kind: kind, detail: trimmed));
+  }
+
+  void _openInsightFollowUp() {
+    openChat();
+    final insight = weeklyInsight();
+    final body = insight.text(isAr);
+    chat.add(ChatTurn(who: ChatWho.u, text: isAr ? 'رأي الأسبوع' : 'Weekly insight'));
+    chat.add(ChatTurn(
+      who: ChatWho.q,
+      text: body,
+      sub: isAr ? 'متابعة واحدة محدودة — اسأل سؤال واحد.' : 'One bounded follow-up — ask a single question.',
+    ));
+    _notify();
+  }
+
+  List<String> planWeekDates() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return [
+      for (var i = 0; i < 7; i++)
+        today.add(Duration(days: i)).toIso8601String().substring(0, 10),
+    ];
+  }
+
+  void selectPlanDate(String ymd) {
+    ensurePlan(date: ymd);
   }
 
   void toggleTree() {
