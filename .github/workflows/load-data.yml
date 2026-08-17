@@ -3,10 +3,13 @@
 # Run it from the Actions tab: "Load Qamar's data" → "Run workflow" → pick what
 # to load.
 #
-# Both jobs are safe to run more than once. The ingest skips documents that are
-# already loaded, and the nutrient importer refuses to store anything the source
-# registry has not granted storage rights for — so a second run costs time and
-# changes nothing rather than duplicating data.
+# Both loads are safe to run more than once, and safe to run again after a
+# failure — which is the case that matters, because a rate-limited embedding
+# provider will interrupt a first run. The ingest reads what is already in the
+# database, skips whole documents, and repairs the specific half-finished state
+# a killed run leaves behind: a document row with no chunks, which looks
+# ingested and is invisible to search. The nutrient importer refuses to store
+# anything the source registry has not granted storage rights for.
 
 name: Load Qamar's data
 
@@ -70,8 +73,14 @@ jobs:
         working-directory: app/supabase/knowledge
         run: deno run --allow-read --allow-write build_sources.ts
 
+      # continue-on-error on both loads, with a gate at the end. They are
+      # independent sources, and a rate limit on the embedding provider is no
+      # reason to skip the food data — failing the step immediately would have
+      # meant one bad key silently costing you the other half.
       - name: Load the knowledge base
+        id: kb
         if: ${{ inputs.what != 'nutrient values only' }}
+        continue-on-error: true
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
@@ -80,13 +89,23 @@ jobs:
             supabase/functions/ai-gateway/ingest.ts supabase/knowledge/sources.json
 
       - name: Load the nutrient values
+        id: usda
         if: ${{ inputs.what != 'knowledge base only' }}
+        continue-on-error: true
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           USDA_API_KEY: ${{ secrets.USDA_API_KEY }}
         run: deno run --allow-net --allow-env supabase/functions/ai-gateway/ingest_usda.ts
 
+      - name: Fail if either load failed
+        if: ${{ steps.kb.outcome == 'failure' || steps.usda.outcome == 'failure' }}
+        run: |
+          echo "::error::knowledge base: ${{ steps.kb.outcome }}, nutrients: ${{ steps.usda.outcome }}"
+          echo "Re-running this workflow resumes rather than duplicating."
+          exit 1
+
       - name: What to check next
+        if: always()
         run: |
           echo "### Loaded" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
