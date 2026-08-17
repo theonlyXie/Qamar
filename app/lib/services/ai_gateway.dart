@@ -35,6 +35,23 @@ class BodyScan {
   bool get isEmpty => heightCm == null && weightKg == null && bodyFatPct == null && age == null;
 }
 
+/// What Ask Qamar returned, including a menu change that is already saved.
+class ChatResult {
+  final String reply;
+  final String? action;
+  final DayPlan? plan;
+  final String? rebuildInstruction;
+
+  const ChatResult({
+    required this.reply,
+    this.action,
+    this.plan,
+    this.rebuildInstruction,
+  });
+
+  bool get changedPlan => plan != null || (rebuildInstruction != null && rebuildInstruction!.trim().isNotEmpty);
+}
+
 /// A generated day of eating, plus why it was built that way.
 class DayPlan {
   /// Each slot's meal and the alternative offered for it, in slot order.
@@ -64,14 +81,27 @@ abstract class AiGateway {
     String lang = 'ar',
   });
 
-  Future<String> chatReply({required String message, required String lang});
+  Future<ChatResult> chatReply({
+    required String message,
+    required String lang,
+    String? date,
+    Map<String, dynamic>? currentPlan,
+    List<String>? swappedSlots,
+  });
 
   /// Reads an InBody or similar body-composition printout.
   Future<BodyScan> readBodyScan({required String imagePath, required String lang});
 
   /// Builds the day's meals around the person's target and exclusions.
   /// [date] is ISO yyyy-MM-dd; the gateway stores the result against it.
-  Future<DayPlan> generatePlan({required String date, required String lang});
+  /// [force] writes a new day even when one is already saved. [instruction]
+  /// is Qamar's nutritionist note for a rebuild ("too tired to cook").
+  Future<DayPlan> generatePlan({
+    required String date,
+    required String lang,
+    bool force = false,
+    String? instruction,
+  });
 
   /// Remaining shared uses for chat, meal analysis and plan today.
   Future<AiQuota> quotaStatus();
@@ -158,11 +188,24 @@ class HttpAiGateway implements AiGateway {
   }
 
   @override
-  Future<String> chatReply({required String message, required String lang}) async {
+  Future<ChatResult> chatReply({
+    required String message,
+    required String lang,
+    String? date,
+    Map<String, dynamic>? currentPlan,
+    List<String>? swappedSlots,
+  }) async {
+    final day = date ?? DateTime.now().toIso8601String().substring(0, 10);
     final res = await _client.post(
       Uri.parse('$baseUrl/chat/reply'),
       headers: _headers,
-      body: jsonEncode({'message': message, 'lang': lang}),
+      body: jsonEncode({
+        'message': message,
+        'lang': lang,
+        'date': day,
+        if (currentPlan != null) 'current_plan': currentPlan,
+        if (swappedSlots != null && swappedSlots.isNotEmpty) 'swapped_slots': swappedSlots,
+      }),
     );
     if (res.statusCode == 429) {
       throw AiQuotaException.fromBody(res.bodyBytes);
@@ -172,7 +215,7 @@ class HttpAiGateway implements AiGateway {
     }
     final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
     _absorbQuota(json);
-    return json['reply'] as String;
+    return chatResultFromJson(json, lang: lang, date: day);
   }
 
   @override
@@ -199,11 +242,21 @@ class HttpAiGateway implements AiGateway {
   static int? _nullableInt(Object? v) => v is num ? v.round() : null;
 
   @override
-  Future<DayPlan> generatePlan({required String date, required String lang}) async {
+  Future<DayPlan> generatePlan({
+    required String date,
+    required String lang,
+    bool force = false,
+    String? instruction,
+  }) async {
     final res = await _client.post(
       Uri.parse('$baseUrl/plan/generate'),
       headers: _headers,
-      body: jsonEncode({'date': date, 'lang': lang}),
+      body: jsonEncode({
+        'date': date,
+        'lang': lang,
+        if (force) 'force': true,
+        if (instruction != null && instruction.trim().isNotEmpty) 'instruction': instruction.trim(),
+      }),
     );
     if (res.statusCode == 429) {
       throw AiQuotaException.fromBody(res.bodyBytes);
@@ -221,56 +274,7 @@ class HttpAiGateway implements AiGateway {
   /// shape the gateway promises can be tested without a network.
   @visibleForTesting
   DayPlan planFromBody(String body, String lang, String fallbackDate) {
-    final json = jsonDecode(body) as Map<String, dynamic>;
-    final plan = json['plan'] as Map<String, dynamic>;
-    final meals = (plan['meals'] as List).cast<Map<String, dynamic>>();
-
-    return DayPlan(
-      date: json['date'] as String? ?? fallbackDate,
-      rationale: (lang == 'ar' ? plan['rationale_ar'] : plan['rationale_en']) as String?,
-      slots: [
-        for (final m in meals)
-          (
-            _mealFromJson(m, m),
-            // A meal without an alternative falls back to itself. The UI then
-            // hides that slot's swap button rather than offering a swap to
-            // the same dish.
-            _mealFromJson((m['alt'] as Map<String, dynamic>?) ?? m, m),
-          ),
-      ],
-    );
-  }
-
-  static const _slotLabels = {
-    'breakfast': ('فطار', 'Breakfast'),
-    'lunch': ('غدا', 'Lunch'),
-    'dinner': ('عشا', 'Dinner'),
-    'snack': ('سناك', 'Snack'),
-  };
-
-  /// [source] carries the slot, which an `alt` object does not repeat.
-  static PlanMeal _mealFromJson(Map<String, dynamic> m, Map<String, dynamic> source) {
-    final slot = (source['slot'] as String? ?? 'meal').toLowerCase();
-    final labels = _slotLabels[slot] ?? (slot, slot);
-    return (
-      id: slot,
-      slotAr: labels.$1,
-      slotEn: labels.$2,
-      nameAr: (m['name_ar'] ?? m['name_en'] ?? '') as String,
-      nameEn: (m['name_en'] ?? m['name_ar'] ?? '') as String,
-      noteAr: (m['note_ar'] ?? '') as String,
-      noteEn: (m['note_en'] ?? '') as String,
-      portions: [
-        for (final p in ((m['portions'] as List?) ?? const []).cast<Map<String, dynamic>>())
-          (
-            ar: (p['ar'] ?? p['en'] ?? '') as String,
-            en: (p['en'] ?? p['ar'] ?? '') as String,
-            amountAr: (p['amount_ar'] ?? '') as String,
-            amountEn: (p['amount_en'] ?? '') as String,
-            kcal: _int(p['kcal']),
-          ),
-      ],
-    );
+    return dayPlanFromJson(jsonDecode(body) as Map<String, dynamic>, lang, fallbackDate);
   }
 
   /// Tolerant on purpose: a missing macro is a zero, not a crash mid-meal.
@@ -337,6 +341,124 @@ class AiQuotaException implements Exception {
 
   @override
   String toString() => 'AiQuotaException: $message';
+}
+
+const _slotLabels = {
+  'breakfast': ('فطار', 'Breakfast'),
+  'lunch': ('غدا', 'Lunch'),
+  'dinner': ('عشا', 'Dinner'),
+  'snack': ('سناك', 'Snack'),
+};
+
+int _jsonInt(Object? v) => v is num ? v.round() : 0;
+
+/// [source] carries the slot, which an `alt` object does not repeat.
+PlanMeal mealFromJson(Map<String, dynamic> m, Map<String, dynamic> source) {
+  final slot = (source['slot'] as String? ?? 'meal').toLowerCase();
+  final labels = _slotLabels[slot] ?? (slot, slot);
+  return (
+    id: slot,
+    slotAr: labels.$1,
+    slotEn: labels.$2,
+    nameAr: (m['name_ar'] ?? m['name_en'] ?? '') as String,
+    nameEn: (m['name_en'] ?? m['name_ar'] ?? '') as String,
+    noteAr: (m['note_ar'] ?? '') as String,
+    noteEn: (m['note_en'] ?? '') as String,
+    portions: [
+      for (final p in ((m['portions'] as List?) ?? const []).cast<Map<String, dynamic>>())
+        (
+          ar: (p['ar'] ?? p['en'] ?? '') as String,
+          en: (p['en'] ?? p['ar'] ?? '') as String,
+          amountAr: (p['amount_ar'] ?? '') as String,
+          amountEn: (p['amount_en'] ?? '') as String,
+          kcal: _jsonInt(p['kcal']),
+        ),
+    ],
+  );
+}
+
+Map<String, dynamic> mealToWire(PlanMeal m) => {
+      'slot': m.id,
+      'name_ar': m.nameAr,
+      'name_en': m.nameEn,
+      'note_ar': m.noteAr,
+      'note_en': m.noteEn,
+      'portions': [
+        for (final p in m.portions)
+          {
+            'ar': p.ar,
+            'en': p.en,
+            'amount_ar': p.amountAr,
+            'amount_en': p.amountEn,
+            'kcal': p.kcal,
+          },
+      ],
+    };
+
+/// The menu Qamar currently has on Plan/Today, in the shape the gateway edits.
+Map<String, dynamic> planToWire(DayPlan plan) => {
+      'date': plan.date,
+      'meals': [
+        for (final (base, alt) in plan.slots)
+          {
+            ...mealToWire(base),
+            'alt': mealToWire(alt)..remove('slot'),
+          },
+      ],
+    };
+
+DayPlan dayPlanFromJson(Map<String, dynamic> json, String lang, String fallbackDate) {
+  final plan = json['plan'] as Map<String, dynamic>;
+  final meals = (plan['meals'] as List).cast<Map<String, dynamic>>();
+
+  return DayPlan(
+    date: json['date'] as String? ?? fallbackDate,
+    rationale: (lang == 'ar' ? plan['rationale_ar'] : plan['rationale_en']) as String?,
+    slots: [
+      for (final m in meals)
+        (
+          mealFromJson(m, m),
+          // A meal without an alternative falls back to itself. The UI then
+          // hides that slot's swap button rather than offering a swap to
+          // the same dish.
+          mealFromJson((m['alt'] as Map<String, dynamic>?) ?? m, m),
+        ),
+    ],
+  );
+}
+
+ChatResult chatResultFromJson(
+  Map<String, dynamic> json, {
+  required String lang,
+  required String date,
+}) {
+  DayPlan? plan;
+  final planRaw = json['plan'];
+  if (planRaw is Map && ((planRaw['meals'] as List?)?.isNotEmpty ?? false)) {
+    plan = dayPlanFromJson(
+      {'plan': Map<String, dynamic>.from(planRaw), 'date': json['date'] ?? date},
+      lang,
+      date,
+    );
+  }
+
+  String? rebuild;
+  final update = json['plan_update'];
+  if (update is Map) {
+    final kind = '${update['kind'] ?? update['type'] ?? ''}'.toLowerCase();
+    if (kind == 'rebuild' || kind == 'regenerate' || kind == 'rebalance') {
+      final inst = '${update['instruction'] ?? update['reason'] ?? ''}'.trim();
+      if (inst.isNotEmpty) rebuild = inst;
+    }
+  }
+
+  final action = json['action'] as String?;
+  return ChatResult(
+    reply: (json['reply'] as String?) ?? '',
+    action: (action != null && action.trim().isNotEmpty) ? action.trim() : null,
+    plan: plan,
+    rebuildInstruction: rebuild,
+  );
 }
 
 class AiGatewayException implements Exception {

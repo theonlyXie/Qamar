@@ -1666,11 +1666,25 @@ class AppState extends ChangeNotifier {
 
   static String _today() => DateTime.now().toIso8601String().substring(0, 10);
 
+  void _installPlan(DayPlan built) {
+    plan = built;
+    planDate = built.date;
+    planError = null;
+    // A rewritten menu is not the old one; carrying swaps would apply
+    // yesterday's (or the previous dish's) choice to meals that are not there.
+    swappedSlots.clear();
+  }
+
   /// Builds today's plan. Safe to call on every visit to the Plan screen:
   /// it returns immediately if today's plan is already in hand.
-  Future<void> ensurePlan({bool force = false}) async {
+  ///
+  /// [instruction] is Qamar speaking as the nutritionist — a rebuild of the
+  /// written menu, not a comment on it. The Plan and Today screens then show
+  /// whatever comes back.
+  Future<void> ensurePlan({bool force = false, String? instruction}) async {
     final today = _today();
-    if (!force && planDate == today && hasPlan) return;
+    final note = instruction?.trim();
+    if (!force && (note == null || note.isEmpty) && planDate == today && hasPlan) return;
     if (planLoading) return;
 
     final gateway = _ai;
@@ -1686,14 +1700,15 @@ class AppState extends ChangeNotifier {
     planError = null;
     _notify();
     try {
-      final built = await gateway.generatePlan(date: today, lang: lang.code);
+      final built = await gateway.generatePlan(
+        date: today,
+        lang: lang.code,
+        force: force,
+        instruction: (note == null || note.isEmpty) ? null : note,
+      );
       if (_disposed) return;
       await _pullQuota(gateway);
-      plan = built;
-      planDate = built.date;
-      // A new day's meals are not the old day's meals; carrying the swaps
-      // over would apply yesterday's choices to dishes that are not there.
-      swappedSlots.clear();
+      _installPlan(built);
     } on AiQuotaException catch (e) {
       if (_disposed) return;
       aiQuota = e.quota;
@@ -1801,12 +1816,35 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      final reply = await gateway.chatReply(message: text, lang: lang.code);
+      final result = await gateway.chatReply(
+        message: text,
+        lang: lang.code,
+        date: _today(),
+        currentPlan: plan == null ? null : planToWire(plan!),
+        swappedSlots: swappedSlots.toList(),
+      );
+      if (_disposed) return;
+
+      var menuMoved = false;
+      if (result.plan != null) {
+        _installPlan(result.plan!);
+        menuMoved = true;
+      } else if (result.rebuildInstruction != null && result.rebuildInstruction!.trim().isNotEmpty) {
+        while (planLoading && !_disposed) {
+          await Future<void>.delayed(const Duration(milliseconds: 40));
+        }
+        if (_disposed) return;
+        await ensurePlan(force: true, instruction: result.rebuildInstruction);
+        menuMoved = hasPlan;
+      }
+
       if (_disposed) return;
       await _pullQuota(gateway);
       chatState = ChatState.idle;
       turn += 1;
-      chat.add(ChatTurn(who: ChatWho.q, text: reply));
+      final action = result.action ??
+          (menuMoved ? (isAr ? 'شوفي الخطة' : 'See the plan') : null);
+      chat.add(ChatTurn(who: ChatWho.q, text: result.reply, action: action));
     } on AiQuotaException catch (e) {
       if (_disposed) return;
       _onQuotaHit(e);

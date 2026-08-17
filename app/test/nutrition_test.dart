@@ -2,6 +2,7 @@
 // matter most: the calorie maths, the eligibility gate, and the orb's
 // hit-testing. All pure Dart — no widgets, no network.
 
+import 'dart:convert';
 import 'dart:ui' show Offset, Rect;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -240,6 +241,32 @@ void secondRound() {
       }
       expect(plan.slots.first.$1.id, 'breakfast');
       expect(plan.slots.first.$2.nameEn, isNot(plan.slots.first.$1.nameEn));
+    });
+
+    test('a chat reply that rewrote dinner is the same shape Plan already parses', () {
+      final result = chatResultFromJson(
+        jsonDecode('''
+{"reply":"I’ll change dinner.","action":"See the plan","date":"2026-08-15",
+ "plan":{"rationale_en":"Fits your target","meals":[
+   {"slot":"dinner","name_ar":"بيض","name_en":"Eggs","note_ar":"","note_en":"",
+    "portions":[{"ar":"بيض","en":"Eggs","amount_ar":"٢","amount_en":"2","kcal":160}]}
+ ]}}
+''') as Map<String, dynamic>,
+        lang: 'en',
+        date: '2026-08-15',
+      );
+      expect(result.changedPlan, isTrue);
+      expect(result.plan!.slots.single.$1.nameEn, 'Eggs');
+      expect(mealKcal(result.plan!.slots.single.$1), 160);
+    });
+
+    test('a rebuild instruction is read even when the meals are not in the reply', () {
+      final result = chatResultFromJson({
+        'reply': 'I’ll rewrite the day.',
+        'plan_update': {'kind': 'rebuild', 'instruction': 'no cooking tonight'},
+      }, lang: 'en', date: '2026-08-17');
+      expect(result.plan, isNull);
+      expect(result.rebuildInstruction, 'no cooking tonight');
     });
 
     test('meal totals equal the sum of their portions', () {
