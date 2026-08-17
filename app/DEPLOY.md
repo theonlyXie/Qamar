@@ -1,7 +1,7 @@
 # Deploying the backend
 
-Two things ship outside the app: the SQL migrations and the `ai-gateway` Edge
-Function. Both need credentials that only the project owner has — a Supabase
+Two things ship outside the app: the SQL migrations, the `ai-gateway` Edge
+Function, and the `billing` Edge Function (Paymob). All of them need credentials that only the project owner has — a Supabase
 personal access token, or the database password — so they are run from your
 machine rather than from a build agent.
 
@@ -78,7 +78,15 @@ go through chat.
 supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
 supabase secrets set VOYAGE_API_KEY=pa-...        # or OPENAI_API_KEY for embeddings
 supabase secrets set USDA_API_KEY=...             # free from api.data.gov, and worth it
+supabase secrets set PAYMOB_SECRET_KEY=...        # Paymob dashboard — never the phone
+supabase secrets set PAYMOB_PUBLIC_KEY=...
+supabase secrets set PAYMOB_HMAC_SECRET=...
+supabase secrets set PAYMOB_INTEGRATION_IDS=123,456
 ```
+
+Paymob in plain language: `PAYMOB.md`. `billing` is deployed with `--no-verify-jwt`
+because Paymob’s webhook cannot send a Supabase token; checkout still checks
+the user’s JWT itself.
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically —
 do not set them yourself.
@@ -87,6 +95,7 @@ do not set them yourself.
 
 ```sh
 supabase functions deploy ai-gateway
+supabase functions deploy billing --no-verify-jwt
 ```
 
 `ai-gateway` is already deployed and ACTIVE (`verify_jwt` on), and answers an

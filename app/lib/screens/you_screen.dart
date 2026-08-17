@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../models/billing.dart';
 import '../services/config.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
@@ -127,6 +129,8 @@ class YouScreen extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 14),
+        _AffiliateCard(state: state),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
@@ -263,6 +267,74 @@ class YouScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AffiliateCard extends StatelessWidget {
+  final AppState state;
+  const _AffiliateCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final wallet = state.affiliateWallet;
+    final code = wallet.code;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(isAr ? 'عمولة الأفلييت' : 'Affiliate wallet',
+              style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+          const SizedBox(height: 4),
+          Text(
+            isAr
+                ? 'ابعتهالكود لحد: يشترك بـ ٢٩٩ ج.م، وإنت يوصلك ٥٠ ج.م كاش نبعتهالك من طرفنا. مش نقاط Su.'
+                : 'Share your code: they subscribe at EGP 299, and you earn EGP 50 cash we send from our end. Not Su Points.',
+            style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  code ?? (isAr ? 'اربط حسابك عشان يطلعلك كود' : 'Link an account to get a code'),
+                  style: QText.number(size: 16, weight: FontWeight.w600, color: QColors.textPrimary),
+                ),
+              ),
+              if (code != null)
+                QOutlineButton(
+                  label: isAr ? 'نسخ' : 'Copy',
+                  height: 36,
+                  onTap: () async {
+                    await Clipboard.setData(ClipboardData(text: code));
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isAr
+                ? '${formatEgp(wallet.balancePounds, ar: true)} متاح · ${formatEgp(wallet.lifetimeEarnedCents ~/ 100, ar: true)} مكتسب'
+                : '${formatEgp(wallet.balancePounds, ar: false)} available · ${formatEgp(wallet.lifetimeEarnedCents ~/ 100, ar: false)} earned',
+            style: QText.body(size: 12, color: QColors.textFaint),
+          ),
+          const SizedBox(height: 8),
+          QOutlineButton(
+            label: isAr ? 'حوّل العمولة' : 'Redeem EGP',
+            height: 36,
+            color: QColors.gold,
+            onTap: state.requestAffiliatePayout,
+          ),
+          if (state.affiliateNotice != null) ...[
+            const SizedBox(height: 8),
+            Text(state.affiliateNotice!, style: QText.body(size: 12, height: 18, color: QColors.amberSoft)),
+          ],
+        ],
+      ),
     );
   }
 }

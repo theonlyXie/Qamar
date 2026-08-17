@@ -38,4 +38,15 @@ class QamarConfig {
 
   static bool get useSupabase => supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
   static bool get useAiGateway => aiGatewayUrl.isNotEmpty;
+
+  /// Paymob billing Edge Function. Defaults to the same Supabase project as
+  /// the rest of the backend so Egypt checkout needs no extra dart-define.
+  static const billingUrlOverride = String.fromEnvironment('BILLING_URL');
+  static String get billingUrl {
+    if (billingUrlOverride.isNotEmpty) return billingUrlOverride;
+    if (supabaseUrl.isEmpty) return '';
+    return '$supabaseUrl/functions/v1/billing';
+  }
+
+  static bool get useBilling => billingUrl.isNotEmpty;
 }

@@ -95,7 +95,7 @@ for you to connect:
 | `lib/services/supabase_repositories.dart` | Supabase-backed implementations of the above | Re-check each call against your pinned `supabase_flutter` version's query-builder API before use — it has shifted across majors |
 | `lib/services/auth_service.dart` | Anonymous sign-in + Apple/Google identity-linking + email OTP, preserving the anonymous user id | Add `sign_in_with_apple` / `google_sign_in` packages and native config when you wire the sign-in buttons |
 | `lib/services/ai_gateway.dart` | `MockAiGateway` (what the app uses today) + `HttpAiGateway` client for meal analysis / chat replies | Stand up a server endpoint (Edge Function or similar) that holds the OpenAI key server-side — **the client never holds a model API key**, per spec_mvp.txt §29.1 |
-| `lib/services/payments.dart` | `in_app_purchase` wrapper for the Qamar+ subscription (Su Points are earned only — see `walletTerms` copy — never a paid product) | Create `qamar_plus_monthly`/`qamar_plus_annual` in App Store Connect / Play Console, and a server endpoint to verify receipts before flipping entitlement |
+| `lib/services/payments.dart` | Paymob checkout for Qamar+ (EGP). Su Points are earned only — see `walletTerms` | Open a Paymob Egypt merchant account and follow `PAYMOB.md`. The phone never holds Paymob secrets. |
 | `lib/services/config.dart` | `--dart-define` driven flags (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `AI_GATEWAY_URL`) | `flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...` |
 
 **Wiring — done.** `AppState` now takes optional repositories plus a user id.

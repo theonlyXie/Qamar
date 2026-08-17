@@ -14,9 +14,11 @@ import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/su_economy.dart';
+import 'package:qamar/models/billing.dart';
 import 'package:qamar/models/water.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/auth_service.dart';
+import 'package:qamar/services/payments.dart';
 import 'package:qamar/services/quick_invoke.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
@@ -879,4 +881,130 @@ void main() {
     expect(state.screen, AppScreen.welcome);
     expect(state.target().kcal, greaterThan(0));
   });
+
+  test('Start Qamar+ opens Paymob and does not mark Plus on the phone', () async {
+    final billing = FakeBilling();
+    final opened = <String>[];
+    final state = AppState(
+      userId: 'user-1',
+      billing: billing,
+      openCheckout: (url) async {
+        opened.add(url);
+        return true;
+      },
+    )..setLang(AppLang.en);
+    await settle();
+
+    expect(state.plusActive, isFalse);
+    await state.startPlusPurchase();
+
+    expect(billing.lastPlan, 'annual');
+    expect(opened.single, contains('accept.paymob.com/unifiedcheckout'));
+    expect(state.plusActive, isFalse, reason: 'only a verified Paymob callback may grant Plus');
+    expect(state.plusNotice, contains('Paymob'));
+  });
+
+  test('a promo code is sent with checkout and still does not mark Plus on the phone', () async {
+    final billing = FakeBilling();
+    final state = AppState(
+      userId: 'user-1',
+      billing: billing,
+      openCheckout: (url) async => true,
+    )..setLang(AppLang.en);
+    await settle();
+
+    state.selectPlusPlan(PlusPlan.monthly);
+    state.setPlusPromoCode('qmr 7k2p');
+    await settle();
+    await state.startPlusPurchase();
+
+    expect(billing.lastPlan, 'monthly');
+    expect(billing.lastPromo, 'QMR7K2P');
+    expect(state.plusActive, isFalse);
+  });
+
+  test('a promo code is sent with checkout and still does not mark Plus on the phone', () async {
+    final billing = FakeBilling();
+    final state = AppState(
+      userId: 'user-1',
+      billing: billing,
+      openCheckout: (url) async => true,
+    )..setLang(AppLang.en);
+    await settle();
+
+    state.selectPlusPlan(PlusPlan.monthly);
+    state.setPlusPromoCode('qmr 7k2p');
+    await settle();
+    await state.startPlusPurchase();
+
+    expect(billing.lastPlan, 'monthly');
+    expect(billing.lastPromo, 'QMR7K2P');
+    expect(state.plusActive, isFalse);
+  });
+
+  test('coming back from Paymob reads the server entitlement', () async {
+    final billing = FakeBilling()
+      ..current = PlusEntitlement(
+        status: 'active',
+        plan: 'monthly',
+        periodEnd: DateTime.now().toUtc().add(const Duration(days: 30)),
+      );
+    final state = AppState(userId: 'user-1', billing: billing)..setLang(AppLang.en);
+    await settle();
+
+    await state.onReturnedFromPaymob();
+    expect(state.plusActive, isTrue);
+    expect(state.screen, AppScreen.subscription);
+  });
+}
+
+class FakeBilling implements BillingGateway {
+  String? lastPlan;
+  String? lastPromo;
+  PlusEntitlement current = PlusEntitlement.free;
+  AffiliateWallet wallet = const AffiliateWallet(code: 'QMRTEST1');
+
+  @override
+  Future<CheckoutSession> checkout({
+    required String plan,
+    String? promoCode,
+    String? email,
+    String? phone,
+    String? firstName,
+  }) async {
+    lastPlan = plan;
+    lastPromo = promoCode;
+    return const CheckoutSession(
+      checkoutUrl: 'https://accept.paymob.com/unifiedcheckout/?publicKey=pk_test&clientSecret=csk_test',
+      orderId: 'ord-1',
+    );
+  }
+
+  @override
+  Future<PlusQuote> quote({required String plan, String? promoCode}) async {
+    return PlusPricing.quote(
+      plan: plan,
+      firstPurchase: current.firstPurchase,
+      promo: promoCode == null || promoCode.isEmpty
+          ? null
+          : PlusPromo(code: promoCode, kind: 'affiliate', ownerUserId: 'friend'),
+    );
+  }
+
+  @override
+  Future<PlusEntitlement> entitlement() async => current;
+
+  @override
+  Future<AffiliateWallet> affiliate() async => wallet;
+
+  @override
+  Future<AffiliateWallet> requestAffiliatePayout({int? amountCents}) async {
+    wallet = AffiliateWallet(
+      code: wallet.code,
+      balanceCents: 0,
+      lifetimeEarnedCents: wallet.lifetimeEarnedCents,
+      pendingPayoutCents: amountCents ?? wallet.balanceCents,
+    );
+    return wallet;
+  }
 }
