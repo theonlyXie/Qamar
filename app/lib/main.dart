@@ -9,6 +9,7 @@ import 'services/ai_gateway.dart';
 import 'services/auth_service.dart';
 import 'services/dictation.dart';
 import 'services/config.dart';
+import 'services/payments.dart';
 import 'services/supabase_repositories.dart';
 import 'state/app_state.dart';
 import 'theme/app_theme.dart';
@@ -60,6 +61,7 @@ Future<AppState> _backedState(Dictation dictation) async {
       mealRepo: SupabaseMealRepository(client),
       walletRepo: SupabaseWalletRepository(client),
       ai: _gatewayIfConfigured(client),
+      billing: _billingIfConfigured(client),
       dictation: dictation,
       auth: auth,
       userId: user.id,
@@ -82,6 +84,14 @@ AiGateway? _gatewayIfConfigured(SupabaseClient? client) {
   if (!QamarConfig.useAiGateway || client == null) return null;
   return HttpAiGateway(
     baseUrl: QamarConfig.aiGatewayUrl,
+    authTokenProvider: () => client.auth.currentSession?.accessToken ?? '',
+  );
+}
+
+BillingGateway? _billingIfConfigured(SupabaseClient? client) {
+  if (!QamarConfig.useBilling || client == null) return null;
+  return HttpBillingGateway(
+    baseUrl: QamarConfig.billingUrl,
     authTokenProvider: () => client.auth.currentSession?.accessToken ?? '',
   );
 }

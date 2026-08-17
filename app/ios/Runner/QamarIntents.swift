@@ -29,10 +29,10 @@ enum QamarQuickBridge {
     var action: String?
     if host == "quick", let first = parts.first {
       action = first
-    } else if host == "ask" || host == "log" {
+    } else if host == "ask" || host == "log" || host == "plus" {
       action = host
     }
-    guard let resolved = action, resolved == "ask" || resolved == "log" else { return }
+    guard let resolved = action, resolved == "ask" || resolved == "log" || resolved == "plus" else { return }
     let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
     let text = comps?.queryItems?.first(where: { $0.name == "q" || $0.name == "text" })?.value
     enqueue(action: resolved, text: text)

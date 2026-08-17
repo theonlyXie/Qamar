@@ -11,10 +11,8 @@ import '../widgets/moon.dart';
 
 /// Qamar+ paywall.
 ///
-/// Prices here are display copy only. The real figures come from the store at
-/// runtime once `PaymentsService.loadProducts()` is wired up — App Store and
-/// Play localise price and currency per storefront, and hardcoded prices are a
-/// review rejection. Treat these as placeholders for layout.
+/// Prices here match the Paymob catalog (EGP). The charge itself is stamped
+/// server-side; this screen only names the plan.
 typedef PlusTier = ({
   PlusPlan plan,
   String titleAr,
@@ -148,21 +146,21 @@ class SubscriptionScreen extends StatelessWidget {
           label: state.plusActive
               ? (isAr ? 'إدارة الاشتراك' : 'Manage subscription')
               : (isAr ? 'ابدأ Qamar+' : 'Start Qamar+'),
-          onTap: state.startPlusPurchase,
+          onTap: () { state.startPlusPurchase(); },
         ),
         const SizedBox(height: 8),
         Center(
           child: TextButton(
-            onPressed: state.restorePlusPurchases,
-            child: Text(isAr ? 'استرجاع مشترياتي' : 'Restore purchases',
+            onPressed: () { state.restorePlusPurchases(); },
+            child: Text(isAr ? 'تأكيد الاشتراك' : 'Confirm subscription',
                 style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
           ),
         ),
         const SizedBox(height: 4),
         Text(
           isAr
-              ? 'الاشتراك بيتجدد تلقائياً لحد ما تلغيه من إعدادات المتجر. نقاط Su مش بتتباع ومش بتتشحن بفلوس — بتتكسب بس.'
-              : 'Subscriptions renew automatically until cancelled in your store settings. Su Points are never sold or topped up with money — they are only earned.',
+              ? 'الدفع في مصر عن طريق Paymob بالجنيه: فيزا، ماستركارد، Meeza، أو محفظة فودافون/أورانج. قمر+ بيتفعل بعد ما Paymob يأكد التحويل. نقاط Su مش بتتباع ومش بتتشحن بفلوس — بتتكسب بس.'
+              : 'Egypt billing is Paymob, in EGP: Visa, Mastercard, Meeza, or Vodafone/Orange Cash. Qamar+ turns on after Paymob confirms the transfer. Su Points are never sold or topped up with money — they are only earned.',
           textAlign: TextAlign.center,
           style: QText.body(size: 11, height: 17, color: QColors.textFaint),
         ),

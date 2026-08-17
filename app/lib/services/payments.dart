@@ -1,68 +1,85 @@
-import 'dart:async';
-import 'package:in_app_purchase/in_app_purchase.dart';
+import 'dart:convert';
 
-/// Qamar+ is the only real-money product — Su Points are explicitly
-/// "never purchased, never cash" per the wallet's own terms copy
-/// (l10n/strings.dart: walletTerms). Configure these IDs to match what you
-/// create in App Store Connect / Google Play Console.
-class QamarProductIds {
-  QamarProductIds._();
-  static const monthly = 'qamar_plus_monthly';
-  static const annual = 'qamar_plus_annual';
-  static const all = {monthly, annual};
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
+
+import '../models/billing.dart';
+
+/// Server-gateway for Qamar+. Paymob is the Egyptian collector — EGP, cards,
+/// Meeza, Vodafone Cash / Orange Cash. The app never holds a Paymob secret
+/// and never marks someone Plus from a browser redirect.
+abstract class BillingGateway {
+  Future<CheckoutSession> checkout({required String plan, String? email, String? phone, String? firstName});
+  Future<PlusEntitlement> entitlement();
 }
 
-/// Thin wrapper over `in_app_purchase`. Per spec_mvp.txt §29.1, this client
-/// never decides entitlement on its own — every completed purchase must be
-/// verified server-side (App Store Server API / Google Play Developer API,
-/// or a RevenueCat webhook) before the app is told Qamar+ is active. Not
-/// wired into the You/paywall screens yet.
-class PaymentsService {
-  final InAppPurchase _iap = InAppPurchase.instance;
-  StreamSubscription<List<PurchaseDetails>>? _sub;
+class HttpBillingGateway implements BillingGateway {
+  final String baseUrl;
+  final String Function() authTokenProvider;
+  final http.Client _client;
 
-  /// Called once you have a backend endpoint to verify a completed purchase
-  /// and flip the user's Entitlement row (spec_mvp.txt Part 28).
-  final Future<void> Function(PurchaseDetails purchase) onVerifyPurchase;
+  HttpBillingGateway({
+    required this.baseUrl,
+    required this.authTokenProvider,
+    http.Client? client,
+  }) : _client = client ?? http.Client();
 
-  PaymentsService({required this.onVerifyPurchase});
+  Map<String, String> get _headers => {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${authTokenProvider()}',
+      };
 
-  Future<bool> isAvailable() => _iap.isAvailable();
-
-  Future<List<ProductDetails>> loadProducts() async {
-    final res = await _iap.queryProductDetails(QamarProductIds.all);
-    if (res.error != null) {
-      throw StateError('queryProductDetails failed: ${res.error}');
+  @override
+  Future<CheckoutSession> checkout({
+    required String plan,
+    String? email,
+    String? phone,
+    String? firstName,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$baseUrl/checkout'),
+      headers: _headers,
+      body: jsonEncode({
+        'plan': plan,
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+        if (firstName != null && firstName.isNotEmpty) 'first_name': firstName,
+      }),
+    );
+    if (res.statusCode != 200) {
+      throw BillingException('checkout failed: ${res.statusCode} ${res.body}');
     }
-    return res.productDetails;
-  }
-
-  void startListening() {
-    _sub = _iap.purchaseStream.listen(_onPurchaseUpdate, onError: (Object e) {});
-  }
-
-  void stopListening() => _sub?.cancel();
-
-  Future<void> buy(ProductDetails product) async {
-    final param = PurchaseParam(productDetails: product);
-    await _iap.buyNonConsumable(purchaseParam: param);
-  }
-
-  Future<void> restorePurchases() => _iap.restorePurchases();
-
-  Future<void> _onPurchaseUpdate(List<PurchaseDetails> purchases) async {
-    for (final p in purchases) {
-      switch (p.status) {
-        case PurchaseStatus.purchased:
-        case PurchaseStatus.restored:
-          await onVerifyPurchase(p);
-          if (p.pendingCompletePurchase) await _iap.completePurchase(p);
-          break;
-        case PurchaseStatus.error:
-        case PurchaseStatus.canceled:
-        case PurchaseStatus.pending:
-          break;
-      }
+    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final url = json['checkout_url'] as String?;
+    final orderId = json['order_id'] as String?;
+    if (url == null || orderId == null) {
+      throw BillingException('checkout returned no Paymob session');
     }
+    return CheckoutSession(checkoutUrl: url, orderId: orderId);
   }
+
+  @override
+  Future<PlusEntitlement> entitlement() async {
+    final res = await _client.post(
+      Uri.parse('$baseUrl/entitlement'),
+      headers: _headers,
+      body: jsonEncode({}),
+    );
+    if (res.statusCode != 200) {
+      throw BillingException('entitlement failed: ${res.statusCode} ${res.body}');
+    }
+    return PlusEntitlement.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+  }
+}
+
+/// Opens Paymob's hosted checkout in the system browser.
+Future<bool> openPaymobCheckout(String url) {
+  return launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+}
+
+class BillingException implements Exception {
+  final String message;
+  BillingException(this.message);
+  @override
+  String toString() => 'BillingException: $message';
 }

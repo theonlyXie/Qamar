@@ -61,6 +61,7 @@
                 <data android:scheme="com.qamar.app" android:host="quick"/>
                 <data android:scheme="com.qamar.app" android:host="ask"/>
                 <data android:scheme="com.qamar.app" android:host="log"/>
+                <data android:scheme="com.qamar.app" android:host="plus"/>
             </intent-filter>
             <intent-filter>
                 <action android:name="com.qamar.app.QUICK_ASK"/>
@@ -91,6 +92,12 @@
     <queries>
         <intent>
             <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
         </intent>
     </queries>
 </manifest>

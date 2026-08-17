@@ -13,7 +13,9 @@ import '../models/su_economy.dart';
 import '../services/ai_gateway.dart';
 import '../services/auth_service.dart';
 import '../services/dictation.dart';
+import '../services/payments.dart';
 import '../services/repositories.dart';
+import '../models/billing.dart';
 import '../widgets/explain.dart';
 import '../models/profile.dart';
 import 'chat_replies.dart';
@@ -45,6 +47,8 @@ class AppState extends ChangeNotifier {
     MealRepository? mealRepo,
     WalletRepository? walletRepo,
     AiGateway? ai,
+    BillingGateway? billing,
+    Future<bool> Function(String url)? openCheckout,
     Dictation? dictation,
     Account? auth,
     String? userId,
@@ -52,6 +56,8 @@ class AppState extends ChangeNotifier {
         _mealRepo = mealRepo,
         _walletRepo = walletRepo,
         _ai = ai,
+        _billing = billing,
+        _openCheckout = openCheckout,
         _dictation = dictation,
         _auth = auth,
         _userId = userId {
@@ -67,6 +73,12 @@ class AppState extends ChangeNotifier {
   /// app tells the truth about being unconnected rather than pretending.
   final AiGateway? _ai;
   bool get hasAssistant => _ai != null;
+
+  /// Paymob checkout. Null offline, where the paywall says so rather than
+  /// pretending a card was charged.
+  final BillingGateway? _billing;
+  final Future<bool> Function(String url)? _openCheckout;
+  bool get hasBilling => _billing != null;
 
   /// The device's speech recogniser. Null in tests and on platforms without
   /// one, where the UI falls back to typing.
@@ -124,6 +136,7 @@ class AppState extends ChangeNotifier {
       }
 
       await _refreshQuota();
+      await _refreshPlus();
 
       final history = await _mealRepo?.dailyTotals(uid, days: 7);
       if (history != null) {
@@ -246,6 +259,7 @@ class AppState extends ChangeNotifier {
     explainHoverId = null;
     explainOpen = null;
     plusActive = false;
+    plusUntil = null;
     plusNotice = null;
     plusPlan = PlusPlan.annual;
     improve = false;
@@ -1182,17 +1196,16 @@ class AppState extends ChangeNotifier {
   // ---- Qamar+ subscription --------------------------------------------
 
   /// Which tier the paywall has selected. Annual is preselected because it is
-  /// the better-value option; nothing is charged until a real store product is
-  /// wired in (lib/services/payments.dart).
+  /// the better-value option; nothing is charged until Paymob confirms.
   PlusPlan plusPlan = PlusPlan.annual;
 
-  /// Entitlement. In production this is set only from a server-verified
-  /// purchase — never decided on the client (spec_mvp.txt §29.1). Here it is
+  /// Entitlement. In production this is set only from a Paymob-verified
+  /// payment — never decided on the client (spec_mvp.txt §29.1). Here it is
   /// local so the subscribed state is demoable.
   bool plusActive = false;
+  DateTime? plusUntil;
 
-  /// Set when a purchase is attempted with no store products configured, which
-  /// is the expected state until App Store Connect / Play Console are set up.
+  /// Set when checkout cannot start, or while Paymob's page is open.
   String? plusNotice;
 
   void openSubscription() {
@@ -1208,21 +1221,84 @@ class AppState extends ChangeNotifier {
     _notify();
   }
 
-  /// Stands in for the real store purchase flow. [PaymentsService] holds the
-  /// `in_app_purchase` calls; this cannot reach a store until real product IDs
-  /// exist, so it reports that plainly rather than pretending to charge.
-  void startPlusPurchase() {
-    plusNotice = isAr
-        ? 'الاشتراك مش متوصل بمتجر حقيقي لسه. لما تتعمل منتجات qamar_plus في App Store Connect و Play Console، الزرار ده هيفتح شاشة الدفع.'
-        : 'Billing isn’t connected to a real store yet. Once the qamar_plus products exist in App Store Connect and Play Console, this button opens the native purchase sheet.';
+  /// Opens Paymob's checkout for the selected plan. Qamar+ is not flipped
+  /// here — Paymob tells the server, and the next entitlement read does.
+  Future<void> startPlusPurchase() async {
+    if (plusActive) {
+      plusNotice = isAr
+          ? 'اشتراكك شغال عن طريق Paymob. لو حابب تلغيه، راسل الدعم من الشاشة دي.'
+          : 'Your subscription is billed through Paymob. To cancel, write to support from this screen.';
+      _notify();
+      return;
+    }
+    if (!isBacked || _billing == null) {
+      plusNotice = isAr
+          ? 'الدفع في مصر عن طريق Paymob. اربط حسابك الأول، وبعدين نفتح صفحة الدفع بالجنيه المصري (فيزا، محفظة، أو Meeza).'
+          : 'Egypt billing runs through Paymob. Link your account first, then we open checkout in EGP (card, wallet, or Meeza).';
+      _notify();
+      return;
+    }
+
+    plusNotice = isAr ? 'بنفتح صفحة Paymob…' : 'Opening Paymob…';
+    _notify();
+    try {
+      final product = plusPlan == PlusPlan.annual ? PlusCatalog.annual : PlusCatalog.monthly;
+      final session = await _billing!.checkout(
+        plan: product.id,
+        email: _auth?.email,
+        firstName: profile.name.isEmpty ? null : profile.name.split(' ').first,
+      );
+      final opener = _openCheckout ?? openPaymobCheckout;
+      final opened = await opener(session.checkoutUrl);
+      if (!opened) {
+        plusNotice = isAr
+            ? 'مقدرتش أفتح صفحة Paymob. جرّب تاني أو ادفع من متصفح.'
+            : 'Could not open Paymob. Try again, or pay from a browser.';
+        _notify();
+        return;
+      }
+      plusNotice = isAr
+          ? 'كمّل الدفع في Paymob. أول ما يتأكد التحويل، قمر+ هيتفعل لوحده — من غير ما التطبيق يقول إنه دُفع.'
+          : 'Finish in Paymob. Qamar+ turns on when the payment is confirmed — the app does not mark you paid on its own.';
+    } catch (e) {
+      plusNotice = isAr
+          ? 'Paymob مش جاهز يستقبل دفعات دلوقتي. لو المفاتيح لسه متعملت، دي الخطوة الجاية من دليل Paymob.'
+          : 'Paymob cannot take a payment yet. If the keys are still missing, that is the next step in the Paymob guide.';
+    }
     _notify();
   }
 
-  void restorePlusPurchases() {
-    plusNotice = isAr
-        ? 'استرجاع المشتريات محتاج ربط المتجر كمان.'
-        : 'Restoring purchases also needs the store connection.';
-    _notify();
+  Future<void> restorePlusPurchases() => _refreshPlus(announce: true);
+
+  /// Called when Paymob sends the person back to the app.
+  Future<void> onReturnedFromPaymob() async {
+    await _refreshPlus(announce: true);
+    if (screen != AppScreen.subscription) go(AppScreen.subscription);
+  }
+
+  Future<void> _refreshPlus({bool announce = false}) async {
+    final billing = _billing;
+    if (billing == null) return;
+    try {
+      final ent = await billing.entitlement();
+      plusActive = ent.active;
+      plusUntil = ent.periodEnd;
+      if (announce) {
+        plusNotice = plusActive
+            ? (isAr ? 'قمر+ اشتغل. شكراً.' : 'Qamar+ is on. Thank you.')
+            : (isAr
+                ? 'لسه مفيش دفع متأكد من Paymob. لو خلصت دلوقتي، استنى لحظة وجرّب استرجاع الاشتراك.'
+                : 'Paymob has not confirmed a payment yet. If you just finished, wait a moment and tap Restore.');
+      }
+      _notify();
+    } catch (e) {
+      if (announce) {
+        plusNotice = isAr
+            ? 'مقدرتش أقرأ حالة الاشتراك دلوقتي.'
+            : 'Could not read the subscription just now.';
+        _notify();
+      }
+    }
   }
 
   void showSpend() {

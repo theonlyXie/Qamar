@@ -20,6 +20,7 @@ void main() {
 
   test('parses host-only ask/log URLs and ignores unrelated ones', () {
     expect(QuickInvoke.parseUri(Uri.parse('com.qamar.app://ask'))?.kind, 'ask');
+    expect(QuickInvoke.parseUri(Uri.parse('com.qamar.app://plus/return'))?.kind, 'plus');
     expect(QuickInvoke.parseUri(Uri.parse('com.qamar.app://login-callback')), isNull);
     expect(QuickInvoke.parseUri(Uri.parse('https://example.com/quick/ask')), isNull);
   });

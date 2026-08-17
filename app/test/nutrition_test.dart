@@ -12,6 +12,7 @@ import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/su_economy.dart';
+import 'package:qamar/models/billing.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/state/app_state.dart';
@@ -98,6 +99,16 @@ void main() {
       expect(SuEconomy.mealLogged, greaterThanOrEqualTo(100));
       expect(SuEconomy.extraAiUse, greaterThanOrEqualTo(SuEconomy.mealLogged));
       expect(SuEconomy.signupBonus, greaterThanOrEqualTo(1000));
+    });
+  });
+
+  group('Qamar+ Egypt billing', () {
+    test('is priced in EGP for Paymob, not a foreign store', () {
+      expect(PlusCatalog.currency, 'EGP');
+      expect(PlusCatalog.provider, 'paymob');
+      expect(PlusCatalog.monthly.amountPounds, 199);
+      expect(PlusCatalog.annual.amountPounds, 1590);
+      expect(PlusCatalog.monthly.amountCents, 19900);
     });
   });
 

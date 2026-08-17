@@ -37,6 +37,13 @@ jobs:
           deno check index.ts
           deno test
 
+      - name: Billing tests
+        if: ${{ !inputs.skip_tests }}
+        working-directory: app/supabase/functions/billing
+        run: |
+          deno check index.ts hmac.ts
+          deno test
+
       - name: Warn when the gate was skipped
         if: ${{ inputs.skip_tests }}
         run: echo "::warning::Tests were skipped for this deploy."
@@ -50,6 +57,12 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: supabase functions deploy ai-gateway --project-ref "$PROJECT_REF"
+
+      - name: Deploy the billing function
+        working-directory: app
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy billing --no-verify-jwt --project-ref "$PROJECT_REF"
 
       - name: What to check next
         run: |

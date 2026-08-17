@@ -60,10 +60,10 @@ class MainActivity : FlutterActivity() {
                 val segs = data.pathSegments
                 val kind = when {
                     host == "quick" && segs.isNotEmpty() -> segs[0]
-                    host == "ask" || host == "log" -> host
+                    host == "ask" || host == "log" || host == "plus" -> host
                     else -> null
                 }
-                if (kind == "ask" || kind == "log") {
+                if (kind == "ask" || kind == "log" || kind == "plus") {
                     enqueue(kind, data.getQueryParameter("q") ?: data.getQueryParameter("text"))
                 }
             }
