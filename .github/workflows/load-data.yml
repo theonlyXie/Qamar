@@ -1,0 +1,105 @@
+# Fills the knowledge base and the food graph. A button.
+#
+# Run it from the Actions tab: "Load Qamar's data" → "Run workflow" → pick what
+# to load.
+#
+# Both jobs are safe to run more than once. The ingest skips documents that are
+# already loaded, and the nutrient importer refuses to store anything the source
+# registry has not granted storage rights for — so a second run costs time and
+# changes nothing rather than duplicating data.
+
+name: Load Qamar's data
+
+on:
+  workflow_dispatch:
+    inputs:
+      what:
+        description: "What to load"
+        type: choice
+        default: both
+        options:
+          - both
+          - knowledge base only
+          - nutrient values only
+
+env:
+  SUPABASE_URL: https://stqirjlqzchcoeegumoq.supabase.co
+
+jobs:
+  load:
+    name: Load
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # Fails early and says which secret is missing, rather than dying twenty
+      # minutes in with a 401 nobody can interpret.
+      - name: Check the keys are present
+        env:
+          SERVICE: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VOYAGE: ${{ secrets.VOYAGE_API_KEY }}
+          USDA: ${{ secrets.USDA_API_KEY }}
+          WHAT: ${{ inputs.what }}
+        run: |
+          missing=""
+          [ -z "$SERVICE" ] && missing="$missing SUPABASE_SERVICE_ROLE_KEY"
+          if [ "$WHAT" != "nutrient values only" ] && [ -z "$VOYAGE" ]; then
+            missing="$missing VOYAGE_API_KEY"
+          fi
+          if [ "$WHAT" != "knowledge base only" ] && [ -z "$USDA" ]; then
+            missing="$missing USDA_API_KEY"
+          fi
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing"
+            echo "Add them under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          echo "All required keys are present."
+
+      # build_sources.ts writes sources.json beside itself, so it runs from its
+      # own directory; the ingest below then reads that path relative to app/.
+      - name: Build the source manifest
+        if: ${{ inputs.what != 'nutrient values only' }}
+        working-directory: app/supabase/knowledge
+        run: deno run --allow-read --allow-write build_sources.ts
+
+      - name: Load the knowledge base
+        if: ${{ inputs.what != 'nutrient values only' }}
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: |
+          deno run --allow-net --allow-env --allow-read \
+            supabase/functions/ai-gateway/ingest.ts supabase/knowledge/sources.json
+
+      - name: Load the nutrient values
+        if: ${{ inputs.what != 'knowledge base only' }}
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          USDA_API_KEY: ${{ secrets.USDA_API_KEY }}
+        run: deno run --allow-net --allow-env supabase/functions/ai-gateway/ingest_usda.ts
+
+      - name: What to check next
+        run: |
+          echo "### Loaded" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "In the Supabase SQL editor, confirm it landed:" >> $GITHUB_STEP_SUMMARY
+          echo '```sql' >> $GITHUB_STEP_SUMMARY
+          echo "select count(*) from kb_chunks where embedding is null;  -- must be 0" >> $GITHUB_STEP_SUMMARY
+          echo "select count(*) from food_nutrients;                     -- should not be 0" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "A chunk with no embedding is invisible to search, so a non-zero" >> $GITHUB_STEP_SUMMARY
+          echo "count there means the load half-finished and should be re-run." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Then rebuild the search index, once:" >> $GITHUB_STEP_SUMMARY
+          echo '```sql' >> $GITHUB_STEP_SUMMARY
+          echo "reindex index kb_chunks_embedding_idx;" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

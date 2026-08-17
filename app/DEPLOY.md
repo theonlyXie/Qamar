@@ -22,7 +22,7 @@ scratch is the only fix.
 
 ## 1. Apply the migrations
 
-`0001`–`0006` are all live on `stqirjlqzchcoeegumoq` as of 2026-08-15. This
+`0001`–`0029` are all live on `stqirjlqzchcoeegumoq` as of 2026-08-15. This
 section is kept for rebuilding the project from scratch, and for the next
 migration.
 
@@ -97,6 +97,21 @@ That first deploy went up through the Supabase MCP connector, which uploads
 file contents rather than a directory, so run the command above once from a
 checkout when convenient. It republishes straight from `supabase/functions/`
 and makes the deployed bundle provably identical to the repository.
+
+**The running version is that first deploy, and it is now well behind the
+repository.** The food resolver, the safety recording, the self-harm and
+severe-symptom guards, the evidence packets and the verifier are all in
+`supabase/functions/` and none of them are live until the command above is run.
+The function is seven files bigger than the deployed one (`graph.ts`,
+`safety.ts`, `packet.ts`, `verify.ts` and their tests), which is the other
+reason to deploy from a checkout rather than file by file.
+
+Before deploying, from `supabase/functions/ai-gateway/`:
+
+```sh
+deno check index.ts     # types
+deno test               # scope, packet, verifier, eval dispatcher — 66 tests
+```
 
 Verify it is up. A 401 is the correct answer to an unauthenticated call — it
 means the function is running and rejecting you, which is what you want. A 404
@@ -188,6 +203,165 @@ What the answers mean:
 - **`404`** — not deployed.
 
 Then rebuild the APK with `AI_GATEWAY_URL` set, per the README.
+
+## 6b. The safety log
+
+Every refusal, escalation and hard block is now recorded. Three views answer
+the questions worth asking:
+
+```sql
+select * from public.safety_rule_activity;  -- which rules fire, and when last
+select * from public.safety_daily;          -- tier mix per day, with a denominator
+select * from public.clinician_queue;       -- what is waiting on a human
+```
+
+All nine rules now have detection behind them. Five are keyword sets in
+`scope.ts` — `self_harm`, `severe_symptom`, `medical_question`,
+`eating_disorder`, `minor`, `pregnancy_declared` and `prompt_injection` — and
+two are database triggers, so they fire on a weight or a lab arriving from any
+path, not only from the app:
+
+- `rapid_weight_change` — trigger on `weight_entries`: 5% of body weight inside
+  30 days, needing at least three measurements over at least 14 days, debounced
+  to one review a week.
+- `critical_lab` — trigger on `user_labs`, on `critical_low` / `critical_high`.
+
+Four rules escalate rather than merely refusing, so they queue a clinician
+review: `self_harm` and `severe_symptom` as urgent, `eating_disorder` and
+`rapid_weight_change` as routine. **Check `clinician_queue` has an owner before
+relying on any of that** — an urgent row ageing in that queue is the exact
+failure the escalation design exists to prevent.
+
+A rule at zero is either never triggered or quietly broken, and from inside the
+application those look identical. `safety_rule_activity` is where the
+difference becomes visible, so it is worth reading after the first week of real
+traffic rather than assuming silence means safety.
+
+These views are staff surfaces. `0023` revoked them from `anon` and
+`authenticated`, so they are reachable with the service role or from the SQL
+editor, and not through the app's API.
+
+## 6c. The evidence trail and what it costs
+
+Every request now writes an `evidence_packets` row — the facts about the person
+that were in play, what the food resolver made of each phrase and how sure it
+was, the target, which curated rules applied and which were excluded and why,
+and the claims the answer made in a form something could later check.
+
+```sql
+-- The last few answers, and what each of them stood on
+select created_at, kind, jsonb_array_length(food_facts) as foods,
+       jsonb_array_length(claims_to_verify) as claims, uncertainty
+from public.evidence_packets order by created_at desc limit 20;
+
+select * from public.ai_cost_daily;           -- spend and latency per stage
+select * from public.stage_budget_pressure;   -- stages running over their 0015 ceiling
+```
+
+`cost_usd` is computed on insert by a trigger from `model_prices`, not by the
+gateway. **If a price changes, update `model_prices` — do not redeploy the
+function.** A model with no row there records its tokens and leaves `cost_usd`
+null, which reads as "unpriced", not "free":
+
+```sql
+insert into public.model_prices
+  (model, effective_from, input_usd_per_mtok, output_usd_per_mtok, cached_input_usd_per_mtok, note)
+values ('some-new-model', current_date, 3.0, 15.0, 0.3, 'list')
+on conflict (model, effective_from) do nothing;
+```
+
+The seeded prices are published list rates entered by hand and are a budgeting
+estimate, not an invoice. Reconcile against the provider's own billing before
+anyone makes a decision on them.
+
+`applicable_rules` is empty on every packet because `clinical_rules` is empty —
+no rule has been curated, which is different from the population filter
+rejecting them all.
+
+## 6d. The verifier
+
+Every answer is now checked before it goes out, and the check is arithmetic, not
+a second model. Nothing here is anyone's opinion: each finding recomputes a
+number from figures already in the packet, which is why `verifier_results.model`
+is null on every row.
+
+```sql
+select * from public.verifier_activity;    -- verdicts per day and per pass
+select * from public.verifier_failures;    -- what is actually failing, commonest first
+select * from public.verifier_revisions;   -- whether the correction round earns its cost
+```
+
+What each route can honestly check:
+
+| Route | Checked | Not checked |
+|---|---|---|
+| `plan` | meal totals against the target, every portion has a kcal, alternatives near their meal, **and no restricted food in the output** | — |
+| `meal/analyze` | macros reconcile with kcal at 4/4/9, kcal plausible | restrictions: the user is reporting what they ate, not being offered it |
+| `chat/reply` | a restricted food is *mentioned* — advisory only | the numbers, because prose does not attach them to a resolved food |
+| `scan/read` | nothing | re-reading the image needs another vision call, which is the trap this avoids. The plausibility filter in the route is the whole check |
+
+Three verdicts, and they do different things:
+
+- **PASS** — the response carries `verification.verified: true`.
+- **REVISE** — one bounded correction. The model is re-asked with the specific
+  failures and its own previous answer, and the new version is accepted **only
+  if it has strictly fewer failures**. A meal-photo revision drops the image and
+  uses the text prompt, because fixing a sum needs no picture.
+- **ESCALATE** — either a safety failure, or a revision that did not land. The
+  cap is enforced by the `unique (task_id, revision_number)` constraint from
+  `0015`, not by the gateway remembering.
+
+**An ESCALATE does not always block.** A day of food still 9% off target is
+returned with `verification.verified: false` and the recomputed total attached —
+withholding someone's meals over an energy sum would be worse for them than
+showing it with the correction. What is never returned is a plan naming a food
+the person has recorded as an allergy: that is refused with 409, written to
+`safety_events` as a `hard_block`, and not re-asked for, because the model has
+already been told once and a second round of the same model is not a control.
+
+That last check is the one that is not redundant with anything upstream. The
+route already removes restricted foods from the list the model is *shown*;
+nothing stops it naming one that was never on that list.
+
+## 6e. The eval suite
+
+52 frozen cases. Every tolerance in this system — the 0.35 fuzzy-match floor,
+the verifier's 20% Atwater band, the 5% plan target — was a number chosen with
+no way to tell whether it was right. This is what makes them measurable.
+
+Half runs in the database with **no API key at all**:
+
+```sql
+select public.qamar_run_eval('before the deploy');   -- returns a run id
+select * from public.eval_latest limit 5;            -- pass rate per run
+select * from public.eval_failures;                  -- what broke, with detail
+select * from public.eval_coverage;                  -- which families have cases
+```
+
+The other half is pure TypeScript — the scope guard and the verifier — and runs
+from a checkout, writing into the same tables so there is one pass rate:
+
+```sh
+cd supabase/functions/ai-gateway
+SUPABASE_URL=https://stqirjlqzchcoeegumoq.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=... \
+  deno run --allow-net --allow-env eval.ts "pre-release"
+```
+
+It exits non-zero on any failure, so it can gate a deploy. Nothing in it calls a
+model, so it costs nothing and gives the same answer every time.
+
+**The first run found a real bug, which is the argument for having it.** "ملوخية"
+resolved to the raw leaf rather than the cooked dish — someone logging a bowl
+would have been priced against a leafy green. Underneath it, the resolver's
+ordering was not a total order at all, so the same phrase could resolve
+differently between two runs. `0027`–`0029` are the three fixes that forced,
+and the suite went 32/33 → 36/36 across them.
+
+**Four families are deliberately empty**: `evidence_grounding`,
+`meal_optimization`, `longitudinal_adaptation` and `cost_tokens` need a deployed
+gateway and an ingested corpus. Seeding cases nothing can run would teach
+everyone to ignore the failures. `eval_coverage` shows the gap on purpose.
 
 ## 7. Sign-in: what is actually switched on
 

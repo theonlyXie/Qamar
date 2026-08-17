@@ -25,9 +25,14 @@ class SupabaseProfileRepository implements ProfileRepository {
       birthMonth: birth?.month ?? 6,
       birthDay: birth?.day ?? 15,
       gender: (row['gender'] as String?) == 'female' ? Gender.female : Gender.male,
-      height: row['height_cm'] as int? ?? 172,
-      weight: row['weight_kg'] as int? ?? 82,
-      fat: row['body_fat_pct'] as int? ?? 27,
+      // weight_kg and body_fat_pct are numeric since 0007, so these arrive as
+      // doubles and a cast straight to int? throws. Read as num and round:
+      // Profile still models them as int, so the stored decimal is preserved in
+      // the database and in weight_entries — which is what the weight trend
+      // reads — but rounded for display here.
+      height: (row['height_cm'] as num?)?.round() ?? 172,
+      weight: (row['weight_kg'] as num?)?.round() ?? 82,
+      fat: (row['body_fat_pct'] as num?)?.round() ?? 27,
       goal: _goalFromDb(row['goal'] as String?),
       activity: (row['activity_factor'] as num?)?.toDouble() ?? 1.5,
       prefs: (row['food_exclusions'] as List?)?.cast<String>() ?? const [],

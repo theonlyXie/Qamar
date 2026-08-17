@@ -46,3 +46,11 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Secrets. The service role key bypasses row level security entirely, so a
+# committed .env is a full database compromise, not a leaked setting.
+.env
+.env.*
+!.env.example
+supabase/.env
+supabase/.temp/
