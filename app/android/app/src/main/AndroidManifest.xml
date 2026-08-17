@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds do not inherit the debug/profile INTERNET permission.
+         Without this, a sideloaded APK cannot reach Supabase or the gateway. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- image_picker launches the system camera/gallery via intents, so no
          runtime permission is declared here on purpose: declaring CAMERA
          would oblige us to request it and would break devices that only have
