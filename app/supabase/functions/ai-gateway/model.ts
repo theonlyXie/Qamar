@@ -11,9 +11,27 @@ import type { FoodFacts, Passage } from "./retrieval.ts";
 const ANTHROPIC_VERSION = "2023-06-01";
 const DEFAULT_MODEL = "claude-sonnet-5";
 
+/**
+ * What the call consumed.
+ *
+ * The three token counts are additive — Anthropic reports cache reads
+ * separately from input_tokens rather than inside them — so summing them is
+ * correct and does not double-count. Null when the response carried no usage
+ * block, which is a "we do not know" and must not be recorded as zero.
+ */
+export interface Usage {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  cacheWriteTokens: number;
+}
+
 export interface ModelResult {
   text: string;
   model: string;
+  usage: Usage | null;
+  /** Wall clock around the HTTP call, which is what a user waits for. */
+  latencyMs: number;
 }
 
 /** A photo to reason about, as the model expects it. */
@@ -54,6 +72,7 @@ export async function callModel({ system, user, maxTokens = 1024, prefill, image
   // stop a model wrapping JSON in prose.
   if (prefill) messages.push({ role: "assistant", content: prefill });
 
+  const started = performance.now();
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -68,8 +87,28 @@ export async function callModel({ system, user, maxTokens = 1024, prefill, image
     throw new Error(`model call failed: ${res.status} ${await res.text()}`);
   }
   const json = await res.json();
+  const latencyMs = Math.round(performance.now() - started);
   const text = (json.content ?? []).map((b: { text?: string }) => b.text ?? "").join("");
-  return { text: prefill ? prefill + text : text, model };
+  return { text: prefill ? prefill + text : text, model, usage: readUsage(json), latencyMs };
+}
+
+/** The usage block, tolerating its absence rather than assuming zeros. */
+function readUsage(json: {
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_read_input_tokens?: number;
+    cache_creation_input_tokens?: number;
+  };
+}): Usage | null {
+  const u = json.usage;
+  if (!u || typeof u.input_tokens !== "number") return null;
+  return {
+    inputTokens: u.input_tokens,
+    outputTokens: u.output_tokens ?? 0,
+    cachedInputTokens: u.cache_read_input_tokens ?? 0,
+    cacheWriteTokens: u.cache_creation_input_tokens ?? 0,
+  };
 }
 
 // ---- prompts ------------------------------------------------------------
@@ -109,7 +148,12 @@ function renderPassages(passages: Passage[]): string {
     .join("\n\n");
 }
 
-function renderFoods(foods: FoodFacts[]): string {
+/**
+ * Exported because the food block can now come from two places: the Qamar
+ * graph, which knows portions in grams, or a bare external lookup. Callers
+ * render whichever they have and pass the string in.
+ */
+export function renderFoods(foods: FoodFacts[]): string {
   if (foods.length === 0) return "(no food database matches)";
   return foods
     .map((f) => `${f.name}: per 100 g — ${f.per100g.kcal} kcal, P ${f.per100g.protein} g, C ${f.per100g.carbs} g, F ${f.per100g.fat} g (${f.source})`)
@@ -137,7 +181,7 @@ Hard rules, in order of priority:
    'ar', otherwise plain English.
 `.trim();
 
-export function chatSystemPrompt(u: UserContext, passages: Passage[], foods: FoodFacts[]): string {
+export function chatSystemPrompt(u: UserContext, passages: Passage[], foodBlock: string): string {
   return `${COMMON_RULES}
 
 THE PERSON: ${describeUser(u)}
@@ -147,13 +191,13 @@ RETRIEVED GUIDANCE:
 ${renderPassages(passages)}
 
 FOOD DATA:
-${renderFoods(foods)}
+${foodBlock}
 
 Answer in at most four sentences. Cite the guidance you used as [1], [2] where
 it carries real weight — not on every sentence.`;
 }
 
-export function planSystemPrompt(u: UserContext, passages: Passage[], foods: FoodFacts[]): string {
+export function planSystemPrompt(u: UserContext, passages: Passage[], foodBlock: string): string {
   return `${COMMON_RULES}
 
 THE PERSON: ${describeUser(u)}
@@ -162,7 +206,7 @@ RETRIEVED GUIDANCE:
 ${renderPassages(passages)}
 
 FOOD DATA (use these figures; do not invent others):
-${renderFoods(foods)}
+${foodBlock}
 
 Write one day of eating: breakfast, lunch and dinner. Requirements:
 - The three meals must total within 5% of the daily target.
@@ -200,7 +244,7 @@ Return ONLY JSON of this exact shape, no prose:
 }`;
 }
 
-export function mealAnalysisSystemPrompt(u: UserContext, passages: Passage[], foods: FoodFacts[]): string {
+export function mealAnalysisSystemPrompt(u: UserContext, passages: Passage[], foodBlock: string): string {
   return `${COMMON_RULES}
 
 THE PERSON: ${describeUser(u)}
@@ -209,7 +253,7 @@ RETRIEVED GUIDANCE — how these dishes are built and what a normal portion is:
 ${renderPassages(passages)}
 
 FOOD DATA (use these figures where they match; otherwise mark confidence low):
-${renderFoods(foods)}
+${foodBlock}
 
 The user has described or photographed a meal. Break it into items with
 portions and nutrition. Confidence is "high" only when the item matched the
@@ -230,7 +274,7 @@ Return ONLY JSON, no prose:
 }`;
 }
 
-export function mealPhotoSystemPrompt(u: UserContext, passages: Passage[], foods: FoodFacts[]): string {
+export function mealPhotoSystemPrompt(u: UserContext, passages: Passage[], foodBlock: string): string {
   return `${COMMON_RULES}
 
 THE PERSON: ${describeUser(u)}
@@ -239,7 +283,7 @@ RETRIEVED GUIDANCE — how these dishes are built and what a normal portion is:
 ${renderPassages(passages)}
 
 FOOD DATA (use these per-100g figures wherever an item matches):
-${renderFoods(foods)}
+${foodBlock}
 
 You are looking at a photograph of a meal. Identify what is on the plate and
 estimate the portion of each item from what you can see — plate size, utensils

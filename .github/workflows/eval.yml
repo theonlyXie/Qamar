@@ -1,0 +1,101 @@
+# Runs the frozen eval suite against the live project. A button.
+#
+# Run it from the Actions tab: "Check Qamar" → "Run workflow".
+#
+# Both halves run and both write into the same eval_runs table, so there is one
+# pass rate rather than two half-measures nobody compares. Nothing here calls a
+# model, so it costs nothing and answers the same way every time.
+#
+# It fails the job on any failing case, on purpose: a suite that goes red
+# quietly is worth less than no suite, because it teaches everyone to ignore it.
+
+name: Check Qamar
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "What to call this run in eval_latest"
+        type: string
+        default: manual check
+
+env:
+  SUPABASE_URL: https://stqirjlqzchcoeegumoq.supabase.co
+
+jobs:
+  evaluate:
+    name: Run the eval suite
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Check the key is present
+        env:
+          SERVICE: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SERVICE" ]; then
+            echo "::error::SUPABASE_SERVICE_ROLE_KEY is not set. Add it under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      # The database half: food resolution and the requirement arithmetic,
+      # against live data. Called through PostgREST so no database password is
+      # needed anywhere.
+      - name: Run the database cases
+        env:
+          SERVICE: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          LABEL: ${{ inputs.label }}
+        run: |
+          set -o pipefail
+          curl -sS -X POST "$SUPABASE_URL/rest/v1/rpc/qamar_run_eval" \
+            -H "apikey: $SERVICE" -H "Authorization: Bearer $SERVICE" \
+            -H "Content-Type: application/json" \
+            -d "{\"p_label\": \"$LABEL (sql)\", \"p_trigger\": \"manual\"}" \
+            -o run_id.txt -w "%{http_code}" | grep -q '^200$'
+          echo "run: $(cat run_id.txt)"
+
+      - name: Report the database result
+        env:
+          SERVICE: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          summary=$(curl -sS \
+            "$SUPABASE_URL/rest/v1/eval_latest?select=label,passed,failed,pass_pct&limit=1" \
+            -H "apikey: $SERVICE" -H "Authorization: Bearer $SERVICE")
+          echo "$summary"
+          echo "### Database cases" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          echo "$summary" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          failed=$(echo "$summary" | grep -o '"failed":[0-9]*' | head -1 | cut -d: -f2)
+          if [ "${failed:-1}" != "0" ]; then
+            echo "::error::$failed database case(s) failed. See eval_failures for the detail."
+            exit 1
+          fi
+
+      # The TypeScript half: the scope guard's refusal boundary and the
+      # verifier's arithmetic. Exits non-zero by itself on any failure.
+      - name: Run the scope and verifier cases
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          deno run --allow-net --allow-env \
+            supabase/functions/ai-gateway/eval.ts "${{ inputs.label }} (deno)"
+
+      - name: Where to look when something failed
+        if: failure()
+        run: |
+          echo "### A case failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "In the Supabase SQL editor:" >> $GITHUB_STEP_SUMMARY
+          echo '```sql' >> $GITHUB_STEP_SUMMARY
+          echo "select * from public.eval_failures limit 20;" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Each row names the case, the phrase, and what it got instead." >> $GITHUB_STEP_SUMMARY

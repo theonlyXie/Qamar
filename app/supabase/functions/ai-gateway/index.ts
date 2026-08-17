@@ -30,8 +30,50 @@ import {
   type ImageInput,
   type UserContext,
 } from "./model.ts";
-import { lookupFoods, retrieve, type FoodFacts, type Passage, type Source } from "./retrieval.ts";
+import { retrieve, type FoodFacts, type Passage, type Source } from "./retrieval.ts";
+import {
+  renderResolutions,
+  resolveFoods,
+  toPacketFacts,
+  type Resolution,
+} from "./graph.ts";
 import { classify, refusalText } from "./scope.ts";
+import {
+  loadHardConstraints,
+  recordAllowed,
+  recordHardBlock,
+  recordRefusal,
+  violatesConstraint,
+} from "./safety.ts";
+import {
+  externalCallsIn,
+  loadUserFacts,
+  numericClaims,
+  recordStages,
+  recordVerification,
+  resolutionUncertainty,
+  ruleSelection,
+  targetsFrom,
+  timed,
+  writePacket,
+  type Kind,
+  type PacketInput,
+  type StageCost,
+  type TargetRow,
+} from "./packet.ts";
+import {
+  blocks,
+  finalVerdict,
+  isImprovement,
+  isRevisable,
+  revisionInstruction,
+  verifyChat,
+  verifyMeal,
+  verifyPlan,
+  type Meal,
+  type MealItem,
+  type Verification,
+} from "./verify.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -80,17 +122,24 @@ async function db(path: string, init: RequestInit = {}): Promise<Response> {
  * gateway: a blocked user must not be able to reach the model by calling the
  * API directly, whatever the app shows.
  */
-async function loadContext(userId: string, lang: string): Promise<{ ctx: UserContext; blocked: boolean }> {
+async function loadContext(
+  userId: string,
+  lang: string,
+): Promise<{ ctx: UserContext; blocked: boolean; lifeStage: string; target: TargetRow | null }> {
   const res = await db(`profiles?user_id=eq.${userId}&select=*`);
   const rows = res.ok ? await res.json() : [];
   const p = rows[0];
 
-  let targetKcal: number | null = null;
-  const tRes = await db(`targets?user_id=eq.${userId}&select=kcal&order=valid_from.desc&limit=1`);
-  if (tRes.ok) {
-    const tRows = await tRes.json();
-    targetKcal = tRows[0]?.kcal ?? null;
-  }
+  // The whole row, not just the kcal: since 0025 it carries the equation that
+  // produced it and the inputs that equation ran on, which is what the evidence
+  // packet cites.
+  let target: TargetRow | null = null;
+  const tRes = await db(
+    `targets?user_id=eq.${userId}&select=kcal,protein_g,carbs_g,fat_g,formula_version,inputs` +
+      `&order=valid_from.desc&limit=1`,
+  );
+  if (tRes.ok) target = (await tRes.json())[0] ?? null;
+  const targetKcal = target?.kcal ?? null;
 
   let age: number | null = null;
   if (p?.birth_date) {
@@ -108,6 +157,12 @@ async function loadContext(userId: string, lang: string): Promise<{ ctx: UserCon
 
   return {
     blocked,
+    target,
+    // Pregnancy and lactation are recorded since 0007 but nothing read the
+    // column, so the refusal was still a keyword match on the question. A user
+    // who declared it at onboarding and then asked plainly got an answer from
+    // equations that are not valid for them.
+    lifeStage: p?.life_stage ?? "none",
     ctx: {
       name: p?.name ?? null,
       age,
@@ -125,12 +180,16 @@ async function loadContext(userId: string, lang: string): Promise<{ ctx: UserCon
 
 async function record(
   userId: string,
-  kind: "chat" | "meal_analysis" | "plan",
+  kind: "chat" | "meal_analysis" | "plan" | "body_scan",
   fields: { inScope: boolean; refusal?: string; question?: string; answer?: string; sources?: Source[]; model?: string },
-): Promise<void> {
+): Promise<string | null> {
+  // Returns the row id so a safety event can point at the interaction that
+  // caused it. Null on failure, which callers pass through: an unlinked safety
+  // event is worth more than no safety event.
   try {
-    await db("ai_interactions", {
+    const res = await db("ai_interactions", {
       method: "POST",
+      headers: { Prefer: "return=representation" },
       body: JSON.stringify({
         user_id: userId,
         kind,
@@ -142,8 +201,12 @@ async function record(
         model: fields.model ?? null,
       }),
     });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return rows?.[0]?.id ?? null;
   } catch {
     // Audit is important but never worth failing the user's request over.
+    return null;
   }
 }
 
@@ -151,6 +214,58 @@ const asSources = (p: Passage[], f: FoodFacts[] = []): Source[] => [
   ...p.map(({ source, title, url }) => ({ source, title, url })),
   ...f.map((x) => ({ source: x.source, title: x.name, url: x.url })),
 ];
+
+/** Sources from a resolution set, so a graph-resolved food still cites itself. */
+const resolvedSources = (p: Passage[], r: Resolution[]): Source[] =>
+  asSources(p, r.map((x) => x.facts).filter((x): x is FoodFacts => x !== null));
+
+/**
+ * Writes the evidence packet and the per-stage costs for one request.
+ *
+ * Packet first, because the cost rows point at it — but a failed packet write
+ * returns null rather than throwing, and the costs are written anyway against
+ * the interaction. Losing the reasoning trail is bad; losing the token counts
+ * as well, when they are the part that cannot be reconstructed afterwards,
+ * would be worse.
+ *
+ * Awaited rather than fired and forgotten. It adds two inserts to a request
+ * that already spent seconds in the model, and an audit trail that races the
+ * response is one that goes missing exactly when the request is interesting.
+ */
+async function trace(
+  userId: string,
+  interactionId: string | null,
+  kind: Kind,
+  packet: Omit<PacketInput, "userId" | "interactionId" | "kind">,
+  stages: StageCost[],
+  /** One entry per verification pass, in order: index 0 is the first check. */
+  verifications: Verification[] = [],
+): Promise<string | null> {
+  const taskId = await writePacket(SUPABASE_URL, SERVICE_KEY, {
+    userId,
+    interactionId,
+    kind,
+    ...packet,
+  });
+  await recordStages(SUPABASE_URL, SERVICE_KEY, { taskId, interactionId, userId }, stages);
+  for (let i = 0; i < verifications.length; i++) {
+    await recordVerification(SUPABASE_URL, SERVICE_KEY, taskId, verifications[i], i);
+  }
+  return taskId;
+}
+
+/** The verification, in the shape the app can act on. */
+function verificationSummary(v: Verification) {
+  return {
+    verdict: v.verdict,
+    // The plain question the client actually asks. An ESCALATE that reached the
+    // user is an answer worth showing with its correction attached, not one
+    // worth presenting as checked.
+    verified: v.verdict === "PASS",
+    recomputed: v.recomputed,
+    findings: v.failures.map((f) => ({ type: f.failure_type, detail: f.detail })),
+  };
+}
 
 /** Candidate food names to look up, from free text. Crude on purpose. */
 function foodTerms(text: string): string[] {
@@ -169,17 +284,25 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
 
   const verdict = classify(message);
   if (!verdict.allowed) {
-    await record(userId, "chat", { inScope: false, refusal: verdict.reason, question: message });
+    const id = await record(userId, "chat", {
+      inScope: false,
+      refusal: verdict.reason,
+      question: message,
+    });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, verdict.reason, message);
     return json({ reply: refusalText(verdict.reason, lang), refused: true, reason: verdict.reason });
   }
 
-  const { ctx, blocked } = await loadContext(userId, lang);
+  const { ctx, blocked, lifeStage, target } = await loadContext(userId, lang);
   if (blocked) {
-    await record(userId, "chat", { inScope: false, refusal: "minor", question: message });
+    const id = await record(userId, "chat", { inScope: false, refusal: "minor", question: message });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", message);
     return json({ reply: refusalText("minor", lang), refused: true, reason: "minor" });
   }
 
-  const passages = await retrieve(SUPABASE_URL, SERVICE_KEY, message, verdict.domain);
+  const [passages, retrievalMs] = await timed(() =>
+    retrieve(SUPABASE_URL, SERVICE_KEY, message, verdict.domain)
+  );
   if (passages.length === 0) {
     // No grounding, no answer. This is the rule that stops the assistant
     // becoming a general chatbot the moment retrieval is empty.
@@ -190,21 +313,69 @@ async function chatReply(userId: string, body: { message?: string; lang?: string
     return json({ reply, refused: true, reason: "no_grounding" });
   }
 
-  const foods = await lookupFoods(foodTerms(message));
-  const { text, model } = await callModel({
-    system: chatSystemPrompt(ctx, passages, foods),
+  const [resolved, resolveMs] = await timed(() =>
+    resolveFoods(SUPABASE_URL, SERVICE_KEY, foodTerms(message))
+  );
+  const { text, model, usage, latencyMs } = await callModel({
+    system: chatSystemPrompt(ctx, passages, renderResolutions(resolved)),
     user: message,
     maxTokens: 600,
   });
 
-  await record(userId, "chat", {
+  // The only thing checkable in prose is whether it named something the person
+  // cannot have — and even that is advisory, because a reply that mentions
+  // sesame in order to refuse it looks identical to one suggesting it.
+  const [constraints, verifyMs] = await timed(() =>
+    loadHardConstraints(SUPABASE_URL, SERVICE_KEY, userId)
+  );
+  const verification = verifyChat(text, constraints);
+
+  const sources = resolvedSources(passages, resolved);
+  const id = await record(userId, "chat", {
     inScope: true,
     question: message,
     answer: text,
-    sources: asSources(passages, foods),
+    sources,
     model,
   });
-  return json({ reply: text, sources: asSources(passages, foods), refused: false });
+  const flags = lifeStage === "none" ? [] : [`life_stage:${lifeStage}`];
+  // Allowed requests are recorded too. A safety log that only holds refusals
+  // cannot answer what proportion of traffic was high-risk, which is the
+  // question an audit actually asks.
+  await recordAllowed(
+    SUPABASE_URL,
+    SERVICE_KEY,
+    userId,
+    id,
+    lifeStage === "none" ? "general_wellness" : "condition_aware",
+    flags,
+    ["answer_grounded"],
+  );
+
+  const [facts, rules] = await Promise.all([
+    loadUserFacts(SUPABASE_URL, SERVICE_KEY, userId, ctx),
+    ruleSelection(SUPABASE_URL, SERVICE_KEY, { age: ctx.age ?? null, sex: ctx.gender ?? null, lifeStage }),
+  ]);
+  await trace(userId, id, "chat", {
+    userFacts: facts,
+    foodFacts: toPacketFacts(resolved),
+    calculatedTargets: targetsFrom(ctx, target),
+    applicableRules: rules.applicable,
+    excludedRules: rules.excluded,
+    candidateDecision: { reply: text.slice(0, 2000), domain: verdict.domain, sources },
+    safetyFlags: flags,
+    uncertainty: {
+      foods: resolutionUncertainty(resolved),
+      passages_retrieved: passages.length,
+    },
+    claimsToVerify: numericClaims(text),
+  }, [
+    { stage: "retrieval", externalCalls: 1, latencyMs: retrievalMs },
+    { stage: "food_resolver", externalCalls: externalCallsIn(resolved), latencyMs: resolveMs },
+    { stage: "reasoner", model, usage, latencyMs },
+    { stage: "verifier", latencyMs: verifyMs },
+  ], [verification]);
+  return json({ reply: text, sources, refused: false });
 }
 
 /**
@@ -230,6 +401,26 @@ function readImage(body: { imageBase64?: string; imageMediaType?: string }): Ima
   return { data, mediaType };
 }
 
+/**
+ * A meal analysis restated as claims that can be checked without the model.
+ *
+ * Both checks named here are arithmetic: the macros must reconcile with the
+ * kcal at 4/4/9, and the kcal must reconcile with the per-100g figures at the
+ * portion claimed. Nothing here runs those checks — verifier_results is still
+ * empty — but the claims have to be recorded in a checkable form before
+ * anything can, and writing them down is what turns "the model said 520 kcal"
+ * into something later provable or disprovable.
+ */
+function mealClaims(items: MealItem[]): unknown[] {
+  return items.slice(0, 20).map((i) => ({
+    claim: `${i?.en ?? i?.ar ?? "item"} at ${i?.portionEn ?? i?.portionAr ?? "unstated portion"}`,
+    kcal: i?.kcal ?? null,
+    macros: { protein_g: i?.proteinG ?? null, carbs_g: i?.carbsG ?? null, fat_g: i?.fatG ?? null },
+    model_confidence: i?.confidence ?? null,
+    check: "atwater_4_4_9_and_portion_arithmetic",
+  }));
+}
+
 async function analyzeMeal(
   userId: string,
   body: { inputType?: string; text?: string; imageBase64?: string; imageMediaType?: string; lang?: string },
@@ -237,29 +428,43 @@ async function analyzeMeal(
   const lang = body.lang === "ar" ? "ar" : "en";
   const described = (body.text ?? "").trim();
 
-  const { ctx, blocked } = await loadContext(userId, lang);
-  if (blocked) return json({ error: "not eligible" }, 403);
+  const { ctx, blocked, lifeStage, target } = await loadContext(userId, lang);
+  if (blocked) {
+    const id = await record(userId, "meal_analysis", {
+      inScope: false,
+      refusal: "minor",
+      question: described || "[photo]",
+    });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", described || "[photo]");
+    return json({ error: "not eligible" }, 403);
+  }
 
   const image = readImage(body);
   if (typeof image === "string") return json({ error: image }, 413);
 
   if (!described && !image) return json({ items: [], note: "nothing to analyse" });
 
-  // Free text names foods we can look up; a photo does not, so the lookup is
-  // driven by whatever the user typed alongside it, if anything.
-  const foods = await lookupFoods(foodTerms(described));
+  // Free text names foods we can resolve; a photo does not, so resolution is
+  // driven by whatever the user typed alongside it, if anything. The graph
+  // answers first and knows what a رغيف weighs; an external lookup is the
+  // fallback for what it does not carry.
+  const [resolved, resolveMs] = await timed(() =>
+    resolveFoods(SUPABASE_URL, SERVICE_KEY, foodTerms(described))
+  );
 
   // Meal analysis needs the knowledge base as much as chat does: no food
   // database contains a cooked national dish, so the only way to price a plate
   // of koshary is to retrieve what it is made of and look up the ingredients.
   // A bare photo has no text to retrieve on, so it falls back to a standing
   // query that pulls the dish and household-portion documents.
-  const passages = await retrieve(
-    SUPABASE_URL,
-    SERVICE_KEY,
-    described || "Egyptian dish ingredients and typical household portion sizes",
-    "nutrition",
-    6,
+  const [passages, retrievalMs] = await timed(() =>
+    retrieve(
+      SUPABASE_URL,
+      SERVICE_KEY,
+      described || "Egyptian dish ingredients and typical household portion sizes",
+      "nutrition",
+      6,
+    )
   );
 
   // A photo with no caption still needs something in the user turn — the
@@ -268,28 +473,125 @@ async function analyzeMeal(
     ? described || (lang === "ar" ? "الوجبة دي فيها إيه وكام سعرة؟" : "What is in this meal, and how many calories?")
     : described;
 
-  const { text, model } = await callModel({
-    system: image ? mealPhotoSystemPrompt(ctx, passages, foods) : mealAnalysisSystemPrompt(ctx, passages, foods),
+  const foodBlock = renderResolutions(resolved);
+  const { text, model, usage, latencyMs } = await callModel({
+    system: image
+      ? mealPhotoSystemPrompt(ctx, passages, foodBlock)
+      : mealAnalysisSystemPrompt(ctx, passages, foodBlock),
     user: ask,
     maxTokens: 900,
     prefill: "{",
     image: image ?? undefined,
   });
 
-  const parsed = parseJson<{ items: unknown[]; note_ar?: string; note_en?: string }>(text);
-  if (!parsed?.items) return json({ error: "could not analyse" }, 502);
+  const stages: StageCost[] = [
+    { stage: "food_resolver", externalCalls: externalCallsIn(resolved), latencyMs: resolveMs },
+    { stage: "retrieval", externalCalls: 1, latencyMs: retrievalMs },
+    // Transcribing a plate into items is extraction, not reasoning, whatever
+    // the size of the model doing it.
+    { stage: "extractor", model, usage, latencyMs },
+  ];
 
-  await record(userId, "meal_analysis", {
+  const parsed = parseJson<{ items: MealItem[]; note_ar?: string; note_en?: string }>(text);
+  if (!parsed?.items) {
+    // A call that produced nothing usable still cost what it cost, and a run of
+    // these is the signal that the prompt or the model has drifted. Recording
+    // only successes is how that stays invisible until someone reads the bill.
+    await trace(userId, null, "meal_analysis", {
+      candidateDecision: { parse_failed: true, raw: text.slice(0, 1000) },
+      uncertainty: { parse: "model did not return the requested JSON" },
+    }, stages);
+    return json({ error: "could not analyse" }, 502);
+  }
+
+  // Check the arithmetic, and spend the one allowed correction if it fails.
+  // The revision deliberately drops the photo and uses the text prompt: the
+  // task has changed from "read this plate" to "fix these numbers in this
+  // JSON", which needs no image and costs a fraction of the input tokens.
+  let items = parsed.items;
+  let verification = verifyMeal(items);
+  const verifications: Verification[] = [verification];
+
+  if (isRevisable(verification)) {
+    const [retry, retryMs] = await timed(() =>
+      callModel({
+        system: mealAnalysisSystemPrompt(ctx, passages, foodBlock),
+        user: revisionInstruction(verification, { items }),
+        maxTokens: 900,
+        prefill: "{",
+      })
+    );
+    stages.push({ stage: "extractor", model: retry.model, usage: retry.usage, latencyMs: retryMs });
+    const again = parseJson<{ items: MealItem[] }>(retry.text);
+    const after = again?.items?.length ? finalVerdict(verifyMeal(again.items)) : null;
+    if (after) verifications.push(after);
+    if (after && isImprovement(verification, after)) {
+      items = again!.items;
+      verification = after;
+    } else {
+      // The correction did not land. The cap is spent either way, so the
+      // original answer stands and the verdict says it was not fixed.
+      verification = finalVerdict(verification);
+    }
+  }
+
+  const sources = resolvedSources(passages, resolved);
+  const id = await record(userId, "meal_analysis", {
     inScope: true,
     question: image ? `[photo] ${ask}` : ask,
-    answer: JSON.stringify(parsed.items).slice(0, 2000),
-    sources: asSources(passages, foods),
+    answer: JSON.stringify(items).slice(0, 2000),
+    sources,
     model,
   });
+  const flags = lifeStage === "none" ? [] : [`life_stage:${lifeStage}`];
+  // Describing what someone ate is general wellness whatever their life stage —
+  // it is prescription that pregnancy takes out of scope, not observation.
+  await recordAllowed(
+    SUPABASE_URL,
+    SERVICE_KEY,
+    userId,
+    id,
+    "general_wellness",
+    flags,
+    ["analyse_meal"],
+  );
+
+  const [facts, rules] = await Promise.all([
+    loadUserFacts(SUPABASE_URL, SERVICE_KEY, userId, ctx),
+    ruleSelection(SUPABASE_URL, SERVICE_KEY, { age: ctx.age ?? null, sex: ctx.gender ?? null, lifeStage }),
+  ]);
+  await trace(userId, id, "meal_analysis", {
+    userFacts: facts,
+    foodFacts: toPacketFacts(resolved),
+    calculatedTargets: targetsFrom(ctx, target),
+    applicableRules: rules.applicable,
+    excludedRules: rules.excluded,
+    candidateDecision: { items, input: image ? "photo" : "text" },
+    safetyFlags: flags,
+    uncertainty: {
+      foods: resolutionUncertainty(resolved),
+      passages_retrieved: passages.length,
+      // Every item the model itself marked uncertain. This is what the
+      // confirmation screen is for, and what the verifier recomputes first.
+      low_confidence_items: items
+        .filter((i) => i?.confidence !== "high")
+        .map((i) => i?.en ?? i?.ar ?? "unnamed"),
+    },
+    claimsToVerify: mealClaims(items),
+  }, stages, verifications);
+
   return json({
-    items: parsed.items,
+    items,
     note: (lang === "ar" ? parsed.note_ar : parsed.note_en) ?? null,
-    sources: asSources(passages, foods),
+    sources,
+    // What the graph made of each phrase: the canonical food, the portion it
+    // assumed, and every reason it is unsure. The confirmation screen needs
+    // this to ask a specific question rather than a vague one.
+    resolutions: toPacketFacts(resolved),
+    // Whether the numbers reconcile. An item whose macros do not match its kcal
+    // is one of the two figures being wrong, and the app should not present
+    // that as settled.
+    verification: verificationSummary(verification),
   });
 }
 
@@ -308,9 +610,10 @@ interface BodyScanShape {
  * misread "1.74" as 174 kg has to fail closed, because these numbers set the
  * person's calorie target and nobody re-checks them afterwards.
  */
-function plausible(v: unknown, min: number, max: number): number | null {
+function plausible(v: unknown, min: number, max: number, decimals = 0): number | null {
   if (typeof v !== "number" || !Number.isFinite(v)) return null;
-  const n = Math.round(v);
+  const factor = 10 ** decimals;
+  const n = Math.round(v * factor) / factor;
   return n >= min && n <= max ? n : null;
 }
 
@@ -323,36 +626,65 @@ async function readBodyScan(
   if (typeof image === "string") return json({ error: image }, 413);
   if (!image) return json({ error: "no image supplied" }, 400);
 
-  const { text, model } = await callModel({
+  const { text, model, usage, latencyMs } = await callModel({
     system: bodyScanSystemPrompt(lang),
     user: lang === "ar" ? "اقرا الأرقام اللي في التقرير ده." : "Read the figures on this report.",
     maxTokens: 400,
     prefill: "{",
     image,
   });
+  const stages: StageCost[] = [{ stage: "extractor", model, usage, latencyMs }];
 
   const parsed = parseJson<BodyScanShape>(text);
-  if (!parsed) return json({ error: "could not read the report" }, 502);
+  if (!parsed) {
+    await trace(userId, null, "body_scan", {
+      candidateDecision: { parse_failed: true, raw: text.slice(0, 1000) },
+      uncertainty: { parse: "model did not return the requested JSON" },
+    }, stages);
+    return json({ error: "could not read the report" }, 502);
+  }
 
+  // Weight and body fat keep one decimal: the profile columns are numeric, and
+  // a smoothed weight trend cannot see a change smaller than the rounding it
+  // was stored with. Height and age are whole numbers on the page anyway.
   const result = {
     heightCm: plausible(parsed.heightCm, 120, 230),
-    weightKg: plausible(parsed.weightKg, 30, 300),
-    bodyFatPct: plausible(parsed.bodyFatPct, 3, 70),
+    weightKg: plausible(parsed.weightKg, 30, 300, 1),
+    bodyFatPct: plausible(parsed.bodyFatPct, 3, 70, 1),
     age: plausible(parsed.age, 13, 100),
     note: typeof parsed.note === "string" ? parsed.note : null,
   };
 
-  await record(userId, "meal_analysis", {
+  const id = await record(userId, "body_scan", {
     inScope: true,
     question: "[body scan]",
     answer: JSON.stringify(result),
     model,
   });
+
+  // What the model claimed before the plausibility filter, alongside what
+  // survived it. A field the model read and this rejected is the single most
+  // useful thing in the trace — it is either a misread digit caught, or a
+  // range set too tight, and the two are indistinguishable without both halves.
+  const dropped = (["heightCm", "weightKg", "bodyFatPct", "age"] as const)
+    .filter((k) => parsed[k] != null && result[k] == null);
+  await trace(userId, id, "body_scan", {
+    candidateDecision: { read: result, raw: parsed },
+    claimsToVerify: (["heightCm", "weightKg", "bodyFatPct", "age"] as const)
+      .filter((k) => result[k] != null)
+      .map((k) => ({ claim: k, value: result[k], check: "transcription_against_image" })),
+    uncertainty: {
+      not_legible: (["heightCm", "weightKg", "bodyFatPct", "age"] as const)
+        .filter((k) => parsed[k] == null),
+      rejected_as_implausible: dropped,
+    },
+    safetyFlags: dropped.length ? ["body_scan_value_rejected"] : [],
+  }, stages);
   return json(result);
 }
 
 interface PlanShape {
-  meals: unknown[];
+  meals: Meal[];
   rationale_ar?: string;
   rationale_en?: string;
 }
@@ -361,42 +693,172 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
   const lang = body.lang === "ar" ? "ar" : "en";
   const day = body.date ?? new Date().toISOString().slice(0, 10);
 
-  const { ctx, blocked } = await loadContext(userId, lang);
-  if (blocked) return json({ error: "not eligible" }, 403);
+  const { ctx, blocked, lifeStage, target } = await loadContext(userId, lang);
+  if (blocked) {
+    const id = await record(userId, "plan", { inScope: false, refusal: "minor", question: "[plan]" });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", "[plan]");
+    return json({ error: "not eligible" }, 403);
+  }
+
+  // Pregnancy and lactation are out of consumer-wellness scope, and the
+  // pregnancy module in clinical_modules is not approved. Prescribing a day of
+  // eating is exactly the act that is out of scope — which is why this gate is
+  // here and not on chat or meal analysis, where the user is asking about food
+  // rather than being told what to eat.
+  if (lifeStage !== "none") {
+    const id = await record(userId, "plan", {
+      inScope: false,
+      refusal: "pregnancy",
+      question: `[plan] life_stage=${lifeStage}`,
+    });
+    await recordRefusal(
+      SUPABASE_URL, SERVICE_KEY, userId, id, "pregnancy", `[plan] life_stage=${lifeStage}`,
+    );
+    return json({ error: refusalText("pregnancy", lang), refused: true, reason: "life_stage" }, 409);
+  }
+
   if (!ctx.targetKcal) return json({ error: "no target yet — finish onboarding first" }, 409);
 
   const brief =
     `daily meal plan for ${ctx.targetKcal} kcal, goal ${ctx.goal ?? "maintain"}, ` +
     `Egyptian home cooking, avoiding ${ctx.exclusions?.join(", ") || "nothing"}`;
 
-  const passages = await retrieve(SUPABASE_URL, SERVICE_KEY, brief, "nutrition", 8);
+  const [passages, retrievalMs] = await timed(() =>
+    retrieve(SUPABASE_URL, SERVICE_KEY, brief, "nutrition", 8)
+  );
   if (passages.length === 0) return json({ error: "no grounded guidance available" }, 503);
 
   // Look the staples up so the model has real per-100g figures to divide.
+  // Resolved through the graph, so the plan is built on Egyptian foods with
+  // known household portions rather than whatever an international database
+  // returns for "bread".
   const staples = [
-    "foul medames", "baladi bread", "white rice cooked", "chicken breast grilled",
-    "greek yogurt", "oats", "banana", "olive oil", "tomato", "cucumber", "eggs", "tuna",
+    "فول", "عيش بلدي", "رز", "فراخ", "زبادي", "شوفان",
+    "موز", "زيت زيتون", "طماطم", "خيار", "بيض", "تونة", "جبنة قريش", "عدس أصفر",
   ];
-  const foods = await lookupFoods(staples);
+  const [resolvedAll, resolveMs] = await timed(() =>
+    resolveFoods(SUPABASE_URL, SERVICE_KEY, staples)
+  );
 
-  const { text, model } = await callModel({
-    system: planSystemPrompt(ctx, passages, foods),
+  // Hard constraints are applied before the model sees the food list, not
+  // checked afterwards. An allergen the model never receives cannot end up in
+  // the plan, whereas one it receives and is merely asked to avoid depends on
+  // it obeying an instruction.
+  const constraints = await loadHardConstraints(SUPABASE_URL, SERVICE_KEY, userId);
+  const excludedFoods: { food: string; restriction: string }[] = [];
+  const resolved: Resolution[] = [];
+  for (const r of resolvedAll) {
+    const hit = r.facts
+      ? violatesConstraint(constraints, {
+        name: [r.facts.name, r.food?.nameAr, r.food?.nameEg, r.phrase].filter(Boolean).join(" "),
+      })
+      : null;
+    if (hit) {
+      await recordHardBlock(SUPABASE_URL, SERVICE_KEY, userId, null, "restricted_food_excluded", {
+        food: r.food?.slug ?? r.phrase,
+        restriction: hit.label,
+        kind: hit.kind,
+        severity: hit.severity,
+        stage: "plan_staples",
+      });
+      excludedFoods.push({ food: r.food?.slug ?? r.phrase, restriction: hit.label });
+      continue;
+    }
+    resolved.push(r);
+  }
+
+  const { text, model, usage, latencyMs } = await callModel({
+    system: planSystemPrompt(ctx, passages, renderResolutions(resolved)),
     user: brief,
     maxTokens: 2000,
     prefill: "{",
   });
+  const stages: StageCost[] = [
+    { stage: "retrieval", externalCalls: 1, latencyMs: retrievalMs },
+    { stage: "food_resolver", externalCalls: externalCallsIn(resolvedAll), latencyMs: resolveMs },
+    { stage: "reasoner", model, usage, latencyMs },
+  ];
 
   const parsed = parseJson<PlanShape>(text);
-  if (!parsed?.meals?.length) return json({ error: "could not generate a plan" }, 502);
+  if (!parsed?.meals?.length) {
+    await trace(userId, null, "plan", {
+      candidateDecision: { parse_failed: true, raw: text.slice(0, 1000) },
+      uncertainty: { parse: "model did not return the requested JSON" },
+    }, stages);
+    return json({ error: "could not generate a plan" }, 502);
+  }
 
-  const sources = asSources(passages, foods);
+  // Verification happens before the plan is saved or shown. The constraint
+  // check here is not the same as the filtering above: that removed restricted
+  // foods from the list the model was *shown*, and nothing stopped it naming
+  // one that was never on the list. This is the difference between asking it
+  // not to and checking that it did not.
+  let meals = parsed.meals;
+  let verification = verifyPlan(meals, ctx.targetKcal, constraints);
+  const verifications: Verification[] = [verification];
+
+  if (isRevisable(verification)) {
+    const [retry, retryMs] = await timed(() =>
+      callModel({
+        system: planSystemPrompt(ctx, passages, renderResolutions(resolved)),
+        user: revisionInstruction(verification, { meals }),
+        maxTokens: 2000,
+        prefill: "{",
+      })
+    );
+    stages.push({ stage: "reasoner", model: retry.model, usage: retry.usage, latencyMs: retryMs });
+    const again = parseJson<PlanShape>(retry.text);
+    const after = again?.meals?.length
+      ? finalVerdict(verifyPlan(again.meals, ctx.targetKcal, constraints))
+      : null;
+    if (after) verifications.push(after);
+    if (after && isImprovement(verification, after)) {
+      meals = again!.meals;
+      verification = after;
+    } else {
+      verification = finalVerdict(verification);
+    }
+  }
+
+  const flags = constraints.length ? [`hard_constraints:${constraints.length}`] : [];
+  const blocking = blocks(verification);
+  const sources = resolvedSources(passages, resolved);
+
+  if (blocking.length > 0) {
+    // A plan naming something the person is allergic to is not a draft to
+    // improve. It is not saved, not returned, and not re-asked for: the model
+    // has already been told and has already ignored it once, so another round
+    // of the same model is not a control. The user gets a plain refusal and a
+    // human gets a row to look at.
+    await recordHardBlock(SUPABASE_URL, SERVICE_KEY, userId, null, "restricted_food_in_generated_plan", {
+      failures: blocking,
+      restrictions: constraints.map((c) => c.label),
+      stage: "plan_verification",
+    });
+    await trace(userId, null, "plan", {
+      userFacts: await loadUserFacts(SUPABASE_URL, SERVICE_KEY, userId, ctx),
+      foodFacts: toPacketFacts(resolved),
+      calculatedTargets: targetsFrom(ctx, target),
+      candidateDecision: { meals, plan_date: day, rejected: true },
+      safetyFlags: [...flags, "restricted_food_in_output"],
+      uncertainty: { staples_withheld: excludedFoods },
+    }, stages, verifications);
+    return json({
+      error: lang === "ar"
+        ? "الخطة اللي اتولدت فيها حاجة مش مفروض تاكلها، فمنفعش أعرضهالك. جرّب تاني من فضلك."
+        : "The generated plan included something you have told me you cannot eat, so I am not showing it. Please try again.",
+      refused: true,
+      reason: "failed_safety_verification",
+    }, 409);
+  }
+
   const saved = await db("meal_plans?on_conflict=user_id,plan_date", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify({
       user_id: userId,
       plan_date: day,
-      meals: parsed.meals,
+      meals,
       target_kcal: ctx.targetKcal,
       rationale_ar: parsed.rationale_ar ?? null,
       rationale_en: parsed.rationale_en ?? null,
@@ -406,8 +868,62 @@ async function generatePlan(userId: string, body: { date?: string; lang?: string
   });
   if (!saved.ok) return json({ error: `could not save plan: ${await saved.text()}` }, 500);
 
-  await record(userId, "plan", { inScope: true, question: brief, answer: JSON.stringify(parsed.meals).slice(0, 2000), sources, model });
-  return json({ plan: parsed, date: day, sources });
+  const planId = await record(userId, "plan", {
+    inScope: true,
+    question: brief,
+    answer: JSON.stringify(meals).slice(0, 2000),
+    sources,
+    model,
+  });
+  await recordAllowed(
+    SUPABASE_URL,
+    SERVICE_KEY,
+    userId,
+    planId,
+    "general_wellness",
+    flags,
+    ["generate_plan"],
+  );
+
+  const [facts, rules] = await Promise.all([
+    loadUserFacts(SUPABASE_URL, SERVICE_KEY, userId, ctx),
+    ruleSelection(SUPABASE_URL, SERVICE_KEY, { age: ctx.age ?? null, sex: ctx.gender ?? null, lifeStage }),
+  ]);
+  await trace(userId, planId, "plan", {
+    userFacts: facts,
+    foodFacts: toPacketFacts(resolved),
+    calculatedTargets: targetsFrom(ctx, target),
+    applicableRules: rules.applicable,
+    excludedRules: rules.excluded,
+    candidateDecision: { meals, plan_date: day },
+    safetyFlags: excludedFoods.length ? [...flags, "restricted_food_excluded"] : flags,
+    uncertainty: {
+      foods: resolutionUncertainty(resolved),
+      passages_retrieved: passages.length,
+      // Staples dropped before the model saw them. Without this the plan looks
+      // like it simply never thought of eggs, rather than like it was stopped
+      // from suggesting them.
+      staples_withheld: excludedFoods,
+    },
+    // The plan's own arithmetic: the prompt requires the three meals to land
+    // within 5% of the target, and that is checkable from the meals alone.
+    claimsToVerify: [{
+      claim: "meals total within 5% of the daily target",
+      target_kcal: ctx.targetKcal,
+      check: "sum_portion_kcal_against_target",
+    }],
+  }, stages, verifications);
+
+  // An energy sum that is still off after its one correction is returned, not
+  // withheld — refusing a whole day of food over a 9% miss would be worse for
+  // the person than showing it. What must not happen is presenting it as
+  // checked, so the recomputed total travels with it and `verified` is false.
+  return json({
+    plan: { ...parsed, meals },
+    date: day,
+    sources,
+    verification: verificationSummary(verification),
+  });
 }
 
 // ---- entry --------------------------------------------------------------

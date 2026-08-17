@@ -14,12 +14,42 @@ export type ScopeVerdict =
   | { allowed: false; reason: RefusalReason };
 
 export type RefusalReason =
+  | "self_harm"
+  | "severe_symptom"
   | "medical"
   | "eating_disorder"
   | "pregnancy"
   | "minor"
   | "off_topic"
   | "prompt_injection";
+
+/**
+ * Someone describing a crisis. Checked before everything else, including the
+ * injection guard: if a message contains both an override attempt and this,
+ * the person matters more than the prompt hygiene, and the outcome here is a
+ * refusal plus an escalation either way so there is nothing to exploit.
+ *
+ * Kept separate from severe_symptom because one message needs an ambulance and
+ * the other needs a human, and a single blended sentence serves neither.
+ */
+const SELF_HARM = [
+  "kill myself", "want to die", "end my life", "suicidal", "suicide",
+  "hurt myself", "self harm", "self-harm", "no reason to live",
+  "عايز أموت", "عايزة أموت", "أنتحر", "انتحار", "أأذي نفسي", "مش عايز أعيش",
+];
+
+/** Symptoms that need care now, not a nutrition answer. */
+const SEVERE_SYMPTOM = [
+  "chest pain", "pain in my chest", "chest tightness",
+  "can't breathe", "cannot breathe", "cant breathe", "trouble breathing",
+  "shortness of breath", "passed out", "fainted", "fainting", "blacked out",
+  "vomiting blood", "coughing blood", "blood in my stool", "blood in stool",
+  "blood in my urine", "severe pain", "unbearable pain", "slurred speech",
+  "seizure", "numbness on one side", "cannot stop vomiting",
+  "ألم في الصدر", "وجع في صدري", "مش قادر أتنفس", "مش قادرة أتنفس",
+  "ضيق في التنفس", "أغمى عليا", "إغماء", "بتقيأ دم", "دم في البراز",
+  "دم في البول", "ألم شديد", "وجع فظيع", "تشنج", "تنميل في نص جسمي",
+];
 
 /** Matched case-insensitively against the question, Arabic and English. */
 const MEDICAL = [
@@ -111,6 +141,11 @@ export function classify(question: string): ScopeVerdict {
   const q = question.trim();
   if (q.length === 0) return { allowed: false, reason: "off_topic" };
 
+  // Urgency first. Someone in crisis or describing an emergency gets that
+  // handled before any question about scope or prompt hygiene.
+  if (hits(q, SELF_HARM)) return { allowed: false, reason: "self_harm" };
+  if (hits(q, SEVERE_SYMPTOM)) return { allowed: false, reason: "severe_symptom" };
+
   if (hits(q, INJECTION)) return { allowed: false, reason: "prompt_injection" };
   if (hits(q, EATING_DISORDER)) return { allowed: false, reason: "eating_disorder" };
   if (hits(q, MEDICAL)) return { allowed: false, reason: "medical" };
@@ -130,6 +165,10 @@ export function classify(question: string): ScopeVerdict {
 /** What the user is told, in their own language. Never a bare "I can't". */
 export function refusalText(reason: RefusalReason, lang: string): string {
   const ar: Record<RefusalReason, string> = {
+    self_harm:
+      "أنا مش المكان الصح للكلام ده، ومش هتظاهر بالعكس. لو حاسس بكده دلوقتي، اتكلم مع حد بتثق فيه أو دكتور. ولو في خطر فوري، كلّم الطوارئ أو روح أقرب مستشفى. أنا هنا لو حبيت نتكلم عن الأكل أو التمرين وقت تاني.",
+    severe_symptom:
+      "الأعراض دي محتاجة دكتور دلوقتي، مش تطبيق تغذية. من فضلك دوّر على مساعدة طبية النهاردة، وفورًا لو الوضع بيسوء. أنا موجود لموضوع الأكل بعد ما تطمن.",
     medical:
       "ده سؤال طبي، وأنا مش دكتور ومينفعش أجاوب عليه. الأنسب تكلم دكتور أو صيدلي. لو عايز تسألني عن الأكل أو التمرين، أنا معاك.",
     eating_disorder:
@@ -144,6 +183,10 @@ export function refusalText(reason: RefusalReason, lang: string): string {
       "أنا قمر، ومهمتي الأكل والتمرين. تعالَ نرجع للموضوع — عايز تسأل عن إيه؟",
   };
   const en: Record<RefusalReason, string> = {
+    self_harm:
+      "I am not the right kind of help for this, and I am not going to pretend otherwise. Please talk to someone you trust or a doctor now. If you are in immediate danger, contact your local emergency services or go to the nearest hospital. I am here for food and training another time.",
+    severe_symptom:
+      "That needs a doctor now, not a nutrition app. Please get medical help today, and immediately if it is getting worse. I will be here for the food side once you are seen.",
     medical:
       "That is a medical question and I am not a doctor, so I will not answer it. A doctor or pharmacist is the right person. If you want to ask about food or training, I am here.",
     eating_disorder:
