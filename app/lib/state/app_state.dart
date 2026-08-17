@@ -1214,7 +1214,7 @@ class AppState extends ChangeNotifier {
           uid,
           MealAnalysisDraft(inputType: input, items: drafted, rawText: raw),
         );
-        await repo.confirmMeal(uid, draftId: draftId, meal: meal);
+        await repo.confirmMeal(uid, draftId: draftId, meal: meal, items: drafted);
       });
     }
   }
