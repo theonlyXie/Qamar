@@ -9,6 +9,7 @@
 //   POST /ai-gateway/meal/analyze   { inputType, text?, imageBase64?, imageMediaType? }
 //   POST /ai-gateway/plan/generate  { date?, lang?, force?, instruction? }
 //   POST /ai-gateway/scan/read      { imageBase64, imageMediaType, lang }
+//   POST /ai-gateway/quota          {}
 //
 // Secrets (supabase secrets set ...):
 //   ANTHROPIC_API_KEY   required
@@ -79,6 +80,7 @@ import {
   mergePlanUpdate,
   type PlanUpdate,
 } from "./plan_edit.ts";
+import { asQuota, quotaExceededMessage, quotaPayload, type Quota } from "./quota.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -94,6 +96,55 @@ function json(body: unknown, status = 200): Response {
     status,
     headers: { ...CORS, "Content-Type": "application/json" },
   });
+}
+
+async function rpcJson(name: string, args: Record<string, unknown>): Promise<unknown> {
+  const res = await db(`rpc/${name}`, { method: "POST", body: JSON.stringify(args) });
+  if (!res.ok) throw new Error(`${name} failed: ${res.status} ${await res.text()}`);
+  return await res.json();
+}
+
+/** Spends one of today's five (or extra) uses. Body scan never calls this. */
+async function consumeAi(userId: string): Promise<Quota> {
+  const q = asQuota(await rpcJson("qamar_ai_try_consume", { p_user_id: userId }));
+  if (!q) throw new Error("quota consume returned nothing usable");
+  return q;
+}
+
+async function refundAi(userId: string): Promise<void> {
+  try {
+    await rpcJson("qamar_ai_refund_consume", { p_user_id: userId });
+  } catch (e) {
+    console.error("ai-gateway refund", e);
+  }
+}
+
+async function quotaStatus(userId: string): Promise<Quota> {
+  const q = asQuota(await rpcJson("qamar_ai_quota_snapshot", { p_user_id: userId }));
+  if (!q) throw new Error("quota snapshot returned nothing usable");
+  return q;
+}
+
+function quotaDenied(lang: "ar" | "en", q: Quota): Response {
+  const message = quotaExceededMessage(lang);
+  return json({
+    error: message,
+    reply: message,
+    refused: true,
+    reason: "quota",
+    quota: quotaPayload(q),
+  }, 429);
+}
+
+async function takeAiUse(userId: string, lang: "ar" | "en"): Promise<Quota | Response> {
+  try {
+    const q = await consumeAi(userId);
+    if (!q.allowed) return quotaDenied(lang, q);
+    return q;
+  } catch (e) {
+    console.error("ai-gateway consume", e);
+    return json({ error: "quota unavailable" }, 503);
+  }
 }
 
 // ---- identity -----------------------------------------------------------
@@ -393,12 +444,23 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
   const [resolved, resolveMs] = await timed(() =>
     resolveFoods(SUPABASE_URL, SERVICE_KEY, lookup)
   );
-  const { text, model, usage, latencyMs } = await callModel({
-    system: chatSystemPrompt(ctx, passages, renderResolutions(resolved), menuJson),
-    user: message,
-    maxTokens: 1600,
-    prefill: "{",
-  });
+  const taken = await takeAiUse(userId, lang);
+  if (taken instanceof Response) return taken;
+  const quota = taken;
+
+  let called: Awaited<ReturnType<typeof callModel>>;
+  try {
+    called = await callModel({
+      system: chatSystemPrompt(ctx, passages, renderResolutions(resolved), menuJson),
+      user: message,
+      maxTokens: 1600,
+      prefill: "{",
+    });
+  } catch (e) {
+    await refundAi(userId);
+    throw e;
+  }
+  const { text, model, usage, latencyMs } = called;
 
   const parsed = parseJson<{ reply?: string; action?: string; plan_update?: PlanUpdate | null }>(text);
   let reply: string;
@@ -526,6 +588,7 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
     ...(plan ? { plan, date: day } : {}),
     sources,
     refused: false,
+    quota: quotaPayload(quota),
   });
 }
 
@@ -625,15 +688,26 @@ async function analyzeMeal(
     : described;
 
   const foodBlock = renderResolutions(resolved);
-  const { text, model, usage, latencyMs } = await callModel({
-    system: image
-      ? mealPhotoSystemPrompt(ctx, passages, foodBlock)
-      : mealAnalysisSystemPrompt(ctx, passages, foodBlock),
-    user: ask,
-    maxTokens: 900,
-    prefill: "{",
-    image: image ?? undefined,
-  });
+  const taken = await takeAiUse(userId, lang);
+  if (taken instanceof Response) return taken;
+  const quota = taken;
+
+  let called: Awaited<ReturnType<typeof callModel>>;
+  try {
+    called = await callModel({
+      system: image
+        ? mealPhotoSystemPrompt(ctx, passages, foodBlock)
+        : mealAnalysisSystemPrompt(ctx, passages, foodBlock),
+      user: ask,
+      maxTokens: 900,
+      prefill: "{",
+      image: image ?? undefined,
+    });
+  } catch (e) {
+    await refundAi(userId);
+    throw e;
+  }
+  const { text, model, usage, latencyMs } = called;
 
   const stages: StageCost[] = [
     { stage: "food_resolver", externalCalls: externalCallsIn(resolved), latencyMs: resolveMs },
@@ -652,6 +726,7 @@ async function analyzeMeal(
       candidateDecision: { parse_failed: true, raw: text.slice(0, 1000) },
       uncertainty: { parse: "model did not return the requested JSON" },
     }, stages);
+    await refundAi(userId);
     return json({ error: "could not analyse" }, 502);
   }
 
@@ -731,9 +806,20 @@ async function analyzeMeal(
     claimsToVerify: mealClaims(items),
   }, stages, verifications);
 
+  let shown = quota;
+  if (items.length === 0) {
+    await refundAi(userId);
+    try {
+      shown = await quotaStatus(userId);
+    } catch {
+      shown = { ...quota, used: Math.max(quota.used - 1, 0), remaining: quota.remaining + 1, allowed: true };
+    }
+  }
+
   return json({
     items,
     note: (lang === "ar" ? parsed.note_ar : parsed.note_en) ?? null,
+    quota: quotaPayload(shown),
     sources,
     // What the graph made of each phrase: the canonical food, the portion it
     // assumed, and every reason it is unsure. The confirmation screen needs
@@ -878,6 +964,12 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
   if (!force && !instruction) {
     const existing = await loadSavedPlan(userId, day);
     if (existing) {
+      let quota: Record<string, number> | undefined;
+      try {
+        quota = quotaPayload(await quotaStatus(userId));
+      } catch {
+        // A saved day still belongs on the screen even if the counter is down.
+      }
       return json({
         plan: {
           meals: existing.meals,
@@ -887,6 +979,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
         date: day,
         reused: true,
         sources: existing.sources ?? [],
+        ...(quota ? { quota } : {}),
       });
     }
   }
@@ -942,12 +1035,23 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
     resolved.push(r);
   }
 
-  const { text, model, usage, latencyMs } = await callModel({
-    system: planSystemPrompt(ctx, passages, renderResolutions(resolved)),
-    user,
-    maxTokens: 2000,
-    prefill: "{",
-  });
+  const taken = await takeAiUse(userId, lang);
+  if (taken instanceof Response) return taken;
+  const quota = taken;
+
+  let called: Awaited<ReturnType<typeof callModel>>;
+  try {
+    called = await callModel({
+      system: planSystemPrompt(ctx, passages, renderResolutions(resolved)),
+      user,
+      maxTokens: 2000,
+      prefill: "{",
+    });
+  } catch (e) {
+    await refundAi(userId);
+    throw e;
+  }
+  const { text, model, usage, latencyMs } = called;
   const stages: StageCost[] = [
     { stage: "retrieval", externalCalls: 1, latencyMs: retrievalMs },
     { stage: "food_resolver", externalCalls: externalCallsIn(resolvedAll), latencyMs: resolveMs },
@@ -960,6 +1064,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
       candidateDecision: { parse_failed: true, raw: text.slice(0, 1000) },
       uncertainty: { parse: "model did not return the requested JSON" },
     }, stages);
+    await refundAi(userId);
     return json({ error: "could not generate a plan" }, 502);
   }
 
@@ -1018,6 +1123,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
       safetyFlags: [...flags, "restricted_food_in_output"],
       uncertainty: { staples_withheld: excludedFoods },
     }, stages, verifications);
+    await refundAi(userId);
     return json({
       error: lang === "ar"
         ? "الخطة اللي اتولدت فيها حاجة مش مفروض تاكلها، فمنفعش أعرضهالك. جرّب تاني من فضلك."
@@ -1037,7 +1143,10 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
     sources,
     model,
   );
-  if (!saved.ok) return json({ error: `could not save plan: ${await saved.text()}` }, 500);
+  if (!saved.ok) {
+    await refundAi(userId);
+    return json({ error: `could not save plan: ${await saved.text()}` }, 500);
+  }
 
   const planId = await record(userId, "plan", {
     inScope: true,
@@ -1094,6 +1203,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
     date: day,
     sources,
     verification: verificationSummary(verification),
+    quota: quotaPayload(quota),
   });
 }
 
@@ -1134,6 +1244,8 @@ Deno.serve(async (req) => {
           imageMediaType?: string;
           lang?: string;
         });
+      case "/quota":
+        return json(quotaPayload(await quotaStatus(userId)));
       default:
         return json({ error: `unknown route ${route}` }, 404);
     }

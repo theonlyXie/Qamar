@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/plan.dart';
+import '../models/su_economy.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
@@ -70,7 +71,7 @@ class _TodayScreenState extends State<TodayScreen> {
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
                           const SuCoinIcon(size: 16),
                           const SizedBox(width: 6),
-                          Text('${state.suAvailable}', style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.gold)),
+                          Text('${state.formatSu(state.suAvailable)}', style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.gold)),
                         ]),
                       ),
                     ),
@@ -196,7 +197,7 @@ class _TodayScreenState extends State<TodayScreen> {
                   Row(mainAxisSize: MainAxisSize.min, children: [
                     const SuCoinIcon(size: 15),
                     const SizedBox(width: 5),
-                    Text('+5', style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.gold)),
+                    Text('+${state.formatSu(SuEconomy.dailyQuest)}', style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.gold)),
                   ]),
                 ],
               ),

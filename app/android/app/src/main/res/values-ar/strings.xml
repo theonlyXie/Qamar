@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_ask_short">اسأل قمر</string>
+    <string name="shortcut_ask_long">اسأل قمر سؤال</string>
+    <string name="shortcut_log_short">سجّل وجبة</string>
+    <string name="shortcut_log_long">قول لقمر أكلت إيه</string>
+</resources>

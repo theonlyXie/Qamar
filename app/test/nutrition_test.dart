@@ -11,6 +11,7 @@ import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/state/app_state.dart';
@@ -81,6 +82,22 @@ void main() {
       final t = (AppState()..profile = const Profile()).target();
       final fromMacros = t.protein * 4 + t.carbs * 4 + t.fat * 9;
       expect(fromMacros, closeTo(t.kcal, 12));
+    });
+  });
+
+  group('Su Points scale', () {
+    test('a new wallet is level 1, a 2,500 signup is already level 3', () {
+      expect(SuEconomy.levelFor(0), 1);
+      expect(SuEconomy.levelFor(SuEconomy.signupBonus), 3);
+      expect(SuEconomy.levelFor(99 * SuEconomy.levelXp), 99);
+      expect(SuEconomy.levelFor(200000), SuEconomy.maxLevel);
+    });
+
+    test('the earn and spend table is in hundreds, not 3 / 5 / 20', () {
+      expect(SuEconomy.dailyQuest, greaterThanOrEqualTo(100));
+      expect(SuEconomy.mealLogged, greaterThanOrEqualTo(100));
+      expect(SuEconomy.extraAiUse, greaterThanOrEqualTo(SuEconomy.mealLogged));
+      expect(SuEconomy.signupBonus, greaterThanOrEqualTo(1000));
     });
   });
 

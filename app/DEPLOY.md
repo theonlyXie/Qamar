@@ -54,7 +54,7 @@ where table_schema = 'public'
 -- expect 4 rows
 
 select tgname from pg_trigger where tgname = 'qamar_on_auth_user_created';
--- expect 1 row (the 100-point signup bonus)
+-- expect 1 row (the 2,500-point signup bonus)
 ```
 
 The trigger existing is not evidence the bonus works — that was exactly the
@@ -67,7 +67,7 @@ select count(*) from public.su_point_ledger where reason = 'signup_bonus';
 ```
 
 `0006` also backfills the bonus for users who already exist, so the wallet on
-your test account should jump to 100 the moment it runs.
+your test account should jump to 2,500 the moment it runs.
 
 ## 2. Set the function's secrets
 

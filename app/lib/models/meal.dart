@@ -1,3 +1,5 @@
+import 'su_economy.dart';
+
 class Target {
   final int kcal;
   final int protein;
@@ -60,6 +62,8 @@ class SpendItemDef {
   final String id;
   final int price;
   final String nameAr, nameEn, whatAr, whatEn, limitAr, limitEn;
+  final bool once;
+  final int grantsAiUses;
   const SpendItemDef({
     required this.id,
     required this.price,
@@ -69,33 +73,44 @@ class SpendItemDef {
     required this.whatEn,
     required this.limitAr,
     required this.limitEn,
+    this.once = true,
+    this.grantsAiUses = 0,
   });
 }
 
-/// Ported 1:1 from the prototype's SPEND catalogue (Su Points redemptions).
+/// Su Points redemptions. Extra Qamar uses are how the five-a-day cap flexes;
+/// cosmetics are the prestige sink for a later leaderboard.
 const List<SpendItemDef> kSpendCatalog = [
   SpendItemDef(
-    id: 'photo', price: 20,
-    nameAr: 'مسح وجبة بالصورة زيادة', nameEn: 'Extra photo meal scan',
-    whatAr: 'مسحة إضافية بعد ما حد الشهر يخلص.', whatEn: 'One additional photo scan after the monthly allowance is used.',
-    limitAr: 'لحد ٥ مرات في الشهر · فشل تقني يرجّع النقاط', limitEn: 'Up to 5 per month · technical failure auto-refunds',
+    id: 'ai_extra',
+    price: SuEconomy.extraAiUse,
+    once: false,
+    grantsAiUses: 1,
+    nameAr: 'استخدام زيادة لقمر',
+    nameEn: 'Extra Qamar use',
+    whatAr: 'استخدام إضافي النهارده — سؤال، قراءة طبق، أو كتابة الخطة.',
+    whatEn: 'One more use today — a question, a plate reading, or writing the plan.',
+    limitAr: 'لحد ١٠ زيادة في اليوم · بكرة الصبح بيتجددوا',
+    limitEn: 'Up to 10 extras a day · refreshes at Cairo midnight',
   ),
   SpendItemDef(
-    id: 'insight', price: 30,
-    nameAr: 'متابعة أعمق لرأي الأسبوع', nameEn: 'Deep weekly-insight follow-up',
-    whatAr: 'متابعة واحدة محدودة مع قمر على رأي الأسبوع.', whatEn: 'One bounded Qamar follow-up on an eligible weekly insight.',
-    limitAr: 'مرة لكل رأي · حدود الأمان شغالة', limitEn: 'Once per insight · safety limits still apply',
+    id: 'insight',
+    price: SuEconomy.weeklyInsight,
+    nameAr: 'متابعة أعمق لرأي الأسبوع',
+    nameEn: 'Deep weekly-insight follow-up',
+    whatAr: 'متابعة واحدة محدودة مع قمر على رأي الأسبوع.',
+    whatEn: 'One bounded Qamar follow-up on an eligible weekly insight.',
+    limitAr: 'مرة لكل رأي · حدود الأمان شغالة',
+    limitEn: 'Once per insight · safety limits still apply',
   ),
   SpendItemDef(
-    id: 'plan', price: 25,
-    nameAr: 'تجديد خطة اليوم', nameEn: 'Plan refresh bundle',
-    whatAr: 'توليد خطة يوم إضافية أو تلات بدائل زيادة.', whatEn: 'One extra day-plan regeneration or three extra substitutions.',
-    limitAr: 'باقتين كحد أقصى في الشهر · مش مطلوبة لإصلاح خطة غير آمنة', limitEn: 'Max two bundles/month · never needed to fix an unsafe plan',
-  ),
-  SpendItemDef(
-    id: 'cosmetic', price: 50,
-    nameAr: 'شكل جديد للقمر والشجرة', nameEn: 'Orb and tree cosmetic',
-    whatAr: 'فتح دائم لشكل معروف مقدّماً، مفيش ميزة تغذية.', whatEn: 'Clearly previewed permanent unlock with no nutrition advantage.',
-    limitAr: '٥٠–٢٠٠ نقطة · سعر ثابت · مفيش صناديق عشوائية', limitEn: '50–200 points · fixed price · no random boxes',
+    id: 'cosmetic',
+    price: SuEconomy.cosmetic,
+    nameAr: 'شكل جديد للقمر والشجرة',
+    nameEn: 'Orb and tree cosmetic',
+    whatAr: 'فتح دائم لشكل معروف مقدّماً، مفيش ميزة تغذية.',
+    whatEn: 'Clearly previewed permanent unlock with no nutrition advantage.',
+    limitAr: 'سعر ثابت · مفيش صناديق عشوائية',
+    limitEn: 'Fixed price · no random boxes',
   ),
 ];

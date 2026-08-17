@@ -13,6 +13,7 @@ import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/auth_service.dart';
 import 'package:qamar/services/repositories.dart';
@@ -110,9 +111,25 @@ class FakeGateway implements AiGateway {
   Map<String, dynamic>? lastCurrentPlan;
   final List<String?> imagePaths = [];
 
+  int planCalls = 0;
+  Object? planFailsWith;
+  DayPlan plan = const DayPlan(date: '2026-08-15', slots: []);
+  AiQuota quota = AiQuota.empty;
+
+  void _useAi() {
+    if (quota.remaining <= 0) {
+      throw AiQuotaException(
+        'That’s today’s five Qamar uses. Log a meal or finish the daily quest to earn Su Points, then spend them on another use from the wallet. They refresh at Cairo midnight.',
+        quota,
+      );
+    }
+    quota = quota.consumed();
+  }
+
   @override
   Future<MealAnalysis> analyzeMeal({required String inputType, String? text, String? imagePath, String lang = 'ar'}) async {
     imagePaths.add(imagePath);
+    _useAi();
     return result;
   }
 
@@ -126,6 +143,7 @@ class FakeGateway implements AiGateway {
   }) async {
     chatMessages.add(message);
     lastCurrentPlan = currentPlan;
+    _useAi();
     if (chatResult.reply == 'grounded answer' && reply != 'grounded answer') {
       return ChatResult(reply: reply);
     }
@@ -140,9 +158,6 @@ class FakeGateway implements AiGateway {
     return scan;
   }
 
-  int planCalls = 0;
-  Object? planFailsWith;
-  DayPlan plan = const DayPlan(date: '2026-08-15', slots: []);
   String? lastInstruction;
   bool? lastForce;
 
@@ -157,8 +172,14 @@ class FakeGateway implements AiGateway {
     lastForce = force;
     lastInstruction = instruction;
     if (planFailsWith != null) throw planFailsWith!;
+    _useAi();
+    // Stamp the requested date so ensurePlan can cache "today" instead of
+    // treating a fixture dated 2026-08-15 as a different day forever.
     return DayPlan(date: date, slots: plan.slots, rationale: plan.rationale);
   }
+
+  @override
+  Future<AiQuota> quotaStatus() async => quota;
 }
 
 class FakeAccount implements Account {
@@ -402,8 +423,40 @@ void main() {
     expect(state.ledger(), isEmpty, reason: 'a new user has earned nothing');
 
     state.completeQuest();
-    expect(state.ledger().single.amount, 5);
-    expect(state.suAvailable, 5);
+    expect(state.ledger().single.amount, SuEconomy.dailyQuest);
+    expect(state.suAvailable, SuEconomy.dailyQuest);
+  });
+
+  test('the sixth Qamar use in a day is refused, and the wallet is the way out', () async {
+    final ai = FakeGateway();
+    final state = backed(ai: ai);
+    await settle();
+    state.setLang(AppLang.en);
+
+    for (var i = 0; i < SuEconomy.dailyAiUses; i++) {
+      await state.sendChatMsg('protein?');
+    }
+    expect(ai.quota.remaining, 0);
+
+    await state.sendChatMsg('and now?');
+    expect(state.chat.last.openWallet, isTrue);
+    expect(state.chat.last.text.toLowerCase(), contains('five'));
+    state.chatActionTap();
+    expect(state.screen, AppScreen.wallet);
+    expect(state.chatOpen, isFalse);
+  });
+
+  test('spending Su lengthens today’s allowance instead of unlocking unlimited AI', () {
+    final state = AppState()
+      ..suAvailable = SuEconomy.extraAiUse
+      ..aiQuota = const AiQuota(used: 5, limit: 5, extra: 0, remaining: 0);
+
+    state.redeem(kSpendCatalog.first);
+
+    expect(kSpendCatalog.first.id, 'ai_extra');
+    expect(state.aiQuota.extra, 1);
+    expect(state.aiQuota.remaining, 1);
+    expect(state.suAvailable, 0);
   });
 
   group('account', () {
@@ -657,7 +710,7 @@ void main() {
   });
 
   test('redeeming calls through to the wallet RPC', () async {
-    final wallet = FakeWalletRepo()..stored = (available: 500, lifetime: 500);
+    final wallet = FakeWalletRepo()..stored = (available: 5000, lifetime: 5000);
     final state = backed(wallet: wallet);
     await settle();
 
