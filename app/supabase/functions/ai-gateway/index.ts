@@ -12,6 +12,8 @@
 //   POST /ai-gateway/plan/generate  { date?, lang?, force?, instruction? }
 //   POST /ai-gateway/scan/barcode   { barcode, lang, date?, grams? }
 //     camera feature — Qamar+ on the client; spends a daily AI use
+//   POST /ai-gateway/scan/label     { imageBase64, imageMediaType, lang, barcode?, name?, grams? }
+//     camera feature — reads the nutrition table off a packet
 //   POST /ai-gateway/scan/read      { imageBase64, imageMediaType, lang }
 //   POST /ai-gateway/quota          {}
 //
@@ -28,6 +30,7 @@ import {
   bodyScanSystemPrompt,
   callModel,
   chatSystemPrompt,
+  labelScanSystemPrompt,
   scanPlacementSystemPrompt,
   mealAnalysisSystemPrompt,
   mealPhotoSystemPrompt,
@@ -44,6 +47,11 @@ import {
   scaleTo,
   type ScannedProduct,
 } from "./barcode.ts";
+import {
+  labelProblemText,
+  normaliseLabel,
+  type LabelReading,
+} from "./label.ts";
 import {
   identifyItems,
   itemsFromResolutions,
@@ -1377,6 +1385,270 @@ function renderFoodLine(p: ScannedProduct): string {
     `C ${f.per100g.carbs} g, F ${f.per100g.fat} g (${f.source})`;
 }
 
+/**
+ * The nutrition table on the back of a packet.
+ *
+ * This is the answer to the barcode route's own dead end: a local Egyptian
+ * brand that no database has ever catalogued still has its figures printed on
+ * it, and a photograph of that panel is better data than anything a model
+ * could infer from the product's name.
+ *
+ * The model transcribes; label.ts decides whether the transcription can be
+ * trusted and converts it to per 100 g. Everything after that is the barcode
+ * route's path exactly — the same placement prompt, the same plan merge, the
+ * same allergy check — because "how much of my day did this take" does not
+ * depend on whether the product arrived by barcode or by camera.
+ */
+async function scanLabel(
+  userId: string,
+  body: {
+    imageBase64?: string;
+    imageMediaType?: string;
+    lang?: string;
+    date?: string;
+    barcode?: string;
+    name?: string;
+    grams?: number;
+  },
+): Promise<Response> {
+  const lang = asString(body.lang) === "ar" ? "ar" : "en";
+  const day = asString(body.date) ?? new Date().toISOString().slice(0, 10);
+  const barcode = (asString(body.barcode) ?? "").replace(/\D/g, "");
+
+  const image = readImage(body);
+  if (typeof image === "string") return json({ error: image }, 413);
+  if (!image) return json({ error: "no image" }, 400);
+
+  const { ctx, blocked, target } = await loadContext(userId, lang);
+  if (blocked) {
+    const id = await record(userId, "meal_analysis", {
+      inScope: false,
+      refusal: "minor",
+      question: "[label]",
+    });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", "[label]");
+    return json({ error: "not eligible" }, 403);
+  }
+
+  const taken = await takeAiUse(userId, lang);
+  if (taken instanceof Response) return taken;
+  const quota = taken;
+
+  let read: Awaited<ReturnType<typeof callModel>>;
+  try {
+    read = await callModel({
+      system: labelScanSystemPrompt(lang),
+      user: lang === "ar" ? "اقرا الجدول ده." : "Read this panel.",
+      maxTokens: 700,
+      prefill: "{",
+      image,
+    });
+  } catch (e) {
+    await refundAi(userId);
+    throw e;
+  }
+
+  const parsed = parseJson<LabelReading & { productName?: string | null }>(read.text);
+  if (!parsed) {
+    await refundAi(userId);
+    await trace(userId, null, "meal_analysis", {
+      candidateDecision: { parse_failed: true, raw: read.text.slice(0, 500) },
+      uncertainty: { parse: "model did not return the requested JSON" },
+    }, [{ stage: "extractor", model: read.model, usage: read.usage, latencyMs: read.latencyMs }]);
+    return json({ error: "could not read the panel" }, 502);
+  }
+
+  const normalised = normaliseLabel(parsed);
+  if (!normalised.ok) {
+    // A panel that cannot be trusted is worth less than nothing, so the use is
+    // given back and the person is told what to do differently.
+    await refundAi(userId);
+    const id = await record(userId, "meal_analysis", {
+      inScope: true,
+      question: "[label]",
+      answer: normalised.problem,
+      model: read.model,
+    });
+    await trace(userId, id, "meal_analysis", {
+      candidateDecision: { label_rejected: normalised.problem, reading: parsed },
+      uncertainty: { label: normalised.problem, note: parsed.note ?? null },
+    }, [{ stage: "extractor", model: read.model, usage: read.usage, latencyMs: read.latencyMs }]);
+    return json({
+      found: false,
+      problem: normalised.problem,
+      reply: labelProblemText(normalised.problem, lang),
+      quota: quotaPayload(quota),
+    });
+  }
+
+  const label = normalised.value;
+  const name = (asString(body.name) ?? parsed.productName ?? "").trim() ||
+    (lang === "ar" ? "المنتج" : "the product");
+
+  // A panel photographed after a barcode miss is the missing catalogue entry.
+  // Saving it means nobody has to photograph that packet again.
+  const product: ScannedProduct = {
+    barcode: barcode || `label_${Date.now()}`,
+    name,
+    brand: null,
+    per100g: label.per100g,
+    packGrams: null,
+    servingGrams: label.servingGrams,
+    packLabel: null,
+    source: "open_food_facts",
+    sourceUrl: null,
+  };
+  if (barcode) await rememberProduct({ ...product, barcode });
+
+  const asked = typeof body.grams === "number" && body.grams > 0 && body.grams <= 3000
+    ? { grams: body.grams, label: `${body.grams} g`, assumed: false }
+    : eatenPortion(product);
+  const totals = scaleTo(label.per100g, asked.grams);
+  const kcal = Math.round(totals.energy_kcal ?? 0);
+
+  const eaten = await todaySoFar(userId, day);
+  const targetKcal = ctx.targetKcal ?? null;
+  const remaining = targetKcal == null ? null : targetKcal - eaten;
+
+  const saved = await loadSavedPlan(userId, day);
+  const currentMeals = saved?.meals ?? null;
+  const menuJson = currentMeals ? JSON.stringify({ date: day, meals: currentMeals }) : "";
+
+  const itemLine =
+    `${name} — ${asked.label}${asked.assumed ? " (portion assumed, ask them)" : ""}: ` +
+    `${kcal} kcal, P ${Math.round(totals.protein_g ?? 0)} g, ` +
+    `C ${Math.round(totals.carbs_g ?? 0)} g, F ${Math.round(totals.fat_g ?? 0)} g` +
+    (label.basis === "per_serving" ? " (panel was per serving; converted)" : "") +
+    (label.energyFromKj ? " (energy converted from kJ)" : "");
+
+  let placed: Awaited<ReturnType<typeof callModel>>;
+  try {
+    placed = await callModel({
+      system: scanPlacementSystemPrompt(
+        ctx,
+        { targetKcal, eatenKcal: eaten, remainingKcal: remaining, menuJson },
+        itemLine,
+        `${name}: per 100 g — ${Math.round(label.per100g.energy_kcal ?? 0)} kcal (read off the packet)`,
+      ),
+      user: name,
+      maxTokens: 900,
+      prefill: "{",
+    });
+  } catch (e) {
+    // The reading itself succeeded; the placement is the part that failed, and
+    // the person should still get their numbers.
+    console.error("ai-gateway label placement", e);
+    placed = { text: "", model: read.model, usage: null, latencyMs: 0 };
+  }
+
+  const decision = parseJson<{ reply?: string; fits?: boolean; plan_update?: PlanUpdate | null }>(
+    placed.text,
+  );
+  const reply = (decision?.reply ?? "").trim() ||
+    (lang === "ar" ? `${name}: ${kcal} سعرة.` : `${name}: ${kcal} kcal.`);
+
+  const verifications: Verification[] = [];
+  let plan: { meals: Meal[] } | undefined;
+  let rebuildNeeded: string | undefined;
+  if (decision?.plan_update && currentMeals) {
+    const merged = mergePlanUpdate(currentMeals, decision.plan_update);
+    if (merged?.kind === "rebuild") {
+      rebuildNeeded = merged.instruction || name;
+    } else if (merged && (merged.kind === "replace_slot" || merged.kind === "replace_day")) {
+      const constraints = await loadHardConstraints(SUPABASE_URL, SERVICE_KEY, userId);
+      const planCheck = verifyPlan(merged.meals, targetKcal, constraints);
+      verifications.push(planCheck);
+      if (blocks(planCheck).length > 0) {
+        await recordHardBlock(
+          SUPABASE_URL, SERVICE_KEY, userId, null, "restricted_food_in_generated_plan",
+          { failures: blocks(planCheck), stage: "label_plan_update" },
+        );
+      } else {
+        await saveMealPlan(
+          userId, day, merged.meals, targetKcal ?? 0,
+          saved?.rationale_ar ?? null, saved?.rationale_en ?? null,
+          saved?.sources ?? null, placed.model,
+        );
+        plan = { meals: merged.meals };
+      }
+    }
+  }
+
+  const id = await record(userId, "meal_analysis", {
+    inScope: true,
+    question: `[label] ${name}`,
+    answer: reply,
+    model: read.model,
+  });
+  await recordAllowed(
+    SUPABASE_URL, SERVICE_KEY, userId, id, "general_wellness", [], ["scan_label"],
+  );
+
+  await trace(userId, id, "meal_analysis", {
+    calculatedTargets: targetsFrom(ctx, target),
+    candidateDecision: {
+      source: "label",
+      barcode: barcode || null,
+      product: name,
+      basis: label.basis,
+      serving_grams: label.servingGrams,
+      grams: asked.grams,
+      totals,
+      eaten_before: eaten,
+      fits: decision?.fits ?? null,
+      plan_changed: plan != null,
+    },
+    uncertainty: {
+      portion_assumed: asked.assumed,
+      energy_from_kj: label.energyFromKj,
+      converted_from_serving: label.basis === "per_serving",
+      note: parsed.note ?? null,
+    },
+    claimsToVerify: [{
+      claim: "per-100g figures transcribed from the printed panel",
+      basis: label.basis,
+      kcal_per_100g: label.per100g.energy_kcal,
+      check: "label_transcription",
+    }],
+  }, [
+    { stage: "extractor", model: read.model, usage: read.usage, latencyMs: read.latencyMs },
+    { stage: "reasoner", model: placed.model, usage: placed.usage, latencyMs: placed.latencyMs },
+  ], verifications);
+
+  return json({
+    found: true,
+    name,
+    barcode: barcode || null,
+    basis: label.basis,
+    servingGrams: label.servingGrams,
+    energyFromKj: label.energyFromKj,
+    per100g: label.per100g,
+    grams: asked.grams,
+    portionLabel: asked.label,
+    portionAssumed: asked.assumed,
+    totals,
+    kcal,
+    item: {
+      name,
+      qamar_food_id: null,
+      grams: asked.grams,
+      kcal,
+      protein_g: Math.round(totals.protein_g ?? 0),
+      carbs_g: Math.round(totals.carbs_g ?? 0),
+      fat_g: Math.round(totals.fat_g ?? 0),
+    },
+    targetKcal,
+    eatenKcal: eaten,
+    remainingKcal: remaining == null ? null : remaining - kcal,
+    fits: decision?.fits ?? null,
+    reply,
+    plan,
+    rebuildNeeded,
+    note: parsed.note ?? null,
+    quota: quotaPayload(quota),
+  });
+}
+
 async function readBodyScan(
   userId: string,
   body: { imageBase64?: string; imageMediaType?: string; lang?: string },
@@ -1789,6 +2061,16 @@ Deno.serve(async (req) => {
           barcode?: string;
           lang?: string;
           date?: string;
+          grams?: number;
+        });
+      case "/scan/label":
+        return await scanLabel(userId, body as {
+          imageBase64?: string;
+          imageMediaType?: string;
+          lang?: string;
+          date?: string;
+          barcode?: string;
+          name?: string;
           grams?: number;
         });
       case "/scan/read":
