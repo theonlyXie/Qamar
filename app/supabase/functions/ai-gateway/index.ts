@@ -337,6 +337,20 @@ function foodTerms(text: string): string[] {
     .slice(0, 8);
 }
 
+/**
+ * What Qamar says back to a hello.
+ *
+ * Written rather than generated: a greeting should be instant and free, and
+ * spending a model call plus one of five daily uses on "hi" would be the
+ * wrong trade in both directions. It ends with an invitation, so the next
+ * message is the one worth answering properly.
+ */
+function greetingText(lang: string): string {
+  return lang === "ar"
+    ? "أهلاً! أنا قمر. أنا هنا للأكل والتمرين — قولي أكلت إيه النهاردة، أو اسألني عن أي وجبة."
+    : "Hello. I am Qamar. I am here for food and training — tell me what you ate today, or ask me about any meal.";
+}
+
 function asString(v: unknown): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
@@ -405,7 +419,29 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
   const lang = asString(body.lang) === "ar" ? "ar" : "en";
   const day = (asString(body.date) ?? new Date().toISOString().slice(0, 10));
 
-  const verdict = classify(message);
+  let verdict = classify(message);
+
+  // Someone said hello. Answer, and spend nothing doing it: no retrieval, no
+  // model, no daily use. The first real conversation this app ever had opened
+  // with "ازيك" and was told Qamar only covers food and training.
+  if (verdict.allowed && "greeting" in verdict) {
+    await record(userId, "chat", { inScope: true, question: message, model: "greeting" });
+    return json({ reply: greetingText(lang), greeting: true });
+  }
+
+  // The topic lists came up empty. Before refusing, ask the food graph — it
+  // knows 487 Egyptian aliases where the lists know about thirty, which is how
+  // "كشري" got someone told that Qamar does not cover food.
+  if (!verdict.allowed && verdict.reason === "off_topic") {
+    const terms = foodTerms(message);
+    if (terms.length > 0) {
+      const found = await resolveFoods(SUPABASE_URL, SERVICE_KEY, terms.slice(0, 4));
+      if (found.some((r) => r.food !== null)) {
+        verdict = { allowed: true, domain: "nutrition" };
+      }
+    }
+  }
+
   if (!verdict.allowed) {
     const id = await record(userId, "chat", {
       inScope: false,

@@ -11,6 +11,7 @@ export type Domain = "nutrition" | "training";
 
 export type ScopeVerdict =
   | { allowed: true; domain: Domain }
+  | { allowed: true; greeting: true }
   | { allowed: false; reason: RefusalReason };
 
 export type RefusalReason =
@@ -88,6 +89,25 @@ const INJECTION = [
   "تجاهل التعليمات", "انت دلوقتي", "تظاهر انك",
 ];
 
+/**
+ * Hello.
+ *
+ * The first thing five of the first seven real messages did was fail here.
+ * "ازيك" was refused as off-topic, and so was "أنا تعبان النهاردة". A
+ * nutritionist who cannot be greeted is not a nutritionist, and answering a
+ * greeting costs nothing: no retrieval, no model call, no daily use.
+ *
+ * Deliberately narrow. This is for opening a conversation, not for holding
+ * one — anything with actual content still has to be about food or training.
+ */
+const GREETING = [
+  "hi", "hey", "hello", "good morning", "good evening", "how are you",
+  "thanks", "thank you", "ok", "okay",
+  "ازيك", "إزيك", "ازيكم", "السلام عليكم", "سلام عليكم", "أهلا", "اهلا",
+  "أهلاً", "صباح الخير", "مساء الخير", "عامل ايه", "عامل إيه", "شكرا",
+  "شكراً", "تمام", "حاضر", "مرحبا", "مرحباً",
+];
+
 /** Signals the question really is about food or training. */
 const NUTRITION = [
   "eat", "food", "meal", "calorie", "kcal", "protein", "carb", "fat", "sugar",
@@ -157,9 +177,44 @@ export function classify(question: string): ScopeVerdict {
   // being the product's centre and the deeper half of the knowledge base.
   const nutrition = score(q, NUTRITION);
   const training = score(q, TRAINING);
+
+  // A greeting on its own is answered, not refused. Checked after the refusals
+  // above so "hi, I want to lose weight while pregnant" still refuses on
+  // pregnancy, and after scoring so a greeting carrying a real question ("hi,
+  // how much protein?") is treated as the question it is.
+  if (nutrition === 0 && training === 0 && isGreeting(q)) {
+    return { allowed: true, greeting: true };
+  }
+
   if (nutrition === 0 && training === 0) return { allowed: false, reason: "off_topic" };
 
   return { allowed: true, domain: training > nutrition ? "training" : "nutrition" };
+}
+
+/**
+ * Whether a message is nothing but an opener.
+ *
+ * Length-capped on purpose: "hi" is a greeting, and a paragraph that happens to
+ * begin with "hi" is a question that should be judged on its content.
+ */
+export function isGreeting(question: string): boolean {
+  const q = question.trim();
+  if (q.length === 0 || q.length > 40) return false;
+  return hits(q, GREETING);
+}
+
+/**
+ * The verdict to use when the topic lists found nothing but the food graph
+ * recognised something.
+ *
+ * The scope guard was matching against a hand-written list of about thirty
+ * words while the database held 487 Egyptian food aliases. "كشري" was not on
+ * the list, so someone saying they had eaten koshary was told Qamar only
+ * covers food. Consulting the graph fixes the whole class of that, and it is
+ * only ever asked once the cheap lists have already come up empty.
+ */
+export function nutritionByFoodName(): ScopeVerdict {
+  return { allowed: true, domain: "nutrition" };
 }
 
 /** What the user is told, in their own language. Never a bare "I can't". */
