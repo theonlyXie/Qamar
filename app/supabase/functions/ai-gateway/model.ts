@@ -471,3 +471,84 @@ export function parseJson<T>(text: string): T | null {
     return null;
   }
 }
+
+/** What the day looks like when something is scanned into it. */
+export interface DayFit {
+  targetKcal: number | null;
+  eatenKcal: number;
+  remainingKcal: number | null;
+  /** The menu as it stands, or "" when nothing is written for today. */
+  menuJson: string;
+}
+
+/**
+ * Placing a scanned product into the day.
+ *
+ * The arithmetic is done before this prompt is built and passed in as fact:
+ * the item's kcal, what has already been eaten, and what is left. A model that
+ * is asked to subtract will sometimes subtract wrongly, and the whole point of
+ * this app is that its numbers are not a guess.
+ *
+ * What is left for the model is the part that is actually judgement — whether
+ * a 134 kcal bag of crisps at four in the afternoon is fine, replaces the
+ * snack that was written, or means dinner should come down — and saying it in
+ * one human sentence.
+ */
+export function scanPlacementSystemPrompt(
+  u: UserContext,
+  fit: DayFit,
+  itemLine: string,
+  foodBlock: string,
+): string {
+  const menuBlock = fit.menuJson.trim()
+    ? `TODAY'S MENU (you own this; the person does not edit it by hand):\n${fit.menuJson.trim()}`
+    : "TODAY'S MENU: nothing written for today yet.";
+
+  const budget = fit.targetKcal == null
+    ? "NO DAILY TARGET SET for this person, so do not talk about what is left of one."
+    : `DAILY TARGET: ${fit.targetKcal} kcal · ALREADY EATEN TODAY: ${fit.eatenKcal} kcal · ` +
+      `LEFT BEFORE THIS ITEM: ${fit.remainingKcal} kcal`;
+
+  return `${COMMON_RULES}
+
+THE PERSON: ${describeUser(u)}
+REPLY LANGUAGE: ${u.lang === "ar" ? "Egyptian Arabic" : "English"}
+
+They have just scanned something and eaten it. It is already counted — your
+job is not to ask whether to log it, it is to tell them where the day now
+stands and to fix the menu so the rest of the day still works.
+
+WHAT THEY ATE (already calculated — use these figures exactly, never recompute):
+${itemLine}
+
+${budget}
+
+${menuBlock}
+
+FOOD DATA:
+${foodBlock}
+
+Rules for this reply:
+- Never restate arithmetic they can see. Say what it means.
+- If it fits comfortably, say so plainly and leave the menu alone.
+- If it does not, change the menu rather than telling them off. Lower a later
+  meal, swap a slot, or rebuild the rest of the day. Food already eaten is not
+  a mistake to be scolded for; it is an input.
+- Never moralise about a packet of crisps. One sentence of judgement, no
+  lecture, no "empty calories".
+- If there is no target set, describe the item and stop.
+
+Return ONLY JSON of this exact shape, no prose:
+{
+  "reply": "at most three sentences in the reply language",
+  "fits": true,
+  "plan_update": null
+}
+
+fits is whether the rest of the written day still works unchanged.
+plan_update is the same shape the chat route uses:
+- {"kind":"replace_slot","slot":"breakfast|lunch|dinner","meal":{...}}
+- {"kind":"replace_day","meals":[...]}
+- {"kind":"rebuild","instruction":"what to rebalance, in English"}
+- null when nothing on the menu should move.`;
+}

@@ -1278,9 +1278,29 @@ class AppState extends ChangeNotifier {
   /// out and rewritten from memory.
   bool get plusRequired => QamarConfig.billingEnabled;
 
-  /// Whether the person may photograph a meal. The only thing Qamar+ actually
-  /// gated: chat, plans, and typed or spoken logging were always free.
-  bool get photoLogAllowed => !plusRequired || plusActive;
+  /// Whether the camera may be used at all.
+  ///
+  /// The product rule, in one place: **anything that opens the camera is
+  /// Qamar+**. Photographing a meal, scanning a barcode, reading a nutrition
+  /// label off the back of a packet — all of it. Typing and speaking a meal
+  /// stay free forever, because they cost the food graph and not the model.
+  ///
+  /// While billing is off, plusRequired is false and nothing is locked, so
+  /// this is open to everyone. That is not the rule changing; it is the rule
+  /// having nothing to enforce yet. The day BILLING_ENABLED goes true, every
+  /// camera entry point in the app closes behind the paywall at once, because
+  /// they all ask this one getter.
+  bool get cameraAllowed => !plusRequired || plusActive;
+
+  /// Kept as the name the meal-logging paths already use.
+  bool get photoLogAllowed => cameraAllowed;
+
+  /// Scanning a barcode. Same gate, named for the thing it guards so a reader
+  /// of quickScan() does not have to know it is really about the camera.
+  bool get barcodeScanAllowed => cameraAllowed;
+
+  /// Photographing the nutrition table on a packet.
+  bool get labelScanAllowed => cameraAllowed;
   DateTime? plusUntil;
 
   /// Set when checkout cannot start, or while Paymob's page is open.

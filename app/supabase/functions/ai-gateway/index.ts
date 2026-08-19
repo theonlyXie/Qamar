@@ -10,6 +10,8 @@
 //     text/voice: food graph only — no model, no daily AI use
 //     photo: takeAiUse + vision model (Qamar+ on the client)
 //   POST /ai-gateway/plan/generate  { date?, lang?, force?, instruction? }
+//   POST /ai-gateway/scan/barcode   { barcode, lang, date?, grams? }
+//     camera feature — Qamar+ on the client; spends a daily AI use
 //   POST /ai-gateway/scan/read      { imageBase64, imageMediaType, lang }
 //   POST /ai-gateway/quota          {}
 //
@@ -26,6 +28,7 @@ import {
   bodyScanSystemPrompt,
   callModel,
   chatSystemPrompt,
+  scanPlacementSystemPrompt,
   mealAnalysisSystemPrompt,
   mealPhotoSystemPrompt,
   parseJson,
@@ -34,6 +37,13 @@ import {
   type UserContext,
 } from "./model.ts";
 import { retrieve, type FoodFacts, type Passage, type Source } from "./retrieval.ts";
+import {
+  asFoodFacts,
+  eatenPortion,
+  lookupBarcode,
+  scaleTo,
+  type ScannedProduct,
+} from "./barcode.ts";
 import {
   identifyItems,
   itemsFromResolutions,
@@ -349,6 +359,100 @@ function greetingText(lang: string): string {
   return lang === "ar"
     ? "أهلاً! أنا قمر. أنا هنا للأكل والتمرين — قولي أكلت إيه النهاردة، أو اسألني عن أي وجبة."
     : "Hello. I am Qamar. I am here for food and training — tell me what you ate today, or ask me about any meal.";
+}
+
+/**
+ * What the day has already had.
+ *
+ * Deterministic on purpose. The model is told the answer rather than asked to
+ * work it out: subtraction is the one thing in this flow that must be right
+ * every time, and it is also the one thing a language model has no business
+ * doing.
+ */
+async function todaySoFar(userId: string, day: string): Promise<number> {
+  const next = new Date(`${day}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  const to = next.toISOString().slice(0, 10);
+  const res = await db(
+    `meal_logs?user_id=eq.${userId}&logged_at=gte.${day}&logged_at=lt.${to}&select=kcal`,
+  );
+  if (!res.ok) return 0;
+  const rows = await res.json() as { kcal: number }[];
+  return rows.reduce((n, r) => n + (Number(r.kcal) || 0), 0);
+}
+
+/**
+ * Writes a scanned product into the graph so the next person who scans it
+ * pays nothing and gets its micronutrients.
+ *
+ * Marked unreviewed and ranked below the curated catalogue, like every other
+ * imported food. The barcode goes in food_source_links, which is what makes
+ * the second scan a local hit.
+ */
+async function rememberProduct(p: ScannedProduct): Promise<string | null> {
+  try {
+    const slug = `barcode_${p.barcode}`;
+    const name = p.brand ? `${p.brand} ${p.name}` : p.name;
+    const created = await db("foods?on_conflict=slug", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify({
+        slug,
+        name_en: name,
+        food_state: "unspecified",
+        is_recipe: false,
+        source_rank: 10,
+        confidence: 0.75,
+        human_reviewed: false,
+      }),
+    });
+    const foodId = (await created.json())[0]?.qamar_food_id as string | undefined;
+    if (!foodId) return null;
+
+    // The barcode itself is an alias, so typing the digits finds it too.
+    await db("food_aliases?on_conflict=qamar_food_id,alias,lang", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify([
+        { qamar_food_id: foodId, alias: name.toLowerCase(), lang: "en", priority: 10 },
+        { qamar_food_id: foodId, alias: p.barcode, lang: "en", priority: 10 },
+      ]),
+    });
+
+    const rows = Object.entries(p.per100g).map(([code, amount]) => ({
+      qamar_food_id: foodId,
+      nutrient_code: code,
+      amount,
+      per_basis: "per_100g",
+      source_id: p.source === "usda_branded" ? "usda_fdc" : "open_food_facts",
+      nutrient_definition_version: "barcode-2026-08",
+      confidence: 0.8,
+    }));
+    if (rows.length) {
+      await db("food_nutrients?on_conflict=qamar_food_id,nutrient_code,per_basis", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates" },
+        body: JSON.stringify(rows),
+      });
+    }
+
+    await db("food_source_links?on_conflict=qamar_food_id,source_id,external_id", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify({
+        qamar_food_id: foodId,
+        source_id: p.source === "usda_branded" ? "usda_fdc" : "open_food_facts",
+        external_id: p.barcode,
+        external_type: "barcode",
+        url: p.sourceUrl,
+      }),
+    });
+    return foodId;
+  } catch (e) {
+    // A caching failure must never cost the user their scan.
+    console.error("ai-gateway rememberProduct", e);
+    return null;
+  }
 }
 
 function asString(v: unknown): string | undefined {
@@ -1055,6 +1159,224 @@ function plausible(v: unknown, min: number, max: number, decimals = 0): number |
   return n >= min && n <= max ? n : null;
 }
 
+/**
+ * A scanned barcode, placed into the day.
+ *
+ * The flow the product asks for: point the camera at a packet of crisps and
+ * have it counted and the rest of the day adjusted, without typing anything.
+ *
+ * Order matters here. The graph is asked first so a packet somebody has
+ * already scanned costs nothing. The arithmetic — pack weight, the item's
+ * kcal, what is left of the target — is all done here, deterministically, and
+ * handed to the model as fact. The model is left with the judgement: does this
+ * still work, and if not, what on the menu should move.
+ */
+async function scanBarcode(
+  userId: string,
+  body: { barcode?: string; lang?: string; date?: string; grams?: number },
+): Promise<Response> {
+  const lang = asString(body.lang) === "ar" ? "ar" : "en";
+  const day = asString(body.date) ?? new Date().toISOString().slice(0, 10);
+  const code = (asString(body.barcode) ?? "").replace(/\D/g, "");
+  if (!code) return json({ error: "no barcode" }, 400);
+
+  const { ctx, blocked, target } = await loadContext(userId, lang);
+  if (blocked) {
+    const id = await record(userId, "meal_analysis", {
+      inScope: false,
+      refusal: "minor",
+      question: `[barcode] ${code}`,
+    });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", `[barcode] ${code}`);
+    return json({ error: "not eligible" }, 403);
+  }
+
+  const [product, lookupMs] = await timed(() => lookupBarcode(code));
+  if (!product) {
+    // A local Egyptian brand nobody has catalogued. Saying so and offering the
+    // label scan is the honest answer; inventing a plausible packet is not.
+    await record(userId, "meal_analysis", {
+      inScope: true,
+      question: `[barcode] ${code}`,
+      answer: "",
+      model: "barcode",
+    });
+    return json({
+      found: false,
+      barcode: code,
+      reply: lang === "ar"
+        ? "المنتج ده مش في أي قاعدة بيانات لسه. صوّرلي جدول القيم الغذائية اللي ورا العلبة وأنا أقراه."
+        : "That product is not in any database yet. Photograph the nutrition table on the back and I will read it.",
+    }, 200);
+  }
+
+  await rememberProduct(product);
+
+  // What was eaten, and what it came to.
+  const asked = typeof body.grams === "number" && body.grams > 0 && body.grams <= 3000
+    ? { grams: body.grams, label: `${body.grams} g`, assumed: false }
+    : eatenPortion(product);
+  const totals = scaleTo(product.per100g, asked.grams);
+  const kcal = Math.round(totals.energy_kcal ?? 0);
+
+  const eaten = await todaySoFar(userId, day);
+  const targetKcal = ctx.targetKcal ?? null;
+  const remaining = targetKcal == null ? null : targetKcal - eaten;
+
+  const saved = await loadSavedPlan(userId, day);
+  const currentMeals = saved?.meals ?? null;
+  const menuJson = currentMeals ? JSON.stringify({ date: day, meals: currentMeals }) : "";
+
+  const name = product.brand ? `${product.brand} ${product.name}` : product.name;
+  const itemLine =
+    `${name} — ${asked.label}${asked.assumed ? " (portion assumed, ask them)" : ""}: ` +
+    `${kcal} kcal, P ${Math.round(totals.protein_g ?? 0)} g, ` +
+    `C ${Math.round(totals.carbs_g ?? 0)} g, F ${Math.round(totals.fat_g ?? 0)} g`;
+
+  const taken = await takeAiUse(userId, lang);
+  if (taken instanceof Response) return taken;
+  const quota = taken;
+
+  let called: Awaited<ReturnType<typeof callModel>>;
+  try {
+    called = await callModel({
+      system: scanPlacementSystemPrompt(
+        ctx,
+        { targetKcal, eatenKcal: eaten, remainingKcal: remaining, menuJson },
+        itemLine,
+        renderFoodLine(product),
+      ),
+      user: name,
+      maxTokens: 900,
+      prefill: "{",
+    });
+  } catch (e) {
+    await refundAi(userId);
+    throw e;
+  }
+  const { text, model, usage, latencyMs } = called;
+
+  const parsed = parseJson<{ reply?: string; fits?: boolean; plan_update?: PlanUpdate | null }>(text);
+  const reply = (parsed?.reply ?? "").trim() ||
+    (lang === "ar" ? `${name}: ${kcal} سعرة.` : `${name}: ${kcal} kcal.`);
+
+  // Apply whatever the model decided the menu should do, through the same
+  // merge the chat route uses — one place where a plan is edited, not two.
+  //
+  // And through the same verification. A scan that rewrites dinner is a plan
+  // change like any other, so it goes past the allergy check before it is
+  // saved: the shortest path to putting sesame on somebody's menu would be a
+  // route that edits the plan without the guard the other route has.
+  let plan: { meals: Meal[] } | undefined;
+  let rebuildNeeded: string | undefined;
+  const verifications: Verification[] = [];
+  if (parsed?.plan_update && currentMeals) {
+    const merged = mergePlanUpdate(currentMeals, parsed.plan_update);
+    if (merged?.kind === "rebuild") {
+      // The day needs re-planning rather than patching. Say so; do not invent
+      // the new meals here.
+      rebuildNeeded = merged.instruction || name;
+    } else if (merged && (merged.kind === "replace_slot" || merged.kind === "replace_day")) {
+      const constraints = await loadHardConstraints(SUPABASE_URL, SERVICE_KEY, userId);
+      const planCheck = verifyPlan(merged.meals, targetKcal, constraints);
+      verifications.push(planCheck);
+      if (blocks(planCheck).length > 0) {
+        await recordHardBlock(
+          SUPABASE_URL, SERVICE_KEY, userId, null, "restricted_food_in_generated_plan",
+          { failures: blocks(planCheck), stage: "scan_plan_update" },
+        );
+      } else {
+        await saveMealPlan(
+          userId, day, merged.meals, targetKcal ?? 0,
+          saved?.rationale_ar ?? null, saved?.rationale_en ?? null,
+          saved?.sources ?? null, model,
+        );
+        plan = { meals: merged.meals };
+      }
+    }
+  }
+
+  const id = await record(userId, "meal_analysis", {
+    inScope: true,
+    question: `[barcode] ${code} ${name}`,
+    answer: reply,
+    model,
+  });
+  await recordAllowed(
+    SUPABASE_URL, SERVICE_KEY, userId, id, "general_wellness", [], ["scan_barcode"],
+  );
+
+  const stages: StageCost[] = [
+    { stage: "food_resolver", externalCalls: 1, latencyMs: lookupMs },
+    { stage: "reasoner", model, usage, latencyMs },
+  ];
+  await trace(userId, id, "meal_analysis", {
+    calculatedTargets: targetsFrom(ctx, target),
+    candidateDecision: {
+      barcode: code,
+      product: name,
+      grams: asked.grams,
+      portion_assumed: asked.assumed,
+      totals,
+      eaten_before: eaten,
+      remaining_before: remaining,
+      fits: parsed?.fits ?? null,
+      plan_changed: plan != null,
+    },
+    uncertainty: {
+      portion_assumed: asked.assumed,
+      source: product.source,
+    },
+    claimsToVerify: [{
+      claim: "item kcal scaled from the product table",
+      grams: asked.grams,
+      kcal,
+      check: "per_100g_times_weight",
+    }],
+  }, stages, verifications);
+
+  return json({
+    found: true,
+    barcode: code,
+    name,
+    brand: product.brand,
+    grams: asked.grams,
+    portionLabel: asked.label,
+    portionAssumed: asked.assumed,
+    per100g: product.per100g,
+    totals,
+    kcal,
+    // The app writes the log; these are the keys meal_logs.items needs so the
+    // scan counts towards micronutrients like anything else.
+    item: {
+      name,
+      qamar_food_id: null,
+      grams: asked.grams,
+      kcal,
+      protein_g: Math.round(totals.protein_g ?? 0),
+      carbs_g: Math.round(totals.carbs_g ?? 0),
+      fat_g: Math.round(totals.fat_g ?? 0),
+    },
+    targetKcal,
+    eatenKcal: eaten,
+    remainingKcal: remaining == null ? null : remaining - kcal,
+    fits: parsed?.fits ?? null,
+    reply,
+    plan,
+    rebuildNeeded,
+    source: product.source,
+    sourceUrl: product.sourceUrl,
+    quota: quotaPayload(quota),
+  });
+}
+
+/** One line of food data for the placement prompt. */
+function renderFoodLine(p: ScannedProduct): string {
+  const f = asFoodFacts(p);
+  return `${f.name}: per 100 g — ${f.per100g.kcal} kcal, P ${f.per100g.protein} g, ` +
+    `C ${f.per100g.carbs} g, F ${f.per100g.fat} g (${f.source})`;
+}
+
 async function readBodyScan(
   userId: string,
   body: { imageBase64?: string; imageMediaType?: string; lang?: string },
@@ -1462,6 +1784,13 @@ Deno.serve(async (req) => {
         });
       case "/plan/generate":
         return await generatePlan(userId, body);
+      case "/scan/barcode":
+        return await scanBarcode(userId, body as {
+          barcode?: string;
+          lang?: string;
+          date?: string;
+          grams?: number;
+        });
       case "/scan/read":
         return await readBodyScan(userId, body as {
           imageBase64?: string;
