@@ -429,18 +429,21 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
     return json({ reply: greetingText(lang), greeting: true });
   }
 
-  // The topic lists came up empty. Before refusing, ask the food graph — it
-  // knows 487 Egyptian aliases where the lists know about thirty, which is how
-  // "كشري" got someone told that Qamar does not cover food.
-  if (!verdict.allowed && verdict.reason === "off_topic") {
-    const terms = foodTerms(message);
-    if (terms.length > 0) {
-      const found = await resolveFoods(SUPABASE_URL, SERVICE_KEY, terms.slice(0, 4));
-      if (found.some((r) => r.food !== null)) {
-        verdict = { allowed: true, domain: "nutrition" };
-      }
-    }
-  }
+  // off_topic is now a hint, not a verdict.
+  //
+  // A keyword allowlist cannot hold a conversation. It refused "ازيك", it
+  // refused "أنا تعبان النهاردة", and it refused someone saying they had eaten
+  // koshary — because a list of thirty words is not a nutritionist's sense of
+  // what belongs in their consulting room. The safety refusals below stay
+  // deterministic and stay in front of the model, because those must never be
+  // a matter of judgement. Deciding whether a message is about food is exactly
+  // the kind of thing judgement is for, so it goes to the model, which then
+  // answers or declines in one warm sentence.
+  //
+  // An off-topic message still costs nothing: if the model says it was out of
+  // scope, the daily use is refunded below.
+  const topicUncertain = !verdict.allowed && verdict.reason === "off_topic";
+  if (topicUncertain) verdict = { allowed: true, domain: "nutrition" };
 
   if (!verdict.allowed) {
     const id = await record(userId, "chat", {
@@ -471,15 +474,14 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
   const [passages, retrievalMs] = await timed(() =>
     retrieve(SUPABASE_URL, SERVICE_KEY, message, verdict.domain)
   );
-  if (passages.length === 0) {
-    // No grounding, no answer. This is the rule that stops the assistant
-    // becoming a general chatbot the moment retrieval is empty.
-    const reply = lang === "ar"
-      ? "معنديش مصدر موثوق يجاوب على ده دلوقتي، ومش هألّف. جرّب تسأل بطريقة تانية أو عن حاجة أقرب للأكل والتمرين."
-      : "I do not have a grounded source for that right now, and I will not make one up. Try asking differently, or about something closer to food and training.";
-    await record(userId, "chat", { inScope: true, refusal: "no_grounding", question: message, answer: reply });
-    return json({ reply, refused: true, reason: "no_grounding" });
-  }
+  // Empty retrieval used to end the conversation here. It should not: a
+  // corpus of ten documents cannot cover everything a person says, and
+  // "عدّل العشا" — change my dinner — was refused for want of a citation when
+  // it is an instruction about their own plan, not a claim needing a source.
+  //
+  // Grounding now constrains what may be *asserted*, which the prompt states
+  // and the verifier enforces on the numbers. It no longer decides whether
+  // Qamar is allowed to speak.
 
   const lookup = [...foodTerms(message), ...foodTermsFromMeals(currentMeals)].slice(0, 16);
   const [resolved, resolveMs] = await timed(() =>
@@ -503,7 +505,32 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
   }
   const { text, model, usage, latencyMs } = called;
 
-  const parsed = parseJson<{ reply?: string; action?: string; plan_update?: PlanUpdate | null }>(text);
+  const parsed = parseJson<{
+    reply?: string;
+    in_scope?: boolean;
+    action?: string;
+    plan_update?: PlanUpdate | null;
+  }>(text);
+
+  // The model judged this out of scope. Record it as the refusal it is, and
+  // give the daily use back — someone who asked Qamar about football should
+  // not lose one of five nutrition questions for it. The reply is the model's
+  // own sentence, so the decline is in their language and in character rather
+  // than a canned line about keywords.
+  if (parsed?.in_scope === false) {
+    await refundAi(userId);
+    const declined = (parsed.reply ?? "").trim() || refusalText("off_topic", lang);
+    const id = await record(userId, "chat", {
+      inScope: false,
+      refusal: "off_topic",
+      question: message,
+      answer: declined,
+      model,
+    });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "off_topic", message);
+    return json({ reply: declined, refused: true, reason: "off_topic" });
+  }
+
   let reply: string;
   if (parsed && typeof parsed.reply === "string" && parsed.reply.trim()) {
     reply = parsed.reply.trim();

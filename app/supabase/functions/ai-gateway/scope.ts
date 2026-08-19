@@ -153,6 +153,22 @@ function score(text: string, needles: string[]): number {
 /**
  * Decides whether a question may be answered at all, and in which domain.
  *
+ * NOTE ON off_topic. Every other refusal here is a gate: the chat route turns
+ * it into a refusal without calling the model, and that is correct, because
+ * self-harm, medical questions and eating disorders must never depend on a
+ * model's judgement. off_topic is different — it is now a *hint*. The route
+ * passes the message to the model anyway and lets it decide whether the
+ * subject belongs in a nutritionist's consulting room, refunding the daily use
+ * when it does not.
+ *
+ * This list could never do that job. It refused "ازيك", it refused "أنا تعبان
+ * النهاردة", and it refused someone who said they had eaten koshary. A
+ * keyword allowlist cannot hold a conversation, and holding a conversation is
+ * the product.
+ *
+ * The list is still worth keeping and still worth testing: it is what decides
+ * the retrieval domain, and its judgement is free where the model's is not.
+ *
  * Order matters: the refusals are checked before the topic match, so
  * "what should I eat while I'm pregnant" refuses on pregnancy rather than
  * passing as a nutrition question.
