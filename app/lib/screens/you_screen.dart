@@ -91,6 +91,9 @@ class YouScreen extends StatelessWidget {
           ),
           const SizedBox(height: 14),
         ],
+        // Hidden until Qamar+ is on sale. A card that opens a checkout
+        // which cannot take money is worse than no card.
+        if (state.plusRequired) ...[
         Material(
           color: Colors.transparent,
           child: InkWell(
@@ -129,9 +132,12 @@ class YouScreen extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 14),
+          const SizedBox(height: 14),
+        ],
         _AffiliateCard(state: state),
-        const SizedBox(height: 14),
+        // The upsell. Same reason as above: nothing to sell yet.
+        if (state.plusRequired) ...[
+          const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
@@ -159,6 +165,7 @@ class YouScreen extends StatelessWidget {
             ],
           ),
         ),
+        ],
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
@@ -227,6 +234,8 @@ class YouScreen extends StatelessWidget {
             QLangToggle(lang: state.lang, onChanged: state.setLang),
           ]),
         ),
+        // Third and last Qamar+ surface on this screen.
+        if (state.plusRequired) ...[
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
@@ -260,6 +269,7 @@ class YouScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
+        ],
         Center(
           child: Text(
             'Qamar ${QamarConfig.buildLabel}',

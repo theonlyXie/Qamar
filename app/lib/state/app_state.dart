@@ -12,6 +12,7 @@ import '../models/plan.dart';
 import '../models/su_economy.dart';
 import '../services/ai_gateway.dart';
 import '../services/auth_service.dart';
+import '../services/config.dart';
 import '../services/dictation.dart';
 import '../services/payments.dart';
 import '../services/repositories.dart';
@@ -1268,6 +1269,18 @@ class AppState extends ChangeNotifier {
   /// payment — never decided on the client (spec_mvp.txt §29.1). Here it is
   /// local so the subscribed state is demoable.
   bool plusActive = false;
+
+  /// Whether anything is allowed to be locked behind Qamar+.
+  ///
+  /// False until Paymob is live. Every gate below asks this first, so removing
+  /// the paywall is one flag rather than a scatter of deletions — and putting
+  /// it back is the same flag, with the billing code never having been torn
+  /// out and rewritten from memory.
+  bool get plusRequired => QamarConfig.billingEnabled;
+
+  /// Whether the person may photograph a meal. The only thing Qamar+ actually
+  /// gated: chat, plans, and typed or spoken logging were always free.
+  bool get photoLogAllowed => !plusRequired || plusActive;
   DateTime? plusUntil;
 
   /// Set when checkout cannot start, or while Paymob's page is open.
@@ -1304,6 +1317,10 @@ class AppState extends ChangeNotifier {
   }
 
   void openSubscription() {
+    // Nothing to sell yet. Guarded here as well as in the UI so a stale
+    // widget, a deep link, or a restored navigation state cannot land someone
+    // on a checkout screen that cannot take money.
+    if (!plusRequired) return;
     screen = AppScreen.subscription;
     treeOpen = false;
     plusNotice = null;
@@ -1330,6 +1347,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> refreshPlusQuote() async {
+    if (!plusRequired) return;
     final billing = _billing;
     final gen = ++_plusQuoteGen;
     if (billing == null) {
@@ -1416,6 +1434,10 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _refreshPlus({bool announce = false}) async {
+    // No billing function is deployed, so asking it would fail and the failure
+    // would surface to the user as "could not read the subscription" — an
+    // error about a product that is not on sale.
+    if (!plusRequired) return;
     final billing = _billing;
     if (billing == null) return;
     try {
@@ -2301,7 +2323,7 @@ class AppState extends ChangeNotifier {
   ///  * photo — the caller opens the camera first and hands the shot back
   ///    through [logPhotoTaken].
   void quickLog(QuickLog kind) {
-    if (kind == QuickLog.photo && !plusActive) {
+    if (kind == QuickLog.photo && !photoLogAllowed) {
       refusePhotoLog();
       return;
     }
@@ -2334,7 +2356,7 @@ class AppState extends ChangeNotifier {
   /// which reads it and proposes items — all inside the conversation, with no
   /// analysing page and no confirm page. Qamar+ only: vision spends a daily use.
   void logPhotoTaken(String path) {
-    if (!plusActive) {
+    if (!photoLogAllowed) {
       refusePhotoLog();
       return;
     }

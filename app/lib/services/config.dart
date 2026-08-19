@@ -36,6 +36,23 @@ class QamarConfig {
   static const supportUrl = '$site/support';
   static const deleteDataUrl = '$site/delete-account';
 
+  /// Whether Qamar+ is being sold yet.
+  ///
+  /// Off until Paymob is live. While it is off nothing is locked, the
+  /// subscription screen is unreachable, and the app makes no billing calls at
+  /// all — which also stops it firing requests at a billing function that is
+  /// not deployed and reporting the failure to the user as if it were their
+  /// problem.
+  ///
+  /// This deliberately does not pretend everyone has a subscription. Nobody is
+  /// marked Active; there is simply nothing to be Active for. The distinction
+  /// matters on the day billing is switched on, because a build that had been
+  /// claiming Plus for everyone would suddenly take it away from them.
+  ///
+  /// Turn it on with --dart-define=BILLING_ENABLED=true.
+  static const billingEnabled =
+      bool.fromEnvironment('BILLING_ENABLED', defaultValue: false);
+
   static bool get useSupabase => supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
   static bool get useAiGateway => aiGatewayUrl.isNotEmpty;
 
