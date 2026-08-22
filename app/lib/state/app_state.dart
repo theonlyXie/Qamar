@@ -19,6 +19,8 @@ import '../models/billing.dart';
 import '../widgets/explain.dart';
 import '../models/profile.dart';
 import '../models/water.dart';
+import '../models/study.dart';
+import '../services/config.dart';
 import 'chat_replies.dart';
 
 /// Qamar+ billing period.
@@ -27,7 +29,7 @@ enum PlusPlan { monthly, quarterly, annual }
 /// How a meal gets logged straight from the orb, with no page in between.
 enum QuickLog { voice, text, photo }
 
-enum AppScreen { welcome, scan, onboard, today, plan, progress, you, wallet, subscription }
+enum AppScreen { welcome, scan, onboard, today, plan, progress, you, wallet, subscription, study }
 
 enum ChatState { idle, listening, thinking }
 
@@ -183,6 +185,23 @@ class AppState extends ChangeNotifier {
   final List<ObMessage> msgs = [];
   bool typing = false;
   String draft = '';
+
+  // ---- Study Mode (same Su wallet; feature-flagged) ----------------------
+  StudyView studyView = StudyView.hub;
+  final List<StudyWorkspace> studyWorkspaces = [];
+  String? activeStudyWorkspaceId;
+  final StudyDraft studyDraft = StudyDraft();
+  String? activeStudyTaskId;
+  StudySession? activeStudySession;
+  bool studySessionPaused = false;
+  int studySessionFocusSec = 0;
+  int studyFinishProgress = 100;
+  int studyFinishConfidence = 3;
+  String studyFinishNote = '';
+  int studySuEarnedToday = 0;
+  final Set<String> studyRewardKeys = {};
+  DateTime? studyWeeklyReviewAt;
+  String? studyStatusMessage;
 
   Profile profile = const Profile();
   bool scanned = false;
@@ -2212,7 +2231,368 @@ class AppState extends ChangeNotifier {
         AppScreen.you,
         AppScreen.wallet,
         AppScreen.subscription,
+        AppScreen.study,
       }.contains(screen);
+
+  // ---- Study Mode --------------------------------------------------------
+
+  bool get studyModeEnabled => QamarConfig.studyModeEnabled;
+
+  StudyWorkspace? get activeStudyWorkspace {
+    final id = activeStudyWorkspaceId;
+    if (id == null) return null;
+    for (final w in studyWorkspaces) {
+      if (w.id == id) return w;
+    }
+    return studyWorkspaces.isEmpty ? null : studyWorkspaces.last;
+  }
+
+  StudyTask? get activeStudyTask {
+    final w = activeStudyWorkspace;
+    final id = activeStudyTaskId;
+    if (w == null || id == null) return null;
+    for (final t in w.tasks) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
+
+  void openStudyMode() {
+    if (!studyModeEnabled) return;
+    studyStatusMessage = null;
+    if (studyWorkspaces.isEmpty) {
+      studyDraft.reset();
+      studyView = StudyView.add;
+    } else {
+      activeStudyWorkspaceId ??= studyWorkspaces.last.id;
+      studyView = StudyView.hub;
+    }
+    go(AppScreen.study);
+  }
+
+  void exitStudyMode() {
+    activeStudySession = null;
+    studySessionPaused = false;
+    studyView = StudyView.hub;
+    go(AppScreen.today);
+  }
+
+  void studyGo(StudyView view) {
+    studyView = view;
+    treeOpen = false;
+    _notify();
+  }
+
+  void studyPickType(StudySourceType type) {
+    studyDraft.type = type;
+    studyView = StudyView.setup;
+    _notify();
+  }
+
+  void studyUpdateDraft({
+    String? title,
+    String? author,
+    String? level,
+    String? outcome,
+    String? topicsRaw,
+    DateTime? deadline,
+    bool? noDeadline,
+    int? progressPct,
+    int? maxDailyMin,
+    int? blockMin,
+  }) {
+    if (title != null) studyDraft.title = title;
+    if (author != null) studyDraft.author = author;
+    if (level != null) studyDraft.level = level;
+    if (outcome != null) studyDraft.outcome = outcome;
+    if (topicsRaw != null) studyDraft.topicsRaw = topicsRaw;
+    if (deadline != null) studyDraft.deadline = deadline;
+    if (noDeadline != null) {
+      studyDraft.noDeadline = noDeadline;
+      if (noDeadline) studyDraft.deadline = null;
+    }
+    if (progressPct != null) studyDraft.progressPct = progressPct.clamp(0, 100);
+    if (maxDailyMin != null) studyDraft.maxDailyMin = maxDailyMin.clamp(25, 600);
+    if (blockMin != null) studyDraft.blockMin = blockMin;
+    _notify();
+  }
+
+  Future<void> studyGeneratePlan() async {
+    final title = studyDraft.title.trim();
+    if (title.isEmpty) {
+      studyStatusMessage = isAr ? 'اكتب اسم المادة أو الكتاب أولاً.' : 'Add a title for the subject or book first.';
+      _notify();
+      return;
+    }
+    if (!studyDraft.noDeadline && studyDraft.deadline == null) {
+      studyStatusMessage = isAr
+          ? 'اختار معاد التسليم، أو «مفيش معاد».'
+          : 'Pick a deadline, or choose “no deadline”.';
+      _notify();
+      return;
+    }
+    if (studyDraft.maxDailyMin < studyDraft.blockMin) {
+      studyStatusMessage = isAr
+          ? 'الحد اليومي أصغر من مدة الجلسة.'
+          : 'Daily cap is shorter than the focus block.';
+      _notify();
+      return;
+    }
+
+    studyStatusMessage = null;
+    studyView = StudyView.generating;
+    _notify();
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (_disposed) return;
+
+    final id = 'sw_${DateTime.now().millisecondsSinceEpoch}';
+    final units = StudyPlanner.unitsFromDraft(studyDraft);
+    final tasks = StudyPlanner.schedule(
+      workspaceId: id,
+      units: units,
+      maxDailyMin: studyDraft.maxDailyMin,
+      blockMin: studyDraft.blockMin,
+      bufferRatio: 0.15,
+      deadline: studyDraft.noDeadline ? null : studyDraft.deadline,
+      taskReward: SuEconomy.studyTaskComplete,
+    );
+    final ws = StudyWorkspace(
+      id: id,
+      type: studyDraft.type,
+      title: title,
+      author: studyDraft.author.trim().isEmpty ? null : studyDraft.author.trim(),
+      level: studyDraft.level.trim().isEmpty ? null : studyDraft.level.trim(),
+      deadline: studyDraft.noDeadline ? null : studyDraft.deadline,
+      outcome: studyDraft.outcome.trim().isEmpty
+          ? (isAr ? 'خلّص الخطة بالمعدل المتاح' : 'Finish the plan within available time')
+          : studyDraft.outcome.trim(),
+      currentProgressPct: studyDraft.progressPct,
+      maxDailyMin: studyDraft.maxDailyMin,
+      blockMin: studyDraft.blockMin,
+      bufferRatio: 0.15,
+      units: units,
+      tasks: tasks,
+      createdAt: DateTime.now(),
+    );
+    studyWorkspaces.add(ws);
+    activeStudyWorkspaceId = id;
+    studyView = StudyView.planReview;
+    _notify();
+  }
+
+  void studyApprovePlan() {
+    final w = activeStudyWorkspace;
+    if (w == null) return;
+    final i = studyWorkspaces.indexWhere((x) => x.id == w.id);
+    if (i < 0) return;
+    studyWorkspaces[i] = w.copyWith(planApproved: true);
+    studyView = StudyView.hub;
+    _notify();
+  }
+
+  void studyOpenDaily() {
+    studyView = StudyView.daily;
+    _notify();
+  }
+
+  void studyOpenDashboard() {
+    studyView = StudyView.dashboard;
+    _notify();
+  }
+
+  void studyOpenTask(String taskId) {
+    activeStudyTaskId = taskId;
+    studyView = StudyView.task;
+    _notify();
+  }
+
+  void studyStartSession({String? taskId}) {
+    final w = activeStudyWorkspace;
+    if (w == null) return;
+    final id = taskId ?? activeStudyTaskId ?? w.nextTask?.id;
+    if (id == null) return;
+    activeStudyTaskId = id;
+    studySessionFocusSec = 0;
+    studySessionPaused = false;
+    studyFinishProgress = 100;
+    studyFinishConfidence = 3;
+    studyFinishNote = '';
+    activeStudySession = StudySession(
+      id: 'ss_${DateTime.now().millisecondsSinceEpoch}',
+      taskId: id,
+      workspaceId: w.id,
+      startedAt: DateTime.now(),
+    );
+    studyView = StudyView.session;
+    _notify();
+  }
+
+  void studyTickSession() {
+    if (activeStudySession == null || studySessionPaused) return;
+    studySessionFocusSec += 1;
+    _notify();
+  }
+
+  void studyTogglePause() {
+    if (activeStudySession == null) return;
+    studySessionPaused = !studySessionPaused;
+    _notify();
+  }
+
+  void studyOpenFinish() {
+    if (activeStudySession == null) return;
+    studyView = StudyView.finish;
+    _notify();
+  }
+
+  void studySetFinish({int? progress, int? confidence, String? note}) {
+    if (progress != null) studyFinishProgress = progress.clamp(0, 100);
+    if (confidence != null) studyFinishConfidence = confidence.clamp(1, 5);
+    if (note != null) studyFinishNote = note;
+    _notify();
+  }
+
+  /// Confirms session evidence, updates the task, and posts Su only once.
+  void studyConfirmSession({bool markTaskDone = true}) {
+    final session = activeStudySession;
+    final w = activeStudyWorkspace;
+    final task = activeStudyTask;
+    if (session == null || w == null || task == null) return;
+
+    final focus = studySessionFocusSec;
+    final confirmed = session.copyWith(
+      endedAt: DateTime.now(),
+      focusSec: focus,
+      progressPct: studyFinishProgress,
+      confidence: studyFinishConfidence,
+      note: studyFinishNote.trim().isEmpty ? null : studyFinishNote.trim(),
+      confirmed: true,
+    );
+
+    final tasks = [...w.tasks];
+    final ti = tasks.indexWhere((t) => t.id == task.id);
+    StudyTask? completed;
+    if (ti >= 0 && markTaskDone && studyFinishProgress >= 80) {
+      tasks[ti] = tasks[ti].copyWith(status: StudyTaskStatus.done);
+      completed = tasks[ti];
+    }
+
+    final sessions = [...w.sessions, confirmed];
+    final wi = studyWorkspaces.indexWhere((x) => x.id == w.id);
+    if (wi >= 0) {
+      studyWorkspaces[wi] = w.copyWith(tasks: tasks, sessions: sessions);
+    }
+
+    if (completed != null) {
+      _studyAwardTask(completed);
+      _studyMaybeAwardDayBonus(studyWorkspaces[wi]);
+    }
+
+    activeStudySession = null;
+    studySessionPaused = false;
+    studyView = StudyView.hub;
+    studyStatusMessage = isAr
+        ? 'اتسجّلت ${ (focus / 60).round() } دقيقة.'
+        : 'Logged ${(focus / 60).round()} minutes.';
+    _notify();
+  }
+
+  void studyCompleteTaskQuick(String taskId) {
+    final w = activeStudyWorkspace;
+    if (w == null) return;
+    final tasks = [...w.tasks];
+    final i = tasks.indexWhere((t) => t.id == taskId);
+    if (i < 0 || tasks[i].status == StudyTaskStatus.done) return;
+    tasks[i] = tasks[i].copyWith(status: StudyTaskStatus.done);
+    final wi = studyWorkspaces.indexWhere((x) => x.id == w.id);
+    if (wi < 0) return;
+    studyWorkspaces[wi] = w.copyWith(tasks: tasks);
+    _studyAwardTask(tasks[i]);
+    _studyMaybeAwardDayBonus(studyWorkspaces[wi]);
+    studyView = StudyView.hub;
+    _notify();
+  }
+
+  void studyCarryTask(String taskId) {
+    final w = activeStudyWorkspace;
+    if (w == null) return;
+    final tasks = [...w.tasks];
+    final i = tasks.indexWhere((t) => t.id == taskId);
+    if (i < 0) return;
+    final t = tasks[i];
+    tasks[i] = StudyTask(
+      id: t.id,
+      workspaceId: t.workspaceId,
+      title: t.title,
+      finishCondition: t.finishCondition,
+      sourceAnchor: t.sourceAnchor,
+      milestoneTitle: t.milestoneTitle,
+      dueAt: t.dueAt.add(const Duration(days: 1)),
+      estimateMin: t.estimateMin,
+      order: t.order,
+      status: StudyTaskStatus.carried,
+      version: t.version + 1,
+      rewardPreview: t.rewardPreview,
+    );
+    final wi = studyWorkspaces.indexWhere((x) => x.id == w.id);
+    if (wi < 0) return;
+    studyWorkspaces[wi] = w.copyWith(tasks: tasks);
+    // Catch-up reflection reward — once per task version.
+    final key = 'catchup:${t.id}:v${t.version + 1}';
+    if (!studyRewardKeys.contains(key)) {
+      studyRewardKeys.add(key);
+      _creditStudy(SuEconomy.studyCatchUp, ar: 'ظبطت المهمة ليوم تاني', en: 'Moved a task — catch-up');
+    }
+    studyStatusMessage = isAr
+        ? 'نقلت المهمة وبظبط باقي الأسبوع.'
+        : 'Moved the task and will rebalance the week.';
+    studyView = StudyView.hub;
+    _notify();
+  }
+
+  void studyWeeklyReview() {
+    final now = DateTime.now();
+    if (studyWeeklyReviewAt != null &&
+        now.difference(studyWeeklyReviewAt!).inDays < 7) {
+      studyStatusMessage = isAr ? 'المراجعة الأسبوعية اتعملت خلاص.' : 'Weekly review already done.';
+      _notify();
+      return;
+    }
+    studyWeeklyReviewAt = now;
+    final key = 'weekly:${now.year}-W${(now.difference(DateTime(now.year)).inDays ~/ 7)}';
+    if (!studyRewardKeys.contains(key)) {
+      studyRewardKeys.add(key);
+      _creditStudy(SuEconomy.studyWeeklyReview, ar: 'مراجعة أسبوعية', en: 'Weekly study review');
+    }
+    studyStatusMessage = isAr ? 'شكراً — المراجعة اتسجلت.' : 'Thanks — review saved.';
+    _notify();
+  }
+
+  void _studyAwardTask(StudyTask task) {
+    final key = 'task:${task.id}:v${task.version}';
+    if (studyRewardKeys.contains(key)) return;
+    if (studySuEarnedToday >= SuEconomy.studyDailyCap) return;
+    studyRewardKeys.add(key);
+    final amount = SuEconomy.studyTaskComplete;
+    studySuEarnedToday += amount;
+    _creditStudy(amount, ar: 'خلّصت مهمة مذاكرة', en: 'Completed a study task');
+  }
+
+  void _studyMaybeAwardDayBonus(StudyWorkspace w) {
+    final today = w.todayTasks;
+    if (today.length < 2) return;
+    if (!today.every((t) => t.status == StudyTaskStatus.done)) return;
+    final day = DateTime.now();
+    final key = 'day:${day.year}-${day.month}-${day.day}:${w.id}';
+    if (studyRewardKeys.contains(key)) return;
+    studyRewardKeys.add(key);
+    _creditStudy(SuEconomy.studyDayComplete, ar: 'خلّصت مهام النهارده', en: 'Finished today’s study set');
+  }
+
+  /// Study and nutrition share one Su wallet — same phoenix ledger.
+  void _creditStudy(int amount, {required String ar, required String en}) {
+    _credit(amount, ar: ar, en: en);
+  }
 
   void setOrbPosition(double x, double y, {required double maxX, required double maxY}) {
     orbX = x.clamp(4, maxX).toDouble();

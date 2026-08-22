@@ -116,6 +116,60 @@ class _TodayScreenState extends State<TodayScreen> {
           ),
         ),
         const SizedBox(height: 14),
+        if (state.studyModeEnabled) ...[
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(QRadii.xl),
+              onTap: state.openStudyMode,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: QDecor.card(
+                  gradient: const LinearGradient(colors: [Color(0xFF182238), QColors.cardDeep]),
+                  border: QColors.violet.withOpacity(0.45),
+                  radius: QRadii.xl,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: QColors.moonlight.withOpacity(0.35)),
+                        color: const Color(0xFF121B33),
+                      ),
+                      child: const Icon(Icons.menu_book_rounded, color: QColors.moonlight, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            state.isAr ? 'وضع الدراسة' : 'Study Mode',
+                            style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFE9ECFF)),
+                          ),
+                          Text(
+                            state.isAr
+                                ? 'حوّل كتابك أو مادتك لخطة مذاكرة تناسب وقتك.'
+                                : 'Turn a book or subject into a plan that fits your time.',
+                            style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      state.isAr ? 'ابدأ' : 'Start',
+                      style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.violetSoft),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
         Container(
           padding: const EdgeInsets.all(20),
           decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardSlate]), border: QColors.borderStrong, radius: QRadii.xxxl,

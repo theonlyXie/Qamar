@@ -61,6 +61,10 @@ rebuilt as real Flutter screens rather than copying the prototype's DOM:
   sheet.
 - **Ask Qamar**: companion overlay (`lib/widgets/ask_qamar_overlay.dart`) —
   backdrop blur, orb docked to the side, messages on a moonbeam.
+- **Study Mode** (feature-flagged, default on): book/subject → plan → daily
+  tasks → focus session. Entry from Today and You › Modes. Su Points use the
+  **same wallet** as nutrition (`SuEconomy.study*`). Hide with
+  `--dart-define=STUDY_MODE=false`.
 - **Orb + tree nav**: `lib/widgets/living_orb.dart` (breathing/halo/wander/
   orbiting sparks), `lib/widgets/orb_nav.dart` (drag-anywhere, tap-to-open),
   `lib/widgets/tree_overlay.dart` (radial nav with animated branches).

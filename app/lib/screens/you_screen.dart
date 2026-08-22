@@ -160,6 +160,37 @@ class YouScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
+        if (state.studyModeEnabled) ...[
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(QRadii.xl),
+              onTap: state.openStudyMode,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+                child: Row(children: [
+                  const Icon(Icons.menu_book_rounded, color: QColors.moonlight, size: 28),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(isAr ? 'الأوضاع' : 'Modes',
+                          style: QText.body(size: 12, color: QColors.textMuted)),
+                      Text(isAr ? 'وضع الدراسة' : 'Study Mode',
+                          style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+                      Text(
+                        isAr ? 'خطة مذاكرة · جلسات · نفس محفظة Su' : 'Study plan · sessions · same Su wallet',
+                        style: QText.body(size: 12, height: 18, color: QColors.textFaint),
+                      ),
+                    ]),
+                  ),
+                  const Icon(Icons.chevron_right, size: 20, color: QColors.textFaint),
+                ]),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: QColors.gold.withOpacity(0.08), border: Border.all(color: QColors.gold.withOpacity(0.32)), borderRadius: BorderRadius.circular(QRadii.xl)),

@@ -22,6 +22,22 @@ class SuEconomy {
   static const int mealLogged = 100;
   static const int dailyQuest = 250;
 
+  // ---- Study Mode (same wallet; time alone never earns) -------------------
+  /// Confirmed completion of one planned study task.
+  static const int studyTaskComplete = 10;
+
+  /// Bonus when the day's planned set (≥2 tasks) is finished.
+  static const int studyDayComplete = 20;
+
+  /// One weekly study reflection.
+  static const int studyWeeklyReview = 15;
+
+  /// Completing a catch-up / replan reflection — not the missed task itself.
+  static const int studyCatchUp = 5;
+
+  /// Soft daily cap on study earnings before day-complete bonuses.
+  static const int studyDailyCap = 60;
+
   /// One more use of Qamar today — chat, a meal photo, or writing the plan.
   static const int extraAiUse = 400;
 
