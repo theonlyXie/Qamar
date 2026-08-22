@@ -59,8 +59,8 @@ rebuilt as real Flutter screens rather than copying the prototype's DOM:
   safety gates, target card, save-progress prompt), Today, Log, Analyzing,
   Confirm, Plan, Progress, You, Su Points wallet (Spend/History), Why/Source
   sheet.
-- **Ask Qamar**: companion overlay (`lib/widgets/ask_qamar_overlay.dart`) —
-  backdrop blur, orb docked to the side, messages on a moonbeam.
+- **Ask Qamar**: chat overlay (`lib/widgets/ask_qamar_overlay.dart`) —
+  familiar messenger layout; mic opens a centered speaking-orb voice mode.
 - **Orb + tree nav**: `lib/widgets/living_orb.dart` (breathing/halo/wander/
   orbiting sparks), `lib/widgets/orb_nav.dart` (drag-anywhere, tap-to-open),
   `lib/widgets/tree_overlay.dart` (radial nav with animated branches).
