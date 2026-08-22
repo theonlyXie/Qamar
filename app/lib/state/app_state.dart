@@ -2127,6 +2127,15 @@ class AppState extends ChangeNotifier {
   /// was refused. The UI offers typing instead of leaving a dead button.
   String? dictationError;
 
+  /// Leaves voice mode without sending. Used by "type instead".
+  Future<void> cancelListen() async {
+    if (chatState != ChatState.listening) return;
+    await _dictation?.cancel();
+    heard = '';
+    chatState = ChatState.idle;
+    _notify();
+  }
+
   /// Starts real dictation. Replaces a placeholder that waited 1.5 seconds and
   /// then inserted a scripted sentence.
   Future<void> tapOrbListen() async {
