@@ -20,6 +20,7 @@ import '../widgets/explain.dart';
 import '../models/profile.dart';
 import '../models/water.dart';
 import '../models/study.dart';
+import '../models/teacher_mind.dart';
 import '../services/config.dart';
 import 'chat_replies.dart';
 
@@ -202,6 +203,10 @@ class AppState extends ChangeNotifier {
   final Set<String> studyRewardKeys = {};
   DateTime? studyWeeklyReviewAt;
   String? studyStatusMessage;
+  CompletionForecast? studyForecast;
+  final Map<String, ConceptState> studyConcepts = {};
+  String? studyTutorReply;
+  bool studyTutorBusy = false;
 
   Profile profile = const Profile();
   bool scanned = false;
@@ -2376,6 +2381,17 @@ class AppState extends ChangeNotifier {
     );
     studyWorkspaces.add(ws);
     activeStudyWorkspaceId = id;
+    studyForecast = forecastFromUnits(
+      units: [
+        for (final u in units) (title: u.title, minutes: u.estimatedMin),
+      ],
+      maxDailyMin: studyDraft.maxDailyMin,
+      bufferRatio: 0.18,
+      sampleSessions: 0,
+    );
+    for (final u in units) {
+      studyConcepts.putIfAbsent(u.id, () => ConceptState.fresh(u.id));
+    }
     studyView = StudyView.planReview;
     _notify();
   }
@@ -2486,6 +2502,7 @@ class AppState extends ChangeNotifier {
     if (completed != null) {
       _studyAwardTask(completed);
       _studyMaybeAwardDayBonus(studyWorkspaces[wi]);
+      _studyUpdateMasteryFromFinish(completed, confidence: studyFinishConfidence);
     }
 
     activeStudySession = null;
@@ -2592,6 +2609,90 @@ class AppState extends ChangeNotifier {
   /// Study and nutrition share one Su wallet — same phoenix ledger.
   void _creditStudy(int amount, {required String ar, required String en}) {
     _credit(amount, ar: ar, en: en);
+  }
+
+  MissionCard? missionForTask(StudyTask task) => buildMissionCard(
+        title: task.title,
+        finishCondition: task.finishCondition,
+        estimateMin: task.estimateMin,
+        suPreview: task.rewardPreview ?? SuEconomy.studyTaskComplete,
+      );
+
+  /// Ask the Teacher AI Mind. Uses the gateway when connected; otherwise an
+  /// offline coach reply grounded in evidence rules (never invents mastery).
+  Future<void> studyAskTeacher(String message) async {
+    final text = message.trim();
+    if (text.isEmpty || studyTutorBusy) return;
+    studyTutorBusy = true;
+    studyTutorReply = null;
+    _notify();
+
+    final w = activeStudyWorkspace;
+    final task = activeStudyTask;
+    final forecast = studyForecast;
+    final forecastSummary = forecast == null
+        ? null
+        : 'P50 ${forecast.remainingHoursP50}h / P80 ${forecast.remainingHoursP80}h (${forecast.confidence})';
+
+    try {
+      final gateway = _ai;
+      if (gateway != null) {
+        final result = await gateway.studyTutor(
+          message: text,
+          lang: lang.code,
+          workspaceTitle: w?.title,
+          taskTitle: task?.title,
+          finishCondition: task?.finishCondition,
+          forecastSummary: forecastSummary,
+          estimateMin: task?.estimateMin,
+        );
+        studyTutorReply = result.reply;
+        if (result.refused) {
+          studyStatusMessage = result.reply;
+        }
+      } else {
+        studyTutorReply = _offlineTeacherReply(text, task);
+      }
+    } catch (e) {
+      studyTutorReply = isAr
+          ? 'المعلّم مش متاح دلوقتي. جرّب تاني أو استخدم المهمة كدليل.'
+          : 'The teacher is unavailable right now. Try again, or use the task card as your guide.';
+      studyStatusMessage = studyTutorReply;
+    } finally {
+      studyTutorBusy = false;
+      _notify();
+    }
+  }
+
+  String _offlineTeacherReply(String message, StudyTask? task) {
+    final lower = message.toLowerCase();
+    if (RegExp(r'write my essay|ghostwrite|حل الامتحان|اكتب المقال عني').hasMatch(lower)) {
+      return isAr
+          ? 'أقدر أشرح وأدرّب وأراجع — من غير ما أكتب التسليم أو أجاوب امتحان مكانك.'
+          : 'I can explain, practice, and review — not write a submission or sit an exam for you.';
+    }
+    if (task != null) {
+      final m = missionForTask(task)!;
+      return isAr
+          ? 'النهارده الهدف: ${m.outcome}\nالآلية: ${m.mechanism.name}\nالدليل: ${m.evidenceCriterion}\nلو الوقت ضاق: ${m.fallback}'
+          : 'Today’s outcome: ${m.outcome}\nMechanism: ${m.mechanism.name}\nEvidence: ${m.evidenceCriterion}\nIf time collapses: ${m.fallback}';
+    }
+    return isAr
+        ? 'ابدأ باسترجاع قصير قبل ما ترجع للمصدر. الوقت لوحده مش بيثبت إتقان.'
+        : 'Start with a short retrieval attempt before reopening the source. Time alone does not prove mastery.';
+  }
+
+  /// Records mastery evidence after a confirmed study finish (≥80% progress).
+  void _studyUpdateMasteryFromFinish(StudyTask task, {required int confidence}) {
+    final conceptId = task.sourceAnchor ?? task.id;
+    final prev = studyConcepts[conceptId] ?? ConceptState.fresh(conceptId);
+    // Confidence ≥4 and high progress count as a successful retrieval check.
+    final correct = confidence >= 3;
+    studyConcepts[conceptId] = updateMastery(
+      prev,
+      correct: correct,
+      hintsUsed: confidence <= 2 ? 1 : 0,
+    );
   }
 
   void setOrbPosition(double x, double y, {required double maxX, required double maxY}) {

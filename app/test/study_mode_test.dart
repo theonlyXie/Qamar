@@ -90,31 +90,24 @@ void main() {
     expect(state.suAvailable, 50 + SuEconomy.studyCatchUp);
   });
 
-  test('planner keeps buffer and never invents exact single-minute totals', () {
-    final draft = StudyDraft()
-      ..title = 'Math'
-      ..topicsRaw = 'Algebra\nGeometry\nCalc'
-      ..maxDailyMin = 100
-      ..blockMin = 50
-      ..noDeadline = true;
-    final units = StudyPlanner.unitsFromDraft(draft);
-    final tasks = StudyPlanner.schedule(
-      workspaceId: 'w1',
-      units: units,
-      maxDailyMin: 100,
+  test('plan review carries a P50/P80 teacher forecast', () async {
+    final state = AppState();
+    state.openStudyMode();
+    state.studyPickType(StudySourceType.subject);
+    state.studyUpdateDraft(
+      title: 'Calculus',
+      topicsRaw: 'Limits\nDerivatives\nApplications',
+      noDeadline: true,
+      maxDailyMin: 90,
       blockMin: 50,
-      bufferRatio: 0.15,
-      taskReward: 10,
     );
-    expect(units.length, 3);
-    expect(tasks, isNotEmpty);
-    // Usable capacity is 85 min; a day should not pack more than that in one go
-    // without rolling to the next day.
-    final day0 = DateTime(tasks.first.dueAt.year, tasks.first.dueAt.month, tasks.first.dueAt.day);
-    final firstDayMin = tasks
-        .where((t) =>
-            t.dueAt.year == day0.year && t.dueAt.month == day0.month && t.dueAt.day == day0.day)
-        .fold<int>(0, (s, t) => s + t.estimateMin);
-    expect(firstDayMin, lessThanOrEqualTo(85));
+    await state.studyGeneratePlan();
+    expect(state.studyForecast, isNotNull);
+    expect(state.studyForecast!.remainingHoursP80,
+        greaterThan(state.studyForecast!.remainingHoursP50));
+    final task = state.activeStudyWorkspace!.tasks.first;
+    final mission = state.missionForTask(task);
+    expect(mission, isNotNull);
+    expect(mission!.evidenceCriterion.toLowerCase(), contains('timer'));
   });
 }

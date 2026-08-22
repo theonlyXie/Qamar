@@ -105,6 +105,35 @@ abstract class AiGateway {
 
   /// Remaining shared uses for chat, photographing a meal, and the plan today.
   Future<AiQuota> quotaStatus();
+
+  /// Study Mode tutor — Teacher AI Mind (learning-science + integrity).
+  Future<StudyTutorResult> studyTutor({
+    required String message,
+    required String lang,
+    String? workspaceTitle,
+    String? taskTitle,
+    String? finishCondition,
+    String? forecastSummary,
+    int? estimateMin,
+  });
+}
+
+/// One turn from the Study Mode teacher.
+class StudyTutorResult {
+  final String reply;
+  final bool refused;
+  final String? reason;
+  final String? mode;
+  final String? mechanism;
+  final String? grounding;
+  const StudyTutorResult({
+    required this.reply,
+    this.refused = false,
+    this.reason,
+    this.mode,
+    this.mechanism,
+    this.grounding,
+  });
 }
 
 /// Talks to your own server gateway (supabase/functions/ai-gateway). The
@@ -320,6 +349,46 @@ class HttpAiGateway implements AiGateway {
     final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
     lastQuota = AiQuota.fromJson(json);
     return lastQuota!;
+  }
+
+  @override
+  Future<StudyTutorResult> studyTutor({
+    required String message,
+    required String lang,
+    String? workspaceTitle,
+    String? taskTitle,
+    String? finishCondition,
+    String? forecastSummary,
+    int? estimateMin,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$baseUrl/study/tutor'),
+      headers: _headers,
+      body: jsonEncode({
+        'message': message,
+        'lang': lang,
+        if (workspaceTitle != null) 'workspace_title': workspaceTitle,
+        if (taskTitle != null) 'task_title': taskTitle,
+        if (finishCondition != null) 'finish_condition': finishCondition,
+        if (forecastSummary != null) 'forecast_summary': forecastSummary,
+        if (estimateMin != null) 'estimate_min': estimateMin,
+      }),
+    );
+    if (res.statusCode == 429) {
+      throw AiQuotaException.fromBody(res.bodyBytes);
+    }
+    if (res.statusCode != 200) {
+      throw AiGatewayException('studyTutor failed: ${res.statusCode} ${res.body}');
+    }
+    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    return StudyTutorResult(
+      reply: (json['reply'] as String?) ?? '',
+      refused: json['refused'] == true,
+      reason: json['reason'] as String?,
+      mode: json['mode'] as String?,
+      mechanism: json['mechanism'] as String?,
+      grounding: json['grounding'] as String?,
+    );
   }
 }
 

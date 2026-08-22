@@ -679,6 +679,33 @@ class _StudyPlanReview extends StatelessWidget {
                     : 'About ${hours.toStringAsFixed(1)} h · ${(w.bufferRatio * 100).round()}% buffer · ${w.tasks.length} tasks',
                 style: QText.number(size: 14, color: QColors.textMuted),
               ),
+              if (state.studyForecast != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: QDecor.card(color: QColors.cardDeep, border: QColors.cyan.withOpacity(0.35), radius: QRadii.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(isAr ? 'تقدير الإنهاء (مش رقم وهمي)' : 'Finish forecast (range, not fake precision)',
+                          style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.cyan)),
+                      const SizedBox(height: 6),
+                      Text(
+                        isAr
+                            ? 'الأرجح ~${state.studyForecast!.remainingHoursP50} س · آمن ~${state.studyForecast!.remainingHoursP80} س'
+                            : 'Most likely ~${state.studyForecast!.remainingHoursP50} h · safer ~${state.studyForecast!.remainingHoursP80} h',
+                        style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.textBrand),
+                      ),
+                      Text(
+                        isAr
+                            ? 'ثقة ${state.studyForecast!.confidence} · ${state.studyForecast!.dominantRisk}'
+                            : '${state.studyForecast!.confidence} confidence · ${state.studyForecast!.dominantRisk}',
+                        style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               if (tight) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -768,6 +795,8 @@ class _StudyTask extends StatelessWidget {
     final isAr = state.isAr;
     final t = state.activeStudyTask;
     if (t == null) return const SizedBox.shrink();
+    final mission = state.missionForTask(t);
+    final concept = state.studyConcepts[t.sourceAnchor ?? t.id];
     return Column(
       children: [
         _ModeHeader(title: isAr ? 'تفاصيل المهمة' : 'Task detail', onBack: () => state.studyGo(StudyView.hub)),
@@ -778,6 +807,43 @@ class _StudyTask extends StatelessWidget {
               Text(t.title, style: QText.display(size: 26, height: 32, color: QColors.textBrand)),
               const SizedBox(height: 10),
               Text(t.finishCondition, style: QText.body(size: 15, height: 23, color: QColors.textHigh)),
+              if (mission != null) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: QDecor.card(
+                    gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
+                    radius: QRadii.xl,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(isAr ? 'بطاقة المهمة اليومية' : 'Daily mission card',
+                          style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.violetSoft)),
+                      const SizedBox(height: 6),
+                      Text(
+                        isAr
+                            ? 'آلية التعلم: ${mission.mechanism.name} · P50 ${mission.durationP50Min} د / P80 ${mission.durationP80Min} د'
+                            : 'Mechanism: ${mission.mechanism.name} · P50 ${mission.durationP50Min} min / P80 ${mission.durationP80Min} min',
+                        style: QText.number(size: 13, color: QColors.textMid),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(mission.evidenceCriterion, style: QText.body(size: 13, height: 20, color: QColors.textMuted)),
+                      const SizedBox(height: 4),
+                      Text(mission.fallback, style: QText.body(size: 12, height: 18, color: QColors.textFaint)),
+                    ],
+                  ),
+                ),
+              ],
+              if (concept != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  isAr
+                      ? 'حالة الإتقان: ${concept.status.name} · P(L)=${concept.masteryP.toStringAsFixed(2)}'
+                      : 'Mastery: ${concept.status.name} · P(L)=${concept.masteryP.toStringAsFixed(2)}',
+                  style: QText.number(size: 12, color: QColors.textFaint),
+                ),
+              ],
               if (t.sourceAnchor != null) ...[
                 const SizedBox(height: 8),
                 Text('${isAr ? 'المصدر' : 'Source'}: ${t.sourceAnchor}',
@@ -786,12 +852,43 @@ class _StudyTask extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 isAr
-                    ? 'تقدير ${t.estimateMin} د · +${t.rewardPreview ?? SuEconomy.studyTaskComplete} Su بعد التأكيد'
-                    : 'Estimate ${t.estimateMin} min · +${t.rewardPreview ?? SuEconomy.studyTaskComplete} Su after confirm',
+                    ? 'تقدير ${t.estimateMin} د · +${t.rewardPreview ?? SuEconomy.studyTaskComplete} Su بعد دليل التحقق'
+                    : 'Estimate ${t.estimateMin} min · +${t.rewardPreview ?? SuEconomy.studyTaskComplete} Su after verified evidence',
                 style: QText.number(size: 13, color: QColors.goldMuted),
               ),
+              if (state.studyTutorReply != null) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: QDecor.card(color: QColors.cardSlate, radius: QRadii.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        const QamarMoon(size: 22),
+                        const SizedBox(width: 8),
+                        Text(isAr ? 'قمر · معلّم' : 'Qamar · teacher',
+                            style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.moonlight)),
+                      ]),
+                      const SizedBox(height: 8),
+                      Text(state.studyTutorReply!, style: QText.body(size: 14, height: 22, color: QColors.textHigh)),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 22),
               QPrimaryButton(label: isAr ? 'ابدأ الجلسة' : 'Start session', onTap: () => state.studyStartSession(taskId: t.id)),
+              const SizedBox(height: 10),
+              QOutlineButton(
+                label: state.studyTutorBusy
+                    ? (isAr ? 'بيفكر…' : 'Thinking…')
+                    : (isAr ? 'اسأل قمر ليه النهاردة' : 'Ask Qamar why today'),
+                onTap: state.studyTutorBusy
+                    ? null
+                    : () => state.studyAskTeacher(
+                          isAr ? 'ليه المهمة دي النهاردة وإيه دليل الإتقان؟' : 'Why this task today, and what counts as mastery evidence?',
+                        ),
+              ),
               const SizedBox(height: 10),
               QOutlineButton(label: isAr ? 'علّمها خلصانة' : 'Mark complete', onTap: () => state.studyCompleteTaskQuick(t.id)),
               TextButton(
