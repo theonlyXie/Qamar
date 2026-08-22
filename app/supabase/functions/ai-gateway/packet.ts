@@ -27,7 +27,7 @@
 import type { Usage, UserContext } from "./model.ts";
 import type { Resolution } from "./graph.ts";
 
-export type Kind = "chat" | "meal_analysis" | "plan" | "body_scan";
+export type Kind = "chat" | "meal_analysis" | "plan" | "body_scan" | "study";
 
 /**
  * The stages 0015 budgets.

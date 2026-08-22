@@ -209,6 +209,19 @@ class FakeGateway implements AiGateway {
 
   @override
   Future<AiQuota> quotaStatus() async => quota;
+
+  @override
+  Future<StudyTutorResult> studyTutor({
+    required String message,
+    required String lang,
+    String? workspaceTitle,
+    String? taskTitle,
+    String? finishCondition,
+    String? forecastSummary,
+    int? estimateMin,
+  }) async {
+    return const StudyTutorResult(reply: 'study coach ok', mode: 'coach');
+  }
 }
 
 class FakeAccount implements Account {

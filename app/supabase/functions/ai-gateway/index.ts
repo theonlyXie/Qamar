@@ -12,6 +12,8 @@
 //   POST /ai-gateway/plan/generate  { date?, lang?, force?, instruction? }
 //   POST /ai-gateway/scan/read      { imageBase64, imageMediaType, lang }
 //   POST /ai-gateway/quota          {}
+//   POST /ai-gateway/study/tutor    { message, lang, workspace?, task?, forecast? }
+//   POST /ai-gateway/study/forecast { units, maxDailyMin, bufferRatio?, deadline?, sampleSessions? }
 //
 // Secrets (supabase secrets set ...):
 //   ANTHROPIC_API_KEY   required
@@ -30,9 +32,19 @@ import {
   mealPhotoSystemPrompt,
   parseJson,
   planSystemPrompt,
+  studyTutorSystemPrompt,
   type ImageInput,
   type UserContext,
 } from "./model.ts";
+import {
+  buildMissionCard,
+  classifyStudyRequest,
+  evidenceForMechanism,
+  inferLearningObject,
+  methodForObject,
+} from "./teacher.ts";
+import { forecastCompletion, classifyUnit, type UnitEstimateInput } from "./study_forecast.ts";
+import { freshConcept, updateConcept } from "./learner_model.ts";
 import { retrieve, type FoodFacts, type Passage, type Source } from "./retrieval.ts";
 import {
   identifyItems,
@@ -241,7 +253,7 @@ async function loadContext(
 
 async function record(
   userId: string,
-  kind: "chat" | "meal_analysis" | "plan" | "body_scan",
+  kind: "chat" | "meal_analysis" | "plan" | "body_scan" | "study",
   fields: { inScope: boolean; refusal?: string; question?: string; answer?: string; sources?: Source[]; model?: string },
 ): Promise<string | null> {
   // Returns the row id so a safety event can point at the interaction that
@@ -1368,6 +1380,172 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
   });
 }
 
+// ---- Study Mode / Teacher AI Mind ---------------------------------------
+
+async function studyTutor(userId: string, body: Record<string, unknown>): Promise<Response> {
+  const message = (asString(body.message) ?? "").trim();
+  const lang = asString(body.lang) === "ar" ? "ar" : "en";
+  if (!message) return json({ error: "message required" }, 400);
+
+  const integrity = classifyStudyRequest(message);
+  if (!integrity.allowed) {
+    const id = await record(userId, "study", {
+      inScope: false,
+      refusal: integrity.reason,
+      question: message,
+    });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "off_topic", message);
+    return json({
+      reply: lang === "ar" ? integrity.messageAr : integrity.messageEn,
+      refused: true,
+      reason: integrity.reason,
+    });
+  }
+
+  const workspaceTitle = asString(body.workspace_title) ?? "";
+  const taskTitle = asString(body.task_title) ?? "";
+  const finishCondition = asString(body.finish_condition) ?? "";
+  const forecastSummary = asString(body.forecast_summary) ?? "";
+  const object = inferLearningObject(taskTitle || workspaceTitle, finishCondition || message);
+  const method = methodForObject(object);
+  const cards = evidenceForMechanism(method.mechanism);
+  const evidenceRules = cards.map((c) => `- [${c.id}] ${c.productRule} (${c.sourceIds.join(", ")})`).join("\n");
+  const mission = buildMissionCard({
+    title: taskTitle || workspaceTitle || "Study",
+    finishCondition: finishCondition || message,
+    estimateMin: typeof body.estimate_min === "number" ? body.estimate_min : 50,
+  });
+
+  const taken = await takeAiUse(userId, lang);
+  if (taken instanceof Response) return taken;
+
+  let called: Awaited<ReturnType<typeof callModel>>;
+  try {
+    called = await callModel({
+      system: studyTutorSystemPrompt({
+        lang,
+        mode: integrity.mode,
+        mechanism: method.mechanism,
+        workspaceTitle,
+        taskTitle,
+        finishCondition,
+        evidenceRules,
+        forecastSummary,
+      }),
+      user: message,
+      maxTokens: 1200,
+      prefill: "{",
+    });
+  } catch (e) {
+    await refundAi(userId);
+    throw e;
+  }
+
+  const parsed = parseJson<{
+    reply?: string;
+    action?: string | null;
+    mechanism?: string;
+    grounding?: string;
+  }>(called.text);
+  const reply = (parsed?.reply ?? called.text).trim() ||
+    (lang === "ar" ? "قولي تاني وأنا أظبط الخطوة." : "Say that again and I will adjust the next step.");
+
+  await record(userId, "study", {
+    inScope: true,
+    question: message,
+    answer: reply,
+    model: called.model,
+  });
+
+  return json({
+    reply,
+    refused: false,
+    mode: integrity.mode,
+    mechanism: parsed?.mechanism ?? method.mechanism,
+    grounding: parsed?.grounding ?? "evidence",
+    mission,
+    evidence_card_ids: cards.map((c) => c.id),
+    quota: taken,
+  });
+}
+
+async function studyForecast(_userId: string, body: Record<string, unknown>): Promise<Response> {
+  const rawUnits = Array.isArray(body.units) ? body.units : [];
+  const units: UnitEstimateInput[] = rawUnits.map((u) => {
+    const row = (u && typeof u === "object") ? u as Record<string, unknown> : {};
+    const title = asString(row.title) ?? "unit";
+    const consume = typeof row.consume_min === "number"
+      ? row.consume_min
+      : (typeof row.estimate_min === "number" ? row.estimate_min : 40);
+    const taskClass = (asString(row.task_class) as UnitEstimateInput["taskClass"] | null) ??
+      classifyUnit(title);
+    return { title, consumeMin: consume, taskClass };
+  });
+  if (units.length === 0) return json({ error: "units required" }, 400);
+
+  const maxDailyMin = typeof body.max_daily_min === "number" ? body.max_daily_min : 120;
+  const bufferRatio = typeof body.buffer_ratio === "number" ? body.buffer_ratio : 0.18;
+  const sampleSessions = typeof body.sample_sessions === "number" ? body.sample_sessions : 0;
+  const deadline = asString(body.deadline);
+
+  const forecast = forecastCompletion({
+    units,
+    maxDailyMin,
+    bufferRatio,
+    deadline,
+    sampleSessions,
+  });
+  return json({ forecast });
+}
+
+async function studyMasteryUpdate(_userId: string, body: Record<string, unknown>): Promise<Response> {
+  const conceptId = asString(body.concept_id) ?? "concept";
+  const correct = body.correct === true;
+  const stateIn = body.state && typeof body.state === "object"
+    ? body.state as {
+      mastery_p?: number;
+      memory_stability_days?: number;
+      successes?: number;
+      failures?: number;
+      status?: string;
+    }
+    : null;
+
+  let state = freshConcept(conceptId);
+  if (stateIn) {
+    state = {
+      ...state,
+      masteryP: typeof stateIn.mastery_p === "number" ? stateIn.mastery_p : state.masteryP,
+      memoryStabilityDays: typeof stateIn.memory_stability_days === "number"
+        ? stateIn.memory_stability_days
+        : state.memoryStabilityDays,
+      successes: typeof stateIn.successes === "number" ? stateIn.successes : state.successes,
+      failures: typeof stateIn.failures === "number" ? stateIn.failures : state.failures,
+    };
+  }
+
+  const next = updateConcept(state, {
+    correct,
+    confidence: typeof body.confidence === "number" ? body.confidence : undefined,
+    hintsUsed: typeof body.hints_used === "number" ? body.hints_used : 0,
+    delayedHours: typeof body.delayed_hours === "number" ? body.delayed_hours : null,
+    transfer: body.transfer === true,
+  });
+
+  return json({
+    state: {
+      concept_id: next.conceptId,
+      mastery_p: next.masteryP,
+      uncertainty: next.uncertainty,
+      memory_stability_days: next.memoryStabilityDays,
+      successes: next.successes,
+      failures: next.failures,
+      status: next.status,
+      last_evidence_at: next.lastEvidenceAt,
+    },
+  });
+}
+
 // ---- entry --------------------------------------------------------------
 
 Deno.serve(async (req) => {
@@ -1407,6 +1585,12 @@ Deno.serve(async (req) => {
         });
       case "/quota":
         return json(quotaPayload(await quotaStatus(userId)));
+      case "/study/tutor":
+        return await studyTutor(userId, body);
+      case "/study/forecast":
+        return await studyForecast(userId, body);
+      case "/study/mastery":
+        return await studyMasteryUpdate(userId, body);
       default:
         return json({ error: `unknown route ${route}` }, 404);
     }

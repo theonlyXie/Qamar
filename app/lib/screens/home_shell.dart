@@ -18,6 +18,7 @@ import 'subscription_screen.dart';
 import 'wallet_screen.dart';
 import 'welcome_screen.dart';
 import 'you_screen.dart';
+import 'study/study_shell.dart';
 
 /// Root of the real app — equivalent to the prototype's single device frame.
 /// Owns the current-screen switch plus the overlays that float above any
@@ -46,6 +47,8 @@ class HomeShell extends StatelessWidget {
         return const WalletScreen();
       case AppScreen.subscription:
         return const SubscriptionScreen();
+      case AppScreen.study:
+        return const StudyShell();
     }
   }
 

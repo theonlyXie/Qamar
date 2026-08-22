@@ -39,6 +39,12 @@ class QamarConfig {
   static bool get useSupabase => supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
   static bool get useAiGateway => aiGatewayUrl.isNotEmpty;
 
+  /// Study Mode module (feature paper S63–S85). Default on so the offline
+  /// demo is complete; pass `--dart-define=STUDY_MODE=false` to hide it.
+  static const studyModeDefine = String.fromEnvironment('STUDY_MODE', defaultValue: 'true');
+  static bool get studyModeEnabled =>
+      studyModeDefine != 'false' && studyModeDefine != '0';
+
   /// Paymob billing Edge Function. Defaults to the same Supabase project as
   /// the rest of the backend so Egypt checkout needs no extra dart-define.
   static const billingUrlOverride = String.fromEnvironment('BILLING_URL');
