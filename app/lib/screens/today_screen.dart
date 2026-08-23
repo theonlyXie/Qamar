@@ -205,11 +205,19 @@ class _TodayScreenState extends State<TodayScreen> {
                   ]),
                 ],
               ),
-              Text(state.isAr ? 'سجّل الغدا قبل ٤ العصر' : 'Log lunch before 4pm', style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),
-              Text(
-                state.isAr ? 'لما تسجّل بدري بقدر أعدّل العشا قبل ما اليوم يخلص.' : 'Logging early lets me adjust dinner before the day ends.',
-                style: QText.body(size: 13, color: QColors.textMuted),
-              ),
+              // Quoted from the plan Qamar wrote — see AppState.questCard().
+              Builder(builder: (_) {
+                final q = state.questCard();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(state.isAr ? q.titleAr : q.titleEn,
+                        style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),
+                    Text(state.isAr ? q.bodyAr : q.bodyEn,
+                        style: QText.body(size: 13, color: QColors.textMuted)),
+                  ],
+                );
+              }),
               const SizedBox(height: 8),
               Row(children: [
                 Material(

@@ -2039,6 +2039,38 @@ class AppState extends ChangeNotifier {
     return meals.first;
   }
 
+  /// What today's quest actually asks for.
+  ///
+  /// It used to be two fixed strings — "Log lunch before 4pm" and "Logging
+  /// early lets me adjust dinner" — shown to every user at every hour,
+  /// including at ten at night, and including to someone whose plan has no
+  /// lunch in it. That is the app deciding something Qamar should decide.
+  ///
+  /// Nothing new is generated here and no AI use is spent. The plan Qamar
+  /// already wrote names the meals and explains them in its own words; this
+  /// picks the slot that is due — the arithmetic — and quotes it.
+  ///
+  /// With no plan yet, it states the server's rule plainly rather than
+  /// inventing a personal-sounding one: `qamar_complete_daily_quest` pays when
+  /// a meal has been logged today in Cairo, and that is the whole condition.
+  ({String titleAr, String titleEn, String bodyAr, String bodyEn}) questCard() {
+    final m = nextMeal();
+    if (m == null) {
+      return (
+        titleAr: 'سجّل وجبة النهارده',
+        titleEn: 'Log a meal today',
+        bodyAr: 'أول ما تسجّل وجبة، المهمة تتحسب.',
+        bodyEn: 'The quest counts as soon as one meal is logged.',
+      );
+    }
+    return (
+      titleAr: 'سجّل ${m.slotAr}: ${m.nameAr}',
+      titleEn: 'Log ${m.slotEn.toLowerCase()}: ${m.nameEn}',
+      bodyAr: m.noteAr,
+      bodyEn: m.noteEn,
+    );
+  }
+
   bool isSlotSwapped(String slotId) => swappedSlots.contains(slotId);
 
   void toggleSlotSwap(String slotId) {
