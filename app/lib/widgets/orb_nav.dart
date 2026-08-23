@@ -165,15 +165,19 @@ class _DraggableOrbState extends State<_DraggableOrb> {
     }
   }
 
-  /// Photo opens the real camera; the other two drop straight into the
+  /// Photo and Scan open the real camera; the other two drop straight into the
   /// conversation. Nothing here pushes a screen. The camera is Qamar+:
   /// typing and speaking never open it.
+  ///
+  /// Gated on cameraAllowed rather than plusActive — see the same note in
+  /// tree_overlay._runMethod. plusActive is false for everyone while billing
+  /// is off, so checking it here made the camera unreachable in every build.
   Future<void> _runQuickLog(AppState state, QuickLog kind) async {
-    if (kind != QuickLog.photo) {
+    if (kind != QuickLog.photo && kind != QuickLog.scan) {
       state.quickLog(kind);
       return;
     }
-    if (!state.plusActive) {
+    if (!state.cameraAllowed) {
       state.refusePhotoLog();
       return;
     }
@@ -182,7 +186,11 @@ class _DraggableOrbState extends State<_DraggableOrb> {
       if (!mounted) return;
       if (shot == null) return; // backed out of the camera
       state.quickLog(kind);
-      state.logPhotoTaken(shot.path);
+      if (kind == QuickLog.scan) {
+        await state.scanLabelPhoto(shot.path);
+      } else {
+        state.logPhotoTaken(shot.path);
+      }
     } on Exception {
       if (!mounted) return;
       // No camera, or permission refused: still let them log by typing.

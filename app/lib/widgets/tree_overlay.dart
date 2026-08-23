@@ -82,13 +82,19 @@ const kLogMethods = [
   LogMethod('اتكلم', 'Speak', Icons.mic_none, QuickLog.voice),
   LogMethod('اكتب', 'Type', Icons.keyboard_outlined, QuickLog.text),
   LogMethod('صوّر', 'Photo', Icons.photo_camera_outlined, QuickLog.photo),
+  LogMethod('امسح العلبة', 'Scan packet', Icons.qr_code_scanner, QuickLog.scan),
 ];
 
-/// Where the three log methods sit once Log is chosen. They take over the ring
-/// rather than fanning off the Log node: crowding three 46px circles and their
-/// labels into a 60-degree arc stacked them on top of each other and made them
-/// impossible to hit.
-const _logAngles = [0.0, 120.0, 240.0];
+/// Where the log methods sit once Log is chosen. They take over the ring
+/// rather than fanning off the Log node: crowding them and their labels into a
+/// 60-degree arc stacked them on top of each other and made them impossible to
+/// hit.
+///
+/// Spaced evenly rather than listed, because the list has changed length once
+/// already and a hard-coded [0, 120, 240] is a range error waiting for the
+/// next method to be added.
+List<double> get _logAngles =>
+    [for (var i = 0; i < kLogMethods.length; i++) 360.0 * i / kLogMethods.length];
 
 Offset _logMethodCenter(int i) => Offset(
       _center.dx + _ringRadius * math.cos((_logAngles[i] - 90) * math.pi / 180),
@@ -269,14 +275,22 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
     );
   }
 
-  /// Runs a log method inline. Photo opens the camera immediately; the other
-  /// two drop straight into the conversation. Nothing here pushes a screen.
+  /// Runs a log method inline. Photo and Scan open the camera immediately; the
+  /// other two drop straight into the conversation. Nothing here pushes a
+  /// screen.
+  ///
+  /// The gate is [AppState.cameraAllowed], not plusActive. Those are not the
+  /// same question: plusActive is false for everybody while Paymob is off, so
+  /// asking it directly sent every user to a subscription screen that itself
+  /// refuses to open — a camera button that did nothing at all. cameraAllowed
+  /// is the rule ("camera is Qamar+") including the part where a rule with
+  /// nothing to enforce yet lets everyone through.
   Future<void> _runMethod(BuildContext context, AppState state, QuickLog kind) async {
-    if (kind != QuickLog.photo) {
+    if (kind != QuickLog.photo && kind != QuickLog.scan) {
       state.quickLog(kind);
       return;
     }
-    if (!state.plusActive) {
+    if (!state.cameraAllowed) {
       state.refusePhotoLog();
       return;
     }
@@ -290,7 +304,11 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
         return;
       }
       state.quickLog(kind);
-      state.logPhotoTaken(shot.path);
+      if (kind == QuickLog.scan) {
+        await state.scanLabelPhoto(shot.path);
+      } else {
+        state.logPhotoTaken(shot.path);
+      }
     } on Exception {
       // No camera or a refused permission: fall back to the conversation
       // rather than leaving the tap doing nothing at all.
@@ -326,7 +344,9 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
               method: kLogMethods[i],
               label: kLogMethods[i].label(state.isAr),
               hovered: state.treeHoverSub == i,
-              locked: kLogMethods[i].kind == QuickLog.photo && !state.plusActive,
+              locked: (kLogMethods[i].kind == QuickLog.photo ||
+                      kLogMethods[i].kind == QuickLog.scan) &&
+                  !state.cameraAllowed,
               // Works on a plain tap as well as a hold-and-release.
               onTap: state.treeHold ? null : () => _runMethod(context, state, kLogMethods[i].kind),
             ),

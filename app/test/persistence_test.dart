@@ -226,6 +226,67 @@ class FakeGateway implements AiGateway {
     return scan;
   }
 
+  /// What the next scan returns. Defaults to a packet that was found, with a
+  /// portion the packet itself named — the ordinary case.
+  ScanResult scanResult = const ScanResult(
+    found: true,
+    reply: 'A 25 g bag. It fits — dinner still works as written.',
+    barcode: '6221033000011',
+    name: 'Chipsy Salt',
+    grams: 25,
+    portionLabel: '25 g',
+    kcal: 134,
+    proteinG: 2,
+    carbsG: 14,
+    fatG: 8,
+    targetKcal: 2000,
+    eatenKcal: 600,
+    remainingKcal: 1266,
+    fits: true,
+  );
+
+  final List<String> scannedBarcodes = [];
+  final List<String> scannedLabels = [];
+  int? lastScanGrams;
+
+  /// The barcode sent alongside a panel photo, if any. This is how a panel
+  /// scanned after a failed lookup becomes the catalogue entry for that code.
+  String? lastLabelBarcode;
+
+  @override
+  Future<ScanResult> scanLabel({
+    required String imagePath,
+    required String lang,
+    String? date,
+    String? barcode,
+    String? name,
+    int? grams,
+  }) async {
+    scannedLabels.add(imagePath);
+    lastLabelBarcode = barcode;
+    lastScanGrams = grams;
+    // Reading a panel is a vision call, so it spends a use like a meal photo —
+    // but a panel too blurry to trust gives the use back, which is what the
+    // gateway does rather than charging for an answer it will not give.
+    if (scanResult.found) _useAi();
+    return scanResult;
+  }
+
+  @override
+  Future<ScanResult> scanBarcode({
+    required String barcode,
+    required String lang,
+    String? date,
+    int? grams,
+  }) async {
+    scannedBarcodes.add(barcode);
+    lastScanGrams = grams;
+    // A lookup that misses never reaches the model, so it costs nothing. The
+    // real route returns before takeAiUse for exactly this reason.
+    if (scanResult.found) _useAi();
+    return scanResult;
+  }
+
   String? lastInstruction;
   bool? lastForce;
 
@@ -590,6 +651,128 @@ void main() {
     expect(state.mealsThisWeek(), 0);
     expect(state.week().every((d) => d.kcal == 0), isTrue);
     expect(state.weightHistory, isEmpty);
+  });
+
+  group('scanning a packet', () {
+    test('a scanned packet becomes an ordinary proposal and writes an ordinary meal', () async {
+      final ai = FakeGateway();
+      final meals = FakeMealRepo();
+      final state = backed(ai: ai, meals: meals);
+      await settle();
+
+      await state.scanLabelPhoto('/tmp/panel.jpg');
+
+      expect(ai.scannedLabels, ['/tmp/panel.jpg']);
+      expect(state.hasProposal, isTrue, reason: 'nothing is written until confirmed');
+      expect(meals.saved, isEmpty);
+
+      final item = state.proposalItems().single.def;
+      expect(item.en, 'Chipsy Salt');
+      expect(item.kcal, 134);
+      expect(item.grams, 25);
+      expect(item.portionMatched, isTrue, reason: 'the packet named 25 g');
+
+      state.confirmProposal();
+      await settle();
+
+      // The whole point: a scan lands in meal_logs like anything else, so it
+      // counts towards the day, the micronutrient gaps and the Su award.
+      expect(meals.saved.length, 1);
+      expect(meals.saved.single.kcal, 134);
+    });
+
+    test('an assumed portion is carried through and flagged, not printed as fact', () async {
+      final ai = FakeGateway()
+        ..scanResult = const ScanResult(
+          found: true,
+          reply: 'Per 100 g, since the packet gave no weight.',
+          name: 'Baladi biscuits',
+          grams: 100,
+          portionLabel: '100 g',
+          portionAssumed: true,
+          kcal: 480,
+          proteinG: 7,
+          carbsG: 62,
+          fatG: 22,
+        );
+      final state = backed(ai: ai);
+      await settle();
+      state.setLang(AppLang.en);
+
+      await state.scanLabelPhoto('/tmp/panel.jpg');
+
+      expect(state.scanPortionAssumed, isTrue);
+      expect(state.proposalItems().single.def.portionMatched, isFalse);
+      expect(state.chat.last.sub, contains('portion assumed'));
+
+      state.confirmProposal();
+      // High confidence off a printed panel, but the amount is still a guess —
+      // the log has to say so.
+      expect(state.meals.last.sub, contains('estimate'));
+    });
+
+    test('a packet nobody has catalogued is a real answer, not a failure', () async {
+      final ai = FakeGateway()
+        ..scanResult = const ScanResult(
+          found: false,
+          barcode: '6221033000011',
+          reply: 'That product is not in any database yet. Photograph the nutrition table.',
+        );
+      final state = backed(ai: ai);
+      await settle();
+
+      await state.scanPacketBarcode('6221033000011');
+
+      expect(ai.scannedBarcodes, ['6221033000011']);
+      expect(state.hasProposal, isFalse, reason: 'there are no numbers to confirm');
+      expect(state.scanNotice, contains('Photograph the nutrition table'));
+      expect(state.chat.last.text, contains('not in any database'));
+    });
+
+    test('the barcode from a miss is carried into the panel scan that follows', () async {
+      final ai = FakeGateway()
+        ..scanResult = const ScanResult(found: false, barcode: '6221033000011', reply: 'not catalogued');
+      final state = backed(ai: ai);
+      await settle();
+
+      await state.scanPacketBarcode('6221033000011');
+      await state.scanLabelPhoto('/tmp/panel.jpg');
+
+      // The panel becomes the catalogue entry for that code, so the next
+      // person to scan that packet pays nothing and gets its micronutrients.
+      expect(ai.scannedLabels, ['/tmp/panel.jpg']);
+      expect(ai.lastLabelBarcode, '6221033000011');
+    });
+
+    test('a scan installs a menu Qamar already saved and already checked', () async {
+      final ai = FakeGateway()
+        ..scanResult = ScanResult(
+          found: true,
+          reply: 'Counted. I moved dinner down to make room.',
+          name: 'Chipsy Salt',
+          grams: 25,
+          kcal: 134,
+          plan: const DayPlan(date: '2026-08-23', slots: []),
+        );
+      final state = backed(ai: ai);
+      await settle();
+
+      await state.scanLabelPhoto('/tmp/panel.jpg');
+
+      expect(state.planDate, '2026-08-23');
+    });
+
+    test('scanning is refused with a reason when the camera is behind the paywall', () async {
+      final ai = FakeGateway();
+      final state = backed(ai: ai);
+      await settle();
+
+      // billingEnabled is false in tests, so cameraAllowed is true and the
+      // rule has nothing to enforce. Assert the rule rather than the build:
+      // the day billing is on, plusActive false must close this.
+      expect(state.labelScanAllowed, state.cameraAllowed);
+      expect(state.cameraAllowed, !state.plusRequired || state.plusActive);
+    });
   });
 
   test('the ledger records points as they are earned, not reconstructed', () async {

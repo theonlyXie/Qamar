@@ -380,6 +380,26 @@ class _ProposalCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(t.nothingWrites, style: QText.body(size: 12, color: QColors.textMuted)),
+          // The packet named no weight, so 100 g was used. Saying so turns a
+          // number that looks measured into a question, which is the honest
+          // shape of it — the portion is what every other figure multiplies.
+          if (state.scanPortionAssumed) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: QColors.gold.withOpacity(0.10),
+                border: Border.all(color: QColors.gold.withOpacity(0.35)),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                isAr
+                    ? 'العلبة مكتوبش عليها وزن، فحسبتها على ١٠٠ جرام. لو أكلت غير كده، قوللي في الشات وأنا أعدّلها.'
+                    : 'The packet gave no weight, so this is per 100 g. If you ate a different amount, tell me in the chat and I will redo it.',
+                style: QText.body(size: 12, color: QColors.textMid),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           for (var i = 0; i < items.length; i++) ...[
             Opacity(

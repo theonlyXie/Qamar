@@ -26,7 +26,7 @@ import 'chat_replies.dart';
 enum PlusPlan { monthly, quarterly, annual }
 
 /// How a meal gets logged straight from the orb, with no page in between.
-enum QuickLog { voice, text, photo }
+enum QuickLog { voice, text, photo, scan }
 
 enum AppScreen { welcome, scan, onboard, today, plan, progress, you, wallet, subscription }
 
@@ -294,6 +294,9 @@ class AppState extends ChangeNotifier {
     proposalQty = [];
     proposalRaw = null;
     lastMealPhotoPath = null;
+    scanPortionAssumed = false;
+    scanNotice = null;
+    scanBusy = false;
     scanned = false;
     scanReading = false;
     suAvailable = 0;
@@ -1115,6 +1118,7 @@ class AppState extends ChangeNotifier {
     proposalQty = [];
     proposalRaw = null;
     lastMealPhotoPath = null;
+    scanPortionAssumed = false;
     _notify();
   }
 
@@ -1122,6 +1126,9 @@ class AppState extends ChangeNotifier {
   /// confirmation. Never writes anything by itself.
   Future<void> _analyseMeal({required String inputType, String? text, String? imagePath}) async {
     final gateway = _ai;
+    // Not a scan: clear the packet caveat so it cannot linger onto the next
+    // proposal and label a typed meal as an assumed portion.
+    scanPortionAssumed = false;
     proposalInput = inputType;
     proposalRaw = text;
 
@@ -1206,9 +1213,16 @@ class AppState extends ChangeNotifier {
     final how = switch (proposalInput) {
       'photo' => isAr ? 'بالصورة' : 'by photo',
       'voice' => isAr ? 'بالصوت' : 'by voice',
+      'scan' => isAr ? 'من العلبة' : 'off the packet',
       _ => isAr ? 'بالكتابة' : 'by text',
     };
-    final anyLow = items.any((it) => it.def.conf != Confidence.high);
+    // Two separate ways a logged number can be softer than it looks: the food
+    // itself was not identified confidently, or it was — off a printed panel,
+    // even — but nobody knows how much of it was eaten. A scanned packet is
+    // always high confidence and can still be a guess about the portion, and
+    // the portion is the figure everything else multiplies.
+    final anyLow = items.any((it) => it.def.conf != Confidence.high) ||
+        items.any((it) => !it.def.portionMatched);
     final sub = isAr
         ? 'مسجّل $how${anyLow ? ' · تقدير' : ''}'
         : 'Logged $how${anyLow ? ' · estimate' : ''}';
@@ -1229,6 +1243,7 @@ class AppState extends ChangeNotifier {
     proposalQty = [];
     proposalRaw = null;
     lastMealPhotoPath = null;
+    scanPortionAssumed = false;
     _notify();
 
     // The schema keeps the draft the user confirmed as well as the log, so a
@@ -2462,6 +2477,13 @@ class AppState extends ChangeNotifier {
       refusePhotoLog();
       return;
     }
+    if (kind == QuickLog.scan && !labelScanAllowed) {
+      refuseCameraFeature(
+        ar: 'قراءة جدول القيم الغذائية بتستخدم الكاميرا والموديل، وده لـ Qamar+.',
+        en: 'Reading a nutrition panel uses the camera and the model, so it is Qamar+.',
+      );
+      return;
+    }
     treeOpen = false;
     treeHold = false;
     treeHoverNode = null;
@@ -2469,7 +2491,9 @@ class AppState extends ChangeNotifier {
     treeLogIndex = null;
     openChat();
 
-    if (kind == QuickLog.photo) return; // the caller hands the shot back
+    // Both hand the shot back: the caller opens the camera, then calls
+    // logPhotoTaken or scanLabelPhoto with the file.
+    if (kind == QuickLog.photo || kind == QuickLog.scan) return;
 
     // Whatever they say or type next is a meal, not a question.
     _loggingMeal = true;
@@ -2501,6 +2525,215 @@ class AppState extends ChangeNotifier {
     chat.add(ChatTurn(who: ChatWho.u, text: isAr ? 'صوّرت الوجبة دي' : 'I photographed this meal'));
     _notify();
     _analyseMeal(inputType: 'photo', imagePath: path);
+  }
+
+  // ---- scanning a packet ------------------------------------------------
+  //
+  // Two ways in, one way out. A barcode is looked up; a nutrition panel is
+  // photographed and read. Both come back in the same shape and both end as an
+  // ordinary proposal, so confirming a scanned packet writes the same meal_logs
+  // row as typing one — which is what makes it count towards the day, the
+  // micronutrient gaps and the Su award, instead of being a separate feature
+  // with its own half of the app.
+  //
+  // Nothing is written until the user confirms. That rule does not bend for
+  // scanning: a misread panel costs a tap.
+
+  /// The barcode whose lookup just failed, so a panel photographed next is
+  /// filed under it. Null at every other moment.
+  String? _pendingBarcode;
+
+  /// Set when Qamar had to guess how much of the packet was eaten. The sheet
+  /// turns this into a question rather than printing the number as though the
+  /// packet had said so.
+  bool scanPortionAssumed = false;
+
+  /// The last thing a scan said that was not a proposal — a packet nobody has
+  /// catalogued, or a panel too blurry to trust.
+  String? scanNotice;
+
+  bool scanBusy = false;
+
+  /// Reads the nutrition panel on a packet.
+  ///
+  /// [barcode] is passed automatically when this follows a failed lookup; the
+  /// panel then becomes the catalogue entry for that code and the next person
+  /// to scan it pays nothing.
+  Future<void> scanLabelPhoto(String path, {String? barcode}) async {
+    if (!labelScanAllowed) {
+      refuseCameraFeature(
+        ar: 'قراءة جدول القيم الغذائية بتستخدم الكاميرا والموديل، وده لـ Qamar+.',
+        en: 'Reading a nutrition panel uses the camera and the model, so it is Qamar+.',
+      );
+      return;
+    }
+    await _scan(
+      inputLabel: isAr ? 'صوّرت جدول القيم الغذائية' : 'I photographed the nutrition panel',
+      run: (gateway) => gateway.scanLabel(
+        imagePath: path,
+        lang: lang.code,
+        date: _today(),
+        barcode: barcode ?? _pendingBarcode,
+      ),
+    );
+  }
+
+  /// Looks a packet up by the code on it.
+  Future<void> scanPacketBarcode(String code) async {
+    if (!barcodeScanAllowed) {
+      refuseCameraFeature(
+        ar: 'مسح الباركود بيستخدم الكاميرا، وده لـ Qamar+.',
+        en: 'Scanning a barcode uses the camera, so it is Qamar+.',
+      );
+      return;
+    }
+    final digits = code.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return;
+    await _scan(
+      inputLabel: isAr ? 'مسحت الباركود ده' : 'I scanned this barcode',
+      run: (gateway) => gateway.scanBarcode(
+        barcode: digits,
+        lang: lang.code,
+        date: _today(),
+      ),
+      barcode: digits,
+    );
+  }
+
+  Future<void> _scan({
+    required String inputLabel,
+    required Future<ScanResult> Function(AiGateway gateway) run,
+    String? barcode,
+  }) async {
+    final gateway = _ai;
+    if (gateway == null) {
+      scanNotice = isAr
+          ? 'المسح محتاج اتصال بالمساعد.'
+          : 'Scanning needs a connection to the assistant.';
+      _notify();
+      return;
+    }
+
+    openChat();
+    scanNotice = null;
+    scanPortionAssumed = false;
+    scanBusy = true;
+    chatState = ChatState.thinking;
+    chat.add(ChatTurn(who: ChatWho.u, text: inputLabel));
+    _notify();
+
+    try {
+      final res = await run(gateway);
+      if (_disposed) return;
+      await _pullQuota(gateway);
+      chatState = ChatState.idle;
+
+      if (!res.found) {
+        // A packet nobody has catalogued, or a panel that could not be
+        // trusted. Both are real answers with no numbers attached, and the
+        // reply already says what to do instead.
+        _pendingBarcode = res.problem == null ? (barcode ?? res.barcode) : _pendingBarcode;
+        scanNotice = res.reply;
+        proposal = null;
+        proposalQty = [];
+        chat.add(ChatTurn(who: ChatWho.q, text: res.reply));
+        scanBusy = false;
+        _notify();
+        return;
+      }
+
+      _pendingBarcode = null;
+      proposalInput = 'scan';
+      proposalRaw = res.barcode;
+      scanPortionAssumed = res.portionAssumed;
+      _loggingMeal = false;
+
+      final name = res.displayName;
+      final portion = res.portionLabel ?? '${res.grams} g';
+      proposal = MealAnalysis([
+        ConfirmItemDef(
+          ar: name,
+          en: name,
+          portionAr: portion,
+          portionEn: portion,
+          // The figures were transcribed off the printed panel or read from a
+          // catalogue entry, not estimated from a photograph of a plate.
+          conf: Confidence.high,
+          kcal: res.kcal,
+          p: res.proteinG,
+          c: res.carbsG,
+          f: res.fatG,
+          grams: res.grams.toDouble(),
+          portionMatched: !res.portionAssumed,
+        ),
+      ]);
+      proposalQty = [1];
+
+      chat.add(ChatTurn(
+        who: ChatWho.q,
+        text: res.reply,
+        sub: _scanSub(res),
+      ));
+
+      // Qamar may have moved the rest of the day to make room. The gateway has
+      // already saved that menu and already checked it against this person's
+      // allergies, so the app installs it rather than asking for it again.
+      if (res.plan != null) {
+        _installPlan(res.plan!);
+      } else if (res.rebuildInstruction != null && res.rebuildInstruction!.trim().isNotEmpty) {
+        unawaited(ensurePlan(force: true, instruction: res.rebuildInstruction));
+      }
+    } on AiQuotaException catch (e) {
+      if (_disposed) return;
+      _onQuotaHit(e);
+    } catch (e) {
+      if (_disposed) return;
+      chatState = ChatState.idle;
+      scanNotice = isAr
+          ? 'مقدرتش أوصل للمساعد عشان أقرأ العلبة. جرّب تاني بعد شوية.'
+          : 'I could not reach the assistant to read the packet. Try again in a moment.';
+      chat.add(ChatTurn(who: ChatWho.q, text: scanNotice!, sub: '$e'.length > 120 ? null : '$e'));
+    }
+    scanBusy = false;
+    _notify();
+  }
+
+  /// The line under Qamar's reply: where the numbers came from, and what is
+  /// still a guess. Both are things somebody might want to check.
+  String? _scanSub(ScanResult res) {
+    final parts = <String>[];
+    if (res.portionAssumed) {
+      parts.add(isAr
+          ? 'الكمية تقدير — العلبة مكتوبش عليها وزن'
+          : 'portion assumed — the packet gave no weight');
+    }
+    if (res.basis == 'per_serving') {
+      parts.add(isAr ? 'الجدول للحصة، حوّلته' : 'panel was per serving, converted');
+    }
+    if (res.energyFromKj) {
+      parts.add(isAr ? 'الطاقة محوّلة من كيلوجول' : 'energy converted from kJ');
+    }
+    if (res.remainingKcal != null) {
+      parts.add(isAr
+          ? 'باقي ${res.remainingKcal} سعرة النهارده'
+          : '${res.remainingKcal} kcal left today');
+    }
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  /// Says why a camera feature is closed, without pretending it is broken.
+  void refuseCameraFeature({required String ar, required String en}) {
+    treeHold = false;
+    treeHoverNode = null;
+    treeHoverSub = null;
+    treeLogIndex = null;
+    plusNotice = isAr ? ar : en;
+    go(AppScreen.subscription);
+  }
+
+  void dismissScanNotice() {
+    scanNotice = null;
+    _notify();
   }
 
   void toggleTree() {
