@@ -364,7 +364,6 @@ class HttpAiGateway implements AiGateway {
   }
 
   static int? _nullableInt(Object? v) => v is num ? v.round() : null;
-  static int _int(Object? v) => v is num ? v.round() : 0;
 
   @override
   Future<ScanResult> scanLabel({

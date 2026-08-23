@@ -79,19 +79,27 @@ jobs:
       - name: Fetch packages
         run: flutter pub get
 
-      # Reported, not enforced. The Dart in this repository has never been
-      # compiled anywhere — there is no Flutter toolchain in the environment
-      # most of it was written in — so the first honest signal about its state
-      # is this step and the build below. Failing here would mean no APK at
-      # all on the run that finally tells us what is wrong.
+      # These block now, and that is a deliberate change.
+      #
+      # They were `continue-on-error: true` because the Dart here had never
+      # been compiled anywhere and failing early would have meant no APK on
+      # the very run that finally said what was wrong. That reason expired —
+      # it compiles on every push now — and the flag turned out to be actively
+      # misleading: with continue-on-error the job API reports `conclusion:
+      # success` for a step that failed, because the step was *allowed* to
+      # fail. Only `outcome` carries the truth, and anyone reading the run at a
+      # glance sees the green. A duplicate function definition sailed past two
+      # green-looking checks and was caught by the APK build three minutes
+      # later.
+      #
+      # --no-fatal-warnings keeps the 50-odd deprecations and const hints from
+      # blocking, so this fails on errors and only on errors.
       - name: Analyze
         id: analyze
-        continue-on-error: true
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Test
         id: test
-        continue-on-error: true
         run: flutter test
 
       # The build is the real gate: if the Dart does not compile there is
