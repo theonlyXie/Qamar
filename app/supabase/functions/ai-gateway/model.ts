@@ -41,6 +41,19 @@ export interface ImageInput {
   mediaType: string;
 }
 
+/**
+ * One earlier exchange, as the person actually experienced it.
+ *
+ * `assistant` is what Qamar said back. For a turn that produced no sentence —
+ * a refusal, or a meal reading that returned a list of items — the caller
+ * substitutes a short bracketed note, because an empty content block is
+ * rejected by the API and a raw `[]` is noise the model would try to read.
+ */
+export interface Turn {
+  user: string;
+  assistant: string;
+}
+
 interface CallOptions {
   system: string;
   user: string;
@@ -49,9 +62,50 @@ interface CallOptions {
   prefill?: string;
   /** Attached before the text, which is what the vision docs recommend. */
   image?: ImageInput;
+  /**
+   * Earlier turns, oldest first.
+   *
+   * Without these the gateway judged every message on its own, which is how
+   * "and I got" — a person continuing a sentence about the meal they had just
+   * typed — was scored as a fragment about nothing and refused as off-topic.
+   * A nutritionist who forgets the previous sentence is not a nutritionist.
+   */
+  history?: Turn[];
 }
 
-export async function callModel({ system, user, maxTokens = 1024, prefill, image }: CallOptions): Promise<ModelResult> {
+/**
+ * The messages array: earlier turns, then what was just said, then the prefill.
+ *
+ * Pure and exported so the shape can be tested without a network call. Two
+ * rules the API enforces and a conversation would otherwise break on: content
+ * blocks may not be empty, and roles must alternate. Dropping a half-empty
+ * turn satisfies both — a turn where one side said nothing is not an exchange,
+ * and inventing filler to keep the alternation would put words in someone's
+ * mouth.
+ */
+export function conversationMessages(
+  history: Turn[] | undefined,
+  content: unknown,
+  prefill?: string,
+): { role: string; content: unknown }[] {
+  const messages: { role: string; content: unknown }[] = [];
+  for (const turn of history ?? []) {
+    const u = turn.user.trim();
+    const a = turn.assistant.trim();
+    if (!u || !a) continue;
+    messages.push({ role: "user", content: u });
+    messages.push({ role: "assistant", content: a });
+  }
+  messages.push({ role: "user", content });
+  // Putting the opening brace in the assistant's mouth is the cheapest way to
+  // stop a model wrapping JSON in prose.
+  if (prefill) messages.push({ role: "assistant", content: prefill });
+  return messages;
+}
+
+export async function callModel(
+  { system, user, maxTokens = 1024, prefill, image, history }: CallOptions,
+): Promise<ModelResult> {
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) throw new Error("ANTHROPIC_API_KEY is not configured");
   const model = Deno.env.get("QAMAR_MODEL") ?? DEFAULT_MODEL;
@@ -67,10 +121,7 @@ export async function callModel({ system, user, maxTokens = 1024, prefill, image
   }
   content.push({ type: "text", text: user });
 
-  const messages: { role: string; content: unknown }[] = [{ role: "user", content }];
-  // Putting the opening brace in the assistant's mouth is the cheapest way to
-  // stop a model wrapping JSON in prose.
-  if (prefill) messages.push({ role: "assistant", content: prefill });
+  const messages = conversationMessages(history, content, prefill);
 
   const started = performance.now();
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -217,6 +268,15 @@ person tells you the day changed — they already ate, they are too tired to
 cook, breakfast was late, they cannot have what is written — you change the
 menu those screens show. Logging a meal they already ate is a different path
 and is not what this reply does.
+
+The turns before this one are the same conversation, and you were part of it.
+A short message is usually a continuation, not a new subject: "and I got",
+"the small one", "no, the other one" each finish a sentence that has already
+started, and reading one as a fragment about nothing is a failure of memory
+rather than a message that made no sense. Notes in square brackets on your own
+side are what happened when you produced no sentence — a decline, or a meal
+you read — and they are context, not something to comment on. Do not re-ask
+what they have already told you in these turns.
 
 ${menuBlock}
 

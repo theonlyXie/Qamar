@@ -37,6 +37,7 @@ import {
   parseJson,
   planSystemPrompt,
   type ImageInput,
+  type Turn,
   type UserContext,
 } from "./model.ts";
 import { retrieve, type FoodFacts, type Passage, type Source } from "./retrieval.ts";
@@ -389,6 +390,90 @@ async function todaySoFar(userId: string, day: string): Promise<number> {
   return rows.reduce((n, r) => n + (Number(r.kcal) || 0), 0);
 }
 
+/** How many earlier exchanges Qamar is allowed to remember. */
+const HISTORY_TURNS = 6;
+
+/**
+ * How far back a conversation reaches before it is a different conversation.
+ *
+ * Someone who opens the app at breakfast and again at dinner is starting
+ * again, not continuing; carrying the morning into the evening would make
+ * Qamar answer questions nobody had just asked.
+ */
+const HISTORY_WINDOW_MINUTES = 120;
+
+/**
+ * The last few turns of this person's conversation, oldest first.
+ *
+ * Read from the database rather than accepted from the request. The client
+ * could send anything, and "what did this user say a minute ago" is not a
+ * thing a client should get to assert — it decides what Qamar treats as
+ * already established.
+ *
+ * Both kinds are included because both appear in the same conversation on
+ * screen: `chat` is asking Qamar something, `meal_analysis` is typing a meal
+ * into the same box. Splitting them is what produced the original bug —
+ * somebody typed "kasam", then "and I got", and the second message was judged
+ * with no knowledge of the first because the first was filed under a different
+ * kind.
+ */
+async function loadRecentTurns(userId: string): Promise<Turn[]> {
+  const since = new Date(Date.now() - HISTORY_WINDOW_MINUTES * 60_000).toISOString();
+  try {
+    const res = await db(
+      `ai_interactions?user_id=eq.${userId}` +
+        `&kind=in.(chat,meal_analysis)` +
+        `&created_at=gte.${since}` +
+        `&select=kind,question,answer,in_scope,refusal_reason,created_at` +
+        `&order=created_at.desc&limit=${HISTORY_TURNS}`,
+    );
+    if (!res.ok) return [];
+    const rows = await res.json() as {
+      kind: string;
+      question: string | null;
+      answer: string | null;
+      in_scope: boolean;
+      refusal_reason: string | null;
+    }[];
+
+    const turns: Turn[] = [];
+    for (const r of rows.reverse()) {
+      const q = (r.question ?? "").trim();
+      if (!q) continue;
+      turns.push({ user: q, assistant: assistantSideOf(r) });
+    }
+    return turns;
+  } catch {
+    // Memory is an improvement, not a precondition. A conversation with no
+    // history is the behaviour this app had until now.
+    return [];
+  }
+}
+
+/**
+ * What Qamar said back, or an honest note about what happened when it said
+ * nothing.
+ *
+ * A refusal stored no sentence, and a meal reading stored a JSON array of
+ * items. Replaying either verbatim would be worse than useless: an empty
+ * content block is rejected outright, and `[]` invites the model to interpret
+ * punctuation as an answer. The note says what took place instead, which is
+ * the part that carries meaning into the next turn.
+ */
+function assistantSideOf(
+  r: { kind: string; answer: string | null; in_scope: boolean; refusal_reason: string | null },
+): string {
+  const a = (r.answer ?? "").trim();
+  if (r.refusal_reason) return `[declined: ${r.refusal_reason}]`;
+  if (r.kind === "meal_analysis") {
+    return a === "" || a === "[]"
+      ? "[could not read that meal]"
+      : "[read the meal and offered the items to confirm]";
+  }
+  if (!a || a.startsWith("[") || a.startsWith("{")) return "[no reply recorded]";
+  return a;
+}
+
 /**
  * Writes a scanned product into the graph so the next person who scans it
  * pays nothing and gets its micronutrients.
@@ -599,6 +684,11 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
   const [resolved, resolveMs] = await timed(() =>
     resolveFoods(SUPABASE_URL, SERVICE_KEY, lookup)
   );
+  // What was already said. Loaded before the use is taken so a fragment like
+  // "and I got" is judged as the continuation it is, not as a sentence about
+  // nothing.
+  const history = await loadRecentTurns(userId);
+
   const taken = await takeAiUse(userId, lang);
   if (taken instanceof Response) return taken;
   const quota = taken;
@@ -610,6 +700,7 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
       user: message,
       maxTokens: 1600,
       prefill: "{",
+      history,
     });
   } catch (e) {
     await refundAi(userId);
