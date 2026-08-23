@@ -562,20 +562,26 @@ void main() {
     expect(ai.quota.remaining, SuEconomy.dailyAiUses - 1);
   });
 
-  test('photographing a meal without Qamar+ opens the paywall and does not analyse', () async {
+  // Was 'photographing a meal without Qamar+ opens the paywall'. That stopped
+  // being the behaviour when Paymob was switched off — nothing is locked while
+  // nothing is for sale — and the stale assertion sat failing in CI unnoticed
+  // because the test step was allowed to fail.
+  test('with nothing on sale the camera is open, and the photo is really sent', () async {
     final ai = FakeGateway();
     final state = backed(ai: ai);
     await settle();
     state.setLang(AppLang.en);
 
+    expect(state.photoLogAllowed, isTrue, reason: 'billing is off in a test build');
+
     state.logPhotoTaken('/tmp/meal.jpg');
     await settle();
 
-    expect(ai.imagePaths, isEmpty);
-    expect(state.hasProposal, isFalse);
-    expect(state.screen, AppScreen.subscription);
-    expect(state.plusNotice, contains('Qamar+'));
-    expect(state.lastMealPhotoPath, isNull);
+    expect(ai.imagePaths, ['/tmp/meal.jpg']);
+    expect(state.hasProposal, isTrue);
+    expect(state.screen, isNot(AppScreen.subscription));
+    // A vision call, so it spends one of the five.
+    expect(ai.quota.remaining, SuEconomy.dailyAiUses - 1);
   });
 
   test('an unreadable InBody report prefills nothing and asks instead', () async {
@@ -1224,7 +1230,7 @@ void main() {
     expect(state.plusActive, isFalse);
   });
 
-  test('coming back from Paymob reads the server entitlement', () async {
+  test('while Qamar+ is not on sale, returning from a checkout marks nobody Active', () async {
     final billing = FakeBilling()
       ..current = PlusEntitlement(
         status: 'active',
@@ -1235,7 +1241,14 @@ void main() {
     await settle();
 
     await state.onReturnedFromPaymob();
-    expect(state.plusActive, isTrue);
+
+    // Deliberate, and the reason is the day billing is switched on: a build
+    // that had been marking everyone Active would have to take it away from
+    // them. Nobody is Active because there is nothing to be Active for, and
+    // _refreshPlus does not even ask a billing function that is not deployed.
+    expect(state.plusRequired, isFalse);
+    expect(state.plusActive, isFalse);
+    expect(billing.entitlementCalls, 0, reason: 'no call to a function that is not deployed');
     expect(state.screen, AppScreen.subscription);
   });
 }
@@ -1273,8 +1286,15 @@ class FakeBilling implements BillingGateway {
     );
   }
 
+  /// Counted so a test can assert the app did not call a billing function
+  /// that is not deployed.
+  int entitlementCalls = 0;
+
   @override
-  Future<PlusEntitlement> entitlement() async => current;
+  Future<PlusEntitlement> entitlement() async {
+    entitlementCalls++;
+    return current;
+  }
 
   @override
   Future<AffiliateWallet> affiliate() async => wallet;

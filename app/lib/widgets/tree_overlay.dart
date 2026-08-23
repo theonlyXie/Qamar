@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../services/scan_flow.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -286,7 +287,13 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
   /// is the rule ("camera is Qamar+") including the part where a rule with
   /// nothing to enforce yet lets everyone through.
   Future<void> _runMethod(BuildContext context, AppState state, QuickLog kind) async {
-    if (kind != QuickLog.photo && kind != QuickLog.scan) {
+    if (kind == QuickLog.scan) {
+      // Barcode first, panel second — see services/scan_flow.dart.
+      state.quickLog(kind);
+      await startPacketScan(context, state);
+      return;
+    }
+    if (kind != QuickLog.photo) {
       state.quickLog(kind);
       return;
     }
@@ -304,11 +311,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
         return;
       }
       state.quickLog(kind);
-      if (kind == QuickLog.scan) {
-        await state.scanLabelPhoto(shot.path);
-      } else {
-        state.logPhotoTaken(shot.path);
-      }
+      state.logPhotoTaken(shot.path);
     } on Exception {
       // No camera or a refused permission: fall back to the conversation
       // rather than leaving the tap doing nothing at all.

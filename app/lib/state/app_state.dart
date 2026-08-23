@@ -297,6 +297,7 @@ class AppState extends ChangeNotifier {
     scanPortionAssumed = false;
     scanNotice = null;
     scanBusy = false;
+    awaitingLabelPhoto = false;
     scanned = false;
     scanReading = false;
     suAvailable = 0;
@@ -2554,6 +2555,22 @@ class AppState extends ChangeNotifier {
 
   bool scanBusy = false;
 
+  /// True when the next useful thing is a photograph of the nutrition panel:
+  /// the barcode was not in any catalogue, or the panel that was photographed
+  /// could not be read and is worth another try.
+  bool awaitingLabelPhoto = false;
+
+  /// Says the camera or the picker itself failed, without pretending the scan
+  /// found nothing — those are different, and only one of them is worth
+  /// retrying with a better photo.
+  void reportScanProblem(String detail) {
+    scanNotice = isAr
+        ? 'مقدرتش أفتح الكاميرا.'
+        : 'I could not open the camera.';
+    syncError = 'scan: $detail';
+    _notify();
+  }
+
   /// Reads the nutrition panel on a packet.
   ///
   /// [barcode] is passed automatically when this follows a failed lookup; the
@@ -2617,6 +2634,7 @@ class AppState extends ChangeNotifier {
     openChat();
     scanNotice = null;
     scanPortionAssumed = false;
+    awaitingLabelPhoto = false;
     scanBusy = true;
     chatState = ChatState.thinking;
     chat.add(ChatTurn(who: ChatWho.u, text: inputLabel));
@@ -2632,7 +2650,12 @@ class AppState extends ChangeNotifier {
         // A packet nobody has catalogued, or a panel that could not be
         // trusted. Both are real answers with no numbers attached, and the
         // reply already says what to do instead.
+        // A barcode miss remembers the code so the panel photographed next is
+        // filed under it. A rejected panel keeps whatever code was already
+        // pending — the packet has not changed just because the photo was bad.
         _pendingBarcode = res.problem == null ? (barcode ?? res.barcode) : _pendingBarcode;
+        // Either way the next useful move is the same: photograph the panel.
+        awaitingLabelPhoto = true;
         scanNotice = res.reply;
         proposal = null;
         proposalQty = [];
@@ -2643,6 +2666,7 @@ class AppState extends ChangeNotifier {
       }
 
       _pendingBarcode = null;
+      awaitingLabelPhoto = false;
       proposalInput = 'scan';
       proposalRaw = res.barcode;
       scanPortionAssumed = res.portionAssumed;
@@ -2733,6 +2757,7 @@ class AppState extends ChangeNotifier {
 
   void dismissScanNotice() {
     scanNotice = null;
+    awaitingLabelPhoto = false;
     _notify();
   }
 

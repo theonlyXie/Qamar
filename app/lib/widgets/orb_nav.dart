@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../services/scan_flow.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -173,7 +174,12 @@ class _DraggableOrbState extends State<_DraggableOrb> {
   /// tree_overlay._runMethod. plusActive is false for everyone while billing
   /// is off, so checking it here made the camera unreachable in every build.
   Future<void> _runQuickLog(AppState state, QuickLog kind) async {
-    if (kind != QuickLog.photo && kind != QuickLog.scan) {
+    if (kind == QuickLog.scan) {
+      state.quickLog(kind);
+      await startPacketScan(context, state);
+      return;
+    }
+    if (kind != QuickLog.photo) {
       state.quickLog(kind);
       return;
     }
@@ -186,11 +192,7 @@ class _DraggableOrbState extends State<_DraggableOrb> {
       if (!mounted) return;
       if (shot == null) return; // backed out of the camera
       state.quickLog(kind);
-      if (kind == QuickLog.scan) {
-        await state.scanLabelPhoto(shot.path);
-      } else {
-        state.logPhotoTaken(shot.path);
-      }
+      state.logPhotoTaken(shot.path);
     } on Exception {
       if (!mounted) return;
       // No camera, or permission refused: still let them log by typing.

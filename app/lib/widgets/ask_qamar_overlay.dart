@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../models/meal.dart';
 import '../models/messages.dart';
+import '../services/scan_flow.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -116,6 +117,11 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> {
                           // What the assistant read off the meal, waiting to be
                           // confirmed. Nothing is written until it is.
                           if (state.hasProposal) const _ProposalCard(),
+                          // The barcode found nothing, or the panel could not
+                          // be read. Either way the next move is a photograph
+                          // of the panel, and it should be one tap from here
+                          // rather than a sentence telling them to start over.
+                          if (state.awaitingLabelPhoto) const _PanelPrompt(),
                         ],
                       ),
                       PositionedDirectional(
@@ -342,6 +348,61 @@ class _ChatBubble extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Offered when a barcode found nothing, or a panel could not be read.
+///
+/// A packet that is in no database is the normal case for an Egyptian brand,
+/// not an error, and the answer to it is the nutrition table printed on the
+/// back. Putting the camera one tap away is the difference between a dead end
+/// and a fallback — and the photo is filed under the barcode that missed, so
+/// the next person to scan that packet finds it.
+class _PanelPrompt extends StatelessWidget {
+  const _PanelPrompt();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final isAr = state.isAr;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: QColors.cardDeep,
+        border: Border.all(color: QColors.borderSoft),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            isAr ? 'صوّرلي جدول القيم الغذائية' : 'Photograph the nutrition table',
+            style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textPrimary),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isAr
+                ? 'اللي ورا العلبة. هقراه وأضيفه، وأي حد يمسح العلبة دي بعد كده هيلاقيها.'
+                : 'The one on the back. I will read it, count it, and anyone who scans this packet after you will find it.',
+            style: QText.body(size: 12, color: QColors.textMuted),
+          ),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: state.scanBusy ? null : () => photographPanel(context, state),
+            icon: const Icon(Icons.photo_camera_outlined, size: 18),
+            label: Text(isAr ? 'افتح الكاميرا' : 'Open the camera'),
+          ),
+          TextButton(
+            onPressed: state.dismissScanNotice,
+            child: Text(
+              isAr ? 'مش دلوقتي' : 'Not now',
+              style: QText.body(size: 13, color: QColors.textMuted),
+            ),
+          ),
         ],
       ),
     );

@@ -489,14 +489,36 @@ void secondRound() {
       expect(state.chat.any((c) => c.who == ChatWho.u), isTrue);
     });
 
-    test('photographing a meal without Qamar+ opens the paywall', () {
+    // This used to assert that quickLog(photo) opened the paywall. It stopped
+    // being true when Paymob was switched off and nothing was locked any more,
+    // and it went on "passing" for weeks because CI let the test step fail.
+    // What is worth pinning is the rule, which has not changed: the camera is
+    // Qamar+, and while there is nothing to sell the rule has nothing to
+    // enforce.
+    test('the camera rule is Plus, and lets everyone through while nothing is on sale', () {
       final state = AppState();
       state.setLang(AppLang.en);
+
+      expect(state.cameraAllowed, !state.plusRequired || state.plusActive);
+      expect(state.photoLogAllowed, state.cameraAllowed);
+      expect(state.barcodeScanAllowed, state.cameraAllowed);
+      expect(state.labelScanAllowed, state.cameraAllowed);
+
+      // Billing is off in a test build, so this is the open case: the camera
+      // opens and the conversation is where the meal lands.
+      expect(state.plusRequired, isFalse);
+      expect(state.cameraAllowed, isTrue);
       state.quickLog(QuickLog.photo);
+      expect(state.screen, isNot(AppScreen.subscription));
+    });
+
+    test('the refusal still says why, for the day the paywall is switched on', () {
+      final state = AppState();
+      state.setLang(AppLang.en);
+      state.refusePhotoLog();
 
       expect(state.screen, AppScreen.subscription);
       expect(state.plusNotice, contains('Qamar+'));
-      expect(state.chatOpen, isFalse);
       expect(state.lastMealPhotoPath, isNull);
     });
 
