@@ -45,6 +45,16 @@ env:
   SUPABASE_URL: https://stqirjlqzchcoeegumoq.supabase.co
   SUPABASE_ANON_KEY: sb_publishable_XMpWgfKIB8gGZN4WwopdrA_GXw8Zjl2
   AI_GATEWAY_URL: https://stqirjlqzchcoeegumoq.supabase.co/functions/v1/ai-gateway
+  # Study Mode is unfinished — the planner writes placeholder milestones, the
+  # learner model is supplied by the client and never stored, and its rewards
+  # only exist in memory. Its own default is 'true', so the flag is pinned off
+  # here: whichever branch this workflow builds, no tester gets it by accident.
+  # Nutrition ships first. See docs/study_mode_deferred.md.
+  STUDY_MODE: "false"
+  # Paymob is not live. QamarConfig.billingEnabled already defaults to false;
+  # this makes it explicit at the build, so nothing is locked behind a
+  # subscription that cannot be bought.
+  BILLING_ENABLED: "false"
 
 jobs:
   build:
@@ -91,7 +101,9 @@ jobs:
           flutter build apk --${{ inputs.flavour || 'release' }} \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
-            --dart-define=AI_GATEWAY_URL="$AI_GATEWAY_URL"
+            --dart-define=AI_GATEWAY_URL="$AI_GATEWAY_URL" \
+            --dart-define=STUDY_MODE="$STUDY_MODE" \
+            --dart-define=BILLING_ENABLED="$BILLING_ENABLED"
 
       - name: Name it after the commit
         id: name
