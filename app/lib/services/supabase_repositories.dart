@@ -319,8 +319,32 @@ class SupabaseWalletRepository implements WalletRepository {
   @override
   Future<List<LedgerEntry>> ledger(String userId) async {
     final rows = await _client.from('su_point_ledger').select().eq('user_id', userId).order('created_at', ascending: false).limit(50);
-    return (rows as List)
-        .map((r) => LedgerEntry(label: r['reason'] as String, amount: r['delta'] as int, when: (r['created_at'] as String)))
-        .toList();
+    return (rows as List).map((r) {
+      final reason = r['reason'] as String;
+      final at = DateTime.tryParse(r['created_at'] as String);
+      // `label` stays the raw reason as a last resort; the wallet screen calls
+      // displayLabel(), which translates it.
+      return LedgerEntry(
+        label: reason,
+        amount: r['delta'] as int,
+        when: r['created_at'] as String,
+        reason: reason,
+        at: at,
+      );
+    }).toList();
+  }
+
+  /// The one earning action the client is allowed to *ask* for.
+  ///
+  /// It still cannot award anything: `qamar_complete_daily_quest` takes no
+  /// user id, reads `auth.uid()` from the caller's own JWT, verifies a meal
+  /// was logged today, and keys the credit `quest:<uid>:<cairo day>` so
+  /// pressing the button twice — or on two devices — pays once. See migration
+  /// 0040_server_su_awards.sql.
+  @override
+  Future<QuestResult> completeDailyQuest(String userId) async {
+    final res = await _client.rpc('qamar_complete_daily_quest');
+    if (res is Map) return QuestResult.fromJson(Map<String, dynamic>.from(res));
+    return const QuestResult(credited: false, reason: 'unknown', amount: 0, available: 0);
   }
 }

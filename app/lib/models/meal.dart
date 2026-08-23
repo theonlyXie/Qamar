@@ -72,7 +72,71 @@ class LedgerEntry {
   final String label;
   final int amount; // negative for spends
   final String when;
-  const LedgerEntry({required this.label, required this.amount, required this.when});
+
+  /// The database's `su_point_ledger.reason` when this row came from the
+  /// server — `first_meal`, `daily_quest`, `signup_bonus`. Null for rows the
+  /// app wrote optimistically, which already carry a translated [label].
+  final String? reason;
+
+  /// The raw `created_at`, when there is one, so the wallet can render a time
+  /// instead of an ISO string.
+  final DateTime? at;
+
+  const LedgerEntry({
+    required this.label,
+    required this.amount,
+    required this.when,
+    this.reason,
+    this.at,
+  });
+
+  /// What to actually put on screen.
+  ///
+  /// A server row arrives as a snake_case reason code. Printing it puts
+  /// `economy_v2_signup_topup` in front of an Arabic-first user, which is how
+  /// it read until this existed. Anything unrecognised falls back to the code
+  /// rather than to a wrong guess — a reason nobody has translated yet should
+  /// look untranslated, not look like something else.
+  String displayLabel(bool isAr) {
+    final r = reason;
+    if (r == null) return label;
+    return switch (r) {
+      'signup_bonus' => isAr ? 'هدية التسجيل' : 'Signup bonus',
+      'economy_v2_signup_topup' => isAr ? 'تعويض رصيد البداية' : 'Starting balance top-up',
+      'onboarding' => isAr ? 'إكمال التهيئة' : 'Onboarding completed',
+      'first_meal' => isAr ? 'أول وجبة' : 'First meal logged',
+      'meal_log' => isAr ? 'تأكيد وجبة' : 'Meal confirmed',
+      'daily_quest' => isAr ? 'مهمة اليوم' : 'Primary daily quest',
+      _ => r.startsWith('redeem_') || r == 'redeem'
+          ? (isAr ? 'استبدال' : 'Redemption')
+          : r,
+    };
+  }
+
+  /// A short, local rendering of [at]. Falls back to [when] for optimistic
+  /// rows, which set it to "just now" in the right language already.
+  String displayWhen(bool isAr) {
+    final t = at;
+    if (t == null) return when;
+    final d = DateTime.now().difference(t);
+    if (d.inMinutes < 1) return isAr ? 'دلوقتي' : 'Just now';
+    if (d.inHours < 1) {
+      final m = d.inMinutes;
+      return isAr ? 'من $m دقيقة' : '${m}m ago';
+    }
+    if (d.inDays < 1) {
+      final h = d.inHours;
+      return isAr ? 'من $h ساعة' : '${h}h ago';
+    }
+    if (d.inDays < 7) {
+      final n = d.inDays;
+      return isAr ? 'من $n يوم' : '${n}d ago';
+    }
+    final l = t.toLocal();
+    final mm = l.month.toString().padLeft(2, '0');
+    final dd = l.day.toString().padLeft(2, '0');
+    return '$dd/$mm';
+  }
 }
 
 class SpendItemDef {

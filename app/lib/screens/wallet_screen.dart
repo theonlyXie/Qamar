@@ -96,8 +96,8 @@ class WalletScreen extends StatelessWidget {
               decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(entry.label, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textHigh)),
-                  Text(entry.when, style: QText.body(size: 11, color: QColors.textFaint)),
+                  Text(entry.displayLabel(state.isAr), style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textHigh)),
+                  Text(entry.displayWhen(state.isAr), style: QText.body(size: 11, color: QColors.textFaint)),
                 ]),
                 Text(entry.amount >= 0 ? '+${entry.amount}' : '${entry.amount}', style: QText.number(size: 14, weight: FontWeight.w600, color: entry.amount < 0 ? QColors.red : QColors.gold)),
               ]),

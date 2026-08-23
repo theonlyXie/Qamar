@@ -227,6 +227,15 @@ class _TodayScreenState extends State<TodayScreen> {
                 const SizedBox(width: 8),
                 QOutlineButton(label: t.replace, onTap: state.replaceQuest, height: 34, color: QColors.textMuted),
               ]),
+              // Why the server said no — "log a meal today first" is the usual
+              // one, and without it the button simply appears not to work.
+              if (state.questNotice != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  state.questNotice!,
+                  style: QText.body(size: 12, color: QColors.textMuted),
+                ),
+              ],
             ],
           ),
         ),

@@ -289,6 +289,7 @@ class AppState extends ChangeNotifier {
     affiliateNotice = null;
     improve = false;
     questDone = false;
+    questNotice = null;
     proposal = null;
     proposalQty = [];
     proposalRaw = null;
@@ -949,9 +950,11 @@ class AppState extends ChangeNotifier {
         const ObMessage.target(),
         const ObMessage.save(),
       ]);
-      // Awarded locally for now: crediting Su Points is server-only (see
-      // SupabaseWalletRepository.credit), so the balance reconciles to the
-      // server's number on the next hydrate once the Edge Function exists.
+      // Shown immediately, confirmed by the server a moment later. The award
+      // itself is a trigger on the first `targets` row (migration 0040), keyed
+      // `onboarding:<uid>`, so saving the target is what earns it — not this
+      // line. [_reconcileWallet] below replaces these numbers with the
+      // database's, which is the only version that survives a restart.
       _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
       _notify();
 
@@ -959,7 +962,10 @@ class AppState extends ChangeNotifier {
         final p = profile;
         final t = target();
         _push('save profile', (uid) => _profileRepo!.saveProfile(uid, p));
-        _push('save target', (uid) => _profileRepo!.saveTarget(uid, t, inputs: p));
+        _push('save target', (uid) async {
+          await _profileRepo!.saveTarget(uid, t, inputs: p);
+          await _reconcileWallet();
+        });
         // The weight they just gave is the first real point on the trend.
         // Without it the Progress chart has nothing to draw from for weeks.
         _push('record weight', (uid) async {
@@ -1236,20 +1242,62 @@ class AppState extends ChangeNotifier {
           MealAnalysisDraft(inputType: input, items: drafted, rawText: raw),
         );
         await repo.confirmMeal(uid, draftId: draftId, meal: meal, items: drafted);
+        // The meal_logs insert is what fires the award. Read the balance the
+        // database arrived at rather than trusting the optimistic figure —
+        // `first` above is "first meal in this session's list", which is not
+        // the same question as "first meal this account has ever logged".
+        await _reconcileWallet();
       });
     }
   }
 
   // ---- quest / wallet -------------------------------------------------
 
-  void completeQuest() {
-    questDone = true;
-    _credit(SuEconomy.dailyQuest, ar: 'مهمة اليوم', en: 'Primary daily quest');
-    _notify();
+  /// Non-null while the server is deciding, or when it said no.
+  String? questNotice;
+
+  /// Claims today's quest.
+  ///
+  /// Offline this is the old local award, because there is nothing to ask.
+  /// Backed by a real project it is the server's decision entirely: the RPC
+  /// checks a meal was logged today in Cairo and pays once per Cairo day. A
+  /// second press, or a press on a second phone, returns `already_claimed` and
+  /// changes nothing.
+  Future<void> completeQuest() async {
+    questNotice = null;
+
+    if (!isBacked) {
+      questDone = true;
+      _credit(SuEconomy.dailyQuest, ar: 'مهمة اليوم', en: 'Primary daily quest');
+      _notify();
+      return;
+    }
+
+    final uid = _userId;
+    if (uid == null) return;
+    try {
+      final res = await _walletRepo!.completeDailyQuest(uid);
+      questDone = res.credited || res.reason == 'already_claimed';
+      if (!res.credited) {
+        questNotice = switch (res.reason) {
+          'no_meal_today' => isAr
+              ? 'سجّل وجبة النهارده الأول عشان تاخد المهمة.'
+              : 'Log a meal today first to claim the quest.',
+          'already_claimed' => isAr ? 'خدتها النهارده خلاص.' : 'Already claimed today.',
+          _ => isAr ? 'مش قادر أكمّل المهمة دلوقتي.' : 'Could not complete the quest right now.',
+        };
+      }
+      await _reconcileWallet();
+    } catch (e) {
+      syncError = 'quest: $e';
+      questNotice = isAr ? 'مش قادر أكمّل المهمة دلوقتي.' : 'Could not complete the quest right now.';
+      _notify();
+    }
   }
 
   void replaceQuest() {
     questDone = false;
+    questNotice = null;
     _notify();
   }
 
@@ -1597,15 +1645,50 @@ class AppState extends ChangeNotifier {
   /// happens — see [_credit]. Nothing is reconstructed from the balance.
   List<LedgerEntry> ledger() => serverLedger.isNotEmpty ? serverLedger : ledgerExtra;
 
-  /// Records points earned, and the reason, at the moment it is earned.
+  /// Shows points the moment they are earned, so the screen does not wait on a
+  /// round trip.
   ///
-  /// The balance is still the server's to decide — crediting is server-side
-  /// only (see SupabaseWalletRepository.credit) — so this is the local view
-  /// until the next hydrate replaces it with the database's.
+  /// This is a display, not a decision. Nothing here reaches the database —
+  /// `SupabaseWalletRepository.credit` throws on purpose — and every call site
+  /// that is backed by a real project follows the write with
+  /// [_reconcileWallet]. Until that landed, these two integers were the *only*
+  /// record of a meal award anywhere, and they were gone by the next launch.
   void _credit(int amount, {required String ar, required String en}) {
     suAvailable += amount;
     suLifetime += amount;
     ledgerExtra.insert(0, LedgerEntry(label: isAr ? ar : en, amount: amount, when: isAr ? 'دلوقتي' : 'Just now'));
+  }
+
+  /// Replaces the optimistic balance and ledger with the database's.
+  ///
+  /// Called after any write that earns points. It is deliberately not a full
+  /// [_hydrate]: that re-reads meals, water, weights, quota, Plus and
+  /// affiliate state, which is a lot of network for a 100-point award, and it
+  /// would stamp on whatever the user is typing right now.
+  Future<void> _reconcileWallet() async {
+    final uid = _userId;
+    final repo = _walletRepo;
+    if (uid == null || repo == null) return;
+    try {
+      final bal = await repo.balance(uid);
+      suAvailable = bal.available;
+      suLifetime = bal.lifetime;
+
+      final entries = await repo.ledger(uid);
+      serverLedger
+        ..clear()
+        ..addAll(entries);
+      // The optimistic rows have been superseded by real ones; keeping them
+      // would show every award twice.
+      ledgerExtra.clear();
+      _notify();
+    } catch (e) {
+      // The award is safe in the database either way — this only means the
+      // screen keeps the optimistic number until the next hydrate. Not worth
+      // an error banner.
+      syncError = 'wallet: $e';
+      _notify();
+    }
   }
 
   // ---- account -------------------------------------------------

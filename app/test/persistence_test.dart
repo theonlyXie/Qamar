@@ -102,9 +102,29 @@ class FakeWaterRepo implements WaterRepository {
   Future<List<WaterSip>> sipsForDay(String userId, DateTime day) async => today;
 }
 
+/// Stands in for the database, and behaves the way it does.
+///
+/// The point of this fake is that the *server* owns the balance. It keeps its
+/// own ledger keyed by idempotency string, exactly as `su_point_ledger` does
+/// with its unique (user_id, idempotency_key) constraint, so a replayed award
+/// pays nothing here for the same reason it pays nothing in Postgres.
 class FakeWalletRepo implements WalletRepository {
   ({int available, int lifetime}) stored = (available: 0, lifetime: 0);
   final List<String> redemptions = [];
+  final List<LedgerEntry> rows = [];
+  final Set<String> keys = {};
+
+  /// Set by a test to say whether a meal has been logged today, which is what
+  /// `qamar_complete_daily_quest` checks before it pays.
+  bool mealLoggedToday = true;
+
+  void award(int amount, String reason, String key) {
+    if (!keys.add(key)) return;
+    stored = (available: stored.available + amount, lifetime: stored.lifetime + amount);
+    rows.insert(0, LedgerEntry(
+      label: reason, amount: amount, when: 'now', reason: reason, at: DateTime.now(),
+    ));
+  }
 
   @override
   Future<({int available, int lifetime})> balance(String userId) async => stored;
@@ -120,7 +140,26 @@ class FakeWalletRepo implements WalletRepository {
   }
 
   @override
-  Future<List<LedgerEntry>> ledger(String userId) async => [];
+  Future<List<LedgerEntry>> ledger(String userId) async => List.of(rows);
+
+  @override
+  Future<QuestResult> completeDailyQuest(String userId) async {
+    final key = 'quest:$userId:today';
+    if (keys.contains(key)) {
+      return QuestResult(
+        credited: false, reason: 'already_claimed',
+        amount: SuEconomy.dailyQuest, available: stored.available);
+    }
+    if (!mealLoggedToday) {
+      return QuestResult(
+        credited: false, reason: 'no_meal_today',
+        amount: SuEconomy.dailyQuest, available: stored.available);
+    }
+    award(SuEconomy.dailyQuest, 'daily_quest', key);
+    return QuestResult(
+      credited: true, reason: 'ok',
+      amount: SuEconomy.dailyQuest, available: stored.available);
+  }
 }
 
 /// Stands in for the gateway. It returns what a real one returns — items to
@@ -554,13 +593,73 @@ void main() {
   });
 
   test('the ledger records points as they are earned, not reconstructed', () async {
-    final state = backed(ai: FakeGateway());
+    final wallet = FakeWalletRepo();
+    final state = backed(ai: FakeGateway(), wallet: wallet);
     await settle();
     expect(state.ledger(), isEmpty, reason: 'a new user has earned nothing');
 
-    state.completeQuest();
+    await state.completeQuest();
     expect(state.ledger().single.amount, SuEconomy.dailyQuest);
     expect(state.suAvailable, SuEconomy.dailyQuest);
+  });
+
+  test('the quest is claimed once a day, and the server is the one counting', () async {
+    final wallet = FakeWalletRepo();
+    final state = backed(ai: FakeGateway(), wallet: wallet);
+    await settle();
+
+    await state.completeQuest();
+    expect(state.suAvailable, SuEconomy.dailyQuest);
+    expect(state.questNotice, isNull);
+
+    // Pressing it again — a double tap, a second phone, a restarted app — is
+    // the case that used to mint another 250 into a Dart integer every time.
+    await state.completeQuest();
+    await state.completeQuest();
+    expect(state.suAvailable, SuEconomy.dailyQuest, reason: 'paid once, not three times');
+    expect(state.questNotice, isNotNull);
+    expect(state.ledger().length, 1);
+  });
+
+  test('no meal today means no quest, and it says so instead of failing silently', () async {
+    final wallet = FakeWalletRepo()..mealLoggedToday = false;
+    final state = backed(ai: FakeGateway(), wallet: wallet);
+    await settle();
+    state.setLang(AppLang.en);
+
+    await state.completeQuest();
+    expect(state.suAvailable, 0);
+    expect(state.questDone, isFalse);
+    expect(state.questNotice, contains('Log a meal today'));
+  });
+
+  test('the wallet shows the server balance, not the optimistic one', () async {
+    final wallet = FakeWalletRepo();
+    // The database already holds a signup bonus this session knows nothing of.
+    wallet.award(SuEconomy.signupBonus, 'signup_bonus', 'signup:user-1');
+    final state = backed(ai: FakeGateway(), wallet: wallet);
+    await settle();
+    expect(state.suAvailable, SuEconomy.signupBonus);
+
+    await state.completeQuest();
+    expect(state.suAvailable, SuEconomy.signupBonus + SuEconomy.dailyQuest);
+    // Two real rows, and no duplicated optimistic copy of the quest.
+    expect(state.ledger().length, 2);
+    expect(state.ledger().where((e) => e.amount == SuEconomy.dailyQuest).length, 1);
+  });
+
+  test('server ledger reasons are shown in the user language, not as codes', () {
+    const e = LedgerEntry(label: 'first_meal', amount: 500, when: 'x', reason: 'first_meal');
+    expect(e.displayLabel(true), 'أول وجبة');
+    expect(e.displayLabel(false), 'First meal logged');
+
+    // An optimistic row is already translated and must be left alone.
+    const local = LedgerEntry(label: 'مهمة اليوم', amount: 250, when: 'دلوقتي');
+    expect(local.displayLabel(true), 'مهمة اليوم');
+
+    // A reason nobody has translated shows as itself rather than as a guess.
+    const unknown = LedgerEntry(label: 'x', amount: 1, when: 'x', reason: 'referral_bonus');
+    expect(unknown.displayLabel(true), 'referral_bonus');
   });
 
   test('the sixth Qamar use in a day is refused, and the wallet is the way out', () async {

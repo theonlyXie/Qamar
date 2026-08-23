@@ -47,6 +47,37 @@ abstract class WalletRepository {
   Future<void> credit(String userId, {required int amount, required String reason, required String idempotencyKey});
   Future<void> redeem(String userId, {required SpendItemDef item, required String idempotencyKey});
   Future<List<LedgerEntry>> ledger(String userId);
+
+  /// Claims today's quest, and reports what the server decided.
+  ///
+  /// The client does not get to say whether the quest was completed. The
+  /// database checks that a meal was logged today in Cairo, credits 250 once
+  /// per Cairo day under a key it owns, and returns the balance it arrived at.
+  /// [reason] is `ok`, `already_claimed`, or `no_meal_today` — the last is a
+  /// normal morning, not an error, so it comes back as a value rather than an
+  /// exception.
+  Future<QuestResult> completeDailyQuest(String userId);
+}
+
+/// What the server did with a quest claim.
+class QuestResult {
+  final bool credited;
+  final String reason;
+  final int amount;
+  final int available;
+  const QuestResult({
+    required this.credited,
+    required this.reason,
+    required this.amount,
+    required this.available,
+  });
+
+  factory QuestResult.fromJson(Map<String, dynamic> json) => QuestResult(
+        credited: json['credited'] == true,
+        reason: (json['reason'] as String?) ?? 'ok',
+        amount: json['amount'] is num ? (json['amount'] as num).round() : 0,
+        available: json['available'] is num ? (json['available'] as num).round() : 0,
+      );
 }
 
 /// A day's logged intake, as recorded — never estimated or back-filled.
