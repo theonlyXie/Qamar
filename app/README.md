@@ -89,7 +89,7 @@ for you to connect:
 | File | What it is | To activate |
 |---|---|---|
 | `supabase/migrations/0001_core_schema.sql` | Full Postgres schema (profiles, consents, targets, meal_drafts/logs, wallet + ledger, quests, weight entries) with RLS, scoped to the MVP subset of spec_mvp.txt Part 28 | `supabase db push` (or run in the SQL editor) against a real project |
-| `supabase/migrations/0032_water_logs.sql` | Drinking-water log: one row per glass (250 ml) or bottle (500 ml) | same |
+| `supabase/migrations/0036_water_logs.sql` | Drinking-water log: one row per glass (250 ml) or bottle (500 ml) | same |
 | `supabase/migrations/0002_wallet_functions.sql` | Atomic, idempotent `qamar_wallet_credit` / `qamar_wallet_redeem` RPCs (ledger insert + balance update in one transaction) | same |
 | `lib/services/repositories.dart` | Abstract `ProfileRepository` / `MealRepository` / `WaterRepository` / `WalletRepository` | — |
 | `lib/services/supabase_repositories.dart` | Supabase-backed implementations of the above | Re-check each call against your pinned `supabase_flutter` version's query-builder API before use — it has shifted across majors |
