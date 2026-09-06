@@ -120,11 +120,13 @@ class AccountSheet extends StatefulWidget {
 class _AccountSheetState extends State<AccountSheet> {
   final _email = TextEditingController();
   final _code = TextEditingController();
+  final _password = TextEditingController();
 
   @override
   void dispose() {
     _email.dispose();
     _code.dispose();
+    _password.dispose();
     super.dispose();
   }
 
@@ -223,7 +225,17 @@ class _AccountSheetState extends State<AccountSheet> {
         keyboardType: TextInputType.emailAddress,
         onChanged: state.onAuthEmailChanged,
       ),
-      if (state.authCodeSent) ...[
+      if (state.authUsePassword) ...[
+        const SizedBox(height: 10),
+        _Field(
+          controller: _password,
+          hint: isAr ? 'كلمة السر' : 'Password',
+          enabled: !state.authBusy,
+          keyboardType: TextInputType.visiblePassword,
+          obscure: true,
+          onChanged: state.onAuthPasswordChanged,
+        ),
+      ] else if (state.authCodeSent) ...[
         const SizedBox(height: 10),
         _Field(
           controller: _code,
@@ -250,13 +262,19 @@ class _AccountSheetState extends State<AccountSheet> {
       QPrimaryButton(
         label: state.authBusy
             ? (isAr ? 'ثانية…' : 'One moment…')
-            : state.authCodeSent
-                ? (isAr ? 'أكّد الكود' : 'Confirm code')
-                : (isAr ? 'ابعت الكود' : 'Send code'),
-        onTap: state.authBusy ? null : (state.authCodeSent ? state.verifyAuthCode : state.sendAuthCode),
+            : state.authUsePassword
+                ? (isAr ? 'ادخل' : 'Sign in')
+                : state.authCodeSent
+                    ? (isAr ? 'أكّد الكود' : 'Confirm code')
+                    : (isAr ? 'ابعت الكود' : 'Send code'),
+        onTap: state.authBusy
+            ? null
+            : state.authUsePassword
+                ? state.signInWithPassword
+                : (state.authCodeSent ? state.verifyAuthCode : state.sendAuthCode),
         height: 50,
       ),
-      if (state.authCodeSent) ...[
+      if (state.authCodeSent && !state.authUsePassword) ...[
         Center(
           child: TextButton(
             onPressed: state.authBusy ? null : state.sendAuthCode,
@@ -265,6 +283,21 @@ class _AccountSheetState extends State<AccountSheet> {
           ),
         ),
       ],
+      // Only offered for signing in, never for linking a guest account: a
+      // password proves you know a secret, not that the address is yours, and
+      // linking is exactly the step that has to prove the latter.
+      if (!state.authLinking)
+        Center(
+          child: TextButton(
+            onPressed: state.authBusy ? null : state.toggleAuthPassword,
+            child: Text(
+              state.authUsePassword
+                  ? (isAr ? 'ابعتلي كود على الإيميل' : 'Email me a code instead')
+                  : (isAr ? 'عندي كلمة سر' : 'I have a password'),
+              style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.violetSoft),
+            ),
+          ),
+        ),
     ];
   }
 }
@@ -276,6 +309,12 @@ class _Field extends StatelessWidget {
   final TextInputType keyboardType;
   final List<TextInputFormatter>? formatters;
   final ValueChanged<String> onChanged;
+
+  /// Hides what is typed. Only the password field sets it, and it is the
+  /// reason this widget takes the flag at all rather than each caller
+  /// building its own TextField.
+  final bool obscure;
+
   const _Field({
     required this.controller,
     required this.hint,
@@ -283,6 +322,7 @@ class _Field extends StatelessWidget {
     required this.keyboardType,
     required this.onChanged,
     this.formatters,
+    this.obscure = false,
   });
 
   @override
@@ -292,6 +332,9 @@ class _Field extends StatelessWidget {
       enabled: enabled,
       keyboardType: keyboardType,
       inputFormatters: formatters,
+      obscureText: obscure,
+      autocorrect: !obscure,
+      enableSuggestions: !obscure,
       textDirection: TextDirection.ltr,
       onChanged: onChanged,
       style: QText.number(size: 15, color: QColors.textPrimary),

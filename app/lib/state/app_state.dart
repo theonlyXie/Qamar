@@ -1826,6 +1826,8 @@ class AppState extends ChangeNotifier {
 
   void closeAuth() {
     authOpen = false;
+    // A typed password does not outlive the sheet it was typed into.
+    authPassword = '';
     _notify();
   }
 
@@ -1834,6 +1836,8 @@ class AppState extends ChangeNotifier {
     authBusy = false;
     authProvider = null;
     authCode = '';
+    authPassword = '';
+    authUsePassword = false;
     authError = null;
     authDone = null;
     _notify();
@@ -1849,6 +1853,75 @@ class AppState extends ChangeNotifier {
     authCode = v.trim();
     authError = null;
     _notify();
+  }
+
+  /// The password typed into the account sheet. Never stored, never logged,
+  /// and cleared the moment the sheet closes.
+  String authPassword = '';
+
+  /// True when the sheet is showing the password field instead of the code
+  /// field. Not a preference — a second way in, for the days the first one
+  /// cannot deliver a message.
+  bool authUsePassword = false;
+
+  void onAuthPasswordChanged(String v) {
+    authPassword = v;
+    authError = null;
+    _notify();
+  }
+
+  void toggleAuthPassword() {
+    authUsePassword = !authUsePassword;
+    authCodeSent = false;
+    authCode = '';
+    authError = null;
+    _notify();
+  }
+
+  /// Signs in with an email and password, which asks nobody to send anything.
+  ///
+  /// Deliberately never offered as the way to *link* a guest account: linking
+  /// an address has to prove the address belongs to you, and a password
+  /// proves nothing of the kind. This is for an account that already exists.
+  Future<void> signInWithPassword() async {
+    final auth = _auth;
+    if (auth == null) {
+      authError = isAr
+          ? 'الحسابات محتاجة اتصال بالسيرفر، والتطبيق شغال أوفلاين دلوقتي.'
+          : 'Accounts need a server connection, and the app is running offline.';
+      _notify();
+      return;
+    }
+    if (!authEmailValid) {
+      authError = isAr ? 'الإيميل ده مش مظبوط.' : 'That email does not look right.';
+      _notify();
+      return;
+    }
+    if (authPassword.length < 6) {
+      authError = isAr
+          ? 'كلمة السر ٦ حروف على الأقل.'
+          : 'A password is at least six characters.';
+      _notify();
+      return;
+    }
+    authBusy = true;
+    authError = null;
+    _notify();
+    try {
+      await auth.signInWithPassword(email: authEmail, password: authPassword);
+      if (_disposed) return;
+      authDone = isAr ? 'أهلاً. دخلت بـ $authEmail.' : 'Welcome back — signed in as $authEmail.';
+      authPassword = '';
+      authBusy = false;
+      _notify();
+      // A different account is a different set of rows.
+      await hydrate();
+    } catch (e) {
+      if (_disposed) return;
+      authError = _authMessage(e);
+      authBusy = false;
+      _notify();
+    }
   }
 
   static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s.]+\.[^@\s]+$');
@@ -1931,7 +2004,34 @@ class AppState extends ChangeNotifier {
     if (raw.contains('rate limit') || raw.contains('Too many')) {
       return isAr ? 'طلبات كتير على بعض. استنى شوية.' : 'Too many attempts. Wait a minute and try again.';
     }
-    return raw;
+    // The project's mail server is refusing Supabase's credentials, so no code
+    // can be delivered. This showed up on a real phone as the raw Dart
+    // exception — 'AuthRetryableFetchException(message: {"code":
+    // "unexpected_failure"...}, statusCode: 500)' — in English, in a Latin
+    // monospace box, to somebody reading Arabic. Keeping the raw text was
+    // meant to stop a misconfigured project looking like a broken app; it did
+    // the opposite. The person needs to know it is not their fault, that
+    // nothing they logged is lost, and what still works.
+    if (raw.contains('Error sending') ||
+        raw.contains('unexpected_failure') ||
+        raw.contains('statusCode: 500')) {
+      return isAr
+          ? 'مش قادر أبعت إيميلات دلوقتي — ده إعداد على السيرفر، مش حاجة منك. '
+            'كل اللي سجلته موجود على الموبايل زي ما هو. تقدر تدخل بكلمة سر لو عندك واحدة.'
+          : 'I cannot send email right now — that is a server setting, not '
+            'anything you did. Everything you have logged is still here on '
+            'this phone. You can sign in with a password if you have one.';
+    }
+    if (raw.contains('Invalid login credentials')) {
+      return isAr
+          ? 'الإيميل أو كلمة السر غلط.'
+          : 'That email or password is not right.';
+    }
+    // Anything genuinely unrecognised still shows, because a silent failure is
+    // worse than an ugly one — but it says what it is first.
+    return isAr
+        ? 'حصلت مشكلة مش متوقعة: $raw'
+        : 'Something unexpected went wrong: $raw';
   }
 
   // ---- progress -------------------------------------------------

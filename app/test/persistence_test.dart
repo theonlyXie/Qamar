@@ -356,6 +356,30 @@ class FakeAccount implements Account {
     linked = true;
   }
 
+  /// What the fake accepts. A real project holds this in auth.users; here it
+  /// is one pair, which is enough to tell a right password from a wrong one.
+  String knownEmail = 'tester@dr-qamar.com';
+  String knownPassword = 'QamarTest!2026';
+  final List<String> passwordSignIns = [];
+  String? passwordSet;
+
+  @override
+  Future<void> signInWithPassword({required String email, required String password}) async {
+    passwordSignIns.add(email);
+    if (email != knownEmail || password != knownPassword) {
+      // Matches the string Supabase returns, because that is what
+      // _authMessage reads to decide what the person is told.
+      throw Exception('Invalid login credentials');
+    }
+    linked = true;
+  }
+
+  @override
+  Future<void> setPassword(String password) async {
+    if (failWith != null) throw failWith!;
+    passwordSet = password;
+  }
+
   @override
   Future<void> startSignIn(String email) async => signInStarts.add(email);
 
@@ -884,6 +908,103 @@ void main() {
   });
 
   group('account', () {
+    test('a mail server that refuses Supabase is explained, not dumped raw', () async {
+      // What a real phone showed: 'AuthRetryableFetchException(message:
+      // {"code":"unexpected_failure","message":"Error sending email change
+      // email"}, statusCode: 500)' — English, Latin, monospace, at somebody
+      // reading Arabic. The cause is the project's SMTP server answering
+      // 535 Invalid username, which is nothing the person did.
+      final auth = FakeAccount()
+        ..failWith = Exception(
+          '{"code":"unexpected_failure","message":"Error sending email change email"}, statusCode: 500');
+      final state = backed(auth: auth);
+      await settle();
+      state.setLang(AppLang.en);
+      state.openLinkAccount();
+      state.onAuthEmailChanged('nour@example.com');
+
+      await state.sendAuthCode();
+
+      expect(state.authError, isNotNull);
+      expect(state.authError, contains('server setting'));
+      expect(state.authError, contains('still here'));
+      expect(state.authError, isNot(contains('AuthRetryableFetchException')));
+      expect(state.authError, isNot(contains('statusCode')));
+    });
+
+    test('an unrecognised failure still shows, but says what it is first', () async {
+      // Hiding an unknown error would make a misconfigured project look like a
+      // broken app. Showing it bare made a broken app look like a crash.
+      final auth = FakeAccount()..failWith = Exception('some novel backend problem');
+      final state = backed(auth: auth);
+      await settle();
+      state.setLang(AppLang.en);
+      state.openLinkAccount();
+      state.onAuthEmailChanged('nour@example.com');
+
+      await state.sendAuthCode();
+
+      expect(state.authError, startsWith('Something unexpected went wrong'));
+      expect(state.authError, contains('some novel backend problem'));
+    });
+
+    test('a password signs in without anybody sending an email', () async {
+      final auth = FakeAccount();
+      final state = backed(auth: auth);
+      await settle();
+      state.setLang(AppLang.en);
+      state.openSignIn();
+      state.toggleAuthPassword();
+      state.onAuthEmailChanged('tester@dr-qamar.com');
+      state.onAuthPasswordChanged('QamarTest!2026');
+
+      await state.signInWithPassword();
+
+      expect(auth.passwordSignIns, ['tester@dr-qamar.com']);
+      expect(auth.linkStarts, isEmpty, reason: 'no code was requested');
+      expect(auth.signInStarts, isEmpty, reason: 'no email was sent');
+      expect(state.authError, isNull);
+      expect(state.authDone, contains('tester@dr-qamar.com'));
+    });
+
+    test('a wrong password is told apart from a broken mail server', () async {
+      final auth = FakeAccount();
+      final state = backed(auth: auth);
+      await settle();
+      state.setLang(AppLang.en);
+      state.openSignIn();
+      state.toggleAuthPassword();
+      state.onAuthEmailChanged('tester@dr-qamar.com');
+      state.onAuthPasswordChanged('not-the-password');
+
+      await state.signInWithPassword();
+
+      expect(state.authError, 'That email or password is not right.');
+      expect(state.authDone, isNull);
+    });
+
+    test('the password never outlives the sheet', () async {
+      final state = backed(auth: FakeAccount());
+      await settle();
+      state.openSignIn();
+      state.toggleAuthPassword();
+      state.onAuthPasswordChanged('QamarTest!2026');
+      expect(state.authPassword, isNotEmpty);
+
+      state.closeAuth();
+      expect(state.authPassword, isEmpty);
+    });
+
+    test('linking a guest account is never offered a password', () async {
+      // A password proves you know a secret. Linking has to prove the address
+      // is yours, which is a different claim and needs the code.
+      final state = backed(auth: FakeAccount());
+      await settle();
+      state.openLinkAccount();
+      expect(state.authLinking, isTrue);
+      expect(state.authUsePassword, isFalse);
+    });
+
     test('linking sends a code and only then attaches the email', () async {
       final auth = FakeAccount();
       final state = backed(auth: auth);
