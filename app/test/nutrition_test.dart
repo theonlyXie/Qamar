@@ -17,6 +17,7 @@ import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/models/billing.dart';
 import 'package:qamar/models/water.dart';
 import 'package:qamar/services/ai_gateway.dart';
+import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/state/chat_replies.dart';
@@ -304,6 +305,7 @@ void main() {
 
   secondRound();
   streakAndOrb();
+  gesturesAndDigits();
   languageTests();
 
   group('explain registry', () {
@@ -326,6 +328,81 @@ void main() {
       for (final id in ['kcal_remaining', 'protein', 'carbs', 'fat', 'su_points', 'level', 'plan_total', 'target_kcal', 'water', 'streak']) {
         expect(kExplanations[id], isNotNull, reason: 'missing explanation for "$id"');
       }
+    });
+  });
+}
+
+void gesturesAndDigits() {
+  group('three gestures, taught by doing', () {
+    test('the card stays until each gesture has actually been made', () async {
+      final state = AppState();
+      expect(state.orbTutorialDone, isFalse);
+      expect(state.gesturesLearned, isEmpty);
+
+      state.orbTap();
+      expect(state.gesturesLearned, {OrbGesture.tap});
+      expect(state.orbTutorialDone, isFalse);
+
+      await state.holdOrb();
+      expect(state.gesturesLearned, containsAll([OrbGesture.tap, OrbGesture.hold]));
+      expect(state.orbTutorialDone, isFalse);
+
+      state.openExplain(kExplanations['protein']!);
+      expect(state.orbTutorialDone, isTrue);
+    });
+
+    test('“Got it” dismisses it without pretending the gestures were learned', () {
+      final state = AppState();
+      state.dismissOrbTutorial();
+      expect(state.orbTutorialDone, isTrue);
+      expect(state.gesturesLearned, isEmpty);
+    });
+
+    test('a phone remembers that it has been taught', () async {
+      final prefs = MemoryDevicePrefs();
+      final first = AppState(prefs: prefs);
+      first.orbTap();
+      await first.holdOrb();
+      first.openExplain(kExplanations['protein']!);
+      await Future<void>.delayed(Duration.zero);
+
+      final second = AppState(prefs: prefs);
+      await Future<void>.delayed(Duration.zero);
+      expect(second.orbTutorialDone, isTrue, reason: 'the same phone, a new launch');
+
+      expect(AppState(prefs: MemoryDevicePrefs()).orbTutorialDone, isFalse, reason: 'a different phone starts fresh');
+    });
+  });
+
+  group('digits', () {
+    test('Arabic draws ٠١٢ by default and can switch to 012; English is untouched', () async {
+      final state = AppState();
+      expect(state.isAr, isTrue);
+      expect(state.iso('82'), '\u2066٨٢\u2069');
+      expect(state.formatSu(2500), '٢٬٥٠٠');
+
+      state.setEasternDigits(false);
+      expect(state.iso('82'), '\u206682\u2069');
+      expect(state.formatSu(2500), '2,500');
+
+      state.setLang(AppLang.en);
+      state.setEasternDigits(true);
+      expect(state.iso('82'), '\u206682\u2069', reason: 'the preference is Arabic-only');
+    });
+
+    test('the choice survives a relaunch on the same phone', () async {
+      final prefs = MemoryDevicePrefs();
+      AppState(prefs: prefs).setEasternDigits(false);
+      await Future<void>.delayed(Duration.zero);
+      final again = AppState(prefs: prefs);
+      await Future<void>.delayed(Duration.zero);
+      expect(again.easternDigits, isFalse);
+    });
+
+    test('EGP follows the same preference', () {
+      expect(formatEgp(500, ar: true), '٥٠٠ ج.م');
+      expect(formatEgp(500, ar: true, eastern: false), '500 ج.م');
+      expect(formatEgp(500, ar: false), 'EGP 500');
     });
   });
 }

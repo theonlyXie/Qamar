@@ -227,6 +227,23 @@ class YouScreen extends StatelessWidget {
             QLangToggle(lang: state.lang, onChanged: state.setLang),
           ]),
         ),
+        if (isAr)
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('الأرقام', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+                Text(state.easternDigits ? '٠١٢٣٤٥٦٧٨٩' : '0123456789', style: QText.number(size: 12, color: QColors.textMuted)),
+              ]),
+              Switch.adaptive(
+                value: state.easternDigits,
+                activeThumbColor: QColors.violet,
+                onChanged: state.setEasternDigits,
+              ),
+            ]),
+          ),
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
@@ -318,7 +335,7 @@ class _AffiliateCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             isAr
-                ? '${formatEgp(wallet.balancePounds, ar: true)} متاح · ${formatEgp(wallet.lifetimeEarnedCents ~/ 100, ar: true)} مكتسب'
+                ? '${formatEgp(wallet.balancePounds, ar: true, eastern: state.easternDigits)} متاح · ${formatEgp(wallet.lifetimeEarnedCents ~/ 100, ar: true, eastern: state.easternDigits)} مكتسب'
                 : '${formatEgp(wallet.balancePounds, ar: false)} available · ${formatEgp(wallet.lifetimeEarnedCents ~/ 100, ar: false)} earned',
             style: QText.body(size: 12, color: QColors.textFaint),
           ),

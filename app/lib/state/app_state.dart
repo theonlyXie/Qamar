@@ -13,6 +13,7 @@ import '../models/streak.dart';
 import '../models/su_economy.dart';
 import '../services/ai_gateway.dart';
 import '../services/auth_service.dart';
+import '../services/device_prefs.dart';
 import '../services/dictation.dart';
 import '../services/payments.dart';
 import '../services/repositories.dart';
@@ -27,6 +28,10 @@ enum PlusPlan { monthly }
 
 /// How a meal gets logged straight from the orb, with no page in between.
 enum QuickLog { voice, text, photo }
+
+/// The orb's whole vocabulary. Tap opens the tree (or comes back to Today),
+/// hold talks to Qamar, dragging it onto a number explains that number.
+enum OrbGesture { tap, hold, explain }
 
 enum AppScreen { welcome, scan, onboard, today, plan, progress, you, wallet, subscription }
 
@@ -55,6 +60,7 @@ class AppState extends ChangeNotifier {
     Dictation? dictation,
     Account? auth,
     String? userId,
+    DevicePrefs? prefs,
   })  : _profileRepo = profileRepo,
         _mealRepo = mealRepo,
         _waterRepo = waterRepo,
@@ -64,9 +70,32 @@ class AppState extends ChangeNotifier {
         _openCheckout = openCheckout,
         _dictation = dictation,
         _auth = auth,
-        _userId = userId {
+        _userId = userId,
+        _prefs = prefs {
     _watchAccount();
+    _loadDevicePrefs();
     if (isBacked) hydrate();
+  }
+
+  /// This phone's own choices. Null in tests and wherever there is no store;
+  /// then nothing is remembered between launches, and nothing pretends to be.
+  final DevicePrefs? _prefs;
+  static const _kOrbTutorialDone = 'orb_tutorial_done';
+  static const _kEasternDigits = 'eastern_digits';
+
+  Future<void> _loadDevicePrefs() async {
+    final p = _prefs;
+    if (p == null) return;
+    try {
+      final done = await p.getBool(_kOrbTutorialDone);
+      final digits = await p.getBool(_kEasternDigits);
+      if (_disposed) return;
+      if (done == true) orbTutorialDismissed = true;
+      if (digits != null) easternDigits = digits;
+      _notify();
+    } catch (_) {
+      // A preference store that will not answer is a default, not an error.
+    }
   }
 
   final ProfileRepository? _profileRepo;
@@ -265,12 +294,72 @@ class AppState extends ChangeNotifier {
   QStrings get t => QStrings.of(lang);
   bool get isAr => lang == AppLang.ar;
 
+  /// Which digits Arabic draws: ٠١٢ (Eastern Arabic, the default Egypt reads
+  /// on the street) or 012. Static Arabic copy keeps whatever digits it was
+  /// written with; this governs every number the app computes.
+  bool easternDigits = true;
+
+  void setEasternDigits(bool on) {
+    easternDigits = on;
+    _notify();
+    _prefs?.setBool(_kEasternDigits, on).catchError((_) {});
+  }
+
+  static const _western = '0123456789';
+  static const _eastern = '٠١٢٣٤٥٦٧٨٩';
+
+  /// [x] with its digits drawn the way this phone asked for, in Arabic only.
+  String digits(String x) {
+    if (!isAr || !easternDigits) return x;
+    final out = StringBuffer();
+    for (final ch in x.split('')) {
+      final i = _western.indexOf(ch);
+      out.write(i >= 0 ? _eastern[i] : ch);
+    }
+    return out.toString();
+  }
+
   /// Wraps mixed number/word fragments in Unicode bidi isolates, exactly
   /// like the prototype's `iso()` — keeps "٨٢ كجم" reading correctly in RTL.
-  String iso(String x) => '⁦$x⁩';
+  /// Every computed number on an Arabic screen passes through here, so it is
+  /// also where the digit preference is applied.
+  String iso(String x) => '⁦${digits(x)}⁩';
 
   /// Thousands separators so 2,500 looks like a score, not a calorie leftover.
-  String formatSu(int n) => NumberFormat.decimalPattern(isAr ? 'ar' : 'en').format(n);
+  /// Formatted in English and re-drawn, because intl's 'ar' data does not
+  /// reliably use Eastern digits across versions; the Arabic thousands mark
+  /// (٬) goes with the Eastern digits.
+  String formatSu(int n) {
+    final western = NumberFormat.decimalPattern('en').format(n);
+    if (!isAr || !easternDigits) return western;
+    return digits(western).replaceAll(',', '٬');
+  }
+
+  // ---- the three gestures, taught by doing -----------------------------
+
+  /// Gestures this phone has seen the person make on the orb. The Today
+  /// screen shows a three-line card until all three are ticked (or the card
+  /// is dismissed); ticks come from the real gestures, never from a tap on
+  /// "next".
+  final Set<OrbGesture> gesturesLearned = {};
+  bool orbTutorialDismissed = false;
+
+  bool get orbTutorialDone => orbTutorialDismissed || gesturesLearned.length == OrbGesture.values.length;
+
+  void _learn(OrbGesture g) {
+    if (orbTutorialDone || gesturesLearned.contains(g)) return;
+    gesturesLearned.add(g);
+    if (gesturesLearned.length == OrbGesture.values.length) {
+      _prefs?.setBool(_kOrbTutorialDone, true).catchError((_) {});
+    }
+    _notify();
+  }
+
+  void dismissOrbTutorial() {
+    orbTutorialDismissed = true;
+    _notify();
+    _prefs?.setBool(_kOrbTutorialDone, true).catchError((_) {});
+  }
 
   void setLang(AppLang l) {
     lang = l;
@@ -2373,6 +2462,7 @@ class AppState extends ChangeNotifier {
   }
 
   void openExplain(Explanation ex) {
+    _learn(OrbGesture.explain);
     explainOpen = ex;
     explainHoverId = null;
     _notify();
@@ -2392,6 +2482,7 @@ class AppState extends ChangeNotifier {
   // section above).
 
   void orbTap() {
+    _learn(OrbGesture.tap);
     if (chatOpen) return;
     if (screen != AppScreen.today) {
       _collapseTree();
@@ -2404,6 +2495,7 @@ class AppState extends ChangeNotifier {
   /// Hold to talk. Voice is the default input: the conversation opens and the
   /// moon starts listening straight away; typing is one tap away inside it.
   Future<void> holdOrb() async {
+    _learn(OrbGesture.hold);
     if (chatOpen) return;
     _collapseTree();
     openChat();

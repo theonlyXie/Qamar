@@ -437,6 +437,18 @@ class _OrbLogHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAr = state.isAr;
+    if (state.orbTutorialDone) return const SizedBox.shrink();
+    final learned = state.gesturesLearned;
+    final rows = <(OrbGesture, IconData, String, String)>[
+      (OrbGesture.tap, Icons.touch_app_outlined, 'دوس على القمر', 'Tap the moon'),
+      (OrbGesture.hold, Icons.mic_none, 'استمر ضاغط عليه', 'Hold it'),
+      (OrbGesture.explain, Icons.open_with, 'اسحبه على أي رقم', 'Drag it onto any number'),
+    ];
+    final what = <OrbGesture, (String, String)>{
+      OrbGesture.tap: ('تفتح الشجرة: سجّل · الخطة · مياه · المراجعة · حسابي', 'opens the tree: Log · Plan · Water · Review · Me'),
+      OrbGesture.hold: ('تتكلم مع قمر — بصوتك', 'talk to Qamar — with your voice'),
+      OrbGesture.explain: ('يشرحه لك: من فين جه وإيه معناه', 'and it explains itself: where it came from, what it means'),
+    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       decoration: BoxDecoration(
@@ -444,17 +456,57 @@ class _OrbLogHint extends StatelessWidget {
         border: Border.all(color: QColors.violet.withValues(alpha: 0.3)),
         borderRadius: BorderRadius.circular(QRadii.xl),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.touch_app_outlined, size: 18, color: QColors.violetSoft),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              isAr
-                  ? 'عشان تسجّل وجبة: دوس على القمر ← «سجّل» ← اتكلم أو اكتب، مجاناً. استمر ضاغط على القمر تتكلم مع قمر على طول.'
-                  : 'To log a meal: tap the moon → Log → speak or type, free. Hold the moon to talk to Qamar directly.',
-              style: QText.body(size: 12, height: 18, color: QColors.textMid),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  isAr ? 'القمر بيفهم تلات حركات' : 'The moon knows three gestures',
+                  style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.violetSoft, letterSpacing: 0.3),
+                ),
+              ),
+              GestureDetector(
+                onTap: state.dismissOrbTutorial,
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Text(isAr ? 'عارف' : 'Got it', style: QText.body(size: 12, color: QColors.textMuted)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final (g, icon, ar, en) in rows) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    learned.contains(g) ? Icons.check_circle : icon,
+                    size: 16,
+                    color: learned.contains(g) ? QColors.green : QColors.violetSoft,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${isAr ? ar : en} — ${isAr ? what[g]!.$1 : what[g]!.$2}',
+                      style: QText.body(
+                        size: 12,
+                        height: 18,
+                        color: learned.contains(g) ? QColors.textMuted : QColors.textMid,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
+          ],
+          const SizedBox(height: 4),
+          Text(
+            isAr ? 'الكتابة والصوت ببلاش على طول. الصور تلاتة في اليوم.' : 'Typing and speaking are always free. Photos, three a day.',
+            style: QText.body(size: 11, height: 16, color: QColors.textFaint),
           ),
         ],
       ),

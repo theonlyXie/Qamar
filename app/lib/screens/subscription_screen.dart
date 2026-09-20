@@ -153,7 +153,7 @@ class SubscriptionScreen extends StatelessWidget {
           label: state.plusActive && !state.plusIsTrial
               ? (isAr ? 'إدارة الاشتراك' : 'Manage subscription')
               : (isAr
-                  ? 'ابدأ ${formatEgp(quote.amountPounds, ar: true)}'
+                  ? 'ابدأ ${formatEgp(quote.amountPounds, ar: true, eastern: state.easternDigits)}'
                   : 'Start Qamar+ — ${formatEgp(quote.amountPounds, ar: false)}'),
           onTap: () { state.startPlusPurchase(); },
         ),
@@ -282,13 +282,13 @@ class _TierCard extends StatelessWidget {
               // it has, show what it came down from.
               if (quote.discounted)
                 Text(
-                  formatEgp(quote.listPounds, ar: isAr),
+                  formatEgp(quote.listPounds, ar: isAr, eastern: state.easternDigits),
                   style: QText.number(size: 11, color: QColors.textFaint).copyWith(
                     decoration: TextDecoration.lineThrough,
                   ),
                 ),
               Text(
-                formatEgp(quote.amountPounds, ar: isAr),
+                formatEgp(quote.amountPounds, ar: isAr, eastern: state.easternDigits),
                 style: QText.number(size: 16, weight: FontWeight.w600, color: QColors.textPrimary),
               ),
             ],

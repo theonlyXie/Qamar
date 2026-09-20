@@ -292,13 +292,14 @@ class AffiliateWallet {
   }
 }
 
-String formatEgp(int pounds, {required bool ar}) {
+String formatEgp(int pounds, {required bool ar, bool eastern = true}) {
   if (!ar) return 'EGP $pounds';
-  const western = '0123456789';
-  const eastern = '٠١٢٣٤٥٦٧٨٩';
+  if (!eastern) return '$pounds ج.م';
+  const westernDigits = '0123456789';
+  const easternDigits = '٠١٢٣٤٥٦٧٨٩';
   final mapped = pounds.toString().split('').map((c) {
-    final i = western.indexOf(c);
-    return i >= 0 ? eastern[i] : c;
+    final i = westernDigits.indexOf(c);
+    return i >= 0 ? easternDigits[i] : c;
   }).join();
   return '$mapped ج.م';
 }
