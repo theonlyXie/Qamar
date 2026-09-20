@@ -23,6 +23,7 @@ import '../services/config.dart';
 import '../services/payments.dart';
 import '../services/repositories.dart';
 import '../models/billing.dart';
+import '../models/invitation.dart';
 import '../widgets/explain.dart';
 import '../models/profile.dart';
 import '../models/review.dart';
@@ -60,6 +61,7 @@ class AppState extends ChangeNotifier {
     MealRepository? mealRepo,
     WaterRepository? waterRepo,
     WalletRepository? walletRepo,
+    InvitationRepository? invitationRepo,
     AiGateway? ai,
     BillingGateway? billing,
     Future<bool> Function(String url)? openCheckout,
@@ -75,6 +77,7 @@ class AppState extends ChangeNotifier {
         _mealRepo = mealRepo,
         _waterRepo = waterRepo,
         _walletRepo = walletRepo,
+        _invitationRepo = invitationRepo,
         _ai = ai,
         _billing = billing,
         _openCheckout = openCheckout,
@@ -99,6 +102,10 @@ class AppState extends ChangeNotifier {
 
   /// The share sheet. Null in tests and where there is none.
   final Sharer? _sharer;
+
+  /// The referral loop's server side. Null offline; then invitations are
+  /// not offered, rather than offered and lost.
+  final InvitationRepository? _invitationRepo;
 
   /// Product analytics. Null in tests and in any build without a key; and
   /// even when present, silent until the person consents (see [setImprove]).
@@ -265,6 +272,7 @@ class AppState extends ChangeNotifier {
       await _refreshQuota();
       await _refreshPlus();
       await _refreshAffiliate();
+      await _refreshInvitations(uid);
 
       // Two months, not one week: the chart reads seven days, the streak
       // reads as far back as the run goes.
@@ -1728,6 +1736,123 @@ class AppState extends ChangeNotifier {
 
   /// Affiliate cash wallet (EGP we send the marketer). Not Su Points.
   AffiliateWallet affiliateWallet = AffiliateWallet.empty;
+
+  // ---- invitations (the referral loop) ----------------------------------
+  //
+  // Blueprint: a member earns three named invitations a quarter and sends
+  // one from Me; the friend gets a fortnight of Qamar+ and the sender's name
+  // from the first moment; when the friend pays month one, the sender gets
+  // 1,000 Su and the friend 2,000 — all on the server (0049). Scarce and
+  // numbered so the loop runs on the sender's standing, never on a discount.
+
+  InvitationBook invitations = InvitationBook.empty;
+  String? invitationNotice;
+  bool invitationBusy = false;
+
+  /// Whoever invited this person, once their code is accepted.
+  String? invitedBy;
+
+  int get invitationsLeft => invitations.left;
+
+  Future<void> _refreshInvitations(String uid) async {
+    final repo = _invitationRepo;
+    if (repo == null) return;
+    try {
+      invitations = await repo.mine(uid);
+    } catch (_) {
+      // The card shows what it last knew.
+    }
+  }
+
+  /// Issues the next numbered invitation to [name] and hands the message to
+  /// the share sheet. Every refusal is a sentence on the card, never a crash.
+  Future<void> issueInvitation(String name) async {
+    invitationNotice = null;
+    final repo = _invitationRepo;
+    final uid = _userId;
+    if (!plusActive) {
+      invitationNotice = isAr ? 'الدعوات لأعضاء قمر+.' : 'Invitations are for Qamar+ members.';
+      _notify();
+      return;
+    }
+    if (repo == null || uid == null) {
+      invitationNotice = isAr ? 'اربط حسابك الأول عشان تبعت دعوات.' : 'Link your account first to send invitations.';
+      _notify();
+      return;
+    }
+    final n = name.trim();
+    if (n.isEmpty) {
+      invitationNotice = isAr ? 'الدعوة بتحمل اسم. اكتب اسم صاحبك.' : 'An invitation carries a name. Write your friend’s name.';
+      _notify();
+      return;
+    }
+    if (invitationsLeft <= 0) {
+      invitationNotice = isAr
+          ? 'خلصت دعوات الربع ده. التلاتة الجايين مع الربع الجاي.'
+          : 'This quarter’s invitations are used. The next three come with the next quarter.';
+      _notify();
+      return;
+    }
+    invitationBusy = true;
+    _notify();
+    try {
+      final inv = await repo.issue(uid, name: n);
+      invitations = invitations.plus(inv);
+      _track('invitation_sent', {'number': inv.number});
+      await shareInvitation(inv);
+    } catch (e) {
+      invitationNotice = e is InvitationException
+          ? e.message
+          : (isAr ? 'مقدرتش أعمل الدعوة دلوقتي. جرّب تاني بعد شوية.' : 'Could not create the invitation just now. Try again in a moment.');
+    }
+    invitationBusy = false;
+    _notify();
+  }
+
+  /// The message, to the sheet: the friend's name, the sender's, the code,
+  /// the link.
+  Future<void> shareInvitation(Invitation inv) async {
+    final s = _sharer;
+    if (s == null) return;
+    await s.shareText(inv.message(ar: isAr, sender: profile.name));
+  }
+
+  /// The friend's side: a code typed on the welcome screen. The sender's
+  /// name is the first thing they see, and the fortnight starts if a trial
+  /// is still open to them.
+  Future<void> redeemInvitation(String code) async {
+    invitationNotice = null;
+    final repo = _invitationRepo;
+    final uid = _userId;
+    if (code.trim().isEmpty) return;
+    if (repo == null || uid == null) {
+      invitationNotice = isAr
+          ? 'الدعوة بتتفعّل لما التطبيق يبقى متوصل بحسابك.'
+          : 'An invitation is redeemed once the app is connected to your account.';
+      _notify();
+      return;
+    }
+    invitationBusy = true;
+    _notify();
+    try {
+      final r = await repo.redeem(uid, code: code.trim());
+      invitedBy = r.inviterName.trim().isEmpty ? null : r.inviterName.trim();
+      final who = invitedBy ?? (isAr ? 'صاحبك' : 'A friend');
+      invitationNotice = r.trialDays > 0
+          ? (isAr
+              ? '$who عزمك. ${iso('${r.trialDays}')} يوم قمر+ عليك من دلوقتي.'
+              : '$who invited you. ${r.trialDays} days of Qamar+ are yours from now.')
+          : (isAr ? '$who عزمك. أهلاً بيك.' : '$who invited you. Welcome.');
+      _track('invitation_redeemed', {'trial_days': r.trialDays});
+      await _refreshPlus();
+    } catch (e) {
+      invitationNotice = e is InvitationException
+          ? e.message
+          : (isAr ? 'مقدرتش أفعّل الدعوة دلوقتي. جرّب تاني بعد شوية.' : 'Could not redeem the invitation just now. Try again in a moment.');
+    }
+    invitationBusy = false;
+    _notify();
+  }
   String? affiliateNotice;
 
   PlusQuote get displayPlusQuote =>

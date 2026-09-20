@@ -7,6 +7,9 @@ import 'package:share_plus/share_plus.dart';
 /// the OS does the sending. Null in tests and wherever there is no sheet.
 abstract class Sharer {
   Future<void> shareImage(Uint8List png, {required String text, required String fileName});
+
+  /// A message with no picture — an invitation, for instance.
+  Future<void> shareText(String text);
 }
 
 class PlatformSharer implements Sharer {
@@ -22,11 +25,26 @@ class PlatformSharer implements Sharer {
       debugPrint('Qamar share: $e');
     }
   }
+
+  @override
+  Future<void> shareText(String text) async {
+    try {
+      await SharePlus.instance.share(ShareParams(text: text));
+    } catch (e) {
+      debugPrint('Qamar share: $e');
+    }
+  }
 }
 
 /// Records what would have gone to the sheet.
 class MemorySharer implements Sharer {
   final List<({Uint8List png, String text, String fileName})> shared = [];
+  final List<String> texts = [];
+
+  @override
+  Future<void> shareText(String text) async {
+    texts.add(text);
+  }
 
   @override
   Future<void> shareImage(Uint8List png, {required String text, required String fileName}) async {

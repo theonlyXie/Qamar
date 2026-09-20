@@ -121,6 +121,22 @@ class WelcomeScreen extends StatelessWidget {
                   child: Text(t.haveAccount, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textMuted)),
                 ),
               ),
+              // The friend's side of the referral loop: a code from someone
+              // who is already here. Their name is the first thing shown.
+              SizedBox(
+                height: 34,
+                child: TextButton(
+                  onPressed: state.invitationBusy ? null : () => _askInvitationCode(context, state),
+                  child: Text(state.isAr ? 'عندك دعوة؟' : 'Have an invitation?',
+                      style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.violetSoft)),
+                ),
+              ),
+              if (state.invitationNotice != null) ...[
+                Text(state.invitationNotice!,
+                    textAlign: TextAlign.center,
+                    style: QText.body(size: 12, height: 18, color: state.invitedBy != null ? QColors.cyan : QColors.amberSoft)),
+                const SizedBox(height: 6),
+              ],
               Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 300),
@@ -137,6 +153,33 @@ class WelcomeScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _askInvitationCode(BuildContext context, AppState state) async {
+  final controller = TextEditingController();
+  final isAr = state.isAr;
+  final code = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: QColors.cardDeep,
+      title: Text(isAr ? 'كود الدعوة' : 'Invitation code', style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.textHigh)),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        textCapitalization: TextCapitalization.characters,
+        textDirection: TextDirection.ltr,
+        style: QText.number(size: 18, color: QColors.textHigh),
+        decoration: InputDecoration(hintText: 'QMR-XXXXX', hintStyle: QText.number(size: 18, color: QColors.textFaint)),
+        onSubmitted: (v) => Navigator.of(ctx).pop(v),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(isAr ? 'إلغاء' : 'Cancel', style: QText.body(size: 14, color: QColors.textMuted))),
+        TextButton(onPressed: () => Navigator.of(ctx).pop(controller.text), child: Text(isAr ? 'تفعيل' : 'Redeem', style: QText.body(size: 14, weight: FontWeight.w600, color: QColors.violetSoft))),
+      ],
+    ),
+  );
+  controller.dispose();
+  if (code != null && code.trim().isNotEmpty) await state.redeemInvitation(code);
 }
 
 class _FloatingPill extends StatelessWidget {

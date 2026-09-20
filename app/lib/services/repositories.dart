@@ -1,3 +1,4 @@
+import '../models/invitation.dart';
 import '../models/meal.dart';
 import '../models/nudge.dart';
 import '../models/profile.dart';
@@ -65,6 +66,22 @@ abstract class MealRepository {
   /// Last night's sentence about [day], written by the gateway's night job;
   /// null when none was written (a new account, an empty day, no job yet).
   Future<NightNote?> nightNote(String userId, DateTime day);
+}
+
+/// The referral loop's server side (migration 0049). Every call is the
+/// signed-in person's own: their book, an invitation they issue, a code they
+/// redeem. Refusals arrive as [InvitationException] with the server's reason.
+abstract class InvitationRepository {
+  Future<InvitationBook> mine(String userId);
+  Future<Invitation> issue(String userId, {required String name});
+  Future<InvitationRedemption> redeem(String userId, {required String code});
+}
+
+class InvitationException implements Exception {
+  final String message;
+  const InvitationException(this.message);
+  @override
+  String toString() => message;
 }
 
 abstract class WaterRepository {

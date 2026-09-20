@@ -20,6 +20,7 @@ import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/streak.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/models/billing.dart';
+import 'package:qamar/models/invitation.dart';
 import 'package:qamar/models/water.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/analytics.dart';
@@ -332,15 +333,52 @@ class FakeAccount implements Account {
   Future<void> confirmSignIn({required String email, required String token}) async => linked = true;
 }
 
+class FakeInvitationRepo implements InvitationRepository {
+  InvitationBook book = const InvitationBook(quarter: '2026Q3', limit: 3, invitations: []);
+  final List<String> issued = [];
+  final List<String> redeemCodes = [];
+  InvitationRedemption redemption = const InvitationRedemption(inviterName: 'Basel', inviteeName: 'Omar', trialDays: 14);
+  Object? failWith;
+
+  @override
+  Future<InvitationBook> mine(String userId) async => book;
+
+  @override
+  Future<Invitation> issue(String userId, {required String name}) async {
+    if (failWith != null) throw failWith!;
+    issued.add(name);
+    final inv = Invitation(
+      id: 'inv-${issued.length}',
+      number: book.usedThisQuarter + 1,
+      quarter: book.quarter,
+      name: name,
+      code: 'QMR-7F3A${issued.length}',
+      createdAt: DateTime(2026, 9, 21),
+    );
+    book = book.plus(inv);
+    return inv;
+  }
+
+  @override
+  Future<InvitationRedemption> redeem(String userId, {required String code}) async {
+    if (failWith != null) throw failWith!;
+    redeemCodes.add(code);
+    return redemption;
+  }
+}
+
 AppState backed({
   FakeProfileRepo? profiles,
   FakeMealRepo? meals,
   FakeWaterRepo? water,
   FakeWalletRepo? wallet,
+  FakeInvitationRepo? invitations,
   FakeGateway? ai,
   FakeAccount? auth,
   MemoryAnalytics? analytics,
   MemoryDevicePrefs? prefs,
+  MemorySharer? sharer,
+  FakeBilling? billing,
   DateTime Function()? clock,
 }) =>
     AppState(
@@ -348,11 +386,14 @@ AppState backed({
       mealRepo: meals ?? FakeMealRepo(),
       waterRepo: water ?? FakeWaterRepo(),
       walletRepo: wallet ?? FakeWalletRepo(),
+      invitationRepo: invitations,
       ai: ai,
       auth: auth,
       userId: 'user-1',
       analytics: analytics,
       prefs: prefs,
+      sharer: sharer,
+      billing: billing,
       clock: clock,
     );
 
@@ -1636,6 +1677,108 @@ void main() {
       await settle();
       expect(state.nightNote, isNull);
       expect(state.nightSentence, isNull);
+    });
+  });
+
+  group('invitations — the referral loop', () {
+    test('a member sends a named invitation; the sheet gets the name, the code and the link', () async {
+      final repo = FakeInvitationRepo();
+      final sharer = MemorySharer();
+      final a = MemoryAnalytics();
+      final state = backed(invitations: repo, sharer: sharer, analytics: a)..plusActive = true;
+      state.profile = state.profile.copyWith(name: 'Basel');
+      await state.setImprove(true);
+      await settle();
+
+      await state.issueInvitation('  Omar ');
+      expect(repo.issued, ['Omar']);
+      expect(state.invitations.invitations.single.number, 1);
+      expect(state.invitationsLeft, 2);
+      expect(state.invitationNotice, isNull);
+      final msg = sharer.texts.single;
+      expect(msg, contains('Omar'));
+      expect(msg, contains('Basel'));
+      expect(msg, contains('QMR-7F3A1'));
+      expect(msg, contains('https://dr-qamar.com/i/QMR-7F3A1'));
+      expect(a.named('invitation_sent').single['number'], 1);
+    });
+
+    test('three a quarter: the fourth is refused before the server is asked', () async {
+      final repo = FakeInvitationRepo();
+      final state = backed(invitations: repo, sharer: MemorySharer())..plusActive = true;
+      await settle();
+      for (final n in ['Omar', 'Sara', 'Nour']) {
+        await state.issueInvitation(n);
+      }
+      expect(state.invitationsLeft, 0);
+      await state.issueInvitation('Youssef');
+      expect(repo.issued, ['Omar', 'Sara', 'Nour']);
+      expect(state.invitationNotice, isNotNull);
+    });
+
+    test('the free tier is told invitations are for members, and nothing is issued', () async {
+      final repo = FakeInvitationRepo();
+      final state = backed(invitations: repo, sharer: MemorySharer())..setLang(AppLang.en);
+      await settle();
+      await state.issueInvitation('Omar');
+      expect(repo.issued, isEmpty);
+      expect(state.invitationNotice, 'Invitations are for Qamar+ members.');
+    });
+
+    test('an invitation carries a name', () async {
+      final repo = FakeInvitationRepo();
+      final state = backed(invitations: repo, sharer: MemorySharer())..plusActive = true;
+      await settle();
+      await state.issueInvitation('   ');
+      expect(repo.issued, isEmpty);
+      expect(state.invitationNotice, isNotNull);
+    });
+
+    test('a friend redeems a code: the sender’s name greets them and the fortnight starts', () async {
+      final repo = FakeInvitationRepo();
+      final billing = FakeBilling()..current = const PlusEntitlement(status: 'active', plan: 'monthly', provider: 'trial', trialEligible: false);
+      final a = MemoryAnalytics();
+      final state = backed(invitations: repo, billing: billing, analytics: a)..setLang(AppLang.en);
+      await state.setImprove(true);
+      await settle();
+
+      await state.redeemInvitation(' qmr-7f3a1 ');
+      expect(repo.redeemCodes, ['qmr-7f3a1']);
+      expect(state.invitedBy, 'Basel');
+      expect(state.invitationNotice, 'Basel invited you. 14 days of Qamar+ are yours from now.');
+      expect(state.plusActive, isTrue, reason: 'the entitlement is re-read after the server grants the fortnight');
+      expect(a.named('invitation_redeemed').single['trial_days'], 14);
+    });
+
+    test('the server’s refusal is the message, not a crash', () async {
+      final repo = FakeInvitationRepo()..failWith = const InvitationException('no invitation with that code');
+      final state = backed(invitations: repo)..setLang(AppLang.en);
+      await settle();
+      await state.redeemInvitation('QMR-00000');
+      expect(state.invitationNotice, 'no invitation with that code');
+      expect(state.invitedBy, isNull);
+    });
+
+    test('offline there is nothing to redeem against, and it says so', () async {
+      final state = AppState()..setLang(AppLang.en);
+      await state.redeemInvitation('QMR-7F3A1');
+      expect(state.invitationNotice, contains('connected to your account'));
+    });
+
+    test('the book knows this quarter’s allotment', () {
+      final book = InvitationBook.fromJson({
+        'quarter': '2026Q3',
+        'limit': 3,
+        'invitations': [
+          {'id': 'a', 'number': 1, 'quarter': '2026Q2', 'name': 'Old', 'code': 'QMR-AAAAA', 'created_at': '2026-05-01T10:00:00Z', 'redeemed_at': '2026-05-02T10:00:00Z', 'converted_at': '2026-05-20T10:00:00Z'},
+          {'id': 'b', 'number': 1, 'quarter': '2026Q3', 'name': 'New', 'code': 'QMR-BBBBB', 'created_at': '2026-09-01T10:00:00Z'},
+        ],
+      });
+      expect(book.usedThisQuarter, 1);
+      expect(book.left, 2);
+      expect(book.invitations.first.status, InvitationStatus.subscribed);
+      expect(book.invitations.last.status, InvitationStatus.sent);
+      expect(book.invitations.last.link, 'https://dr-qamar.com/i/QMR-BBBBB');
     });
   });
 }

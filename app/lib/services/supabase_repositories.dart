@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/invitation.dart';
 import '../models/meal.dart';
 import '../models/nudge.dart';
 import '../models/profile.dart';
@@ -13,6 +14,38 @@ import 'repositories.dart';
 /// supabase_flutter's query builder API has shifted across major versions —
 /// re-check each call against the version actually pinned in pubspec.yaml
 /// before flipping QamarConfig.useSupabase on.
+class SupabaseInvitationRepository implements InvitationRepository {
+  final SupabaseClient _client;
+  const SupabaseInvitationRepository(this._client);
+
+  @override
+  Future<InvitationBook> mine(String userId) async {
+    final raw = await _client.rpc('qamar_my_invitations');
+    if (raw is! Map) return InvitationBook.empty;
+    return InvitationBook.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  @override
+  Future<Invitation> issue(String userId, {required String name}) async {
+    try {
+      final raw = await _client.rpc('qamar_issue_invitation', params: {'p_name': name});
+      return Invitation.fromJson(Map<String, dynamic>.from(raw as Map));
+    } on PostgrestException catch (e) {
+      throw InvitationException(e.message);
+    }
+  }
+
+  @override
+  Future<InvitationRedemption> redeem(String userId, {required String code}) async {
+    try {
+      final raw = await _client.rpc('qamar_redeem_invitation', params: {'p_code': code});
+      return InvitationRedemption.fromJson(Map<String, dynamic>.from(raw as Map));
+    } on PostgrestException catch (e) {
+      throw InvitationException(e.message);
+    }
+  }
+}
+
 class SupabaseProfileRepository implements ProfileRepository {
   final SupabaseClient _client;
   const SupabaseProfileRepository(this._client);

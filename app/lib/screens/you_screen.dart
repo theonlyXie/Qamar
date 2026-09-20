@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/billing.dart';
+import '../models/invitation.dart';
 import '../services/config.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
@@ -130,6 +131,8 @@ class YouScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         _AffiliateCard(state: state),
+        const SizedBox(height: 14),
+        _InvitationsCard(state: state),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
@@ -348,6 +351,146 @@ class YouScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The referral loop, from Me: three named invitations a quarter, numbered,
+/// each carrying the friend's name. Members send; the free tier is told
+/// where invitations come from.
+class _InvitationsCard extends StatefulWidget {
+  final AppState state;
+  const _InvitationsCard({required this.state});
+
+  @override
+  State<_InvitationsCard> createState() => _InvitationsCardState();
+}
+
+class _InvitationsCardState extends State<_InvitationsCard> {
+  final _name = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final isAr = state.isAr;
+    final book = state.invitations;
+    final member = state.plusActive;
+    final left = state.invitationsLeft;
+
+    String statusOf(Invitation i) => switch (i.status) {
+          InvitationStatus.sent => isAr ? 'مبعوتة' : 'Sent',
+          InvitationStatus.joined => isAr ? 'انضم' : 'Joined',
+          InvitationStatus.subscribed => isAr ? 'اشترك' : 'Subscribed',
+        };
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Expanded(
+              child: Text(isAr ? 'دعواتك' : 'Your invitations',
+                  style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+            ),
+            if (member)
+              Text(
+                isAr ? 'باقي ${state.iso('$left')} من ${state.iso('${book.limit}')}' : '$left of ${book.limit} left',
+                style: QText.number(size: 12, color: left > 0 ? QColors.cyan : QColors.textFaint),
+              ),
+          ]),
+          const SizedBox(height: 4),
+          Text(
+            isAr
+                ? '${state.iso('${book.limit}')} دعوات بالاسم كل تلات شهور. صاحبك بياخد أسبوعين قمر+ واسمك بيظهرله من أول لحظة. لما يدفع أول شهر: إنت ${state.iso('1000')} نقطة وهو ${state.iso('2000')}.'
+                : '${book.limit} named invitations a quarter. Your friend gets two weeks of Qamar+ and sees your name from the first moment. When they pay their first month: 1,000 Su for you, 2,000 for them.',
+            style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+          ),
+          if (!member) ...[
+            const SizedBox(height: 10),
+            Row(children: [
+              const Icon(Icons.lock_outline, size: 14, color: QColors.gold),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(isAr ? 'الدعوات لأعضاء قمر+.' : 'Invitations are for Qamar+ members.',
+                    style: QText.body(size: 12, color: QColors.gold)),
+              ),
+              QOutlineButton(label: isAr ? 'شوف قمر+' : 'See Qamar+', height: 34, color: QColors.gold, onTap: () => state.go(AppScreen.subscription)),
+            ]),
+          ] else ...[
+            if (book.invitations.isNotEmpty) const SizedBox(height: 10),
+            for (final i in book.invitations)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(children: [
+                  Text(state.iso('${i.number}'), style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.violetSoft)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(i.name, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textHigh), overflow: TextOverflow.ellipsis),
+                  ),
+                  Text(statusOf(i), style: QText.body(size: 12, color: i.status == InvitationStatus.sent ? QColors.textMuted : QColors.green)),
+                  if (i.status == InvitationStatus.sent) ...[
+                    const SizedBox(width: 6),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.ios_share, size: 16, color: QColors.textMid),
+                      onPressed: () => state.shareInvitation(i),
+                    ),
+                  ],
+                ]),
+              ),
+            if (left > 0 && state.isBacked) ...[
+              const SizedBox(height: 10),
+              Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: _name,
+                    enabled: !state.invitationBusy,
+                    style: QText.body(size: 14, color: QColors.textHigh),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: isAr ? 'اسم صاحبك' : 'Your friend’s name',
+                      hintStyle: QText.body(size: 14, color: QColors.textFaint),
+                      filled: true,
+                      fillColor: QColors.cardMid,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                QOutlineButton(
+                  label: isAr ? 'ادعي' : 'Invite',
+                  height: 38,
+                  color: QColors.cyan,
+                  onTap: state.invitationBusy
+                      ? null
+                      : () async {
+                          await state.issueInvitation(_name.text);
+                          if (state.invitationNotice == null) _name.clear();
+                        },
+                ),
+              ]),
+            ],
+            if (!state.isBacked) ...[
+              const SizedBox(height: 10),
+              Text(isAr ? 'اربط حسابك عشان تبعت دعوات.' : 'Link your account to send invitations.',
+                  style: QText.body(size: 12, color: QColors.textFaint)),
+            ],
+          ],
+          if (state.invitationNotice != null) ...[
+            const SizedBox(height: 8),
+            Text(state.invitationNotice!, style: QText.body(size: 12, height: 18, color: QColors.amberSoft)),
+          ],
+        ],
+      ),
     );
   }
 }
