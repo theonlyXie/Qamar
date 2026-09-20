@@ -12,6 +12,23 @@ abstract class ProfileRepository {
   Future<Profile?> loadProfile(String userId);
   Future<void> saveProfile(String userId, Profile profile);
   Future<Target> saveTarget(String userId, Target target, {required Profile inputs});
+
+  /// The consent log is append-only: one row per change, the latest row is
+  /// the answer. [type] is one of [ConsentType].
+  Future<void> saveConsent(String userId, String type, {required bool granted, required String version});
+
+  /// The latest answer on record for [type]; null when never asked.
+  Future<bool?> loadConsent(String userId, String type);
+}
+
+/// The two consents the schema knows (consents.type).
+abstract final class ConsentType {
+  /// Processing the person's answers at all — required to use the app.
+  static const processing = 'processing_required';
+
+  /// Using anonymised usage to improve the service — optional, and the gate
+  /// on analytics.
+  static const improve = 'improve_optional';
 }
 
 abstract class MealRepository {

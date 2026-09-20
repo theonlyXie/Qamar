@@ -61,6 +61,32 @@ class SupabaseProfileRepository implements ProfileRepository {
   }
 
   @override
+  Future<void> saveConsent(String userId, String type, {required bool granted, required String version}) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _client.from('consents').insert({
+      'user_id': userId,
+      'type': type,
+      'version': version,
+      'granted_at': granted ? now : null,
+      'withdrawn_at': granted ? null : now,
+    });
+  }
+
+  @override
+  Future<bool?> loadConsent(String userId, String type) async {
+    final row = await _client
+        .from('consents')
+        .select('granted_at, withdrawn_at')
+        .eq('user_id', userId)
+        .eq('type', type)
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    if (row == null) return null;
+    return row['granted_at'] != null && row['withdrawn_at'] == null;
+  }
+
+  @override
   Future<Target> saveTarget(String userId, Target target, {required Profile inputs}) async {
     await _client.from('targets').insert({
       'user_id': userId,

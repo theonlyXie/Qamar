@@ -35,8 +35,7 @@ class YouScreen extends StatelessWidget {
             : (isAr ? '${state.iso('$remembered')} عناصر' : '$remembered items')
       ),
       (isAr ? 'محفظة نقاط Su' : 'Su Points wallet', state.iso(state.formatSu(state.suAvailable))),
-      (isAr ? 'موافقة تحسين الخدمة' : 'Service-improvement consent', state.improve ? (isAr ? 'مفعّلة' : 'On') : (isAr ? 'موقوفة' : 'Off')),
-      (isAr ? 'الموافقات' : 'Consents', isAr ? 'الإصدار ١.١' : 'v1.1'),
+      (isAr ? 'الموافقات' : 'Consents', isAr ? 'الإصدار ${state.digits(QamarConfig.consentVersion)}' : 'v${QamarConfig.consentVersion}'),
     ];
 
     return ListView(
@@ -225,6 +224,29 @@ class YouScreen extends StatelessWidget {
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text(isAr ? 'اللغة' : 'Language', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
             QLangToggle(lang: state.lang, onChanged: state.setLang),
+          ]),
+        ),
+        // The consent given in the consultation, changeable here. Off means
+        // off: the analytics SDK stops and nothing is sent again.
+        Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(isAr ? 'تحسين الخدمة' : 'Service improvement', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+                Text(
+                  isAr ? 'أحداث استخدام مجهولة. من غير أكلك ولا جسمك ولا صورك.' : 'Anonymous usage events. Never your food, your body or your photos.',
+                  style: QText.body(size: 12, height: 16, color: QColors.textMuted),
+                ),
+              ]),
+            ),
+            Switch.adaptive(
+              value: state.improve,
+              activeThumbColor: QColors.violet,
+              onChanged: (v) => state.setImprove(v),
+            ),
           ]),
         ),
         if (isAr)

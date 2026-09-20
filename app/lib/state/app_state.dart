@@ -13,6 +13,7 @@ import '../models/plan.dart';
 import '../models/streak.dart';
 import '../models/su_economy.dart';
 import '../services/ai_gateway.dart';
+import '../services/analytics.dart';
 import '../services/auth_service.dart';
 import '../services/device_prefs.dart';
 import '../services/dictation.dart';
@@ -68,6 +69,7 @@ class AppState extends ChangeNotifier {
     DevicePrefs? prefs,
     Nudger? nudger,
     Sharer? sharer,
+    Analytics? analytics,
     DateTime Function()? clock,
   })  : _profileRepo = profileRepo,
         _mealRepo = mealRepo,
@@ -82,6 +84,7 @@ class AppState extends ChangeNotifier {
         _prefs = prefs,
         _nudger = nudger,
         _sharer = sharer,
+        _analytics = analytics,
         _clock = clock ?? DateTime.now {
     _watchAccount();
     _watchNudger();
@@ -97,6 +100,10 @@ class AppState extends ChangeNotifier {
   /// The share sheet. Null in tests and where there is none.
   final Sharer? _sharer;
 
+  /// Product analytics. Null in tests and in any build without a key; and
+  /// even when present, silent until the person consents (see [setImprove]).
+  final Analytics? _analytics;
+
   /// Injectable so the meal-time logic can be tested at a chosen hour.
   final DateTime Function() _clock;
 
@@ -110,6 +117,7 @@ class AppState extends ChangeNotifier {
   static const _kNudgePromptDone = 'nudge_prompt_done';
   static const _kFirstDay = 'first_day';
   static const _kReviewNumbers = 'review_numbers';
+  static const _kImprove = 'improve_consent';
 
   Future<void> _loadDevicePrefs() async {
     final p = _prefs;
@@ -122,8 +130,13 @@ class AppState extends ChangeNotifier {
       final promptDone = await p.getBool(_kNudgePromptDone);
       final first = DateTime.tryParse(await p.getString(_kFirstDay) ?? '');
       final reviewNumbers = await p.getBool(_kReviewNumbers);
+      final consent = await p.getBool(_kImprove);
       if (_disposed) return;
       if (reviewNumbers != null) reviewShowNumbers = reviewNumbers;
+      if (consent != null) {
+        improve = consent;
+        _syncAnalytics().ignore();
+      }
       if (done == true) orbTutorialDismissed = true;
       if (digits != null) easternDigits = digits;
       if (perDay != null) nudgesPerDay = perDay.clamp(0, NudgeSchedule.maxPerDay);
@@ -221,6 +234,17 @@ class AppState extends ChangeNotifier {
     try {
       final saved = await _profileRepo?.loadProfile(uid);
       if (saved != null) profile = saved;
+
+      try {
+        final consent = await _profileRepo?.loadConsent(uid, ConsentType.improve);
+        if (consent != null && consent != improve) {
+          improve = consent;
+          _prefs?.setBool(_kImprove, consent).catchError((_) {});
+          _syncAnalytics().ignore();
+        }
+      } catch (_) {
+        // The phone's own record stands until the server answers.
+      }
 
       final today = await _mealRepo?.mealsForDay(uid, DateTime.now());
       if (today != null) {
@@ -331,6 +355,59 @@ class AppState extends ChangeNotifier {
   bool blocked = false;
   bool minor = false;
   bool improve = false;
+
+  /// The service-improvement consent: asked in the consultation, changeable
+  /// on the You screen, recorded on the account, and the one switch that
+  /// turns analytics on or off. Nothing leaves the phone without it.
+  Future<void> setImprove(bool on) async {
+    final changed = improve != on;
+    improve = on;
+    _notify();
+    _prefs?.setBool(_kImprove, on).catchError((_) {});
+    if (changed && isBacked && _profileRepo != null) {
+      _push('save consent', (uid) => _profileRepo.saveConsent(uid, ConsentType.improve, granted: on, version: QamarConfig.consentVersion));
+    }
+    await _syncAnalytics(consentEvent: changed && on);
+  }
+
+  Future<void> _syncAnalytics({bool consentEvent = false}) async {
+    final a = _analytics;
+    if (a == null) return;
+    if (improve) {
+      await a.enable(_userId);
+      if (consentEvent) _track('consent_granted', {'version': QamarConfig.consentVersion});
+    } else {
+      await a.disable();
+    }
+  }
+
+  // ---- analytics ---------------------------------------------------------
+  //
+  // The blueprint's kill metrics and the events that explain them. Every
+  // event carries the language, the tier and whether the account is backed,
+  // and nothing else about the person: no name, no body, no food, no photo.
+  // Dropped silently without consent or without a sink.
+
+  void _track(String event, [Map<String, Object> props = const {}]) {
+    final a = _analytics;
+    if (a == null || !improve) return;
+    a.track(event, {...props, 'lang': lang.code, 'plus': plusActive, 'backed': isBacked}).ignore();
+  }
+
+  void _screen(AppScreen s) {
+    final a = _analytics;
+    if (a == null || !improve) return;
+    a.screen(s.name).ignore();
+  }
+
+  /// When the last nudge was tapped, so a meal logged soon after counts as
+  /// prompted — the distinction the day-30 habit metric rests on.
+  DateTime? _nudgeTappedAt;
+
+  bool get _nudgedRecently {
+    final t = _nudgeTappedAt;
+    return t != null && _clock().difference(t) < const Duration(minutes: 30);
+  }
   WalletTab walletTab = WalletTab.spend;
   bool whyOpen = false;
   final List<String> redeemed = [];
@@ -435,6 +512,7 @@ class AppState extends ChangeNotifier {
 
   /// The person said yes on the Plan screen: ask the OS, then schedule.
   Future<void> allowNudges() async {
+    _track('nudges_allowed', {'per_day': nudgesPerDay});
     nudgePromptDone = true;
     _prefs?.setBool(_kNudgePromptDone, true).catchError((_) {});
     _notify();
@@ -448,6 +526,7 @@ class AppState extends ChangeNotifier {
 
   /// "No, thanks" is zero a day, not a nag later.
   void declineNudges() {
+    _track('nudges_declined');
     nudgePromptDone = true;
     nudgesPerDay = 0;
     _prefs?.setBool(_kNudgePromptDone, true).catchError((_) {});
@@ -517,6 +596,8 @@ class AppState extends ChangeNotifier {
   void _onNudgeTap(String payload) {
     if (!payload.startsWith('nudge:')) return;
     final slot = MealSlot.values.asNameMap()[payload.substring(6)] ?? MealSlot.lunch;
+    _nudgeTappedAt = _clock();
+    _track('nudge_tapped', {'slot': slot.name});
     _openWithNudge(Nudge(slot: slot, at: _clock(), dayIndex: 0));
     _collapseTree();
     openChat();
@@ -549,6 +630,7 @@ class AppState extends ChangeNotifier {
   void _learn(OrbGesture g) {
     if (orbTutorialDone || gesturesLearned.contains(g)) return;
     gesturesLearned.add(g);
+    _track('orb_gesture_first', {'gesture': g.name});
     if (gesturesLearned.length == OrbGesture.values.length) {
       _prefs?.setBool(_kOrbTutorialDone, true).catchError((_) {});
     }
@@ -590,7 +672,7 @@ class AppState extends ChangeNotifier {
     plusFirstPurchase = true;
     affiliateWallet = AffiliateWallet.empty;
     affiliateNotice = null;
-    improve = false;
+    if (improve) setImprove(false).ignore();
     questDone = false;
     _questPaidDay = null;
     proposal = null;
@@ -618,6 +700,7 @@ class AppState extends ChangeNotifier {
     screen = s;
     treeOpen = false;
     _notify();
+    _screen(s);
   }
 
   // ---- welcome / scan -------------------------------------------------
@@ -642,6 +725,8 @@ class AppState extends ChangeNotifier {
     msgs.clear();
     scanned = false;
     _notify();
+    _screen(AppScreen.onboard);
+    _track('intake_started');
     Future.delayed(const Duration(milliseconds: 120), () => askStep(0));
   }
 
@@ -756,6 +841,7 @@ class AppState extends ChangeNotifier {
   }
 
   void advance() {
+    if (step < kOnboardingSteps.length) _track('intake_step', {'step': kOnboardingSteps[step].id});
     step += 1;
     _notify();
     // Persist once per answered step rather than on every stepper notch, so a
@@ -1104,8 +1190,7 @@ class AppState extends ChangeNotifier {
 
       case 'consent':
         if (has(['تحسين', 'ساعد', 'improve', 'help'])) {
-          improve = true;
-          _notify();
+          setImprove(true).ignore();
           advance();
           return;
         }
@@ -1255,6 +1340,7 @@ class AppState extends ChangeNotifier {
         const ObMessage.target(),
         const ObMessage.save(),
       ]);
+      _track('intake_completed');
       // Shown at once; paid by the server (qamar_grant_onboarding, once per
       // account), and the wallet is re-read so the two numbers agree.
       _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
@@ -1336,6 +1422,7 @@ class AppState extends ChangeNotifier {
     );
     waterToday.add(sip);
     _notify();
+    _track('water_logged', {'unit': unit.name});
     if (!isBacked) return;
     final repo = _waterRepo;
     if (repo == null) return;
@@ -1444,11 +1531,14 @@ class AppState extends ChangeNotifier {
         sub: isAr ? 'مش هخمّن أرقام' : 'I will not guess the numbers',
       ));
       _notify();
+      _track('meal_read_failed', {'source': inputType, 'reason': 'offline'});
       return;
     }
 
     chatState = ChatState.thinking;
     _notify();
+    // The verdict's latency, as the person feels it: from asking to seeing.
+    final verdict = Stopwatch()..start();
     try {
       final result = await gateway.analyzeMeal(
         inputType: inputType,
@@ -1457,8 +1547,10 @@ class AppState extends ChangeNotifier {
         lang: lang.code,
       );
       if (_disposed) return;
+      final ms = verdict.elapsedMilliseconds;
       await _pullQuota(gateway);
       chatState = ChatState.idle;
+      _track('meal_read', {'source': inputType, 'items': result.items.length, 'ms': ms});
 
       if (result.items.isEmpty) {
         // An empty reading is a real answer — a name the graph does not carry,
@@ -1487,9 +1579,11 @@ class AppState extends ChangeNotifier {
       }
     } on AiQuotaException catch (e) {
       if (_disposed) return;
+      _track('meal_read_failed', {'source': inputType, 'reason': 'quota'});
       _onQuotaHit(e);
     } catch (e) {
       if (_disposed) return;
+      _track('meal_read_failed', {'source': inputType, 'reason': 'error'});
       chatState = ChatState.idle;
       chat.add(ChatTurn(
         who: ChatWho.q,
@@ -1529,6 +1623,8 @@ class AppState extends ChangeNotifier {
     meals.add(meal);
     final award = first ? SuEconomy.firstMeal : SuEconomy.mealLogged;
     _credit(award, ar: first ? 'أول وجبة' : 'تأكيد وجبة', en: first ? 'First meal logged' : 'Meal confirmed');
+    _track('meal_logged', {'source': proposalInput, 'first': first, 'items': items.length, 'nudged': _nudgedRecently});
+    _nudgeTappedAt = null;
     chat.add(ChatTurn(
       who: ChatWho.q,
       text: isAr ? 'اتسجّلت: ${totals.kcal} سعرة.' : 'Logged: ${totals.kcal} kcal.',
@@ -1575,6 +1671,7 @@ class AppState extends ChangeNotifier {
     if (_questPaidDay != today) {
       _questPaidDay = today;
       _credit(SuEconomy.dailyQuest, ar: 'مهمة اليوم', en: 'Primary daily quest');
+      _track('quest_completed');
       // The server pays it once per Cairo day, whatever this flag says.
       if (isBacked && _walletRepo != null) {
         _push('complete quest', (uid) async {
@@ -1596,6 +1693,7 @@ class AppState extends ChangeNotifier {
     screen = AppScreen.wallet;
     treeOpen = false;
     _notify();
+    _screen(AppScreen.wallet);
   }
 
   // ---- Qamar+ subscription --------------------------------------------
@@ -1657,6 +1755,7 @@ class AppState extends ChangeNotifier {
   void setPlusPromoCode(String code) {
     plusPromoCode = PlusPricing.normalizeCode(code);
     plusNotice = null;
+    if (plusPromoCode.isNotEmpty) _track('promo_entered');
     _notify();
     refreshPlusQuote();
   }
@@ -1727,6 +1826,7 @@ class AppState extends ChangeNotifier {
         _notify();
         return;
       }
+      _track('checkout_opened', {'plan': plusPlan.name, 'promo': plusPromoCode.isNotEmpty});
       plusNotice = isAr
           ? 'كمّل الدفع في Paymob. أول ما يتأكد التحويل، قمر+ هيتفعل لوحده — من غير ما التطبيق يقول إنه دُفع.'
           : 'Finish in Paymob. Qamar+ turns on when the payment is confirmed — the app does not mark you paid on its own.';
@@ -1766,6 +1866,7 @@ class AppState extends ChangeNotifier {
     }
     try {
       _absorbEntitlement(await billing.startTrial());
+      if (plusActive) _track('trial_started');
       plusNotice = plusActive
           ? (isAr ? 'قمر+ شغال لسبعة أيام. مفيش بطاقة ومفيش تجديد لوحده.' : 'Qamar+ is on for seven days. No card, and nothing renews by itself.')
           : (isAr ? 'مقدرتش أبدأ الأسبوع المجاني دلوقتي.' : 'Could not start the free week just now.');
@@ -1792,7 +1893,9 @@ class AppState extends ChangeNotifier {
     if (billing == null) return;
     try {
       final ent = await billing.entitlement();
+      final was = plusActive;
       _absorbEntitlement(ent);
+      if (announce && !was && plusActive) _track('plus_activated', {'provider': ent.isTrial ? 'trial' : 'paymob'});
       if (announce) {
         plusNotice = plusActive
             ? (isAr ? 'قمر+ اشتغل. شكراً.' : 'Qamar+ is on. Thank you.')
@@ -1908,6 +2011,7 @@ class AppState extends ChangeNotifier {
   /// button goes there: another photo is bought with Su in the wallet; the
   /// fourth question is Qamar+.
   void _onQuotaHit(AiQuotaException e) {
+    _track('quota_hit', {'bucket': e.quota.bucket});
     _absorb(e.quota);
     chatState = ChatState.idle;
     final photo = e.quota.bucket == 'photo';
@@ -1925,6 +2029,7 @@ class AppState extends ChangeNotifier {
     final done = item.once && isRedeemed(item.id);
     final afford = suAvailable >= item.price && !done;
     if (!afford) return;
+    _track('wallet_redeemed', {'item': item.id});
     suAvailable -= item.price;
     if (item.once) redeemed.add(item.id);
     if (item.grantsAiUses > 0) {
@@ -2264,6 +2369,7 @@ class AppState extends ChangeNotifier {
     final s = _sharer;
     if (s == null) return;
     await s.shareImage(png, text: reviewShareText(), fileName: 'qamar-week.png');
+    _track('review_shared');
   }
 
   // ---- streak + orb state ---------------------------------------------
@@ -2413,10 +2519,12 @@ class AppState extends ChangeNotifier {
 
   static String _today() => DateTime.now().toIso8601String().substring(0, 10);
 
-  void _installPlan(DayPlan built) {
+  void _installPlan(DayPlan built, {String via = 'request'}) {
+    final first = planDate == null;
     plan = built;
     planDate = built.date;
     planError = null;
+    _track('plan_shown', {'via': via, 'first': first});
     // A rewritten menu is not the old one; carrying swaps would apply
     // yesterday's (or the previous dish's) choice to meals that are not there.
     swappedSlots.clear();
@@ -2547,6 +2655,7 @@ class AppState extends ChangeNotifier {
       await _analyseMeal(inputType: proposalInput, text: text);
       return;
     }
+    _track('question_asked');
 
     final gateway = _ai;
     if (gateway == null) {
@@ -2574,7 +2683,7 @@ class AppState extends ChangeNotifier {
 
       var menuMoved = false;
       if (result.plan != null) {
-        _installPlan(result.plan!);
+        _installPlan(result.plan!, via: 'chat');
         menuMoved = true;
       } else if (result.rebuildInstruction != null && result.rebuildInstruction!.trim().isNotEmpty) {
         while (planLoading && !_disposed) {

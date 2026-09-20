@@ -14,6 +14,7 @@ import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/nudge.dart';
+import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/streak.dart';
@@ -21,6 +22,7 @@ import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/models/billing.dart';
 import 'package:qamar/models/water.dart';
 import 'package:qamar/services/ai_gateway.dart';
+import 'package:qamar/services/analytics.dart';
 import 'package:qamar/services/auth_service.dart';
 import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/services/nudger.dart';
@@ -52,6 +54,18 @@ class FakeProfileRepo implements ProfileRepository {
     targetSaves++;
     return target;
   }
+
+  final List<({String type, bool granted, String version})> consents = [];
+  bool? consentOnRecord;
+
+  @override
+  Future<void> saveConsent(String userId, String type, {required bool granted, required String version}) async {
+    if (failWith != null) throw failWith!;
+    consents.add((type: type, granted: granted, version: version));
+  }
+
+  @override
+  Future<bool?> loadConsent(String userId, String type) async => consentOnRecord;
 }
 
 class FakeMealRepo implements MealRepository {
@@ -320,6 +334,9 @@ AppState backed({
   FakeWalletRepo? wallet,
   FakeGateway? ai,
   FakeAccount? auth,
+  MemoryAnalytics? analytics,
+  MemoryDevicePrefs? prefs,
+  DateTime Function()? clock,
 }) =>
     AppState(
       profileRepo: profiles ?? FakeProfileRepo(),
@@ -329,6 +346,9 @@ AppState backed({
       ai: ai,
       auth: auth,
       userId: 'user-1',
+      analytics: analytics,
+      prefs: prefs,
+      clock: clock,
     );
 
 Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 60));
@@ -1363,6 +1383,207 @@ void main() {
     await state.onReturnedFromPaymob();
     expect(state.plusActive, isTrue);
     expect(state.screen, AppScreen.subscription);
+  });
+
+  group('analytics, behind consent', () {
+    test('nothing is sent before the person says yes', () async {
+      final a = MemoryAnalytics();
+      final state = AppState(analytics: a);
+      state.logWater(WaterUnit.glass);
+      state.orbTap();
+      await settle();
+      expect(a.enabledFor, isEmpty, reason: 'the SDK must not even be started');
+      expect(a.events, isEmpty);
+      expect(a.screens, isEmpty);
+    });
+
+    test('saying yes turns analytics on, records the consent, and is itself the first event', () async {
+      final a = MemoryAnalytics();
+      final profiles = FakeProfileRepo();
+      final prefs = MemoryDevicePrefs();
+      final state = backed(profiles: profiles, analytics: a, prefs: prefs);
+      await settle();
+
+      await state.setImprove(true);
+      await settle();
+
+      expect(a.enabledFor, ['user-1'], reason: 'the account id is the identity, never an email');
+      expect(a.events.single.name, 'consent_granted');
+      expect(a.events.single.props['version'], '1.1');
+      expect(profiles.consents, [(type: 'improve_optional', granted: true, version: '1.1')]);
+      expect(await prefs.getBool('improve_consent'), isTrue);
+    });
+
+    test('the consent answer in the consultation is the same switch', () async {
+      final a = MemoryAnalytics();
+      final state = AppState(analytics: a);
+      state.startOnboarding();
+      await settle();
+      // Jump to the consent step and answer the way the consultation offers.
+      state.step = kOnboardingSteps.indexWhere((s) => s.id == 'consent');
+      state.handleFree('improve');
+      await settle();
+      expect(state.improve, isTrue);
+      expect(a.named('consent_granted'), hasLength(1));
+      expect(a.named('intake_step').single['step'], 'consent', reason: 'the step answered after consent is the first one counted');
+    });
+
+    test('saying no stops everything, and is recorded', () async {
+      final a = MemoryAnalytics();
+      final profiles = FakeProfileRepo();
+      final state = backed(profiles: profiles, analytics: a);
+      await state.setImprove(true);
+      await settle();
+
+      await state.setImprove(false);
+      await settle();
+      state.logWater(WaterUnit.glass);
+      await settle();
+
+      expect(a.disables, 1);
+      expect(a.named('water_logged'), isEmpty);
+      expect(profiles.consents.last.granted, isFalse);
+    });
+
+    test('the answer survives a relaunch on the same phone without a second consent event', () async {
+      final prefs = MemoryDevicePrefs();
+      final first = AppState(prefs: prefs, analytics: MemoryAnalytics());
+      await first.setImprove(true);
+      await settle();
+
+      final a = MemoryAnalytics();
+      final second = AppState(prefs: prefs, analytics: a);
+      await settle();
+      expect(second.improve, isTrue);
+      expect(a.enabledFor, [null], reason: 'no account: the SDK uses its own anonymous id');
+      expect(a.named('consent_granted'), isEmpty);
+    });
+
+    test('the account record wins over the phone', () async {
+      final a = MemoryAnalytics();
+      final profiles = FakeProfileRepo()..consentOnRecord = true;
+      final state = backed(profiles: profiles, analytics: a);
+      await settle();
+      expect(state.improve, isTrue);
+      expect(a.enabledFor, ['user-1']);
+      expect(a.named('consent_granted'), isEmpty, reason: 'reading a consent back is not giving one');
+    });
+
+    test('a logged meal is an event with its source and never the food', () async {
+      final a = MemoryAnalytics();
+      final state = backed(ai: FakeGateway(), analytics: a);
+      await state.setImprove(true);
+      await settle();
+
+      state.quickLog(QuickLog.text);
+      await state.sendChatMsg('koshary');
+      await settle();
+      state.confirmProposal();
+      await settle();
+
+      final read = a.named('meal_read').single;
+      expect(read['source'], 'text');
+      expect(read['items'], 1);
+      expect(read['ms'], isA<int>());
+
+      final logged = a.named('meal_logged').single;
+      expect(logged, {
+        'source': 'text',
+        'first': true,
+        'items': 1,
+        'nudged': false,
+        'lang': 'ar',
+        'plus': false,
+        'backed': true,
+      });
+      for (final e in a.events) {
+        expect(e.props.values.map((v) => '$v'), everyElement(isNot(contains('koshary'))));
+        expect(e.props.values.map((v) => '$v'), everyElement(isNot(contains('كشري'))));
+      }
+    });
+
+    test('a meal logged after tapping a nudge counts as prompted', () async {
+      final a = MemoryAnalytics();
+      final nudger = MemoryNudger();
+      final state = AppState(
+        nudger: nudger,
+        analytics: a,
+        ai: FakeGateway(),
+        clock: () => DateTime(2026, 9, 21, 14, 30),
+      );
+      await state.setImprove(true);
+      nudger.tap('nudge:lunch');
+      await settle();
+      expect(a.named('nudge_tapped').single['slot'], 'lunch');
+
+      await state.sendChatMsg('koshary');
+      await settle();
+      state.confirmProposal();
+      await settle();
+
+      final logged = a.named('meal_logged').single;
+      expect(logged['nudged'], isTrue);
+      expect(logged['source'], 'voice', reason: 'a nudge opens the conversation listening');
+    });
+
+    test('the first use of each gesture is one event', () async {
+      final a = MemoryAnalytics();
+      final state = AppState(analytics: a);
+      await state.setImprove(true);
+      state.orbTap();
+      state.orbTap();
+      await state.holdOrb();
+      await settle();
+      expect(a.named('orb_gesture_first').map((e) => e['gesture']), ['tap', 'hold']);
+    });
+
+    test('the paywall touchpoints are events', () async {
+      final a = MemoryAnalytics();
+      final opened = <String>[];
+      final billing = FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: true);
+      final state = AppState(
+        userId: 'user-1',
+        billing: billing,
+        analytics: a,
+        openCheckout: (url) async {
+          opened.add(url);
+          return true;
+        },
+      );
+      await state.setImprove(true);
+      await settle();
+
+      state.setPlusPromoCode('qmrtest1');
+      await state.startPlusPurchase();
+      expect(a.named('promo_entered'), hasLength(1));
+      expect(a.named('checkout_opened').single['promo'], isTrue);
+      expect(a.named('checkout_opened').single['plan'], 'monthly');
+
+      await state.startPlusTrial();
+      expect(a.named('trial_started'), hasLength(1));
+      expect(a.named('trial_started').single['plus'], isTrue, reason: 'the tier on the event is the tier after the trial started');
+    });
+
+    test('sharing the week is an event; the card itself is not', () async {
+      final a = MemoryAnalytics();
+      final sharer = MemorySharer();
+      final state = AppState(sharer: sharer, analytics: a);
+      await state.setImprove(true);
+      await state.shareReview(Uint8List.fromList([1, 2, 3]));
+      expect(a.named('review_shared'), hasLength(1));
+      expect(sharer.shared, hasLength(1));
+    });
+
+    test('screens are seen only after consent', () async {
+      final a = MemoryAnalytics();
+      final state = AppState(analytics: a);
+      state.go(AppScreen.subscription);
+      await state.setImprove(true);
+      state.go(AppScreen.progress);
+      state.openWallet();
+      await settle();
+      expect(a.screens, ['progress', 'wallet']);
+    });
   });
 }
 

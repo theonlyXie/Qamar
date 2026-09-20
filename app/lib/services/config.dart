@@ -49,4 +49,17 @@ class QamarConfig {
   }
 
   static bool get useBilling => billingUrl.isNotEmpty;
+
+  /// PostHog. Empty means no analytics at all — the SDK is not initialised
+  /// and nothing is sent; there is no demo key. Even with a key, nothing is
+  /// sent before the person says yes to service improvement in the
+  /// consultation (see AppState.setImprove). EU ingestion by default: the
+  /// data stays under EU rules unless a build says otherwise.
+  static const posthogApiKey = String.fromEnvironment('POSTHOG_API_KEY');
+  static const posthogHost = String.fromEnvironment('POSTHOG_HOST', defaultValue: 'https://eu.i.posthog.com');
+  static bool get useAnalytics => posthogApiKey.isNotEmpty;
+
+  /// The version of the consent wording the person agrees to. Bump it when
+  /// the wording changes, and the consents table shows who agreed to what.
+  static const consentVersion = '1.1';
 }

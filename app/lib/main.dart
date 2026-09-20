@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'l10n/strings.dart';
 import 'screens/home_shell.dart';
 import 'services/ai_gateway.dart';
+import 'services/analytics.dart';
 import 'services/auth_service.dart';
 import 'services/device_prefs.dart';
 import 'services/dictation.dart';
@@ -34,7 +35,7 @@ Future<void> main() async {
   if (QamarConfig.useSupabase) {
     state = await _backedState(dictation);
   } else {
-    state = AppState(ai: _gatewayIfConfigured(null), dictation: dictation, prefs: SharedDevicePrefs(), nudger: LocalNudger(), sharer: PlatformSharer());
+    state = AppState(ai: _gatewayIfConfigured(null), dictation: dictation, prefs: SharedDevicePrefs(), nudger: LocalNudger(), sharer: PlatformSharer(), analytics: _analyticsIfConfigured());
   }
 
   runApp(
@@ -72,13 +73,21 @@ Future<AppState> _backedState(Dictation dictation) async {
       prefs: SharedDevicePrefs(),
       nudger: LocalNudger(),
       sharer: PlatformSharer(),
+      analytics: _analyticsIfConfigured(),
     );
   } catch (e) {
     // No network, anonymous sign-ins not enabled, bad keys: run offline
     // rather than showing a dead app.
     debugPrint('Qamar: continuing without a backend — $e');
-    return AppState(dictation: dictation, prefs: SharedDevicePrefs(), nudger: LocalNudger(), sharer: PlatformSharer());
+    return AppState(dictation: dictation, prefs: SharedDevicePrefs(), nudger: LocalNudger(), sharer: PlatformSharer(), analytics: _analyticsIfConfigured());
   }
+}
+
+/// PostHog, or null. Null means the SDK is never initialised. Even with a
+/// key, nothing is sent before the person consents (AppState.setImprove).
+Analytics? _analyticsIfConfigured() {
+  if (!QamarConfig.useAnalytics) return null;
+  return PosthogAnalytics(apiKey: QamarConfig.posthogApiKey, host: QamarConfig.posthogHost);
 }
 
 /// The real assistant, or null.

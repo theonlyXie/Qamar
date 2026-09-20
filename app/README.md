@@ -187,3 +187,30 @@ Leave `AI_GATEWAY_URL` out until the Edge Function is actually deployed. With
 it set but nothing behind it, every AI call fails with a network error; with
 it absent, the app says plainly that the assistant is not connected, which is
 the truthful state.
+
+### Analytics (PostHog), behind consent
+
+Add `--dart-define=POSTHOG_API_KEY=<project token>` (and, if not EU,
+`--dart-define=POSTHOG_HOST=https://us.i.posthog.com`) to turn analytics on.
+Without the key the SDK is never initialised. With it, three rules hold:
+
+- **Nothing is sent before consent.** The SDK starts only when the person
+  says yes to service improvement in the consultation (or on the You screen),
+  and stops when they say no. The answer is remembered on the phone and, on a
+  linked account, in the `consents` table (append-only, latest row wins).
+- **No person in the events.** Events carry a name, the language, the tier
+  and a few small enums or counts (`meal_logged {source, first, items,
+  nudged}`, `meal_read {source, items, ms}`, `intake_step {step}`,
+  `orb_gesture_first {gesture}`, `trial_started`, `checkout_opened {plan,
+  promo}`, `review_shared`, …). Never a name, a weight, a food, a photo or an
+  email. The account id is the identity — the same opaque id the database
+  uses.
+- **The kill metrics do not depend on consent.** `qamar_kill_metrics(from, to)`
+  (migration 0047) computes intake completion, day-7 logging, day-30
+  unprompted logging and trial-to-paid from the rows people already write,
+  and pg_cron records them nightly into `kill_metrics_daily` for the last
+  sixty days of sign-ups. Service role only.
+
+Native auto-init is off in `AndroidManifest.xml` and `Info.plist`
+(`com.posthog.posthog.AUTO_INIT = false`), so the plugin cannot start itself
+at launch.
