@@ -1,15 +1,22 @@
-# Runs on every push. No secrets, no cost, no buttons to press.
+# Runs once per push to a pull request, and on main. No secrets, no buttons
+# to press.
 #
 # This is the one that has to stay green. It type-checks the gateway and runs
 # the whole test suite — the scope guard's refusal boundary, the verifier's
 # arithmetic, the evidence-packet extraction, and the eval dispatcher against
 # the real frozen cases. None of it calls a model or touches the database, so
-# it is free and gives the same answer every time.
+# it gives the same answer every time.
+#
+# It used to run on every push *and* on the pull request, which is the same
+# commit checked twice; on a private repository that spends the account's
+# Actions minutes twice for one answer. Branch pushes without a pull request
+# are not checked — open the PR, which is where the result is read anyway.
 
 name: Checks
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
