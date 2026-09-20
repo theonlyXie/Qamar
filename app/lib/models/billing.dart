@@ -204,15 +204,26 @@ class PlusEntitlement {
   final String provider;
   final bool firstPurchase;
 
+  /// The free week can still be started: never taken, never paid, not Plus.
+  final bool trialEligible;
+
+  /// When the free week ended or ends. Null if it was never started.
+  final DateTime? trialEndsAt;
+
   const PlusEntitlement({
     required this.status,
     this.plan,
     this.periodEnd,
     this.provider = PlusCatalog.provider,
     this.firstPurchase = true,
+    this.trialEligible = false,
+    this.trialEndsAt,
   });
 
   static const free = PlusEntitlement(status: 'free');
+
+  /// Qamar+ right now is the free week, not a payment.
+  bool get isTrial => provider == 'trial' && active;
 
   bool get active {
     if (status != 'active') return false;
@@ -229,6 +240,8 @@ class PlusEntitlement {
       periodEnd: endRaw is String ? DateTime.tryParse(endRaw)?.toUtc() : null,
       provider: (json['provider'] as String?) ?? PlusCatalog.provider,
       firstPurchase: json['first_purchase'] != false,
+      trialEligible: json['trial_eligible'] == true,
+      trialEndsAt: json['trial_ends_at'] is String ? DateTime.tryParse(json['trial_ends_at'] as String)?.toUtc() : null,
     );
   }
 }

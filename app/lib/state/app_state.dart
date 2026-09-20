@@ -291,6 +291,8 @@ class AppState extends ChangeNotifier {
     explainOpen = null;
     plusActive = false;
     plusUntil = null;
+    plusTrialEligible = false;
+    plusIsTrial = false;
     plusNotice = null;
     plusPlan = PlusPlan.monthly;
     plusPromoCode = '';
@@ -1298,6 +1300,11 @@ class AppState extends ChangeNotifier {
   bool plusActive = false;
   DateTime? plusUntil;
 
+  /// The free week: offered once, before any payment. [plusIsTrial] while
+  /// it is the reason Qamar+ is on.
+  bool plusTrialEligible = false;
+  bool plusIsTrial = false;
+
   /// Set when checkout cannot start, or while Paymob's page is open.
   /// Also set when a free-tier user tries to photograph a meal.
   String? plusNotice;
@@ -1376,7 +1383,7 @@ class AppState extends ChangeNotifier {
   /// Opens Paymob's checkout for the selected plan. Qamar+ is not flipped
   /// here — Paymob tells the server, and the next entitlement read does.
   Future<void> startPlusPurchase() async {
-    if (plusActive) {
+    if (plusActive && !plusIsTrial) {
       plusNotice = isAr
           ? 'اشتراكك شغال عن طريق Paymob. لو حابب تلغيه، راسل الدعم من الشاشة دي.'
           : 'Your subscription is billed through Paymob. To cancel, write to support from this screen.';
@@ -1423,6 +1430,46 @@ class AppState extends ChangeNotifier {
 
   Future<void> restorePlusPurchases() => _refreshPlus(announce: true);
 
+  void _absorbEntitlement(PlusEntitlement ent) {
+    plusActive = ent.active;
+    plusUntil = ent.periodEnd;
+    plusFirstPurchase = ent.firstPurchase;
+    plusTrialEligible = ent.trialEligible;
+    plusIsTrial = ent.isTrial;
+  }
+
+  /// Seven days of Qamar+, free, once. The server grants it — the phone only
+  /// asks and reads back what it was given.
+  Future<void> startPlusTrial() async {
+    final billing = _billing;
+    if (!isBacked || billing == null) {
+      plusNotice = isAr
+          ? 'الأسبوع المجاني محتاج حساب مربوط الأول، عشان يبقى مرة واحدة بس.'
+          : 'The free week needs a linked account first, so it stays once only.';
+      _notify();
+      return;
+    }
+    if (!plusTrialEligible) {
+      plusNotice = isAr ? 'الأسبوع المجاني اتستخدم على الحساب ده.' : 'The free week has already been used on this account.';
+      _notify();
+      return;
+    }
+    try {
+      _absorbEntitlement(await billing.startTrial());
+      plusNotice = plusActive
+          ? (isAr ? 'قمر+ شغال لسبعة أيام. مفيش بطاقة ومفيش تجديد لوحده.' : 'Qamar+ is on for seven days. No card, and nothing renews by itself.')
+          : (isAr ? 'مقدرتش أبدأ الأسبوع المجاني دلوقتي.' : 'Could not start the free week just now.');
+      _notify();
+      await _refreshQuota();
+    } catch (e) {
+      plusTrialEligible = false;
+      plusNotice = e is BillingException
+          ? e.message
+          : (isAr ? 'مقدرتش أبدأ الأسبوع المجاني دلوقتي.' : 'Could not start the free week just now.');
+      _notify();
+    }
+  }
+
   /// Called when Paymob sends the person back to the app.
   Future<void> onReturnedFromPaymob() async {
     await _refreshPlus(announce: true);
@@ -1435,9 +1482,7 @@ class AppState extends ChangeNotifier {
     if (billing == null) return;
     try {
       final ent = await billing.entitlement();
-      plusActive = ent.active;
-      plusUntil = ent.periodEnd;
-      plusFirstPurchase = ent.firstPurchase;
+      _absorbEntitlement(ent);
       if (announce) {
         plusNotice = plusActive
             ? (isAr ? 'قمر+ اشتغل. شكراً.' : 'Qamar+ is on. Thank you.')

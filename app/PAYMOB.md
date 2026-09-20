@@ -17,6 +17,8 @@ Professional payouts: the nutritionist taps **Redeem EGP** once the wallet has a
 
 ## What is already settled
 
+- **A free week, once.** `POST /billing/trial/start` gives seven days of Qamar+ with no card. The database (`plus_trials`, migration 0043) allows one per account, never after a payment, and a later Paymob payment simply replaces the trial entitlement. Nothing renews on its own: when the week ends the person is back on Lite.
+
 - Talking to Qamar writes the meal plan.
 - Lite is three meal photos and three questions a day. Extra photos are bought with earned Su, not cash; the fourth question is Qamar+.
 - Qamar+ checkout opens Paymob’s hosted page. The phone **never** marks someone as paid. Paymob tells our server; the server turns Qamar+ on.

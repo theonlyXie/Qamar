@@ -1013,6 +1013,72 @@ void main() {
     expect(state.plusActive, isFalse);
   });
 
+  test('the free week is granted by the server, once, and reads back as Qamar+ on trial', () async {
+    final billing = FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: true);
+    final state = AppState(userId: 'user-1', billing: billing)..setLang(AppLang.en);
+    await settle();
+    expect(state.plusTrialEligible, isTrue);
+    expect(state.plusActive, isFalse);
+
+    await state.startPlusTrial();
+
+    expect(billing.trialStarts, 1);
+    expect(state.plusActive, isTrue);
+    expect(state.plusIsTrial, isTrue);
+    expect(state.plusTrialEligible, isFalse);
+    expect(state.plusNotice, contains('seven days'));
+
+    // A second ask never reaches the server: the phone already knows.
+    await state.startPlusTrial();
+    expect(billing.trialStarts, 1);
+    expect(state.plusNotice, contains('already been used'));
+  });
+
+  test('a paid member is not offered the trial, and the server’s refusal is shown as is', () async {
+    final billing = FakeBilling()..current = const PlusEntitlement(status: 'expired', trialEligible: false);
+    final state = AppState(userId: 'user-1', billing: billing)..setLang(AppLang.en);
+    await settle();
+    expect(state.plusTrialEligible, isFalse);
+
+    await state.startPlusTrial();
+    expect(billing.trialStarts, 0);
+    expect(state.plusActive, isFalse);
+  });
+
+  test('a trial member can still pay: Start Qamar+ opens Paymob instead of “manage”', () async {
+    final billing = FakeBilling()
+      ..current = PlusEntitlement(
+        status: 'active',
+        plan: 'monthly',
+        provider: 'trial',
+        periodEnd: DateTime.now().toUtc().add(const Duration(days: 5)),
+      );
+    final opened = <String>[];
+    final state = AppState(userId: 'user-1', billing: billing, openCheckout: (url) async { opened.add(url); return true; })
+      ..setLang(AppLang.en);
+    await settle();
+    expect(state.plusIsTrial, isTrue);
+
+    await state.startPlusPurchase();
+    expect(opened, hasLength(1));
+  });
+
+  test('the entitlement snapshot carries the trial fields', () {
+    final e = PlusEntitlement.fromJson({
+      'status': 'active',
+      'plan': 'monthly',
+      'provider': 'trial',
+      'period_end': DateTime.now().toUtc().add(const Duration(days: 3)).toIso8601String(),
+      'trial_eligible': false,
+      'trial_ends_at': '2026-09-27T10:00:00Z',
+    });
+    expect(e.isTrial, isTrue);
+    expect(e.trialEligible, isFalse);
+    expect(e.trialEndsAt, DateTime.utc(2026, 9, 27, 10));
+    expect(PlusEntitlement.fromJson({'status': 'free', 'trial_eligible': true}).trialEligible, isTrue);
+    expect(PlusEntitlement.fromJson({'status': 'free'}).trialEligible, isFalse, reason: 'an old server never offers a trial');
+  });
+
   test('coming back from Paymob reads the server entitlement', () async {
     final billing = FakeBilling()
       ..current = PlusEntitlement(
@@ -1064,6 +1130,23 @@ class FakeBilling implements BillingGateway {
 
   @override
   Future<PlusEntitlement> entitlement() async => current;
+
+  int trialStarts = 0;
+
+  @override
+  Future<PlusEntitlement> startTrial() async {
+    trialStarts++;
+    if (!current.trialEligible) throw BillingException('The free week has already been used on this account.');
+    current = PlusEntitlement(
+      status: 'active',
+      plan: 'monthly',
+      provider: 'trial',
+      periodEnd: DateTime.now().toUtc().add(const Duration(days: 7)),
+      trialEligible: false,
+      trialEndsAt: DateTime.now().toUtc().add(const Duration(days: 7)),
+    );
+    return current;
+  }
 
   @override
   Future<AffiliateWallet> affiliate() async => wallet;

@@ -6,6 +6,7 @@
 //   POST /billing/quote          { plan, promo_code? }                 JWT
 //   POST /billing/checkout       { plan, promo_code?, first_name? }    JWT
 //   POST /billing/entitlement    {}                                    JWT
+//   POST /billing/trial/start    {}                                    JWT
 //   POST /billing/affiliate      {}                                    JWT
 //   POST /billing/affiliate/payout { amount_cents? }                   JWT
 //   POST /billing/webhook        Paymob transaction callback           HMAC
@@ -330,6 +331,24 @@ async function entitlement(userId: string): Promise<Response> {
   return json(body);
 }
 
+/**
+ * Seven days of Qamar+, once, before any payment. The database decides
+ * eligibility (plus_trials, paid orders, current entitlement) — this only
+ * turns its refusals into 400s the app can show.
+ */
+async function startTrial(userId: string): Promise<Response> {
+  try {
+    const snap = await rpc("qamar_start_trial", { p_user_id: userId });
+    return json(snap);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "trial failed";
+    if (message.includes("already used")) return json({ error: "The free week has already been used on this account." }, 400);
+    if (message.includes("first-time")) return json({ error: "The free week is for first-time members." }, 400);
+    if (message.includes("already Qamar+")) return json({ error: "Qamar+ is already on." }, 400);
+    throw e;
+  }
+}
+
 async function affiliate(userId: string): Promise<Response> {
   await rpc("qamar_ensure_affiliate_code", { p_user_id: userId });
   const snap = await rpc("qamar_affiliate_snapshot", { p_user_id: userId });
@@ -468,6 +487,8 @@ Deno.serve(async (req) => {
         return await checkout(user, body);
       case "/entitlement":
         return await entitlement(user.id);
+      case "/trial/start":
+        return await startTrial(user.id);
       case "/affiliate":
         return await affiliate(user.id);
       case "/affiliate/payout":

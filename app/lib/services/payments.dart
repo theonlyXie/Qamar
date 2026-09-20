@@ -18,6 +18,10 @@ abstract class BillingGateway {
     String? firstName,
   });
   Future<PlusEntitlement> entitlement();
+
+  /// Starts the free week. The server refuses a second one; the message
+  /// in the [BillingException] says why.
+  Future<PlusEntitlement> startTrial();
   Future<AffiliateWallet> affiliate();
   Future<AffiliateWallet> requestAffiliatePayout({int? amountCents});
 }
@@ -98,6 +102,24 @@ class HttpBillingGateway implements BillingGateway {
     );
     if (res.statusCode != 200) {
       throw BillingException('entitlement failed: ${res.statusCode} ${res.body}');
+    }
+    return PlusEntitlement.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<PlusEntitlement> startTrial() async {
+    final res = await _client.post(
+      Uri.parse('$baseUrl/trial/start'),
+      headers: _headers,
+      body: jsonEncode({}),
+    );
+    if (res.statusCode != 200) {
+      String reason = 'trial failed: ${res.statusCode}';
+      try {
+        final body = jsonDecode(utf8.decode(res.bodyBytes));
+        if (body is Map && body['error'] is String) reason = body['error'] as String;
+      } catch (_) {}
+      throw BillingException(reason);
     }
     return PlusEntitlement.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
   }

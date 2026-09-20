@@ -134,8 +134,23 @@ class SubscriptionScreen extends StatelessWidget {
           const SizedBox(height: 12),
         ],
 
+        if (!state.plusActive && state.plusTrialEligible) ...[
+          QPrimaryButton(
+            label: isAr ? 'جرّب قمر+ سبعة أيام ببلاش' : 'Try Qamar+ free for seven days',
+            onTap: () { state.startPlusTrial(); },
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isAr
+                ? 'من غير بطاقة. بعد السبعة أيام بترجع Lite لوحدك — مفيش تجديد تلقائي.'
+                : 'No card. After seven days you are simply back on Lite — nothing renews on its own.',
+            textAlign: TextAlign.center,
+            style: QText.body(size: 11, height: 17, color: QColors.textFaint),
+          ),
+          const SizedBox(height: 10),
+        ],
         QPrimaryButton(
-          label: state.plusActive
+          label: state.plusActive && !state.plusIsTrial
               ? (isAr ? 'إدارة الاشتراك' : 'Manage subscription')
               : (isAr
                   ? 'ابدأ ${formatEgp(quote.amountPounds, ar: true)}'
@@ -229,9 +244,14 @@ class _TierCard extends StatelessWidget {
     final isAr = state.isAr;
     final quote = state.displayPlusQuote;
     final title = isAr ? 'شهري' : 'Monthly';
-    final sub = quote.pricingReason == 'affiliate'
-        ? (isAr ? '٣٠ يوم · بكود أخصائيك' : '30 days · with your nutritionist’s code')
-        : (isAr ? '٣٠ يوم · إلغاء بضغطة' : '30 days · cancel in one tap');
+    final until = state.plusUntil?.toLocal();
+    final sub = state.plusIsTrial && until != null
+        ? (isAr
+            ? 'الأسبوع المجاني شغال · لحد ${state.iso('${until.day}/${until.month}')}'
+            : 'Free week on · until ${until.day}/${until.month}')
+        : quote.pricingReason == 'affiliate'
+            ? (isAr ? '٣٠ يوم · بكود أخصائيك' : '30 days · with your nutritionist’s code')
+            : (isAr ? '٣٠ يوم · إلغاء بضغطة' : '30 days · cancel in one tap');
 
     return Container(
       padding: const EdgeInsets.all(16),
