@@ -28,7 +28,7 @@ jobs:
           deno-version: v2.x
 
       - name: Type check
-        run: deno check index.ts eval.ts ingest.ts ingest_usda.ts
+        run: deno check index.ts eval.ts ingest.ts ingest_usda.ts nightly.ts
 
       - name: Lint
         run: deno lint

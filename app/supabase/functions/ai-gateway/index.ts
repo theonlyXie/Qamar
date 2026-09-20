@@ -10,6 +10,7 @@
 //     text/voice: food graph only — no model, never counted
 //     photo: the photo bucket (3/day on Lite, more with Su) + vision model
 //   POST /ai-gateway/plan/generate  { date?, lang?, force?, instruction? }
+//   POST /ai-gateway/plan/nightly   {}   X-Qamar-Cron header, not a user JWT — the 22:00 job
 //     the plan bucket — a small cap for everyone
 //   POST /ai-gateway/scan/read      { imageBase64, imageMediaType, lang }
 //     the photo bucket + vision model
@@ -88,6 +89,13 @@ import {
   type PlanUpdate,
 } from "./plan_edit.ts";
 import { asQuota, quotaExceededMessage, quotaPayload, type Bucket, type Quota } from "./quota.ts";
+import {
+  cairoDatePlus,
+  dueMembers,
+  isNightlyWindow,
+  type NightlyReport,
+  RUN_BUDGET_MS,
+} from "./nightly.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -1104,7 +1112,17 @@ interface PlanShape {
   rationale_en?: string;
 }
 
-async function generatePlan(userId: string, body: Record<string, unknown>): Promise<Response> {
+/**
+ * Writes (or returns) the day's plan. [opts.metered] is false only for the
+ * night job: tomorrow's plan is what Qamar+ is paid for, not a use of the
+ * member's own daily plan bucket.
+ */
+async function generatePlan(
+  userId: string,
+  body: Record<string, unknown>,
+  opts: { metered?: boolean } = {},
+): Promise<Response> {
+  const meter = opts.metered !== false;
   const lang = asString(body.lang) === "ar" ? "ar" : "en";
   const day = asString(body.date) ?? new Date().toISOString().slice(0, 10);
   const force = truthy(body.force);
@@ -1223,7 +1241,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
   // to generate is the wrong order.
   const [gaps, gapsMs] = await timed(() => nutrientGaps(SUPABASE_URL, SERVICE_KEY, userId, 7));
 
-  const taken = await takeAiUse(userId, lang, "plan");
+  const taken = meter ? await takeAiUse(userId, lang, "plan") : null;
   if (taken instanceof Response) return taken;
   const quota = taken;
 
@@ -1236,7 +1254,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
       prefill: "{",
     });
   } catch (e) {
-    await refundAi(userId, "plan");
+    if (meter) await refundAi(userId, "plan");
     throw e;
   }
   const { text, model, usage, latencyMs } = called;
@@ -1253,7 +1271,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
       candidateDecision: { parse_failed: true, raw: text.slice(0, 1000) },
       uncertainty: { parse: "model did not return the requested JSON" },
     }, stages);
-    await refundAi(userId, "plan");
+    if (meter) await refundAi(userId, "plan");
     return json({ error: "could not generate a plan" }, 502);
   }
 
@@ -1312,7 +1330,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
       safetyFlags: [...flags, "restricted_food_in_output"],
       uncertainty: { staples_withheld: excludedFoods },
     }, stages, verifications);
-    await refundAi(userId, "plan");
+    if (meter) await refundAi(userId, "plan");
     return json({
       error: lang === "ar"
         ? "الخطة اللي اتولدت فيها حاجة مش مفروض تاكلها، فمنفعش أعرضهالك. جرّب تاني من فضلك."
@@ -1333,7 +1351,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
     model,
   );
   if (!saved.ok) {
-    await refundAi(userId, "plan");
+    if (meter) await refundAi(userId, "plan");
     return json({ error: `could not save plan: ${await saved.text()}` }, 500);
   }
 
@@ -1404,8 +1422,87 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
     date: day,
     sources,
     verification: verificationSummary(verification),
-    quota: quotaPayload(quota),
+    ...(quota ? { quota: quotaPayload(quota) } : {}),
   });
+}
+
+
+// ---- the night job --------------------------------------------------------
+
+/**
+ * Tomorrow's plan for every Qamar+ member without one. Fired by pg_cron (see
+ * 0044_nightly_plan_cron.sql) with a shared secret rather than a user JWT;
+ * accepted only in the 22:00–23:59 Cairo window unless [force] is set for a
+ * manual run. Sequential on purpose: one model call per member, stopping at
+ * the wall-clock budget and reporting how many are left for the next slot.
+ */
+async function nightlyPlans(now: Date, force: boolean): Promise<NightlyReport> {
+  const date = cairoDatePlus(now, 1);
+  const report: NightlyReport = { date, ran: false, written: 0, skipped: 0, failed: 0, remaining: 0, failures: [] };
+  if (!force && !isNightlyWindow(now)) {
+    report.reason = "outside the 22:00 Cairo window";
+    return report;
+  }
+  report.ran = true;
+
+  const nowIso = now.toISOString();
+  const membersRes = await db(
+    `entitlements?status=eq.active&or=(period_end.is.null,period_end.gte.${encodeURIComponent(nowIso)})` +
+      `&select=user_id&order=updated_at.asc&limit=1000`,
+  );
+  if (!membersRes.ok) throw new Error(`entitlements: ${membersRes.status} ${await membersRes.text()}`);
+  const members = (await membersRes.json() as Array<{ user_id: string }>).map((r) => r.user_id);
+  if (members.length === 0) return report;
+
+  const plannedRes = await db(
+    `meal_plans?plan_date=eq.${date}&user_id=in.(${members.join(",")})&select=user_id`,
+  );
+  const planned = plannedRes.ok
+    ? (await plannedRes.json() as Array<{ user_id: string }>).map((r) => r.user_id)
+    : [];
+  report.skipped = planned.length;
+
+  const due = dueMembers(members, planned);
+  const started = Date.now();
+  for (let i = 0; i < due.length; i++) {
+    if (Date.now() - started > RUN_BUDGET_MS) {
+      report.remaining = due.length - i;
+      break;
+    }
+    const userId = due[i];
+    try {
+      const res = await generatePlan(userId, { date, lang: "ar" }, { metered: false });
+      if (res.ok) {
+        report.written++;
+      } else {
+        // 403/409 are the gateway's own refusals (blocked, life stage, no
+        // target yet): not failures of the job, but the member gets no plan
+        // and the report says why.
+        report.failed++;
+        let error: string | undefined;
+        try {
+          const j = await res.json();
+          error = typeof j?.error === "string" ? j.error.slice(0, 200) : undefined;
+        } catch { /* body was not JSON */ }
+        report.failures.push({ user: userId, status: res.status, error });
+      }
+    } catch (e) {
+      report.failed++;
+      report.failures.push({ user: userId, status: 500, error: e instanceof Error ? e.message.slice(0, 200) : "error" });
+    }
+  }
+  return report;
+}
+
+/** True when the request carries the job's shared secret. Constant-time compare. */
+function cronAuthorized(req: Request): boolean | "unset" {
+  const expected = Deno.env.get("QAMAR_CRON_SECRET");
+  if (!expected) return "unset";
+  const given = req.headers.get("X-Qamar-Cron") ?? "";
+  if (given.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= given.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
 }
 
 // ---- entry --------------------------------------------------------------
@@ -1413,6 +1510,27 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
+
+  const route = new URL(req.url).pathname.replace(/^\/ai-gateway/, "").replace(/\/$/, "");
+
+  // The night job is the scheduler, not a person: a shared secret instead of
+  // a JWT, checked before anything else and never reachable with a user token.
+  if (route === "/plan/nightly") {
+    const ok = cronAuthorized(req);
+    if (ok === "unset") return json({ error: "QAMAR_CRON_SECRET is not set" }, 503);
+    if (!ok) return json({ error: "unauthorized" }, 401);
+    let force = false;
+    try {
+      const b = await req.json();
+      force = truthy(b?.force);
+    } catch { /* empty body */ }
+    try {
+      return json(await nightlyPlans(new Date(), force));
+    } catch (e) {
+      console.error("ai-gateway nightly", e);
+      return json({ error: "nightly error" }, 500);
+    }
+  }
 
   const userId = await authenticate(req);
   if (!userId) return json({ error: "unauthorized" }, 401);
@@ -1424,7 +1542,6 @@ Deno.serve(async (req) => {
     return json({ error: "invalid JSON" }, 400);
   }
 
-  const route = new URL(req.url).pathname.replace(/^\/ai-gateway/, "").replace(/\/$/, "");
   try {
     switch (route) {
       case "/chat/reply":

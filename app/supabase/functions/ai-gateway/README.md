@@ -28,6 +28,35 @@ Then point the app at it:
 flutter run --dart-define=AI_GATEWAY_URL=https://<ref>.supabase.co/functions/v1/ai-gateway
 ```
 
+## The night plan (Qamar+)
+
+At 22:00 Cairo the gateway writes tomorrow's plan for every Qamar+ member who
+does not have one yet, so they wake to it. `POST /plan/nightly` is called by
+pg_cron (migration `0044_nightly_plan_cron.sql`) with a shared secret, not a
+user token, and does nothing outside the 22:00–23:59 Cairo window unless the
+body says `{"force": true}` for a manual run. It never spends a member's own
+plan bucket, and a member who already has tomorrow's plan is skipped.
+
+Three secrets, once:
+
+```bash
+supabase secrets set QAMAR_CRON_SECRET=<long random>
+```
+
+and in SQL (Vault, so nothing sits in a migration):
+
+```sql
+select vault.create_secret('https://<ref>.supabase.co/functions/v1/ai-gateway', 'qamar_gateway_url');
+select vault.create_secret('<anon key>',    'qamar_anon_key');
+select vault.create_secret('<long random>', 'qamar_cron_secret');  -- the same value as above
+```
+
+Until all three exist the job logs a notice and does nothing. The run
+returns a report (`written`, `skipped`, `failed`, `remaining`, and each
+failure's reason); `remaining > 0` means the second cron slot an hour later
+picks up the rest, or the user base has outgrown one slot and
+`0044` needs more.
+
 ## The three rules this enforces
 
 **1. Nutrition and training only.** `scope.ts` classifies every question
