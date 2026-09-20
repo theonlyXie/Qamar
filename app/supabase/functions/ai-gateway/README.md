@@ -74,7 +74,7 @@ there to record what you may quote.
 
 ## The food graph has names but no numbers until you fill it
 
-Migrations 0017 and 0034 seed `foods`, `food_aliases`, `food_portions` and
+Migrations 0017 and 0051 seed `foods`, `food_aliases`, `food_portions` and
 `recipes` — every Egyptian name, portion and recipe composition — and
 deliberately **not one nutrient value**. Per-100g figures come from USDA
 FoodData Central through `ingest_usda.ts`, so every number traces to a
@@ -92,7 +92,7 @@ How it decides:
 
 - It takes every `foods` row with `is_recipe = false` and searches USDA for
   `name_en` plus `food_state` (`"Beef, ground, 80% lean meat / 20% fat raw"`).
-  The ingredient rows in 0034 are named to overlap the USDA description on
+  The ingredient rows in 0051 are named to overlap the USDA description on
   purpose; keep doing that when adding one.
 - A match below the token-overlap floor (0.45) is left alone and listed at the
   end. A wrong food is worse than a missing one.
@@ -117,7 +117,7 @@ energy value that is holding the dish back. A dish returns no nutrition at all
 until every non-optional ingredient has one, rather than an undercount from the
 ingredients that happened to load.
 
-Ingredients 0034 added for the new recipes, expected to match USDA by name:
+Ingredients 0051 added for the new recipes, expected to match USDA by name:
 wheat flour, semolina, phyllo dough, puff pastry, bread crumbs, cornstarch,
 rice flour, couscous, white and whole-wheat toast, heavy cream, dry whole milk,
 sweetened condensed milk, mozzarella, cheddar, cream cheese, ground beef,

@@ -3210,7 +3210,7 @@ comment on function public.qamar_nutrients_per_100g is
   'from its ingredients and yield factor, following sub-recipes, and marked '
   'derived with a confidence no higher than its weakest ingredient. Returns '
   'nothing when any non-optional ingredient lacks an energy value, which the '
-  'caller must treat as a miss and fall back on — never as zero. See 0034.';
+  'caller must treat as a miss and fall back on — never as zero. See 0051.';
 
 -- Which dishes can be priced today, and which ingredient stops the rest.
 -- This is the worklist for ingest_usda.ts after this migration: every slug in
