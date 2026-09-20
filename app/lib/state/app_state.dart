@@ -185,6 +185,24 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// The ledger is the wallet. Read after anything that earns — a meal, a
+  /// glass, the quest, onboarding — so the phone's optimistic number and the
+  /// server's agree within a second, and a point never has to vanish on the
+  /// next start.
+  Future<void> _refreshWallet(String uid) async {
+    final repo = _walletRepo;
+    if (repo == null) return;
+    final bal = await repo.balance(uid);
+    if (_disposed) return;
+    suAvailable = bal.available;
+    suLifetime = bal.lifetime;
+    final entries = await repo.ledger(uid);
+    if (_disposed) return;
+    serverLedger
+      ..clear()
+      ..addAll(entries);
+  }
+
   /// Pulls the server's copy over the local defaults on start.
   Future<void> hydrate() async {
     final uid = _userId;
@@ -207,11 +225,7 @@ class AppState extends ChangeNotifier {
           ..addAll(water);
       }
 
-      final bal = await _walletRepo?.balance(uid);
-      if (bal != null) {
-        suAvailable = bal.available;
-        suLifetime = bal.lifetime;
-      }
+      await _refreshWallet(uid);
 
       await _refreshQuota();
       await _refreshPlus();
@@ -236,12 +250,6 @@ class AppState extends ChangeNotifier {
           ..addAll(weights);
       }
 
-      final entries = await _walletRepo?.ledger(uid);
-      if (entries != null) {
-        serverLedger
-          ..clear()
-          ..addAll(entries);
-      }
       _notify();
       _rescheduleNudges();
     } catch (e) {
@@ -1236,11 +1244,17 @@ class AppState extends ChangeNotifier {
         const ObMessage.target(),
         const ObMessage.save(),
       ]);
-      // Awarded locally for now: crediting Su Points is server-only (see
-      // SupabaseWalletRepository.credit), so the balance reconciles to the
-      // server's number on the next hydrate once the Edge Function exists.
+      // Shown at once; paid by the server (qamar_grant_onboarding, once per
+      // account), and the wallet is re-read so the two numbers agree.
       _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
       _notify();
+      if (isBacked && _walletRepo != null) {
+        _push('onboarding bonus', (uid) async {
+          await _walletRepo.grantOnboarding(uid);
+          await _refreshWallet(uid);
+          _notify();
+        });
+      }
 
       if (isBacked) {
         final p = profile;
@@ -1321,6 +1335,9 @@ class AppState extends ChangeNotifier {
         waterToday[i] = sip.copyWith(id: id);
         _notify();
       }
+      // A glass earns on the server (half rate on Lite, first eight a day).
+      await _refreshWallet(uid);
+      _notify();
     });
   }
 
@@ -1525,6 +1542,8 @@ class AppState extends ChangeNotifier {
         );
         await repo.confirmMeal(uid, draftId: draftId, meal: meal, items: drafted);
         await _refreshStreak(uid);
+        // The insert earned points on the server; show the server's number.
+        await _refreshWallet(uid);
         _notify();
       });
     }
@@ -1545,6 +1564,14 @@ class AppState extends ChangeNotifier {
     if (_questPaidDay != today) {
       _questPaidDay = today;
       _credit(SuEconomy.dailyQuest, ar: 'مهمة اليوم', en: 'Primary daily quest');
+      // The server pays it once per Cairo day, whatever this flag says.
+      if (isBacked && _walletRepo != null) {
+        _push('complete quest', (uid) async {
+          await _walletRepo.completeQuest(uid);
+          await _refreshWallet(uid);
+          _notify();
+        });
+      }
     }
     _notify();
   }

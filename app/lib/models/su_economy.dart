@@ -19,11 +19,26 @@ class SuEconomy {
   /// cannot drain the wallet overnight. Questions have no Su path.
   static const int extraAiDailyCap = 10;
 
+  /// What each action pays. The server's su_economy_config (migration 0046)
+  /// is the authority — these mirror it so the phone can show the number a
+  /// second before the ledger confirms it.
   static const int signupBonus = 2500;
   static const int onboarding = 1000;
   static const int firstMeal = 500;
   static const int mealLogged = 100;
   static const int dailyQuest = 250;
+
+  /// A glass of water, for the first eight glasses of the day. Half rate on
+  /// the free tier.
+  static const int waterSip = 10;
+  static const int waterSipLite = 5;
+  static const int waterSipsPaidDaily = 8;
+
+  /// The ring completes at day 7 and pays this, once per completed week.
+  static const int streakWeek = 500;
+
+  /// Earned points per Cairo day, one-offs (signup, onboarding) excluded.
+  static const int dailyEarnCap = 1500;
 
   /// One more meal photo today, after the free three.
   static const int extraAiUse = 400;

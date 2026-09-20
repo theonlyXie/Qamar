@@ -315,16 +315,27 @@ class SupabaseWalletRepository implements WalletRepository {
   ///
   /// `qamar_wallet_credit` is EXECUTE-revoked from anon and authenticated
   /// (migration 0003): if the app could call it, any user could award
-  /// themselves an unlimited balance. Points must be credited by the server
-  /// after it has verified the action that earned them. Calling this from the
-  /// client would fail with a permission error at the database, so it fails
-  /// here instead, where the reason is legible.
+  /// themselves an unlimited balance. Points are credited by the server from
+  /// the rows the person writes — a meal, a glass of water (triggers in
+  /// 0046) — and by the two RPCs above. Calling this from the client would
+  /// fail with a permission error at the database, so it fails here instead,
+  /// where the reason is legible.
   @override
   Future<void> credit(String userId, {required int amount, required String reason, required String idempotencyKey}) {
     throw UnsupportedError(
       'Su Points can only be credited server-side. Award them from an Edge '
       'Function using the service role after verifying the earning action.',
     );
+  }
+
+  @override
+  Future<void> completeQuest(String userId) async {
+    await _client.rpc('qamar_complete_quest', params: {'p_user_id': userId});
+  }
+
+  @override
+  Future<void> grantOnboarding(String userId) async {
+    await _client.rpc('qamar_grant_onboarding', params: {'p_user_id': userId});
   }
 
   @override

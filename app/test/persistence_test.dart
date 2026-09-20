@@ -124,9 +124,31 @@ class FakeWaterRepo implements WaterRepository {
 class FakeWalletRepo implements WalletRepository {
   ({int available, int lifetime}) stored = (available: 0, lifetime: 0);
   final List<String> redemptions = [];
+  int balanceReads = 0;
+  int quests = 0;
+  int onboardingGrants = 0;
+
+  /// What the server pays for the quest — deliberately not the phone's
+  /// number, so a test can tell whose number is on screen.
+  int questPays = 300;
 
   @override
-  Future<({int available, int lifetime})> balance(String userId) async => stored;
+  Future<({int available, int lifetime})> balance(String userId) async {
+    balanceReads++;
+    return stored;
+  }
+
+  @override
+  Future<void> completeQuest(String userId) async {
+    quests++;
+    stored = (available: stored.available + questPays, lifetime: stored.lifetime + questPays);
+  }
+
+  @override
+  Future<void> grantOnboarding(String userId) async {
+    onboardingGrants++;
+    stored = (available: stored.available + 1000, lifetime: stored.lifetime + 1000);
+  }
 
   @override
   Future<void> credit(String userId, {required int amount, required String reason, required String idempotencyKey}) {
@@ -636,6 +658,65 @@ void main() {
     expect(state.suAvailable, 0);
     expect(state.streak().freezesAvailable, 1);
     expect(freeze.once, isFalse, reason: 'one a month, so not a permanent unlock');
+  });
+
+  group('Su Points are earned on the server', () {
+    test('the quest is paid by the server, once, and the wallet re-read', () async {
+      final wallet = FakeWalletRepo();
+      final state = backed(wallet: wallet);
+      await settle();
+      final readsBefore = wallet.balanceReads;
+
+      state.completeQuest();
+      expect(state.suAvailable, SuEconomy.dailyQuest, reason: 'shown at once, optimistically');
+      await settle();
+
+      expect(wallet.quests, 1);
+      expect(wallet.balanceReads, greaterThan(readsBefore));
+      expect(state.suAvailable, wallet.questPays, reason: 'the ledger’s number replaces the phone’s');
+
+      state.replaceQuest();
+      state.completeQuest();
+      await settle();
+      expect(wallet.quests, 1, reason: 'Accept, Replace, Accept posts once a day');
+    });
+
+    test('a confirmed meal re-reads the wallet after the insert that earned it', () async {
+      final wallet = FakeWalletRepo();
+      final ai = FakeGateway();
+      final state = backed(wallet: wallet, ai: ai);
+      await settle();
+
+      state.quickLog(QuickLog.text);
+      await state.sendChatMsg('koshary');
+      await settle();
+      // The server's trigger credited the meal; the fake stands in for it.
+      wallet.stored = (available: 777, lifetime: 777);
+      state.confirmProposal();
+      await settle();
+
+      expect(state.meals, hasLength(1));
+      expect(state.suAvailable, 777);
+      expect(state.suLifetime, 777);
+    });
+
+    test('a glass of water re-reads the wallet too', () async {
+      final wallet = FakeWalletRepo();
+      final state = backed(wallet: wallet);
+      await settle();
+
+      wallet.stored = (available: 5, lifetime: 5);
+      state.logWater(WaterUnit.glass);
+      await settle();
+
+      expect(state.suAvailable, 5);
+    });
+
+    test('offline, nothing is posted and the local number stands', () async {
+      final state = AppState();
+      state.completeQuest();
+      expect(state.suAvailable, SuEconomy.dailyQuest);
+    });
   });
 
   group('nudges', () {

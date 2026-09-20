@@ -55,6 +55,13 @@ abstract class WaterRepository {
 abstract class WalletRepository {
   Future<({int available, int lifetime})> balance(String userId);
   Future<void> credit(String userId, {required int amount, required String reason, required String idempotencyKey});
+
+  /// Today's quest, done. The server pays it once per Cairo day whatever
+  /// the phone says (qamar_complete_quest).
+  Future<void> completeQuest(String userId);
+
+  /// The onboarding bonus, once per account (qamar_grant_onboarding).
+  Future<void> grantOnboarding(String userId);
   Future<void> redeem(String userId, {required SpendItemDef item, required String idempotencyKey});
   Future<List<LedgerEntry>> ledger(String userId);
 }
