@@ -323,7 +323,7 @@ class AppState extends ChangeNotifier {
   /// like the prototype's `iso()` — keeps "٨٢ كجم" reading correctly in RTL.
   /// Every computed number on an Arabic screen passes through here, so it is
   /// also where the digit preference is applied.
-  String iso(String x) => '⁦${digits(x)}⁩';
+  String iso(String x) => '\u2066${digits(x)}\u2069';
 
   /// Thousands separators so 2,500 looks like a score, not a calorie leftover.
   /// Formatted in English and re-drawn, because intl's 'ar' data does not

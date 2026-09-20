@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'colors.dart';
-import 'text_styles.dart';
 
 class QRadii {
   QRadii._();
