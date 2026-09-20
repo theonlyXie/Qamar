@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
+import '../widgets/explain.dart';
 
 /// Progress, drawn from what was actually logged.
 ///
@@ -32,6 +33,7 @@ class ProgressScreen extends StatelessWidget {
     final logged = state.mealsThisWeek();
     final inRange = state.daysInRange();
     final weights = state.weightHistory;
+    final streak = state.streak();
 
     // The tallest bar is the biggest day, or the target if every day is under
     // it — so a normal week fills the chart instead of hugging the floor.
@@ -43,6 +45,56 @@ class ProgressScreen extends StatelessWidget {
         Text(t.progress, style: QText.display(size: 30, height: 38, color: const Color(0xFFF5F7FF))),
         const SizedBox(height: 4),
         Text(t.progressSub, style: QText.body(size: 14, height: 22, color: QColors.textMuted)),
+        const SizedBox(height: 14),
+        Explainable(
+          id: 'streak',
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: QDecor.card(
+              gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
+              border: (streak.current > 0 ? QColors.violet : QColors.textFaint).withValues(alpha: 0.4),
+              radius: QRadii.xl,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(isAr ? 'السلسلة' : 'Streak',
+                          style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+                      const SizedBox(height: 4),
+                      Text(
+                        streak.current == 0
+                            ? (isAr ? 'سجّل وجبة النهاردة وتبدأ سلسلتك.' : 'Log a meal today and your streak begins.')
+                            : streak.atRisk
+                                ? (isAr
+                                    ? '${state.iso('${streak.current}')} ${streak.current == 1 ? 'يوم' : 'أيام'} · وجبة واحدة قبل نص الليل تكمّلها'
+                                    : '${streak.current} ${streak.current == 1 ? 'day' : 'days'} · one meal before midnight keeps it')
+                                : (isAr
+                                    ? '${state.iso('${streak.current}')} ${streak.current == 1 ? 'يوم' : 'أيام'} ورا بعض · النهاردة محسوب'
+                                    : '${streak.current} ${streak.current == 1 ? 'day' : 'days'} in a row · today counted'),
+                        style: QText.body(size: 14, height: 22, color: QColors.textHigh),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isAr
+                            ? 'أطول سلسلة ${state.iso('${streak.best}')} · تجميد متاح: ${state.iso('${streak.freezesAvailable}')}'
+                            : 'best ${streak.best} · freezes available: ${streak.freezesAvailable}',
+                        style: QText.number(size: 10, color: QColors.textFaint),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  state.iso('${streak.current}'),
+                  style: QText.display(size: 34, height: 38, color: streak.current > 0 ? QColors.textHigh : QColors.textFaint),
+                ),
+              ],
+            ),
+          ),
+        ),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),

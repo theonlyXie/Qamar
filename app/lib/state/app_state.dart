@@ -9,6 +9,7 @@ import '../models/meal.dart';
 import '../models/messages.dart';
 import '../models/onboarding.dart';
 import '../models/plan.dart';
+import '../models/streak.dart';
 import '../models/su_economy.dart';
 import '../services/ai_gateway.dart';
 import '../services/auth_service.dart';
@@ -150,12 +151,15 @@ class AppState extends ChangeNotifier {
       await _refreshPlus();
       await _refreshAffiliate();
 
-      final history = await _mealRepo?.dailyTotals(uid, days: 7);
+      // Two months, not one week: the chart reads seven days, the streak
+      // reads as far back as the run goes.
+      final history = await _mealRepo?.dailyTotals(uid, days: 60);
       if (history != null) {
         dayHistory
           ..clear()
           ..addAll(history);
       }
+      await _refreshStreak(uid);
 
       final weights = await _mealRepo?.weightHistory(uid);
       if (weights != null) {
@@ -203,6 +207,10 @@ class AppState extends ChangeNotifier {
 
   /// Recorded weigh-ins, oldest first.
   final List<WeightReading> weightHistory = [];
+
+  /// The server's streak, when it has answered. Freezes only exist here —
+  /// the local count in [streak] never fills a day in on its own.
+  Streak? serverStreak;
 
   /// The wallet ledger as the database has it. Authoritative when present;
   /// [ledgerExtra] covers the offline case.
@@ -308,6 +316,7 @@ class AppState extends ChangeNotifier {
     serverLedger.clear();
     dayHistory.clear();
     weightHistory.clear();
+    serverStreak = null;
     walletTab = WalletTab.spend;
     whyOpen = false;
     _notify();
@@ -1241,6 +1250,8 @@ class AppState extends ChangeNotifier {
           MealAnalysisDraft(inputType: input, items: drafted, rawText: raw),
         );
         await repo.confirmMeal(uid, draftId: draftId, meal: meal, items: drafted);
+        await _refreshStreak(uid);
+        _notify();
       });
     }
   }
@@ -1564,6 +1575,10 @@ class AppState extends ChangeNotifier {
     if (item.grantsAiUses > 0) {
       photoQuota = photoQuota.withExtra(item.grantsAiUses);
     }
+    if (item.id == 'streak_freeze') {
+      final s = streak();
+      serverStreak = s.copyWith(freezesAvailable: s.freezesAvailable + 1);
+    }
     ledgerExtra.insert(0, LedgerEntry(label: isAr ? item.nameAr : item.nameEn, amount: -item.price, when: isAr ? 'دلوقتي' : 'Just now'));
     _notify();
 
@@ -1847,6 +1862,52 @@ class AppState extends ChangeNotifier {
 
   /// Days in the last week with anything logged at all.
   int activeDays() => week().where((d) => d.meals > 0).length;
+
+  // ---- streak + orb state ---------------------------------------------
+
+  Future<void> _refreshStreak(String uid) async {
+    try {
+      final s = await _mealRepo?.streak(uid);
+      if (s != null) serverStreak = s;
+    } catch (_) {
+      // The local count below still works; freezes wait for the next load.
+    }
+  }
+
+  /// Days in a row with a meal, ending today or yesterday. The server's
+  /// answer wins when it exists — it knows about freezes — but a meal logged
+  /// this minute counts before the server has been asked again.
+  Streak streak() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final server = serverStreak;
+    final local = Streak.fromDays(
+      [for (final d in dayHistory) if (d.meals > 0) d.day, if (meals.isNotEmpty) today],
+      today: today,
+      frozenDays: server?.frozenDays ?? const [],
+      freezesAvailable: server?.freezesAvailable ?? 0,
+    );
+    if (server == null) return local;
+    if (meals.isNotEmpty && !server.todayCounted) {
+      // Logged since the snapshot: today joins the run.
+      return server.copyWith(
+        current: server.current + 1,
+        best: math.max(server.best, server.current + 1),
+        todayCounted: true,
+      );
+    }
+    return server.current >= local.current ? server : local;
+  }
+
+  /// What the orb shows: the moon fills toward today's target, the glow
+  /// follows the day's meals against the plan, the ring is the streak.
+  OrbState orbState() => OrbState.derive(
+        consumedKcal: consumed().kcal,
+        targetKcal: target().kcal,
+        mealsToday: meals.length,
+        planSlots: plan?.slots.length ?? 0,
+        streak: streak(),
+      );
 
   int mealsThisWeek() => week().fold(0, (sum, d) => sum + d.meals);
 

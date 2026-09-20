@@ -1,5 +1,6 @@
 import '../models/meal.dart';
 import '../models/profile.dart';
+import '../models/streak.dart';
 import '../models/water.dart';
 
 /// Repository interfaces mirroring the Supabase schema in
@@ -34,6 +35,10 @@ abstract class MealRepository {
   Future<List<WeightReading>> weightHistory(String userId, {int days = 60});
 
   Future<void> recordWeight(String userId, {required double kg, DateTime? at});
+
+  /// The server's streak: computed from meal_logs, with freezes applied.
+  /// Null when the backend has no answer (older schema, offline).
+  Future<Streak?> streak(String userId);
 }
 
 abstract class WaterRepository {

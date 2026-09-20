@@ -13,6 +13,7 @@ import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/models/streak.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/models/billing.dart';
 import 'package:qamar/models/water.dart';
@@ -72,6 +73,15 @@ class FakeMealRepo implements MealRepository {
 
   @override
   Future<List<DayTotals>> dailyTotals(String userId, {int days = 7}) async => history;
+
+  Streak? serverStreak;
+  int streakCalls = 0;
+
+  @override
+  Future<Streak?> streak(String userId) async {
+    streakCalls++;
+    return serverStreak;
+  }
 
   @override
   Future<List<WeightReading>> weightHistory(String userId, {int days = 60}) async => weights;
@@ -561,6 +571,62 @@ void main() {
     expect(state.activeDays(), 2, reason: 'only days with logged meals count');
     expect(state.mealsThisWeek(), 7);
     expect(week.where((d) => d.meals == 0).length, 5, reason: 'unlogged days must stay at zero');
+  });
+
+  test('the streak counts logged days back from today, and today never breaks it', () async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final meals = FakeMealRepo()
+      ..history = [
+        DayTotals(day: today.subtract(const Duration(days: 3)), kcal: 1800, meals: 2),
+        DayTotals(day: today.subtract(const Duration(days: 2)), kcal: 1900, meals: 3),
+        DayTotals(day: today.subtract(const Duration(days: 1)), kcal: 2100, meals: 4),
+      ];
+    final state = backed(meals: meals);
+    await settle();
+
+    final s = state.streak();
+    expect(s.current, 3);
+    expect(s.todayCounted, isFalse);
+    expect(s.atRisk, isTrue, reason: 'yesterday was the last counted day');
+    expect(s.best, 3);
+    expect(state.orbState().streak.current, 3);
+  });
+
+  test('logging today’s first meal joins today to the run before the server is asked', () async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final meals = FakeMealRepo()
+      ..history = [DayTotals(day: today.subtract(const Duration(days: 1)), kcal: 2100, meals: 4)]
+      ..serverStreak = const Streak(current: 1, best: 5, todayCounted: false, freezesAvailable: 1);
+    final ai = FakeGateway();
+    final state = backed(meals: meals, ai: ai);
+    await settle();
+    expect(state.streak().current, 1);
+    expect(state.streak().freezesAvailable, 1);
+
+    state.quickLog(QuickLog.text);
+    await state.sendChatMsg('koshary');
+    await settle();
+    state.confirmProposal();
+    await settle();
+
+    final s = state.streak();
+    expect(s.current, 2);
+    expect(s.todayCounted, isTrue);
+    expect(s.best, 5);
+    expect(meals.streakCalls, greaterThan(1), reason: 'the server is re-asked after a log');
+  });
+
+  test('a streak freeze is bought with Su and shows as an available token', () {
+    final state = AppState()..suAvailable = SuEconomy.streakFreeze;
+    final freeze = kSpendCatalog.firstWhere((i) => i.id == 'streak_freeze');
+
+    state.redeem(freeze);
+
+    expect(state.suAvailable, 0);
+    expect(state.streak().freezesAvailable, 1);
+    expect(freeze.once, isFalse, reason: 'one a month, so not a permanent unlock');
   });
 
   test('a new user sees an empty week rather than an invented one', () async {

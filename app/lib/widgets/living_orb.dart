@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../models/streak.dart';
 import '../theme/colors.dart';
 import 'moon.dart';
 
@@ -17,6 +18,12 @@ class LivingOrb extends StatefulWidget {
   final Duration wanderDuration;
   final VoidCallback? onTap;
 
+  /// The day, on the orb. Null is the decorative orb (welcome, subscription):
+  /// waxing crescent, steady halo, no ring. With a state the moon fills
+  /// toward today's target, the halo brightens with the day's meals and warms
+  /// when intake runs over, and the streak ring closes one day at a time.
+  final OrbState? state;
+
   const LivingOrb({
     super.key,
     required this.size,
@@ -27,6 +34,7 @@ class LivingOrb extends StatefulWidget {
     this.haloDuration = const Duration(milliseconds: 5200),
     this.wanderDuration = const Duration(milliseconds: 11000),
     this.onTap,
+    this.state,
   });
 
   @override
@@ -81,7 +89,13 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
         final scale = 1.0 + 0.045 * breathT;
         final haloT = _halo.value;
         final haloScale = 1.0 + 0.22 * haloT;
-        final haloOpacity = 0.32 + 0.40 * haloT;
+        final day = widget.state;
+        // A day with nothing in it glows faintly; a full one, fully.
+        final glowBase = day == null ? 0.32 : 0.16 + 0.24 * day.glow;
+        final haloOpacity = glowBase + 0.40 * haloT;
+        final haloColors = day?.over == true
+            ? const [Color(0x8CFFB36C), Color(0x1FFF7C4F), Colors.transparent]
+            : const [Color(0x8C7B6CFF), Color(0x1F4F7CFF), Colors.transparent];
         final offset = widget.wander ? Offset(_wanderOffset.value.dx * s, _wanderOffset.value.dy * s) : Offset.zero;
 
         return Transform.translate(
@@ -99,11 +113,11 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
                     child: Container(
                       width: s * 1.55,
                       height: s * 1.55,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
-                          colors: [Color(0x8C7B6CFF), Color(0x1F4F7CFF), Colors.transparent],
-                          stops: [0.0, 0.45, 0.7],
+                          colors: haloColors,
+                          stops: const [0.0, 0.45, 0.7],
                         ),
                       ),
                     ),
@@ -111,6 +125,11 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
                 ),
                 if (widget.sparks) ..._buildSparks(s),
                 if (widget.activeRings) ..._buildActiveRings(s),
+                if (day != null && day.streak.current > 0)
+                  CustomPaint(
+                    size: Size.square(s * 1.3),
+                    painter: StreakRingPainter(streak: day.streak),
+                  ),
                 Transform.scale(
                   scale: scale,
                   child: Container(
@@ -122,7 +141,7 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
                         BoxShadow(color: QColors.violet.withOpacity(0.55), blurRadius: s * 0.5),
                       ],
                     ),
-                    child: QamarMoon(size: s),
+                    child: QamarMoon(size: s, phase: day?.moonPhase),
                   ),
                 ),
               ],
@@ -228,4 +247,65 @@ class _OrbitingSpark extends StatelessWidget {
       },
     );
   }
+}
+
+/// The streak as a ring: one arc segment per day of the current week of the
+/// run, closing at seven and starting over. Violet while young, cyan from
+/// three, gold from a full week. A gap in the arc at the top is today, still
+/// open, when today has not been counted yet.
+class StreakRingPainter extends CustomPainter {
+  final Streak streak;
+  const StreakRingPainter({required this.streak});
+
+  static const daysPerTurn = 7;
+
+  /// Filled fraction of the ring for [count] days.
+  static double fraction(int count) {
+    if (count <= 0) return 0;
+    final inTurn = count % daysPerTurn;
+    return inTurn == 0 ? 1 : inTurn / daysPerTurn;
+  }
+
+  static Color colorFor(int count) {
+    if (count >= daysPerTurn) return const Color(0xFFF2C56B);
+    if (count >= 3) return QColors.cyan;
+    return QColors.violet;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = size.width / 2;
+    final c = Offset(r, r);
+    final stroke = math.max(1.5, size.width * 0.035);
+    final rect = Rect.fromCircle(center: c, radius: r - stroke);
+    final color = colorFor(streak.current);
+
+    final track = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..color = color.withValues(alpha: 0.14);
+    canvas.drawArc(rect, 0, math.pi * 2, false, track);
+
+    const gap = 0.12; // radians left open between segments
+    const segment = math.pi * 2 / daysPerTurn;
+    final lit = (fraction(streak.current) * daysPerTurn).round();
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round
+      ..color = color;
+    for (var i = 0; i < lit; i++) {
+      final start = -math.pi / 2 + i * segment + gap / 2;
+      canvas.drawArc(rect, start, segment - gap, false, paint);
+    }
+    if (streak.atRisk) {
+      // Today's segment, waiting for its meal.
+      final start = -math.pi / 2 + lit * segment + gap / 2;
+      canvas.drawArc(rect, start, segment - gap, false, paint..color = color.withValues(alpha: 0.35));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant StreakRingPainter old) =>
+      old.streak.current != streak.current || old.streak.todayCounted != streak.todayCounted;
 }

@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/meal.dart';
 import '../models/profile.dart';
+import '../models/streak.dart';
 import '../models/water.dart';
 import 'repositories.dart';
 
@@ -204,6 +205,13 @@ class SupabaseMealRepository implements MealRepository {
     final out = byDay.values.map((e) => DayTotals(day: e.day, kcal: e.kcal, meals: e.meals)).toList()
       ..sort((a, b) => a.day.compareTo(b.day));
     return out;
+  }
+
+  @override
+  Future<Streak?> streak(String userId) async {
+    final raw = await _client.rpc('qamar_streak_snapshot', params: {'p_user_id': userId});
+    if (raw is! Map) return null;
+    return Streak.fromJson(Map<String, dynamic>.from(raw));
   }
 
   @override

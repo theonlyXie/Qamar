@@ -7,10 +7,12 @@ import 'dart:ui' show Offset, Rect;
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/models/streak.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/models/billing.dart';
 import 'package:qamar/models/water.dart';
@@ -19,6 +21,7 @@ import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/state/chat_replies.dart';
 import 'package:qamar/widgets/explain.dart';
+import 'package:qamar/widgets/living_orb.dart';
 import 'package:qamar/widgets/tree_overlay.dart';
 
 /// Long enough for answerStep's 260ms hand-off plus a margin.
@@ -300,6 +303,7 @@ void main() {
   });
 
   secondRound();
+  streakAndOrb();
   languageTests();
 
   group('explain registry', () {
@@ -319,9 +323,116 @@ void main() {
     test('every explainable id used in the UI has copy behind it', () {
       // Guards against wiring up an Explainable whose id has no entry, which
       // would open an empty sheet.
-      for (final id in ['kcal_remaining', 'protein', 'carbs', 'fat', 'su_points', 'level', 'plan_total', 'target_kcal', 'water']) {
+      for (final id in ['kcal_remaining', 'protein', 'carbs', 'fat', 'su_points', 'level', 'plan_total', 'target_kcal', 'water', 'streak']) {
         expect(kExplanations[id], isNotNull, reason: 'missing explanation for "$id"');
       }
+    });
+  });
+}
+
+void streakAndOrb() {
+  final today = DateTime(2026, 9, 20);
+  DateTime ago(int d) => today.subtract(Duration(days: d));
+
+  group('streak', () {
+    test('consecutive logged days count back from yesterday when today is empty', () {
+      final s = Streak.fromDays([ago(1), ago(2), ago(3)], today: today);
+      expect(s.current, 3);
+      expect(s.todayCounted, isFalse);
+      expect(s.atRisk, isTrue);
+    });
+
+    test('today counts as soon as it has a meal', () {
+      final s = Streak.fromDays([today, ago(1)], today: today);
+      expect(s.current, 2);
+      expect(s.todayCounted, isTrue);
+      expect(s.atRisk, isFalse);
+    });
+
+    test('a gap two days ago ends the run there, but the old run is still the best', () {
+      final s = Streak.fromDays([today, ago(1), ago(3), ago(4), ago(5), ago(6)], today: today);
+      expect(s.current, 2);
+      expect(s.best, 4);
+    });
+
+    test('a frozen day bridges the gap; the client never invents one', () {
+      final s = Streak.fromDays([today, ago(1), ago(3)], today: today, frozenDays: [ago(2)]);
+      expect(s.current, 4);
+      expect(s.frozenDays, [ago(2)]);
+      expect(Streak.fromDays([today, ago(1), ago(3)], today: today).current, 2);
+    });
+
+    test('nothing logged is zero, not at risk', () {
+      final s = Streak.fromDays(const [], today: today);
+      expect(s.current, 0);
+      expect(s.atRisk, isFalse);
+    });
+
+    test('the server snapshot parses', () {
+      final s = Streak.fromJson({'current': 4, 'best': 9, 'today_counted': true, 'freezes_available': 1, 'frozen_days': ['2026-09-17']});
+      expect(s.current, 4);
+      expect(s.best, 9);
+      expect(s.todayCounted, isTrue);
+      expect(s.freezesAvailable, 1);
+      expect(s.frozenDays.single, DateTime(2026, 9, 17));
+    });
+  });
+
+  group('orb state', () {
+    test('an empty day is a thin crescent with a faint glow', () {
+      final o = OrbState.derive(consumedKcal: 0, targetKcal: 2000, mealsToday: 0, planSlots: 3, streak: Streak.none);
+      expect(o.fill, 0);
+      expect(o.glow, 0);
+      expect(o.over, isFalse);
+      expect(o.moonPhase, closeTo(0.9, 1e-9), reason: 'the painter reads 1 as dark');
+    });
+
+    test('a day at target is a near-full moon', () {
+      final o = OrbState.derive(consumedKcal: 2000, targetKcal: 2000, mealsToday: 3, planSlots: 3, streak: Streak.none);
+      expect(o.fill, 1);
+      expect(o.glow, 1);
+      expect(o.moonPhase, closeTo(0.1, 1e-9));
+      expect(o.over, isFalse);
+    });
+
+    test('running over the target warms the glow instead of filling further', () {
+      final o = OrbState.derive(consumedKcal: 2600, targetKcal: 2000, mealsToday: 4, planSlots: 3, streak: Streak.none);
+      expect(o.fill, 1);
+      expect(o.over, isTrue);
+    });
+
+    test('without a plan the glow reads meals against three', () {
+      final o = OrbState.derive(consumedKcal: 600, targetKcal: 2000, mealsToday: 1, planSlots: 0, streak: Streak.none);
+      expect(o.glow, closeTo(1 / 3, 1e-9));
+    });
+
+    test('the state follows the app: logging a meal fills the moon and starts the ring', () {
+      final state = AppState();
+      final before = state.orbState();
+      expect(before.fill, 0);
+      expect(before.streak.current, 0);
+
+      state.meals.add(const LoggedMeal(name: 'Koshary', sub: 'typed', kcal: 700, p: 16, c: 120, f: 10));
+      final after = state.orbState();
+      expect(after.fill, greaterThan(0));
+      expect(after.streak.current, 1);
+      expect(after.streak.todayCounted, isTrue);
+    });
+  });
+
+  group('streak ring', () {
+    test('fills one segment a day and closes at seven', () {
+      expect(StreakRingPainter.fraction(0), 0);
+      expect(StreakRingPainter.fraction(1), closeTo(1 / 7, 1e-9));
+      expect(StreakRingPainter.fraction(7), 1);
+      expect(StreakRingPainter.fraction(8), closeTo(1 / 7, 1e-9));
+      expect(StreakRingPainter.fraction(14), 1);
+    });
+
+    test('colour warms with the run', () {
+      expect(StreakRingPainter.colorFor(1), isNot(StreakRingPainter.colorFor(3)));
+      expect(StreakRingPainter.colorFor(3), isNot(StreakRingPainter.colorFor(7)));
+      expect(StreakRingPainter.colorFor(7), StreakRingPainter.colorFor(30));
     });
   });
 }

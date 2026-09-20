@@ -112,6 +112,17 @@ const List<SpendItemDef> kSpendCatalog = [
     limitEn: 'Up to 10 extras a day · refreshes at Cairo midnight',
   ),
   SpendItemDef(
+    id: 'streak_freeze',
+    price: SuEconomy.streakFreeze,
+    once: false,
+    nameAr: 'تجميد السلسلة',
+    nameEn: 'Streak freeze',
+    whatAr: 'يوم واحد من غير تسجيل ميقطعش سلسلتك. بيتصرف لوحده لما تحتاجه.',
+    whatEn: 'One day without a log will not break your streak. Applied automatically when a day is missed.',
+    limitAr: 'مرة في الشهر · ميتشتراش بفلوس',
+    limitEn: 'Once a month · never for money',
+  ),
+  SpendItemDef(
     id: 'insight',
     price: SuEconomy.weeklyInsight,
     nameAr: 'متابعة أعمق لرأي الأسبوع',

@@ -96,6 +96,14 @@ const kExplanations = <String, Explanation>{
     soWhatAr: 'النقط دي بتتكسب بس. مش بتتشترى بفلوس ومالهاش قيمة نقدية.',
     soWhatEn: 'They are only ever earned. They cannot be bought with money and have no cash value.',
   ),
+  'streak': Explanation(
+    titleAr: 'السلسلة',
+    titleEn: 'Streak',
+    bodyAr: 'أيام ورا بعض سجّلت فيها وجبة واحدة على الأقل. اليوم ميقطعش السلسلة قبل ما يخلص — بس لازم وجبة قبل نص الليل. الحلقة حوالين القمر هي السلسلة دي.',
+    bodyEn: 'Days in a row with at least one logged meal. Today never breaks the streak before it ends — but it needs a meal before midnight. The ring around the moon is this streak.',
+    soWhatAr: 'وجبة واحدة مسجلة بتكفي. وتجميد السلسلة من المحفظة بيغطي يوم واحد فايت في الشهر.',
+    soWhatEn: 'One logged meal is enough. A streak freeze from the wallet covers one missed day a month.',
+  ),
   'level': Explanation(
     titleAr: 'المستوى',
     titleEn: 'Level',

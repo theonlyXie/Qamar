@@ -29,6 +29,8 @@ class SuEconomy {
   static const int extraAiUse = 400;
 
   static const int weeklyInsight = 600;
+  /// One freeze a month covers one empty day in a streak.
+  static const int streakFreeze = 600;
   static const int cosmetic = 2500;
 
   /// Lifetime Su per level. Level is a vanity rank for later leaderboards,

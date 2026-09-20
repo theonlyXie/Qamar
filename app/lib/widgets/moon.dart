@@ -32,11 +32,17 @@ class QamarMoon extends StatefulWidget {
   /// Fixes the phase instead of drifting it. Useful for tests and goldens.
   final double? staticPhase;
 
+  /// Pins the phase to the day's state (see OrbState.moonPhase) while keeping
+  /// the slow drift, narrowed to a whisper either side. Null keeps the
+  /// decorative waxing band.
+  final double? phase;
+
   const QamarMoon({
     super.key,
     required this.size,
     this.phaseDuration = const Duration(seconds: 90),
     this.staticPhase,
+    this.phase,
   });
 
   @override
@@ -76,7 +82,11 @@ class _QamarMoonState extends State<QamarMoon> with SingleTickerProviderStateMix
         // Drift across a narrow band: always waxing, never full, so the
         // crescent stays Qamar's mark — but wide enough that the cratered
         // surface is the thing you actually look at.
-        painter: _MoonPainter(phase: 0.28 + 0.16 * controller.value),
+        painter: _MoonPainter(
+          phase: widget.phase == null
+              ? 0.28 + 0.16 * controller.value
+              : (widget.phase! - 0.02 + 0.04 * controller.value).clamp(0.0, 1.0),
+        ),
       ),
     );
   }
