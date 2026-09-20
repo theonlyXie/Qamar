@@ -90,9 +90,9 @@ const kExplanations = <String, Explanation>{
     titleAr: 'نقاط Su',
     titleEn: 'Su Points',
     bodyAr:
-        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة (+١٠٠، وأول وجبة +٥٠٠)، كوباية مياه (+٥، ومع Qamar+ +١٠)، تخلّص مهمة اليوم (+٢٥٠)، أسبوع كامل في السلسلة (+٥٠٠). بتتصرف على صورة زيادة أو تجميد السلسلة. الأسئلة مش بتتشترى بالنقط — الرابع في Qamar+.',
+        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة (+١٠٠، وأول وجبة +٥٠٠)، كوباية مياه (+٥، ومع Qamar+ +١٠)، تخلّص مهمة اليوم (+٢٥٠)، أسبوع كامل في السلسلة (+١٠٠). بتتصرف على صورة زيادة أو تجميد السلسلة. الأسئلة مش بتتشترى بالنقط — الرابع في Qamar+.',
     bodyEn:
-        'Earned when you do something useful for yourself — logging a meal (+100, first meal +500), a glass of water (+5, +10 with Qamar+), finishing the day’s quest (+250), a full week of streak (+500). Spent on another photo or a streak freeze. Questions are never bought with points — the fourth is Qamar+.',
+        'Earned when you do something useful for yourself — logging a meal (+100, first meal +500), a glass of water (+5, +10 with Qamar+), finishing the day’s quest (+250), a full week of streak (+100). Spent on another photo or a streak freeze. Questions are never bought with points — the fourth is Qamar+.',
     soWhatAr: 'النقط دي بتتكسب بس. مش بتتشترى بفلوس ومالهاش قيمة نقدية.',
     soWhatEn: 'They are only ever earned. They cannot be bought with money and have no cash value.',
   ),

@@ -17,11 +17,14 @@ import '../services/auth_service.dart';
 import '../services/device_prefs.dart';
 import '../services/dictation.dart';
 import '../services/nudger.dart';
+import '../services/sharer.dart';
+import '../services/config.dart';
 import '../services/payments.dart';
 import '../services/repositories.dart';
 import '../models/billing.dart';
 import '../widgets/explain.dart';
 import '../models/profile.dart';
+import '../models/review.dart';
 import '../models/water.dart';
 import 'chat_replies.dart';
 
@@ -64,6 +67,7 @@ class AppState extends ChangeNotifier {
     String? userId,
     DevicePrefs? prefs,
     Nudger? nudger,
+    Sharer? sharer,
     DateTime Function()? clock,
   })  : _profileRepo = profileRepo,
         _mealRepo = mealRepo,
@@ -77,6 +81,7 @@ class AppState extends ChangeNotifier {
         _userId = userId,
         _prefs = prefs,
         _nudger = nudger,
+        _sharer = sharer,
         _clock = clock ?? DateTime.now {
     _watchAccount();
     _watchNudger();
@@ -88,6 +93,9 @@ class AppState extends ChangeNotifier {
   /// none; then nudges exist only as the orb's pulse.
   final Nudger? _nudger;
   StreamSubscription<String>? _nudgeSub;
+
+  /// The share sheet. Null in tests and where there is none.
+  final Sharer? _sharer;
 
   /// Injectable so the meal-time logic can be tested at a chosen hour.
   final DateTime Function() _clock;
@@ -101,6 +109,7 @@ class AppState extends ChangeNotifier {
   static const _kNudgesAllowed = 'nudges_allowed';
   static const _kNudgePromptDone = 'nudge_prompt_done';
   static const _kFirstDay = 'first_day';
+  static const _kReviewNumbers = 'review_numbers';
 
   Future<void> _loadDevicePrefs() async {
     final p = _prefs;
@@ -112,7 +121,9 @@ class AppState extends ChangeNotifier {
       final allowed = await p.getBool(_kNudgesAllowed);
       final promptDone = await p.getBool(_kNudgePromptDone);
       final first = DateTime.tryParse(await p.getString(_kFirstDay) ?? '');
+      final reviewNumbers = await p.getBool(_kReviewNumbers);
       if (_disposed) return;
+      if (reviewNumbers != null) reviewShowNumbers = reviewNumbers;
       if (done == true) orbTutorialDismissed = true;
       if (digits != null) easternDigits = digits;
       if (perDay != null) nudgesPerDay = perDay.clamp(0, NudgeSchedule.maxPerDay);
@@ -2204,8 +2215,56 @@ class AppState extends ChangeNotifier {
     ];
   }
 
+  /// The seven days before [week], oldest first — the comparison the review
+  /// card draws. Unlogged days are zeros here too.
+  List<DayTotals> lastWeek() {
+    final now = _clock();
+    final today = DateTime(now.year, now.month, now.day);
+    final byDay = {for (final d in dayHistory) DateTime(d.day.year, d.day.month, d.day.day): d};
+    return [
+      for (var i = 13; i >= 7; i--)
+        byDay[today.subtract(Duration(days: i))] ??
+            DayTotals(day: today.subtract(Duration(days: i)), kcal: 0, meals: 0),
+    ];
+  }
+
   /// Days in the last week with anything logged at all.
   int activeDays() => week().where((d) => d.meals > 0).length;
+
+  // ---- the weekly review card ------------------------------------------
+  //
+  // The only thing in the product designed to be shared. No weight on it,
+  // ever; calories only when the person turns numbers on, and that choice is
+  // the phone's. The shared card travels with the site link.
+
+  bool reviewShowNumbers = false;
+
+  void setReviewShowNumbers(bool on) {
+    reviewShowNumbers = on;
+    _notify();
+    _prefs?.setBool(_kReviewNumbers, on).catchError((_) {});
+  }
+
+  WeekReview weekReview() => WeekReview.build(
+        week: week(),
+        lastWeek: lastWeek(),
+        targetKcal: target().kcal,
+        streak: streak(),
+        iso: iso,
+      );
+
+  /// What travels with the picture: the sentence, and the link.
+  String reviewShareText() {
+    final r = weekReview();
+    return '${isAr ? r.insight.ar : r.insight.en}\n${isAr ? 'أسبوعي مع قمر' : 'My week with Qamar'} · ${QamarConfig.site}';
+  }
+
+  /// The card, rendered by the screen, handed to the share sheet.
+  Future<void> shareReview(Uint8List png) async {
+    final s = _sharer;
+    if (s == null) return;
+    await s.shareImage(png, text: reviewShareText(), fileName: 'qamar-week.png');
+  }
 
   // ---- streak + orb state ---------------------------------------------
 

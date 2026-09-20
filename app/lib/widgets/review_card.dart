@@ -1,0 +1,122 @@
+import 'package:flutter/material.dart';
+
+import '../models/review.dart';
+import '../models/streak.dart';
+import '../theme/colors.dart';
+import '../theme/text_styles.dart';
+import 'moon.dart';
+
+/// The one thing in the product designed to be shared.
+///
+/// A moon for each day of the week, lit as far as that day's intake reached
+/// the target; the sentence the person did not expect; the one change for
+/// next week. No weight, ever. Calories only when [showNumbers]. The footer
+/// carries the link the card travels with.
+class ReviewCard extends StatelessWidget {
+  final WeekReview review;
+  final bool isAr;
+  final bool showNumbers;
+  final String footer;
+  final String Function(String) iso;
+
+  const ReviewCard({
+    super.key,
+    required this.review,
+    required this.isAr,
+    required this.showNumbers,
+    required this.footer,
+    required this.iso,
+  });
+
+  static const _lettersAr = ['ن', 'ث', 'ر', 'خ', 'ج', 'س', 'ح'];
+  static const _lettersEn = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  @override
+  Widget build(BuildContext context) {
+    final fills = review.fills;
+    final letters = isAr ? _lettersAr : _lettersEn;
+    return Directionality(
+      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+      child: Container(
+        width: 340,
+        padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF141C3C), Color(0xFF0B1024)],
+          ),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isAr ? 'أسبوعي مع قمر' : 'My week with Qamar',
+              style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.violetSoft, letterSpacing: 0.4),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                for (var i = 0; i < review.days.length; i++)
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Opacity(
+                        opacity: fills[i] == null ? 0.35 : 1,
+                        child: QamarMoon(
+                          size: 30,
+                          staticPhase: fills[i] == null ? 1.0 : OrbState.phaseForFill(fills[i]!),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        letters[review.days[i].day.weekday - 1],
+                        style: QText.number(size: 10, color: fills[i] == null ? QColors.textFaint : QColors.textMuted),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Text(
+              isAr ? review.insight.ar : review.insight.en,
+              style: QText.body(size: 16, height: 24, weight: FontWeight.w600, color: const Color(0xFFF5F7FF)),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isAr ? review.change.ar : review.change.en,
+              style: QText.body(size: 13, height: 20, color: QColors.textMid),
+            ),
+            if (showNumbers && review.avgKcal != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                isAr
+                    ? 'متوسط ${iso('${review.avgKcal}')} سعرة في اليوم المسجّل · ${iso('${review.inRange}')} من ${iso('${review.loggedDays}')} داخل النطاق'
+                    : 'Average ${review.avgKcal} kcal on a logged day · ${review.inRange} of ${review.loggedDays} in range',
+                style: QText.number(size: 11, color: QColors.textMuted),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (review.streak.current >= 2)
+                  Text(
+                    isAr ? '${iso('${review.streak.current}')} أيام ورا بعض' : '${review.streak.current} days in a row',
+                    style: QText.body(size: 11, color: QColors.cyan),
+                  )
+                else
+                  const SizedBox.shrink(),
+                Text(footer, textDirection: TextDirection.ltr, style: QText.number(size: 10, color: QColors.textFaint)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

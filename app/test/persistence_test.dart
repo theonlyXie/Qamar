@@ -6,6 +6,7 @@
 // screen.
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -23,6 +24,7 @@ import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/auth_service.dart';
 import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/services/nudger.dart';
+import 'package:qamar/services/sharer.dart';
 import 'package:qamar/services/payments.dart';
 import 'package:qamar/services/quick_invoke.dart';
 import 'package:qamar/services/repositories.dart';
@@ -716,6 +718,51 @@ void main() {
       final state = AppState();
       state.completeQuest();
       expect(state.suAvailable, SuEconomy.dailyQuest);
+    });
+  });
+
+  group('the weekly review card', () {
+    test('sharing hands the picture and the sentence to the sheet, with the link', () async {
+      final sharer = MemorySharer();
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final meals = FakeMealRepo()
+        ..history = [
+          for (var i = 1; i <= 4; i++) DayTotals(day: today.subtract(Duration(days: i)), kcal: i == 2 ? 2900 : 1900, meals: 3),
+        ];
+      final state = AppState(
+        mealRepo: meals, profileRepo: FakeProfileRepo(), waterRepo: FakeWaterRepo(), walletRepo: FakeWalletRepo(),
+        userId: 'user-1', sharer: sharer,
+      );
+      await settle();
+
+      final review = state.weekReview();
+      expect(review.enough, isTrue);
+      await state.shareReview(Uint8List.fromList([137, 80, 78, 71]));
+
+      final shared = sharer.shared.single;
+      expect(shared.fileName, 'qamar-week.png');
+      expect(shared.text, contains(review.insight.ar));
+      expect(shared.text, contains('dr-qamar.com'));
+      expect(shared.png.length, 4);
+    });
+
+    test('numbers are off by default and the choice is the phone\'s', () async {
+      final prefs = MemoryDevicePrefs();
+      final first = AppState(prefs: prefs);
+      await settle();
+      expect(first.reviewShowNumbers, isFalse);
+      first.setReviewShowNumbers(true);
+      await settle();
+
+      final second = AppState(prefs: prefs);
+      await settle();
+      expect(second.reviewShowNumbers, isTrue);
+    });
+
+    test('without a share sheet, sharing is a quiet no-op', () async {
+      final state = AppState();
+      await state.shareReview(Uint8List(0));
     });
   });
 

@@ -26,7 +26,7 @@ insert into public.su_economy_config (key, value) values
   ('water_sip', 10),
   ('water_sip_lite', 5),          -- half rate on the free tier
   ('water_sips_paid_daily', 8),   -- a full water day; the ninth glass is just water
-  ('streak_week', 500),           -- the ring completes at day 7
+  ('streak_week', 100),           -- the ring completes at day 7 (the blueprint's weekly loop)
   ('daily_cap', 1500)             -- earned points per Cairo day, one-offs excluded
 on conflict (key) do update set value = excluded.value;
 
@@ -118,7 +118,7 @@ begin
   if v_current > 0 and v_current % 7 = 0 and coalesce((v_snap ->> 'today_counted')::boolean, false) then
     perform public.qamar_su_earn(
       new.user_id,
-      coalesce(public.qamar_su_value('streak_week'), 500),
+      coalesce(public.qamar_su_value('streak_week'), 100),
       'streak_week',
       'streak:' || new.user_id::text || ':' || public.qamar_cairo_today()::text
     );

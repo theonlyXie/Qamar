@@ -35,7 +35,7 @@ class SuEconomy {
   static const int waterSipsPaidDaily = 8;
 
   /// The ring completes at day 7 and pays this, once per completed week.
-  static const int streakWeek = 500;
+  static const int streakWeek = 100;
 
   /// Earned points per Cairo day, one-offs (signup, onboarding) excluded.
   static const int dailyEarnCap = 1500;

@@ -126,7 +126,10 @@ class OrbState {
 
   /// The moon painter's phase: 0 is fully lit, 1 fully dark. An empty day is
   /// a thin crescent, a day at target a moon a day from full.
-  double get moonPhase => 0.92 - 0.86 * fill;
+  double get moonPhase => phaseForFill(fill);
+
+  /// The same mapping for any day — the review card draws a week of them.
+  static double phaseForFill(double fill) => 0.92 - 0.86 * fill.clamp(0.0, 1.0);
 
   factory OrbState.derive({
     required int consumedKcal,

@@ -1,4 +1,7 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
 import '../services/repositories.dart';
@@ -6,7 +9,10 @@ import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
+import '../services/config.dart';
+import '../widgets/common.dart';
 import '../widgets/explain.dart';
+import '../widgets/review_card.dart';
 
 /// Progress, drawn from what was actually logged.
 ///
@@ -95,6 +101,8 @@ class ProgressScreen extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 14),
+        _ShareableReview(state: state),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
@@ -336,4 +344,83 @@ class _WeightTrendPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _WeightTrendPainter old) => old.readings != readings;
+}
+
+/// The week's card, exactly as it will be shared, with the two controls
+/// that are not part of the picture: share it, show numbers.
+class _ShareableReview extends StatefulWidget {
+  final AppState state;
+  const _ShareableReview({required this.state});
+
+  @override
+  State<_ShareableReview> createState() => _ShareableReviewState();
+}
+
+class _ShareableReviewState extends State<_ShareableReview> {
+  final _cardKey = GlobalKey();
+  bool _busy = false;
+
+  Future<void> _share() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final boundary = _cardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return;
+      final image = await boundary.toImage(pixelRatio: 3);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes == null) return;
+      await widget.state.shareReview(bytes.buffer.asUint8List());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final isAr = state.isAr;
+    final review = state.weekReview();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(
+          child: RepaintBoundary(
+            key: _cardKey,
+            child: ReviewCard(
+              review: review,
+              isAr: isAr,
+              showNumbers: state.reviewShowNumbers,
+              footer: QamarConfig.site.replaceFirst('https://', ''),
+              iso: state.iso,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: QOutlineButton(
+                label: _busy ? (isAr ? 'لحظة…' : 'One moment…') : (isAr ? 'شارك كارت الأسبوع' : 'Share the week'),
+                onTap: _busy ? null : _share,
+                height: 40,
+                color: QColors.violetSoft,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(isAr ? 'الأرقام' : 'Numbers', style: QText.body(size: 12, color: QColors.textMuted)),
+            const SizedBox(width: 4),
+            Switch.adaptive(
+              value: state.reviewShowNumbers,
+              activeThumbColor: QColors.violet,
+              onChanged: state.setReviewShowNumbers,
+            ),
+          ],
+        ),
+        Text(
+          isAr ? 'الكارت من غير وزن أبداً، ومن غير سعرات إلا لو فتحت الأرقام.' : 'Never your weight; calories only if you turn numbers on.',
+          style: QText.body(size: 11, color: QColors.textFaint),
+        ),
+      ],
+    );
+  }
 }
