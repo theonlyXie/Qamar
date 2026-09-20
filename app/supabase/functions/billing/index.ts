@@ -18,6 +18,7 @@
 //   PAYMOB_BASE_URL          optional, defaults to https://accept.paymob.com
 
 import { verifyPaymobHmac } from "./hmac.ts";
+import { amountMatches, signedOrderId, txnObject, txnOutcome, type OrderRow } from "./webhook.ts";
 import {
   MIN_PAYOUT_CENTS,
   PLANS,
@@ -320,24 +321,19 @@ async function affiliatePayout(userId: string, body: Record<string, unknown>): P
   }
 }
 
-function txnObject(body: unknown): Record<string, unknown> | null {
-  if (!body || typeof body !== "object") return null;
-  const o = body as Record<string, unknown>;
-  if (o.obj && typeof o.obj === "object") return o.obj as Record<string, unknown>;
-  if (typeof o.id !== "undefined" && typeof o.success !== "undefined") return o;
-  return null;
-}
-
-function orderIdFrom(obj: Record<string, unknown>): string | null {
-  const extras = obj.payment_key_claims;
-  if (extras && typeof extras === "object") {
-    const extraBag = (extras as { extra?: Record<string, unknown> }).extra;
-    const fromExtra = extraBag?.qamar_order_id;
-    if (typeof fromExtra === "string" && fromExtra) return fromExtra;
-  }
-  const merchant = obj.merchant_order_id ?? (obj.order as { merchant_order_id?: unknown } | undefined)?.merchant_order_id;
-  if (typeof merchant === "string" && merchant) return merchant;
-  return null;
+/**
+ * The billing_orders row for a Paymob order id, or null. Resolved by the
+ * signed `order.id` that checkout stored as paymob_order_id, so the webhook
+ * never acts on an order id the caller supplied.
+ */
+async function loadOrderByPaymobId(paymobOrderId: string): Promise<OrderRow | null> {
+  const res = await db(
+    `billing_orders?paymob_order_id=eq.${encodeURIComponent(paymobOrderId)}` +
+      `&select=id,user_id,plan,amount_cents,currency,status&limit=1`,
+  );
+  if (!res.ok) return null;
+  const rows = await res.json() as OrderRow[];
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
 }
 
 async function webhook(req: Request): Promise<Response> {
@@ -360,27 +356,42 @@ async function webhook(req: Request): Promise<Response> {
     return json({ error: "hmac mismatch" }, 401);
   }
 
-  const success = obj.success === true || obj.success === "true";
-  const pending = obj.pending === true || obj.pending === "pending";
-  const voided = obj.is_voided === true;
-  const refunded = obj.is_refunded === true;
+  // From here on, only signed fields decide anything: order.id, amount_cents,
+  // currency, success, pending, is_voided, is_refunded and the transaction id.
+  const outcome = txnOutcome(obj);
   const txnId = String(obj.id ?? "");
-  const orderId = orderIdFrom(obj);
+  const paymobOrderId = signedOrderId(obj);
+  if (!paymobOrderId || !txnId) return json({ error: "missing order or transaction id" }, 400);
 
-  if (!success || pending || voided || refunded) {
-    if (orderId) {
-      await db(`billing_orders?id=eq.${orderId}&status=eq.pending`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "failed", paymob_txn_id: txnId || null }),
-      });
-    }
+  const order = await loadOrderByPaymobId(paymobOrderId);
+  if (!order) {
+    // Not one of ours, or checkout never stored the intention's order id.
+    // Acknowledged so Paymob does not retry forever; logged so someone sees it.
+    console.error("billing webhook: no order for paymob order", paymobOrderId, "txn", txnId);
+    return json({ ok: true, applied: false, reason: "unknown order" });
+  }
+
+  if (!outcome.success || outcome.pending || outcome.voided || outcome.refunded) {
+    await db(`billing_orders?id=eq.${order.id}&status=eq.pending`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "failed", paymob_txn_id: txnId }),
+    });
     return json({ ok: true, applied: false });
   }
 
-  if (!orderId || !txnId) return json({ error: "missing order or transaction id" }, 400);
+  if (!amountMatches(obj, order)) {
+    // Signed amount disagrees with the order it is paying for. Nothing is
+    // applied and the order is left as it was; this is the row to read when
+    // someone asks why a payment "went through" and Plus did not turn on.
+    console.error(
+      "billing webhook: amount mismatch",
+      { order: order.id, expected: order.amount_cents, currency: order.currency, got: obj.amount_cents, txn: txnId },
+    );
+    return json({ error: "amount mismatch" }, 409);
+  }
 
   try {
-    const snap = await rpc("qamar_apply_paid_order", { p_order_id: orderId, p_txn_id: txnId });
+    const snap = await rpc("qamar_apply_paid_order", { p_order_id: order.id, p_txn_id: txnId });
     return json({ ok: true, applied: true, entitlement: snap });
   } catch (e) {
     console.error("billing apply", e);

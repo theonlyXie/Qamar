@@ -1,7 +1,8 @@
 // Copy and shape for the shared daily AI allowance.
 // The counter itself lives in Postgres (qamar_ai_try_consume); this is what
 // the gateway returns when the five uses are gone, and how a 200 response
-// carries the remaining count so the app can show it.
+// carries the remaining count so the app can show it. Every model route spends
+// it: chat, meal photo, plan, and the body scan.
 
 export interface Quota {
   allowed: boolean;

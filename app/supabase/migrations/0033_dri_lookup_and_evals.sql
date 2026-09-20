@@ -1,6 +1,6 @@
 -- The DRI lookup, separated from the profile, and frozen into the eval set.
 --
--- 0031 could only be tested through qamar_micronutrient_targets, which needs a
+-- 0032 could only be tested through qamar_micronutrient_targets, which needs a
 -- profile row, which means a user, which means the test either fabricates one or
 -- depends on whoever happens to be in the database. Neither belongs in a
 -- regression suite that is supposed to say the same thing next year.

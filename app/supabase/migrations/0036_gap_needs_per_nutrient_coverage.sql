@@ -1,6 +1,6 @@
 -- A nutrient nobody measured is not a nutrient you are short on.
 --
--- 0031 guarded the obvious case: when no logged item resolves to a known food,
+-- 0032 guarded the obvious case: when no logged item resolves to a known food,
 -- every status is unknown. It missed the case the nutrient load has just made
 -- real. Iodine now has a target of 150 µg and a value for zero of 131 foods —
 -- USDA rarely analyses it — so a user who logged a full, perfectly identified

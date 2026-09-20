@@ -11,6 +11,7 @@
 //     photo: takeAiUse + vision model (Qamar+ on the client)
 //   POST /ai-gateway/plan/generate  { date?, lang?, force?, instruction? }
 //   POST /ai-gateway/scan/read      { imageBase64, imageMediaType, lang }
+//     takeAiUse + vision model — metered like a meal photo
 //   POST /ai-gateway/quota          {}
 //
 // Secrets (supabase secrets set ...):
@@ -938,15 +939,11 @@ async function analyzeMeal(
     claimsToVerify: mealClaims(items),
   }, stages, verifications);
 
-  let shown = quota;
-  if (items.length === 0) {
-    await refundAi(userId);
-    try {
-      shown = await quotaStatus(userId);
-    } catch {
-      shown = { ...quota, used: Math.max(quota.used - 1, 0), remaining: quota.remaining + 1, allowed: true };
-    }
-  }
+  // An empty item list is a real answer the model was paid for — a photo too
+  // dark to read, or not food. It used to be refunded, which made "send a
+  // black image" a free, unbounded vision call. The use stands; only a
+  // parse failure above, which is our fault, is refunded.
+  const shown = quota;
 
   return json({
     // These carry qamar_food_id and grams. The app must persist them onto
@@ -1001,13 +998,35 @@ async function readBodyScan(
   if (typeof image === "string") return json({ error: image }, 413);
   if (!image) return json({ error: "no image supplied" }, 400);
 
-  const { text, model, usage, latencyMs } = await callModel({
-    system: bodyScanSystemPrompt(lang),
-    user: lang === "ar" ? "اقرا الأرقام اللي في التقرير ده." : "Read the figures on this report.",
-    maxTokens: 400,
-    prefill: "{",
-    image,
-  });
+  // Same gates as every other model route. This one used to have neither: any
+  // anonymous sign-up could loop vision calls through it at no cost to them
+  // and full cost to us, and a blocked profile could reach the model here when
+  // it could not anywhere else. A body scan is one use of the day, like a
+  // meal photo — it is the same call to the same model.
+  const { blocked } = await loadContext(userId, lang);
+  if (blocked) {
+    const id = await record(userId, "body_scan", { inScope: false, refusal: "minor", question: "[body scan]" });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", "[body scan]");
+    return json({ error: "not eligible" }, 403);
+  }
+  const taken = await takeAiUse(userId, lang);
+  if (taken instanceof Response) return taken;
+  const quota = taken;
+
+  let called: Awaited<ReturnType<typeof callModel>>;
+  try {
+    called = await callModel({
+      system: bodyScanSystemPrompt(lang),
+      user: lang === "ar" ? "اقرا الأرقام اللي في التقرير ده." : "Read the figures on this report.",
+      maxTokens: 400,
+      prefill: "{",
+      image,
+    });
+  } catch (e) {
+    await refundAi(userId);
+    throw e;
+  }
+  const { text, model, usage, latencyMs } = called;
   const stages: StageCost[] = [{ stage: "extractor", model, usage, latencyMs }];
 
   const parsed = parseJson<BodyScanShape>(text);
@@ -1016,6 +1035,8 @@ async function readBodyScan(
       candidateDecision: { parse_failed: true, raw: text.slice(0, 1000) },
       uncertainty: { parse: "model did not return the requested JSON" },
     }, stages);
+    // Unusable output is our failure, not a use of theirs.
+    await refundAi(userId);
     return json({ error: "could not read the report" }, 502);
   }
 
@@ -1055,7 +1076,7 @@ async function readBodyScan(
     },
     safetyFlags: dropped.length ? ["body_scan_value_rejected"] : [],
   }, stages);
-  return json(result);
+  return json({ ...result, quota: quotaPayload(quota) });
 }
 
 interface PlanShape {

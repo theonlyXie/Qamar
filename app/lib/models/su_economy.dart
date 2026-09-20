@@ -7,9 +7,9 @@
 class SuEconomy {
   SuEconomy._();
 
-  /// Chat, photographing a meal, and writing the plan share this many model
-  /// calls a day. Typed and spoken logs use the food graph and do not spend
-  /// this pool. Body scans are onboarding, not this pool. Cairo midnight resets it.
+  /// Chat, photographing a meal, writing the plan and reading a body scan
+  /// share this many model calls a day. Typed and spoken logs use the food
+  /// graph and do not spend this pool. Cairo midnight resets it.
   static const int dailyAiUses = 5;
 
   /// How many extra uses Su can buy in one Cairo day, so a stolen session

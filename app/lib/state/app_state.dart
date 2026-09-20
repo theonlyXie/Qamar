@@ -288,6 +288,7 @@ class AppState extends ChangeNotifier {
     affiliateNotice = null;
     improve = false;
     questDone = false;
+    _questPaidDay = null;
     proposal = null;
     proposalQty = [];
     proposalRaw = null;
@@ -1241,9 +1242,20 @@ class AppState extends ChangeNotifier {
 
   // ---- quest / wallet -------------------------------------------------
 
+  /// The Cairo day the primary quest last paid out. Accept, Replace, Accept…
+  /// used to credit 250 Su on every tap, because Replace cleared [questDone]
+  /// and nothing remembered that the day had already paid. One primary quest
+  /// payout per day, whatever is tapped.
+  String? _questPaidDay;
+
   void completeQuest() {
+    if (questDone) return;
     questDone = true;
-    _credit(SuEconomy.dailyQuest, ar: 'مهمة اليوم', en: 'Primary daily quest');
+    final today = _today();
+    if (_questPaidDay != today) {
+      _questPaidDay = today;
+      _credit(SuEconomy.dailyQuest, ar: 'مهمة اليوم', en: 'Primary daily quest');
+    }
     _notify();
   }
 

@@ -103,6 +103,25 @@ void main() {
     });
   });
 
+  group('daily quest', () {
+    test('the primary quest pays once a day, however many times it is accepted or replaced', () {
+      final state = AppState();
+      final start = state.suAvailable;
+      state.completeQuest();
+      expect(state.suAvailable, start + SuEconomy.dailyQuest);
+      // The loop that used to mint: accept, replace, accept, replace…
+      state.completeQuest();
+      state.replaceQuest();
+      state.completeQuest();
+      state.replaceQuest();
+      state.completeQuest();
+      expect(state.suAvailable, start + SuEconomy.dailyQuest);
+      expect(state.ledger().where((e) => e.amount == SuEconomy.dailyQuest).length, 1);
+      expect(state.questDone, isTrue);
+      state.dispose();
+    });
+  });
+
   group('Qamar+ Egypt billing', () {
     test('is priced in EGP for Paymob, not a foreign store', () {
       expect(PlusCatalog.currency, 'EGP');
