@@ -61,6 +61,10 @@ abstract class MealRepository {
   /// When this person eats, learned from their logs (qamar_meal_time_profile).
   /// Null when the backend has no answer.
   Future<MealTimes?> mealTimes(String userId);
+
+  /// Last night's sentence about [day], written by the gateway's night job;
+  /// null when none was written (a new account, an empty day, no job yet).
+  Future<NightNote?> nightNote(String userId, DateTime day);
 }
 
 abstract class WaterRepository {
@@ -95,6 +99,18 @@ class WeightReading {
   final DateTime at;
   final double kg;
   const WeightReading({required this.at, required this.kg});
+}
+
+/// The one sentence written at night about the coming day: tomorrow against
+/// today, no dish named. On Qamar+ the plan is behind it; on the free tier it
+/// is what stands in for the plan, with the plan locked.
+class NightNote {
+  final DateTime day;
+  final String ar;
+  final String en;
+  final int planKcal;
+  final int todayKcal;
+  const NightNote({required this.day, required this.ar, required this.en, required this.planKcal, required this.todayKcal});
 }
 
 /// Payload shape for [MealRepository.saveDraft] — matches meal_drafts.

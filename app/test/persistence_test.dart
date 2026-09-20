@@ -102,6 +102,11 @@ class FakeMealRepo implements MealRepository {
   @override
   Future<MealTimes?> mealTimes(String userId) async => times;
 
+  NightNote? note;
+
+  @override
+  Future<NightNote?> nightNote(String userId, DateTime day) async => note;
+
   @override
   Future<Streak?> streak(String userId) async {
     streakCalls++;
@@ -1583,6 +1588,54 @@ void main() {
       state.openWallet();
       await settle();
       expect(a.screens, ['progress', 'wallet']);
+    });
+  });
+
+  group('the night sentence', () {
+    final today = DateTime(2026, 9, 21, 8, 30);
+    NightNote note() => NightNote(
+          day: DateTime(2026, 9, 21),
+          ar: 'بكرة أخف من النهارده بـ 12٪ — 1800 سعرة على 3 وجبات.',
+          en: 'Tomorrow is 12% lighter than today — 1800 kcal over 3 meals.',
+          planKcal: 1800,
+          todayKcal: 2050,
+        );
+
+    test('last night’s sentence is loaded for today, in the app’s language and digits', () async {
+      final meals = FakeMealRepo()..note = note();
+      final state = backed(meals: meals, clock: () => today);
+      await settle();
+      expect(state.nightNote, isNotNull);
+      expect(state.nightSentence, contains('١٢٪'), reason: 'Arabic with Eastern digits by default');
+      state.setLang(AppLang.en);
+      expect(state.nightSentence, 'Tomorrow is 12% lighter than today — 1800 kcal over 3 meals.');
+    });
+
+    test('on the free tier the plan behind it is locked, and the lock is the wall', () async {
+      final a = MemoryAnalytics();
+      final state = backed(meals: FakeMealRepo()..note = note(), analytics: a, clock: () => today);
+      await state.setImprove(true);
+      await settle();
+      expect(state.nightPlanLocked, isTrue);
+      state.openNightNote();
+      expect(state.screen, AppScreen.subscription);
+      expect(a.named('wall_tapped').single['wall'], 'tomorrow');
+    });
+
+    test('a member opens today’s plan from it', () async {
+      final state = backed(meals: FakeMealRepo()..note = note(), clock: () => today)..plusActive = true;
+      await settle();
+      expect(state.nightPlanLocked, isFalse);
+      state.openNightNote();
+      expect(state.screen, AppScreen.plan);
+    });
+
+    test('without a backend, or with nothing written, there is no sentence and none is invented', () async {
+      expect(AppState().nightNote, isNull);
+      final state = backed(meals: FakeMealRepo(), clock: () => today);
+      await settle();
+      expect(state.nightNote, isNull);
+      expect(state.nightSentence, isNull);
     });
   });
 }

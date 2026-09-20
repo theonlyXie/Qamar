@@ -249,6 +249,25 @@ class SupabaseMealRepository implements MealRepository {
   }
 
   @override
+  Future<NightNote?> nightNote(String userId, DateTime day) async {
+    final d = day.toIso8601String().substring(0, 10);
+    final row = await _client
+        .from('night_notes')
+        .select('day, sentence_ar, sentence_en, plan_kcal, today_kcal')
+        .eq('user_id', userId)
+        .eq('day', d)
+        .maybeSingle();
+    if (row == null) return null;
+    return NightNote(
+      day: DateTime.parse(row['day'] as String),
+      ar: row['sentence_ar'] as String? ?? '',
+      en: row['sentence_en'] as String? ?? '',
+      planKcal: (row['plan_kcal'] as num?)?.toInt() ?? 0,
+      todayKcal: (row['today_kcal'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  @override
   Future<List<WeightReading>> weightHistory(String userId, {int days = 60}) async {
     final from = DateTime.now().subtract(Duration(days: days));
     final rows = await _client

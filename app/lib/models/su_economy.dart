@@ -22,7 +22,11 @@ class SuEconomy {
   /// What each action pays. The server's su_economy_config (migration 0046)
   /// is the authority — these mirror it so the phone can show the number a
   /// second before the ledger confirms it.
-  static const int signupBonus = 2500;
+  /// The server pays this on sign-up (migration 0004) and is the authority;
+  /// it used to say 2,500 here while the ledger said 100, and the first
+  /// hydrate corrected the screen downwards. Signing up earns little on
+  /// purpose — points are for logging, not for arriving.
+  static const int signupBonus = 100;
   static const int onboarding = 1000;
   static const int firstMeal = 500;
   static const int mealLogged = 100;

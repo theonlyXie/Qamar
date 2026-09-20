@@ -91,9 +91,13 @@ import {
 import { asQuota, quotaExceededMessage, quotaPayload, type Bucket, type Quota } from "./quota.ts";
 import {
   cairoDatePlus,
+  cairoNow,
+  chunks,
   dueMembers,
   isNightlyWindow,
   type NightlyReport,
+  nightSentence,
+  planKcal,
   RUN_BUDGET_MS,
 } from "./nightly.ts";
 
@@ -374,6 +378,13 @@ interface SavedPlan {
   rationale_en?: string | null;
   sources?: unknown;
   model?: string | null;
+}
+
+/** Whether this account is on Qamar+ right now, by the rule the database uses. */
+async function isPlusMember(userId: string): Promise<boolean> {
+  const res = await db("rpc/qamar_is_plus", { method: "POST", body: JSON.stringify({ p_user_id: userId }) });
+  if (!res.ok) return false;
+  return (await res.json()) === true;
 }
 
 /** The menu already written for this person today, or null if none. */
@@ -1128,6 +1139,20 @@ async function generatePlan(
   const force = truthy(body.force);
   const instruction = (asString(body.instruction) ?? "").trim();
 
+  // Paywall four: tomorrow. The night job (unmetered) writes it for everyone
+  // who was active today; a member opens it; the free tier reads the night
+  // sentence and finds the plan behind it locked. Today and the past stay
+  // free — those plans were built on request.
+  if (meter && day > cairoNow(new Date()).date && !(await isPlusMember(userId))) {
+    return json({
+      error: lang === "ar"
+        ? "بكرة موجود لما تكمل — خطة بكرة من قمر+."
+        : "Tomorrow is there when you continue — tomorrow’s plan is Qamar+.",
+      locked: true,
+      reason: "tomorrow_locked",
+    }, 403);
+  }
+
   const { ctx, blocked, lifeStage, target } = await loadContext(userId, lang);
   if (blocked) {
     const id = await record(userId, "plan", { inScope: false, refusal: "minor", question: "[plan]" });
@@ -1430,15 +1455,25 @@ async function generatePlan(
 // ---- the night job --------------------------------------------------------
 
 /**
- * Tomorrow's plan for every Qamar+ member without one. Fired by pg_cron (see
+ * Tomorrow's plan and the night sentence. Fired by pg_cron (see
  * 0044_nightly_plan_cron.sql) with a shared secret rather than a user JWT;
  * accepted only in the 22:00–23:59 Cairo window unless [force] is set for a
- * manual run. Sequential on purpose: one model call per member, stopping at
- * the wall-clock budget and reporting how many are left for the next slot.
+ * manual run.
+ *
+ * The audience is every Qamar+ member, then every free-tier account that
+ * logged today: the blueprint's night step generates tomorrow from today's
+ * log for everyone and writes one sentence for the morning — a member opens
+ * the plan behind it, the free tier finds it locked (paywall four). Members
+ * come first so a long night never costs a paying member their morning.
+ * Sequential on purpose: one model call per person, stopping at the
+ * wall-clock budget and reporting how many are left for the next slot.
  */
 async function nightlyPlans(now: Date, force: boolean): Promise<NightlyReport> {
   const date = cairoDatePlus(now, 1);
-  const report: NightlyReport = { date, ran: false, written: 0, skipped: 0, failed: 0, remaining: 0, failures: [] };
+  const today = cairoNow(now).date;
+  const report: NightlyReport = {
+    date, ran: false, plus: 0, lite: 0, written: 0, noted: 0, skipped: 0, failed: 0, remaining: 0, failures: [],
+  };
   if (!force && !isNightlyWindow(now)) {
     report.reason = "outside the 22:00 Cairo window";
     return report;
@@ -1452,17 +1487,39 @@ async function nightlyPlans(now: Date, force: boolean): Promise<NightlyReport> {
   );
   if (!membersRes.ok) throw new Error(`entitlements: ${membersRes.status} ${await membersRes.text()}`);
   const members = (await membersRes.json() as Array<{ user_id: string }>).map((r) => r.user_id);
-  if (members.length === 0) return report;
 
-  const plannedRes = await db(
-    `meal_plans?plan_date=eq.${date}&user_id=in.(${members.join(",")})&select=user_id`,
-  );
-  const planned = plannedRes.ok
-    ? (await plannedRes.json() as Array<{ user_id: string }>).map((r) => r.user_id)
-    : [];
+  const activeRes = await db("rpc/qamar_active_today", { method: "POST", body: "{}" });
+  const active = activeRes.ok ? (await activeRes.json() as string[]) : [];
+  const plusSet = new Set(members);
+  const lite = active.filter((id) => !plusSet.has(id));
+  report.plus = members.length;
+  report.lite = lite.length;
+  const audience = [...members, ...lite];
+  if (audience.length === 0) return report;
+
+  const planned: string[] = [];
+  const noted = new Set<string>();
+  for (const group of chunks(audience)) {
+    const plannedRes = await db(`meal_plans?plan_date=eq.${date}&user_id=in.(${group.join(",")})&select=user_id`);
+    if (plannedRes.ok) {
+      for (const r of await plannedRes.json() as Array<{ user_id: string }>) planned.push(r.user_id);
+    }
+    const notedRes = await db(`night_notes?day=eq.${date}&user_id=in.(${group.join(",")})&select=user_id`);
+    if (notedRes.ok) {
+      for (const r of await notedRes.json() as Array<{ user_id: string }>) noted.add(r.user_id);
+    }
+  }
   report.skipped = planned.length;
 
-  const due = dueMembers(members, planned);
+  // A plan already there (a member who asked for tomorrow, an earlier slot
+  // that stopped before the sentence) still owes the morning its line.
+  for (const userId of planned) {
+    if (noted.has(userId)) continue;
+    const saved = await loadSavedPlan(userId, date);
+    if (saved && await writeNightNote(userId, date, today, saved.meals)) report.noted++;
+  }
+
+  const due = dueMembers(audience, planned);
   const started = Date.now();
   for (let i = 0; i < due.length; i++) {
     if (Date.now() - started > RUN_BUDGET_MS) {
@@ -1474,6 +1531,8 @@ async function nightlyPlans(now: Date, force: boolean): Promise<NightlyReport> {
       const res = await generatePlan(userId, { date, lang: "ar" }, { metered: false });
       if (res.ok) {
         report.written++;
+        const meals = mealsFromBody((await res.json())?.plan);
+        if (meals && await writeNightNote(userId, date, today, meals)) report.noted++;
       } else {
         // 403/409 are the gateway's own refusals (blocked, life stage, no
         // target yet): not failures of the job, but the member gets no plan
@@ -1492,6 +1551,35 @@ async function nightlyPlans(now: Date, force: boolean): Promise<NightlyReport> {
     }
   }
   return report;
+}
+
+/**
+ * Tomorrow against today, in one sentence, for the morning (night_notes,
+ * migration 0048). Today's calories come from the database in Cairo time so
+ * the comparison is the day the person lived, not the UTC one.
+ */
+async function writeNightNote(userId: string, day: string, today: string, meals: Meal[]): Promise<boolean> {
+  const kcalRes = await db("rpc/qamar_day_kcal", {
+    method: "POST",
+    body: JSON.stringify({ p_user_id: userId, p_day: today }),
+  });
+  const todayKcal = kcalRes.ok ? Number(await kcalRes.json()) || 0 : 0;
+  const plan = planKcal(meals);
+  const s = nightSentence({ planKcal: plan, todayKcal, meals: meals.length });
+  const res = await db("night_notes?on_conflict=user_id,day", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({
+      user_id: userId,
+      day,
+      sentence_ar: s.ar,
+      sentence_en: s.en,
+      plan_kcal: plan,
+      today_kcal: todayKcal,
+    }),
+  });
+  if (!res.ok) console.error("ai-gateway night note", userId, res.status, await res.text());
+  return res.ok;
 }
 
 /** True when the request carries the job's shared secret. Constant-time compare. */

@@ -92,9 +92,10 @@ void main() {
   });
 
   group('Su Points scale', () {
-    test('a new wallet is level 1, a 2,500 signup is already level 3', () {
+    test('a new wallet is level 1, and signing up does not buy a level', () {
       expect(SuEconomy.levelFor(0), 1);
-      expect(SuEconomy.levelFor(SuEconomy.signupBonus), 3);
+      expect(SuEconomy.levelFor(SuEconomy.signupBonus), 1);
+      expect(SuEconomy.levelFor(SuEconomy.onboarding + SuEconomy.firstMeal + SuEconomy.mealLogged * 5), 3);
       expect(SuEconomy.levelFor(99 * SuEconomy.levelXp), 99);
       expect(SuEconomy.levelFor(200000), SuEconomy.maxLevel);
     });
@@ -103,7 +104,7 @@ void main() {
       expect(SuEconomy.dailyQuest, greaterThanOrEqualTo(100));
       expect(SuEconomy.mealLogged, greaterThanOrEqualTo(100));
       expect(SuEconomy.extraAiUse, greaterThanOrEqualTo(SuEconomy.mealLogged));
-      expect(SuEconomy.signupBonus, greaterThanOrEqualTo(1000));
+      expect(SuEconomy.signupBonus, 100, reason: 'the signup trigger (migration 0004) pays 100; the phone mirrors the ledger');
     });
   });
 

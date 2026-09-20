@@ -116,6 +116,10 @@ class _TodayScreenState extends State<TodayScreen> {
           ),
         ),
         const SizedBox(height: 14),
+        if (state.nightNote != null) ...[
+          _NightCard(state: state),
+          const SizedBox(height: 14),
+        ],
         Container(
           padding: const EdgeInsets.all(20),
           decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardSlate]), border: QColors.borderStrong, radius: QRadii.xxxl,
@@ -430,6 +434,65 @@ class _MacroRow extends StatelessWidget {
 /// Replaces the old "log a meal" button. The action itself lives in the orb —
 /// tap it, choose Log, pick speak, type or photo — so this only has to teach
 /// the two gestures once.
+/// Last night's sentence about today — the plan's one line, read in the
+/// morning. On Qamar+ it opens the plan; on the free tier the plan behind it
+/// is locked, and this card is where the wall stands.
+class _NightCard extends StatelessWidget {
+  final AppState state;
+  const _NightCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final locked = state.nightPlanLocked;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(QRadii.xl),
+        onTap: state.openNightNote,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            color: QColors.violet.withValues(alpha: 0.08),
+            border: Border.all(color: QColors.violet.withValues(alpha: 0.3)),
+            borderRadius: BorderRadius.circular(QRadii.xl),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.nightlight_round, size: 14, color: QColors.violetSoft),
+                const SizedBox(width: 6),
+                Text(
+                  isAr ? 'من الليل' : 'From last night',
+                  style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.violetSoft, letterSpacing: 0.3),
+                ),
+              ]),
+              const SizedBox(height: 8),
+              Text(state.nightSentence ?? '', style: QText.body(size: 14, height: 21, color: QColors.textHigh)),
+              const SizedBox(height: 8),
+              Row(children: [
+                Icon(
+                  locked ? Icons.lock_outline : Icons.arrow_outward,
+                  size: 14,
+                  color: locked ? QColors.gold : QColors.textMuted,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  locked
+                      ? (isAr ? 'الخطة الكاملة في قمر+' : 'The full plan is Qamar+')
+                      : (isAr ? 'افتح خطة النهارده' : 'Open today’s plan'),
+                  style: QText.body(size: 12, color: locked ? QColors.gold : QColors.textMuted),
+                ),
+              ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _OrbLogHint extends StatelessWidget {
   final AppState state;
   const _OrbLogHint({required this.state});

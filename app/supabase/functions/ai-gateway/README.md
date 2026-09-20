@@ -28,14 +28,23 @@ Then point the app at it:
 flutter run --dart-define=AI_GATEWAY_URL=https://<ref>.supabase.co/functions/v1/ai-gateway
 ```
 
-## The night plan (Qamar+)
+## The night plan, and the night sentence
 
 At 22:00 Cairo the gateway writes tomorrow's plan for every Qamar+ member who
-does not have one yet, so they wake to it. `POST /plan/nightly` is called by
-pg_cron (migration `0044_nightly_plan_cron.sql`) with a shared secret, not a
-user token, and does nothing outside the 22:00–23:59 Cairo window unless the
-body says `{"force": true}` for a manual run. It never spends a member's own
-plan bucket, and a member who already has tomorrow's plan is skipped.
+does not have one yet, then for every free-tier account that logged today, and
+with each plan **one sentence about tomorrow** (`night_notes`, migration
+`0048`): tomorrow against today, no dish named. The phone shows the sentence
+next morning; a member taps through to the plan, the free tier finds the plan
+locked — the blueprint's "tomorrow as the wall". `/plan/generate` refuses a
+future date to a free account (403, `reason: tomorrow_locked`), and the
+`meal_plans` policy in `0048` hides future rows from them the same way.
+
+`POST /plan/nightly` is called by pg_cron (migration `0044_nightly_plan_cron.sql`)
+with a shared secret, not a user token, and does nothing outside the
+22:00–23:59 Cairo window unless the body says `{"force": true}` for a manual
+run. It never spends anyone's own plan bucket; members come first, and anyone
+who already has tomorrow's plan is skipped (but still gets the sentence if it
+is missing).
 
 Three secrets, once:
 
@@ -52,8 +61,8 @@ select vault.create_secret('<long random>', 'qamar_cron_secret');  -- the same v
 ```
 
 Until all three exist the job logs a notice and does nothing. The run
-returns a report (`written`, `skipped`, `failed`, `remaining`, and each
-failure's reason); `remaining > 0` means the second cron slot an hour later
+returns a report (`plus`, `lite`, `written`, `noted`, `skipped`, `failed`,
+`remaining`, and each failure's reason); `remaining > 0` means the second cron slot an hour later
 picks up the rest, or the user base has outgrown one slot and
 `0044` needs more.
 

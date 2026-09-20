@@ -1,4 +1,5 @@
-// The night job: Qamar+ members wake to tomorrow's plan.
+// The night job: members wake to tomorrow's plan; everyone who logged today
+// wakes to one sentence about it.
 //
 // Pure helpers only — the route in index.ts does the database and model work.
 // Everything here is about *when* and *for whom*, which is what needs testing
@@ -67,9 +68,73 @@ export interface NightlyReport {
   date: string;
   ran: boolean;
   reason?: string;
+  /** Qamar+ members in tonight's audience. */
+  plus: number;
+  /** Free-tier accounts that logged today, and so get the sentence too. */
+  lite: number;
   written: number;
+  /** Night sentences written (for plans written tonight or already there). */
+  noted: number;
   skipped: number;
   failed: number;
   remaining: number;
   failures: Array<{ user: string; status: number; error?: string }>;
+}
+
+// ---- the night sentence ---------------------------------------------------
+
+/** Portion calories summed across the plan's meals. Alternatives are not counted. */
+export function planKcal(meals: Array<{ portions?: Array<{ kcal?: number }> }>): number {
+  let sum = 0;
+  for (const m of meals) for (const p of m.portions ?? []) sum += Number(p.kcal) || 0;
+  return Math.round(sum);
+}
+
+export interface NightSentence {
+  ar: string;
+  en: string;
+}
+
+/** Below this, tomorrow and today are "the same rhythm". */
+export const SAME_RHYTHM_PCT = 10;
+
+/**
+ * The one sentence written at night and read in the morning: tomorrow against
+ * today, in Qamar's voice, and no dish named. The free tier sees this line
+ * with the plan locked behind it (the blueprint's fourth paywall), so it has
+ * to be worth reading without giving the plan away. Western digits — the
+ * phone redraws them in the digits the person chose.
+ */
+export function nightSentence(input: { planKcal: number; todayKcal: number; meals: number }): NightSentence {
+  const { planKcal: plan, todayKcal: today, meals } = input;
+  if (today <= 0) {
+    return {
+      ar: `بكرة جاهز: ${plan} سعرة على ${meals} وجبات، مبني على هدفك — النهارده مفيش تسجيل.`,
+      en: `Tomorrow is ready: ${plan} kcal over ${meals} meals, built on your target — nothing was logged today.`,
+    };
+  }
+  const pct = Math.round(((plan - today) / today) * 100);
+  if (pct <= -SAME_RHYTHM_PCT) {
+    return {
+      ar: `بكرة أخف من النهارده بـ ${-pct}٪ — ${plan} سعرة على ${meals} وجبات.`,
+      en: `Tomorrow is ${-pct}% lighter than today — ${plan} kcal over ${meals} meals.`,
+    };
+  }
+  if (pct >= SAME_RHYTHM_PCT) {
+    return {
+      ar: `النهارده كنت تحت هدفك، فبكرة أكتر بـ ${pct}٪ — ${plan} سعرة على ${meals} وجبات.`,
+      en: `You were under your target today, so tomorrow is ${pct}% more — ${plan} kcal over ${meals} meals.`,
+    };
+  }
+  return {
+    ar: `بكرة نفس إيقاع النهارده تقريباً — ${plan} سعرة على ${meals} وجبات.`,
+    en: `Tomorrow keeps today's rhythm — ${plan} kcal over ${meals} meals.`,
+  };
+}
+
+/** Splits [ids] into URL-sized groups for PostgREST `in.(...)` filters. */
+export function chunks<T>(ids: T[], size = 100): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+  return out;
 }

@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { cairoDatePlus, cairoNow, dueMembers, isNightlyWindow, MAX_PER_RUN } from "./nightly.ts";
+import { cairoDatePlus, cairoNow, chunks, dueMembers, isNightlyWindow, MAX_PER_RUN, nightSentence, planKcal } from "./nightly.ts";
 
 Deno.test("Cairo is UTC+3 in summer and UTC+2 in winter", () => {
   // 2026-07-01 19:00Z → 22:00 Cairo (EEST).
@@ -35,4 +35,36 @@ Deno.test("members who already have tomorrow's plan are never written a second o
 Deno.test("a run is capped", () => {
   const many = Array.from({ length: MAX_PER_RUN + 50 }, (_, i) => `u${i}`);
   assertEquals(dueMembers(many, []).length, MAX_PER_RUN);
+});
+
+Deno.test("plan calories are the portions, not the alternatives", () => {
+  const meals = [
+    { portions: [{ kcal: 300 }, { kcal: 120 }], alt: { portions: [{ kcal: 900 }] } },
+    { portions: [{ kcal: 650.4 }] },
+    {},
+  ];
+  assertEquals(planKcal(meals), 1070);
+});
+
+Deno.test("the night sentence compares tomorrow with today and names no dish", () => {
+  const lighter = nightSentence({ planKcal: 1800, todayKcal: 2100, meals: 3 });
+  assertEquals(lighter.en, "Tomorrow is 14% lighter than today — 1800 kcal over 3 meals.");
+  assert(lighter.ar.includes("أخف") && lighter.ar.includes("14٪"));
+
+  const more = nightSentence({ planKcal: 2000, todayKcal: 1500, meals: 3 });
+  assert(more.en.startsWith("You were under your target today, so tomorrow is 33% more"));
+
+  const same = nightSentence({ planKcal: 1900, todayKcal: 1850, meals: 3 });
+  assert(same.en.startsWith("Tomorrow keeps today's rhythm"));
+
+  const empty = nightSentence({ planKcal: 1900, todayKcal: 0, meals: 3 });
+  assert(empty.en.includes("nothing was logged today"), "no division by an empty day");
+  for (const s of [lighter, more, same, empty]) {
+    assert(!/كشري|فول|رز|koshary|rice/i.test(s.ar + s.en));
+  }
+});
+
+Deno.test("audiences are chunked for the URL", () => {
+  assertEquals(chunks([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
+  assertEquals(chunks([], 2), []);
 });

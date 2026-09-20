@@ -275,6 +275,7 @@ class AppState extends ChangeNotifier {
           ..addAll(history);
       }
       await _refreshStreak(uid);
+      await _refreshNightNote(uid);
       final times = await _mealRepo?.mealTimes(uid);
       if (times != null) mealTimes = times;
 
@@ -2465,6 +2466,42 @@ class AppState extends ChangeNotifier {
 
   /// The generated day, or null before one exists.
   DayPlan? plan;
+
+  /// Last night's sentence about today (the gateway's night job). Null when
+  /// nothing was written — a new account, an empty day, no backend.
+  NightNote? nightNote;
+
+  Future<void> _refreshNightNote(String uid) async {
+    try {
+      final now = _clock();
+      nightNote = await _mealRepo?.nightNote(uid, DateTime(now.year, now.month, now.day));
+    } catch (_) {
+      // The card simply stays away.
+    }
+  }
+
+  /// The sentence in the app's language and digits, or null.
+  String? get nightSentence {
+    final n = nightNote;
+    if (n == null) return null;
+    return digits(isAr ? n.ar : n.en);
+  }
+
+  /// The plan behind the sentence is Qamar+: on the free tier the sentence is
+  /// visible and the plan is locked — the blueprint's fourth paywall.
+  bool get nightPlanLocked => !plusActive;
+
+  /// Tapping the sentence: a member opens the plan; the free tier meets the
+  /// wall, and that meeting is counted (the blueprint tests this wall against
+  /// the scan limit).
+  void openNightNote() {
+    if (nightPlanLocked) {
+      _track('wall_tapped', {'wall': 'tomorrow'});
+      go(AppScreen.subscription);
+      return;
+    }
+    go(AppScreen.plan);
+  }
 
   /// The date [plan] was built for, so a day rolling over is noticed.
   String? planDate;
