@@ -1,4 +1,5 @@
 import '../models/meal.dart';
+import '../models/nudge.dart';
 import '../models/profile.dart';
 import '../models/streak.dart';
 import '../models/water.dart';
@@ -39,6 +40,10 @@ abstract class MealRepository {
   /// The server's streak: computed from meal_logs, with freezes applied.
   /// Null when the backend has no answer (older schema, offline).
   Future<Streak?> streak(String userId);
+
+  /// When this person eats, learned from their logs (qamar_meal_time_profile).
+  /// Null when the backend has no answer.
+  Future<MealTimes?> mealTimes(String userId);
 }
 
 abstract class WaterRepository {

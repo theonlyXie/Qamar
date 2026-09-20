@@ -52,6 +52,10 @@ class _PlanScreenState extends State<PlanScreen> {
           _PlanEmpty(state: state),
         ] else ...[
           Explainable(id: 'plan_total', child: _DayTotal(state: state, kcal: dayTotal)),
+          if (state.nudgePromptDue) ...[
+            const SizedBox(height: 10),
+            _NudgePrompt(state: state),
+          ],
           if (state.plan?.rationale case final why? when why.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(why, style: QText.body(size: 13, height: 20, color: QColors.textMuted)),
@@ -250,6 +254,56 @@ class _MealCard extends StatelessWidget {
               QOutlineButton(label: t.swap, onTap: () => state.toggleSlotSwap(meal.id), height: 34, color: QColors.textMid),
             ]),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The one place notification permission is asked: after the plan is on
+/// screen, with the reason stated, as the blueprint has it. "No" is zero a
+/// day, not a prompt again next week.
+class _NudgePrompt extends StatelessWidget {
+  final AppState state;
+  const _NudgePrompt({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: QColors.violet.withValues(alpha: 0.10),
+        border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(QRadii.xl),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isAr ? 'قمر يسأل في مواعيد أكلك' : 'Qamar asks at your meal times',
+            style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isAr
+                ? 'مرتين في اليوم، بصوت قمر: «الغدا إيه النهاردة؟» — مفيش «متنساش تسجّل». تقدر تقللها لصفر من «حسابي» في أي وقت. أول أسبوعين بس؛ بعدها بتبقى عارف لوحدك.'
+                : 'Twice a day, in Qamar’s voice: “What’s for lunch today?” — never “don’t forget to log”. Lower it to zero any time from Me. Only for the first two weeks; after that you’ll know on your own.',
+            style: QText.body(size: 13, height: 20, color: QColors.textMid),
+          ),
+          const SizedBox(height: 12),
+          QPrimaryButton(
+            label: isAr ? 'اسمح بالأسئلة' : 'Allow the questions',
+            height: 44,
+            onTap: () { state.allowNudges(); },
+          ),
+          const SizedBox(height: 4),
+          Center(
+            child: TextButton(
+              onPressed: state.declineNudges,
+              child: Text(isAr ? 'لا، شكراً' : 'No, thanks', style: QText.body(size: 13, color: QColors.textMuted)),
+            ),
+          ),
         ],
       ),
     );

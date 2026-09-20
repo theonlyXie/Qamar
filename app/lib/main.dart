@@ -9,6 +9,7 @@ import 'services/ai_gateway.dart';
 import 'services/auth_service.dart';
 import 'services/device_prefs.dart';
 import 'services/dictation.dart';
+import 'services/nudger.dart';
 import 'services/config.dart';
 import 'services/payments.dart';
 import 'services/supabase_repositories.dart';
@@ -32,7 +33,7 @@ Future<void> main() async {
   if (QamarConfig.useSupabase) {
     state = await _backedState(dictation);
   } else {
-    state = AppState(ai: _gatewayIfConfigured(null), dictation: dictation, prefs: SharedDevicePrefs());
+    state = AppState(ai: _gatewayIfConfigured(null), dictation: dictation, prefs: SharedDevicePrefs(), nudger: LocalNudger());
   }
 
   runApp(
@@ -68,12 +69,13 @@ Future<AppState> _backedState(Dictation dictation) async {
       auth: auth,
       userId: user.id,
       prefs: SharedDevicePrefs(),
+      nudger: LocalNudger(),
     );
   } catch (e) {
     // No network, anonymous sign-ins not enabled, bad keys: run offline
     // rather than showing a dead app.
     debugPrint('Qamar: continuing without a backend — $e');
-    return AppState(dictation: dictation, prefs: SharedDevicePrefs());
+    return AppState(dictation: dictation, prefs: SharedDevicePrefs(), nudger: LocalNudger());
   }
 }
 

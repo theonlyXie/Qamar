@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../l10n/strings.dart';
 import '../models/meal.dart';
 import '../models/messages.dart';
+import '../models/nudge.dart';
 import '../models/onboarding.dart';
 import '../models/plan.dart';
 import '../models/streak.dart';
@@ -15,6 +16,7 @@ import '../services/ai_gateway.dart';
 import '../services/auth_service.dart';
 import '../services/device_prefs.dart';
 import '../services/dictation.dart';
+import '../services/nudger.dart';
 import '../services/payments.dart';
 import '../services/repositories.dart';
 import '../models/billing.dart';
@@ -61,6 +63,8 @@ class AppState extends ChangeNotifier {
     Account? auth,
     String? userId,
     DevicePrefs? prefs,
+    Nudger? nudger,
+    DateTime Function()? clock,
   })  : _profileRepo = profileRepo,
         _mealRepo = mealRepo,
         _waterRepo = waterRepo,
@@ -71,17 +75,32 @@ class AppState extends ChangeNotifier {
         _dictation = dictation,
         _auth = auth,
         _userId = userId,
-        _prefs = prefs {
+        _prefs = prefs,
+        _nudger = nudger,
+        _clock = clock ?? DateTime.now {
     _watchAccount();
+    _watchNudger();
     _loadDevicePrefs();
     if (isBacked) hydrate();
   }
+
+  /// The phone's notification schedule. Null in tests and where there is
+  /// none; then nudges exist only as the orb's pulse.
+  final Nudger? _nudger;
+  StreamSubscription<String>? _nudgeSub;
+
+  /// Injectable so the meal-time logic can be tested at a chosen hour.
+  final DateTime Function() _clock;
 
   /// This phone's own choices. Null in tests and wherever there is no store;
   /// then nothing is remembered between launches, and nothing pretends to be.
   final DevicePrefs? _prefs;
   static const _kOrbTutorialDone = 'orb_tutorial_done';
   static const _kEasternDigits = 'eastern_digits';
+  static const _kNudgesPerDay = 'nudges_per_day';
+  static const _kNudgesAllowed = 'nudges_allowed';
+  static const _kNudgePromptDone = 'nudge_prompt_done';
+  static const _kFirstDay = 'first_day';
 
   Future<void> _loadDevicePrefs() async {
     final p = _prefs;
@@ -89,10 +108,28 @@ class AppState extends ChangeNotifier {
     try {
       final done = await p.getBool(_kOrbTutorialDone);
       final digits = await p.getBool(_kEasternDigits);
+      final perDay = int.tryParse(await p.getString(_kNudgesPerDay) ?? '');
+      final allowed = await p.getBool(_kNudgesAllowed);
+      final promptDone = await p.getBool(_kNudgePromptDone);
+      final first = DateTime.tryParse(await p.getString(_kFirstDay) ?? '');
       if (_disposed) return;
       if (done == true) orbTutorialDismissed = true;
       if (digits != null) easternDigits = digits;
+      if (perDay != null) nudgesPerDay = perDay.clamp(0, NudgeSchedule.maxPerDay);
+      if (allowed != null) nudgesAllowed = allowed;
+      if (promptDone == true) nudgePromptDone = true;
+      // The fourteen-day window of push nudges starts on the phone's first
+      // day with the app, and is remembered so a reinstall does not restart it
+      // on the same phone... which it would; that is acceptable.
+      if (first != null) {
+        firstDay = first;
+      } else {
+        final now = _clock();
+        firstDay = DateTime(now.year, now.month, now.day);
+        await p.setString(_kFirstDay, firstDay!.toIso8601String());
+      }
       _notify();
+      _rescheduleNudges();
     } catch (_) {
       // A preference store that will not answer is a default, not an error.
     }
@@ -189,6 +226,8 @@ class AppState extends ChangeNotifier {
           ..addAll(history);
       }
       await _refreshStreak(uid);
+      final times = await _mealRepo?.mealTimes(uid);
+      if (times != null) mealTimes = times;
 
       final weights = await _mealRepo?.weightHistory(uid);
       if (weights != null) {
@@ -204,6 +243,7 @@ class AppState extends ChangeNotifier {
           ..addAll(entries);
       }
       _notify();
+      _rescheduleNudges();
     } catch (e) {
       syncError = 'load: $e';
       _notify();
@@ -282,6 +322,7 @@ class AppState extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _authSub?.cancel();
+    _nudgeSub?.cancel();
     super.dispose();
   }
 
@@ -335,6 +376,146 @@ class AppState extends ChangeNotifier {
     return digits(western).replaceAll(',', '٬');
   }
 
+  // ---- nudges: the loop's trigger -------------------------------------
+  //
+  // Two questions a day at this person's meal times, in Qamar's voice, and
+  // only for the first fourteen days on the phone. The person can lower the
+  // count to zero and never raise it above two. Permission is asked once,
+  // after the plan is on screen, with the reason stated (see PlanScreen).
+  // In the app the same question is the orb's slow pulse; holding it hears it.
+
+  int nudgesPerDay = NudgeSchedule.maxPerDay;
+
+  /// The OS said yes. False until asked, and false if the person refused.
+  bool nudgesAllowed = false;
+
+  /// The Plan-screen card has been answered, one way or the other.
+  bool nudgePromptDone = false;
+
+  /// This phone's first day with the app; the push window counts from here.
+  DateTime? firstDay;
+
+  /// When this person eats. Typical hours until their own logs say otherwise.
+  MealTimes mealTimes = MealTimes.typical;
+
+  bool get nudgePromptDue => hasPlan && !nudgePromptDone && nudgesPerDay > 0;
+
+  /// Meals eaten today, by slot — the questions the day no longer needs.
+  Set<MealSlot> get slotsLoggedToday => {
+        for (final m in meals)
+          if (m.at != null) slotForHour(m.at!.hour),
+      };
+
+  /// The question the orb is holding right now, or null.
+  Nudge? get waitingNudge => NudgeSchedule.waiting(
+        perDay: nudgesPerDay,
+        times: mealTimes,
+        now: _clock(),
+        loggedToday: slotsLoggedToday,
+      );
+
+  /// The person said yes on the Plan screen: ask the OS, then schedule.
+  Future<void> allowNudges() async {
+    nudgePromptDone = true;
+    _prefs?.setBool(_kNudgePromptDone, true).catchError((_) {});
+    _notify();
+    final granted = await (_nudger?.requestPermission() ?? Future.value(false));
+    if (_disposed) return;
+    nudgesAllowed = granted;
+    _prefs?.setBool(_kNudgesAllowed, granted).catchError((_) {});
+    _notify();
+    await _rescheduleNudges();
+  }
+
+  /// "No, thanks" is zero a day, not a nag later.
+  void declineNudges() {
+    nudgePromptDone = true;
+    nudgesPerDay = 0;
+    _prefs?.setBool(_kNudgePromptDone, true).catchError((_) {});
+    _prefs?.setString(_kNudgesPerDay, '0').catchError((_) {});
+    _notify();
+    _rescheduleNudges();
+  }
+
+  /// 0, 1 or 2. Anything higher is two: the ceiling is the blueprint's, not
+  /// the person's to raise. Turning them back on from zero asks the OS if it
+  /// never said yes.
+  Future<void> setNudgesPerDay(int n) async {
+    nudgesPerDay = n.clamp(0, NudgeSchedule.maxPerDay);
+    _prefs?.setString(_kNudgesPerDay, '$nudgesPerDay').catchError((_) {});
+    if (nudgesPerDay > 0 && !nudgesAllowed) {
+      nudgePromptDone = true;
+      _prefs?.setBool(_kNudgePromptDone, true).catchError((_) {});
+      final granted = await (_nudger?.requestPermission() ?? Future.value(false));
+      if (_disposed) return;
+      nudgesAllowed = granted;
+      _prefs?.setBool(_kNudgesAllowed, granted).catchError((_) {});
+    }
+    _notify();
+    await _rescheduleNudges();
+  }
+
+  /// Rebuilds the phone's schedule from the day as it is now. Called when
+  /// anything it depends on changes: a meal logged, the allowance, the
+  /// language, the learned meal times, the first load.
+  Future<void> _rescheduleNudges() async {
+    final n = _nudger;
+    if (n == null) return;
+    try {
+      if (!nudgesAllowed || nudgesPerDay == 0) {
+        await n.replaceAll(const [], ar: isAr);
+        return;
+      }
+      await n.replaceAll(
+        NudgeSchedule.build(
+          perDay: nudgesPerDay,
+          times: mealTimes,
+          now: _clock(),
+          loggedToday: slotsLoggedToday,
+          firstDay: firstDay,
+        ),
+        ar: isAr,
+      );
+    } catch (_) {
+      // A schedule that could not be written is a missing nudge, not an error
+      // the person needs to see.
+    }
+  }
+
+  void _watchNudger() {
+    final n = _nudger;
+    if (n == null) return;
+    _nudgeSub = n.taps.listen((p) {
+      if (!_disposed) _onNudgeTap(p);
+    });
+    n.takeLaunchPayload().then((p) {
+      if (p != null && !_disposed) _onNudgeTap(p);
+    }).catchError((_) {});
+  }
+
+  /// A tapped question opens the conversation with that question and
+  /// listens — voice is the default input, and the meal is what they say.
+  void _onNudgeTap(String payload) {
+    if (!payload.startsWith('nudge:')) return;
+    final slot = MealSlot.values.asNameMap()[payload.substring(6)] ?? MealSlot.lunch;
+    _openWithNudge(Nudge(slot: slot, at: _clock(), dayIndex: 0));
+    _collapseTree();
+    openChat();
+    _loggingMeal = true;
+    proposalInput = 'voice';
+    tapOrbListen();
+  }
+
+  /// The question as Qamar's opening line, when the conversation is fresh.
+  void _openWithNudge(Nudge n) {
+    if (chat.isNotEmpty) return;
+    chat.add(ChatTurn(
+      who: ChatWho.q,
+      text: n.text(ar: isAr),
+      sub: isAr ? 'صوّرها أو قول لي.' : 'Photograph it or tell me.',
+    ));
+  }
+
   // ---- the three gestures, taught by doing -----------------------------
 
   /// Gestures this phone has seen the person make on the orb. The Today
@@ -364,6 +545,7 @@ class AppState extends ChangeNotifier {
   void setLang(AppLang l) {
     lang = l;
     _notify();
+    _rescheduleNudges();
   }
 
   void restart() {
@@ -1311,7 +1493,7 @@ class AppState extends ChangeNotifier {
     final sub = isAr
         ? 'مسجّل $how${anyLow ? ' · تقدير' : ''}'
         : 'Logged $how${anyLow ? ' · estimate' : ''}';
-    final meal = LoggedMeal(name: name, sub: sub, kcal: totals.kcal, p: totals.p, c: totals.c, f: totals.f);
+    final meal = LoggedMeal(name: name, sub: sub, kcal: totals.kcal, p: totals.p, c: totals.c, f: totals.f, at: _clock());
     final drafted = items.map((it) => (def: it.def, qty: it.q)).toList();
     final raw = proposalRaw;
 
@@ -1329,6 +1511,7 @@ class AppState extends ChangeNotifier {
     proposalRaw = null;
     lastMealPhotoPath = null;
     _notify();
+    _rescheduleNudges();
 
     // The schema keeps the draft the user confirmed as well as the log, so a
     // correction stays traceable back to what was proposed.
@@ -2498,6 +2681,8 @@ class AppState extends ChangeNotifier {
     _learn(OrbGesture.hold);
     if (chatOpen) return;
     _collapseTree();
+    final n = waitingNudge;
+    if (n != null) _openWithNudge(n);
     openChat();
     await tapOrbListen();
   }

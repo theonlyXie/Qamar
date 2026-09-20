@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/meal.dart';
+import '../models/nudge.dart';
 import '../models/profile.dart';
 import '../models/streak.dart';
 import '../models/water.dart';
@@ -173,7 +174,7 @@ class SupabaseMealRepository implements MealRepository {
     final end = DateTime(day.year, day.month, day.day + 1).toIso8601String();
     final rows = await _client.from('meal_logs').select().eq('user_id', userId).gte('logged_at', start).lt('logged_at', end).order('logged_at');
     return (rows as List)
-        .map((r) => LoggedMeal(name: r['name'] as String, sub: r['source'] as String, kcal: r['kcal'] as int, p: r['protein_g'] as int, c: r['carbs_g'] as int, f: r['fat_g'] as int))
+        .map((r) => LoggedMeal(name: r['name'] as String, sub: r['source'] as String, kcal: r['kcal'] as int, p: r['protein_g'] as int, c: r['carbs_g'] as int, f: r['fat_g'] as int, at: DateTime.tryParse(r['logged_at'] as String? ?? '')?.toLocal()))
         .toList();
   }
 
@@ -205,6 +206,13 @@ class SupabaseMealRepository implements MealRepository {
     final out = byDay.values.map((e) => DayTotals(day: e.day, kcal: e.kcal, meals: e.meals)).toList()
       ..sort((a, b) => a.day.compareTo(b.day));
     return out;
+  }
+
+  @override
+  Future<MealTimes?> mealTimes(String userId) async {
+    final raw = await _client.rpc('qamar_meal_time_profile', params: {'p_user_id': userId});
+    if (raw is! Map) return null;
+    return MealTimes.fromJson(Map<String, dynamic>.from(raw));
   }
 
   @override

@@ -24,6 +24,11 @@ class LivingOrb extends StatefulWidget {
   /// when intake runs over, and the streak ring closes one day at a time.
   final OrbState? state;
 
+  /// Qamar has something to say (a meal's question is waiting): the halo
+  /// breathes wider and brighter on its own slow cycle. A pulse, never a
+  /// bounce, and never a sound.
+  final bool speaking;
+
   const LivingOrb({
     super.key,
     required this.size,
@@ -35,6 +40,7 @@ class LivingOrb extends StatefulWidget {
     this.wanderDuration = const Duration(milliseconds: 11000),
     this.onTap,
     this.state,
+    this.speaking = false,
   });
 
   @override
@@ -88,11 +94,11 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
         final breathT = _breath.value; // 0..1..0
         final scale = 1.0 + 0.045 * breathT;
         final haloT = _halo.value;
-        final haloScale = 1.0 + 0.22 * haloT;
+        final haloScale = 1.0 + (widget.speaking ? 0.38 : 0.22) * haloT;
         final day = widget.state;
         // A day with nothing in it glows faintly; a full one, fully.
         final glowBase = day == null ? 0.32 : 0.16 + 0.24 * day.glow;
-        final haloOpacity = glowBase + 0.40 * haloT;
+        final haloOpacity = (glowBase + 0.40 * haloT + (widget.speaking ? 0.2 : 0.0)).clamp(0.0, 1.0);
         final haloColors = day?.over == true
             ? const [Color(0x8CFFB36C), Color(0x1FFF7C4F), Colors.transparent]
             : const [Color(0x8C7B6CFF), Color(0x1F4F7CFF), Colors.transparent];

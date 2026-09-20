@@ -245,6 +245,48 @@ class YouScreen extends StatelessWidget {
             ]),
           ),
         Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(isAr ? 'أسئلة قمر' : 'Qamar’s questions', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+                  Text(isAr ? 'في مواعيد أكلك · مرتين كحد أقصى' : 'At your meal times · two a day at most',
+                      style: QText.body(size: 12, color: QColors.textMuted)),
+                ]),
+              ),
+              const SizedBox(width: 8),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                for (final n in [0, 1, 2]) ...[
+                  GestureDetector(
+                    onTap: () { state.setNudgesPerDay(n); },
+                    child: Container(
+                      width: 36,
+                      height: 30,
+                      margin: const EdgeInsets.only(left: 6),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: state.nudgesPerDay == n ? QColors.violet : Colors.transparent,
+                        border: Border.all(color: state.nudgesPerDay == n ? QColors.violet : QColors.borderSoft),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(state.iso('$n'),
+                          style: QText.number(size: 13, weight: FontWeight.w600, color: state.nudgesPerDay == n ? Colors.white : QColors.textMuted)),
+                    ),
+                  ),
+                ],
+              ]),
+            ]),
+            if (state.nudgesPerDay > 0 && state.nudgePromptDone && !state.nudgesAllowed) ...[
+              const SizedBox(height: 6),
+              Text(isAr ? 'مقفولة من إعدادات الموبايل — افتحها من هناك.' : 'Off in the phone’s settings — turn them on there.',
+                  style: QText.body(size: 12, color: QColors.amber)),
+            ],
+          ]),
+        ),
+        Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             gradient: LinearGradient(colors: [QColors.cyan.withOpacity(0.12), QColors.violet.withOpacity(0.14)]),

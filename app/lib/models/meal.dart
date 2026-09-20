@@ -23,7 +23,10 @@ class LoggedMeal {
   final int p;
   final int c;
   final int f;
-  const LoggedMeal({required this.name, required this.sub, required this.kcal, required this.p, required this.c, required this.f});
+
+  /// When it was logged. Null only for rows written before this existed.
+  final DateTime? at;
+  const LoggedMeal({required this.name, required this.sub, required this.kcal, required this.p, required this.c, required this.f, this.at});
 }
 
 enum Confidence { high, med, low }

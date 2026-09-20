@@ -11,6 +11,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/models/meal.dart';
+import 'package:qamar/models/messages.dart';
+import 'package:qamar/models/nudge.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/streak.dart';
@@ -19,6 +21,8 @@ import 'package:qamar/models/billing.dart';
 import 'package:qamar/models/water.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/auth_service.dart';
+import 'package:qamar/services/device_prefs.dart';
+import 'package:qamar/services/nudger.dart';
 import 'package:qamar/services/payments.dart';
 import 'package:qamar/services/quick_invoke.dart';
 import 'package:qamar/services/repositories.dart';
@@ -76,6 +80,11 @@ class FakeMealRepo implements MealRepository {
 
   Streak? serverStreak;
   int streakCalls = 0;
+
+  MealTimes? times;
+
+  @override
+  Future<MealTimes?> mealTimes(String userId) async => times;
 
   @override
   Future<Streak?> streak(String userId) async {
@@ -627,6 +636,140 @@ void main() {
     expect(state.suAvailable, 0);
     expect(state.streak().freezesAvailable, 1);
     expect(freeze.once, isFalse, reason: 'one a month, so not a permanent unlock');
+  });
+
+  group('nudges', () {
+    const lunchMeal = (
+      id: 'lunch', slotAr: 'غدا', slotEn: 'Lunch',
+      nameAr: 'كشري', nameEn: 'Koshary', noteAr: '', noteEn: '',
+      portions: <PlanPortion>[(ar: 'كشري', en: 'Koshary', amountAr: 'طبق', amountEn: '1 bowl', kcal: 520)],
+    );
+    // A morning, before lunch: both of today's questions are still ahead.
+    DateTime morning() => DateTime(2026, 9, 21, 9, 0);
+
+    test('the permission card waits for the plan to be on screen', () {
+      final state = AppState(nudger: MemoryNudger(), clock: morning);
+      expect(state.nudgePromptDue, isFalse, reason: 'no plan yet');
+
+      state.plan = const DayPlan(date: '2026-09-21', slots: [(lunchMeal, lunchMeal)]);
+      expect(state.nudgePromptDue, isTrue);
+    });
+
+    test('allowing asks the OS once and schedules two questions a day', () async {
+      final nudger = MemoryNudger();
+      final state = AppState(nudger: nudger, clock: morning)
+        ..plan = const DayPlan(date: '2026-09-21', slots: [(lunchMeal, lunchMeal)]);
+
+      await state.allowNudges();
+
+      expect(nudger.permissionAsks, 1);
+      expect(state.nudgesAllowed, isTrue);
+      expect(state.nudgePromptDue, isFalse);
+      final today = nudger.scheduled.where((n) => n.dayIndex == 0).map((n) => n.slot).toList();
+      expect(today, [MealSlot.lunch, MealSlot.dinner]);
+      expect(nudger.scheduled.length, 6, reason: 'three days ahead, two a day');
+      expect(nudger.lastAr, isTrue);
+    });
+
+    test('“No, thanks” is zero a day and an empty schedule, not a later nag', () async {
+      final nudger = MemoryNudger();
+      final state = AppState(nudger: nudger, clock: morning)
+        ..plan = const DayPlan(date: '2026-09-21', slots: [(lunchMeal, lunchMeal)]);
+
+      state.declineNudges();
+      await settle();
+
+      expect(state.nudgesPerDay, 0);
+      expect(state.nudgePromptDue, isFalse);
+      expect(nudger.permissionAsks, 0);
+      expect(nudger.scheduled, isEmpty);
+    });
+
+    test('the OS saying no leaves the allowance but nothing scheduled', () async {
+      final nudger = MemoryNudger()..grant = false;
+      final state = AppState(nudger: nudger, clock: morning);
+
+      await state.allowNudges();
+
+      expect(state.nudgesAllowed, isFalse);
+      expect(state.nudgesPerDay, 2);
+      expect(nudger.scheduled, isEmpty);
+    });
+
+    test('the allowance goes down to one or zero, never above two', () async {
+      final nudger = MemoryNudger();
+      final state = AppState(nudger: nudger, clock: morning);
+      await state.allowNudges();
+
+      await state.setNudgesPerDay(5);
+      expect(state.nudgesPerDay, 2);
+
+      await state.setNudgesPerDay(1);
+      expect(nudger.scheduled.map((n) => n.slot).toSet(), {MealSlot.lunch}, reason: 'one a day is lunch');
+
+      await state.setNudgesPerDay(0);
+      expect(nudger.scheduled, isEmpty);
+    });
+
+    test('a lunch that was logged is a question the day no longer needs', () async {
+      final nudger = MemoryNudger();
+      final state = AppState(nudger: nudger, clock: () => DateTime(2026, 9, 21, 12, 30));
+      await state.allowNudges();
+      expect(nudger.scheduled.any((n) => n.dayIndex == 0 && n.slot == MealSlot.lunch), isTrue);
+
+      state.meals.add(LoggedMeal(name: 'كشري', sub: 'كتابة', kcal: 520, p: 16, c: 96, f: 9, at: DateTime(2026, 9, 21, 12, 30)));
+      await state.setNudgesPerDay(2); // any change rebuilds the schedule
+
+      expect(nudger.scheduled.any((n) => n.dayIndex == 0 && n.slot == MealSlot.lunch), isFalse);
+      expect(nudger.scheduled.any((n) => n.dayIndex == 0 && n.slot == MealSlot.dinner), isTrue);
+      expect(nudger.scheduled.any((n) => n.dayIndex == 1 && n.slot == MealSlot.lunch), isTrue, reason: 'tomorrow still asks');
+    });
+
+    test('at lunchtime the orb holds the question, and holding it hears it', () async {
+      final state = AppState(nudger: MemoryNudger(), clock: () => DateTime(2026, 9, 21, 14, 30));
+      final waiting = state.waitingNudge;
+      expect(waiting?.slot, MealSlot.lunch);
+
+      await state.holdOrb();
+
+      expect(state.chatOpen, isTrue);
+      expect(state.chat.first.who, ChatWho.q);
+      expect(state.chat.first.text, waiting!.text(ar: true));
+      expect(NudgeCopy.all.contains(state.chat.first.text), isTrue);
+    });
+
+    test('with lunch logged the orb has nothing to say', () {
+      final state = AppState(nudger: MemoryNudger(), clock: () => DateTime(2026, 9, 21, 14, 30));
+      state.meals.add(LoggedMeal(name: 'كشري', sub: 'كتابة', kcal: 520, p: 16, c: 96, f: 9, at: DateTime(2026, 9, 21, 14, 10)));
+      expect(state.waitingNudge, isNull);
+    });
+
+    test('tapping the notification opens the conversation on that question, listening', () async {
+      final nudger = MemoryNudger();
+      final state = AppState(nudger: nudger, clock: () => DateTime(2026, 9, 21, 20, 40));
+      await settle();
+
+      nudger.tap('nudge:dinner');
+      await settle();
+
+      expect(state.chatOpen, isTrue);
+      expect(state.chat.first.text, NudgeCopy.text(MealSlot.dinner, DateTime(2026, 9, 21), ar: true));
+      expect(state.proposalInput, 'voice');
+    });
+
+    test('the allowance is remembered on the phone', () async {
+      final prefs = MemoryDevicePrefs();
+      final first = AppState(nudger: MemoryNudger(), prefs: prefs, clock: morning);
+      await settle();
+      await first.setNudgesPerDay(1);
+
+      final second = AppState(nudger: MemoryNudger(), prefs: prefs, clock: morning);
+      await settle();
+      expect(second.nudgesPerDay, 1);
+      expect(second.nudgesAllowed, isTrue);
+      expect(second.nudgePromptDone, isTrue);
+      expect(second.firstDay, DateTime(2026, 9, 21));
+    });
   });
 
   test('a new user sees an empty week rather than an invented one', () async {

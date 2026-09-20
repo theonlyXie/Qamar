@@ -132,7 +132,7 @@ class _DraggableOrbState extends State<_DraggableOrb> {
             key: _moonKey,
             width: 56,
             height: 56,
-            child: Center(child: LivingOrb(size: 56, wander: true, sparks: true, state: state.orbState())),
+            child: Center(child: LivingOrb(size: 56, wander: true, sparks: true, state: state.orbState(), speaking: state.waitingNudge != null)),
           ),
           Transform.translate(
             offset: const Offset(0, -4),
