@@ -260,6 +260,8 @@ async function loadContext(
       goal: p?.goal ?? null,
       activityFactor: p?.activity_factor ?? null,
       exclusions: p?.food_exclusions ?? [],
+      // Ramadan mode (0050): the plan becomes iftar and suhoor.
+      fasting: p?.fasting_mode ?? "none",
       targetKcal,
       lang,
     },

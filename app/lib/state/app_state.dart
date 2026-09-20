@@ -26,6 +26,7 @@ import '../models/billing.dart';
 import '../models/invitation.dart';
 import '../widgets/explain.dart';
 import '../models/profile.dart';
+import '../models/ramadan.dart';
 import '../models/review.dart';
 import '../models/water.dart';
 import 'chat_replies.dart';
@@ -40,7 +41,7 @@ enum QuickLog { voice, text, photo }
 /// hold talks to Qamar, dragging it onto a number explains that number.
 enum OrbGesture { tap, hold, explain }
 
-enum AppScreen { welcome, scan, onboard, today, plan, progress, you, wallet, subscription }
+enum AppScreen { welcome, scan, onboard, today, plan, progress, you, wallet, subscription, ramadan }
 
 enum ChatState { idle, listening, thinking }
 
@@ -114,6 +115,9 @@ class AppState extends ChangeNotifier {
   /// Injectable so the meal-time logic can be tested at a chosen hour.
   final DateTime Function() _clock;
 
+  /// The app's idea of now — the injected clock, so screens and state agree.
+  DateTime clockNow() => _clock();
+
   /// This phone's own choices. Null in tests and wherever there is no store;
   /// then nothing is remembered between launches, and nothing pretends to be.
   final DevicePrefs? _prefs;
@@ -125,6 +129,7 @@ class AppState extends ChangeNotifier {
   static const _kFirstDay = 'first_day';
   static const _kReviewNumbers = 'review_numbers';
   static const _kImprove = 'improve_consent';
+  static const _kRamadanAsked = 'ramadan_asked';
 
   Future<void> _loadDevicePrefs() async {
     final p = _prefs;
@@ -138,7 +143,9 @@ class AppState extends ChangeNotifier {
       final first = DateTime.tryParse(await p.getString(_kFirstDay) ?? '');
       final reviewNumbers = await p.getBool(_kReviewNumbers);
       final consent = await p.getBool(_kImprove);
+      final asked = await p.getString(_kRamadanAsked);
       if (_disposed) return;
+      if (asked != null) ramadanAskedFor = asked;
       if (reviewNumbers != null) reviewShowNumbers = reviewNumbers;
       if (consent != null) {
         improve = consent;
@@ -273,6 +280,7 @@ class AppState extends ChangeNotifier {
       await _refreshPlus();
       await _refreshAffiliate();
       await _refreshInvitations(uid);
+      await _refreshSeason();
 
       // Two months, not one week: the chart reads seven days, the streak
       // reads as far back as the run goes.
@@ -318,8 +326,10 @@ class AppState extends ChangeNotifier {
   /// Glasses and bottles drunk today. One running millilitre total.
   final List<WaterSip> waterToday = [];
 
-  WaterStatus get water =>
-      WaterStatus(waterToday.fold<int>(0, (sum, s) => sum + s.ml));
+  WaterStatus get water => WaterStatus(
+        waterToday.fold<int>(0, (sum, s) => sum + s.ml),
+        goalMl: fasting ? HydrationWindows.goalMl : Water.goalMl,
+      );
 
   /// Days that actually have logged meals behind them, from the backend.
   /// Empty offline and empty for a new user — the Progress screen says so
@@ -508,15 +518,16 @@ class AppState extends ChangeNotifier {
   /// Meals eaten today, by slot — the questions the day no longer needs.
   Set<MealSlot> get slotsLoggedToday => {
         for (final m in meals)
-          if (m.at != null) slotForHour(m.at!.hour),
+          if (m.at != null) slotForHour(m.at!.hour, fasting: fasting),
       };
 
   /// The question the orb is holding right now, or null.
   Nudge? get waitingNudge => NudgeSchedule.waiting(
         perDay: nudgesPerDay,
-        times: mealTimes,
+        times: nudgeTimes,
         now: _clock(),
         loggedToday: slotsLoggedToday,
+        fasting: fasting,
       );
 
   /// The person said yes on the Plan screen: ask the OS, then schedule.
@@ -576,10 +587,11 @@ class AppState extends ChangeNotifier {
       await n.replaceAll(
         NudgeSchedule.build(
           perDay: nudgesPerDay,
-          times: mealTimes,
+          times: nudgeTimes,
           now: _clock(),
           loggedToday: slotsLoggedToday,
           firstDay: firstDay,
+          fasting: fasting,
         ),
         ar: isAr,
       );
@@ -1754,6 +1766,107 @@ class AppState extends ChangeNotifier {
 
   int get invitationsLeft => invitations.left;
 
+  // ---- Ramadan mode ---------------------------------------------------
+  //
+  // Blueprint: "Ramadan mode free for everyone → suhoor and iftar plans,
+  // hydration windows → 30-day Ramadan log: 500 points → Eid report: what
+  // changed in 30 days → keep the plan going? standard price." The mode
+  // shows itself a week before the first fast (a seventh node on the tree)
+  // and stays a week after Eid for the report. The switch lives on the
+  // profile so the server's night job writes a fasting day.
+
+  /// The season in view. The built-in estimate until the server, which
+  /// carries the operator's post-sighting correction, answers.
+  Season season = Season.ramadan1448;
+
+  /// Which season the "fasting this year?" question was answered for.
+  String? ramadanAskedFor;
+
+  SeasonPhase get seasonPhase => season.phase(_clock());
+
+  bool get seasonVisible => seasonPhase != SeasonPhase.none;
+
+  bool get fasting => profile.fasting == FastingMode.ramadan && seasonPhase == SeasonPhase.during;
+
+  /// The question is asked once per season, on Today, while it is coming
+  /// or on.
+  bool get fastingPromptDue =>
+      (seasonPhase == SeasonPhase.before || seasonPhase == SeasonPhase.during) && ramadanAskedFor != season.key;
+
+  Future<void> _refreshSeason() async {
+    try {
+      final s = await _profileRepo?.currentSeason();
+      if (s != null) season = s;
+    } catch (_) {
+      // The estimate stands.
+    }
+  }
+
+  /// The person's answer to "fasting this Ramadan?", now or from the
+  /// seventh node later. Turning it on rewrites today's plan as iftar and
+  /// suhoor and moves the questions to those hours.
+  Future<void> setFasting(bool on) async {
+    ramadanAskedFor = season.key;
+    _prefs?.setString(_kRamadanAsked, season.key).catchError((_) {});
+    final mode = on ? FastingMode.ramadan : FastingMode.none;
+    final changed = profile.fasting != mode;
+    profile = profile.copyWith(fasting: mode);
+    _notify();
+    _track('fasting_set', {'on': on, 'season': season.key});
+    if (isBacked && _profileRepo != null) {
+      _push('save fasting', (uid) => _profileRepo.saveFastingMode(uid, mode));
+    }
+    _rescheduleNudges();
+    // A plan asked for today is a different day now: rewrite it.
+    if (changed && planDate != null) await ensurePlan(force: true);
+  }
+
+  void dismissFastingPrompt() {
+    ramadanAskedFor = season.key;
+    _prefs?.setString(_kRamadanAsked, season.key).catchError((_) {});
+    _notify();
+  }
+
+  /// Iftar (sunset) and suhoor's end (dawn) for today, on the phone's clock.
+  int get iftarMinutes => SunTimes.sunset(_clock());
+  int get fajrMinutes => SunTimes.fajr(_clock());
+
+  HydrationWindows get hydrationWindows => HydrationWindows(iftarMin: iftarMinutes, fajrMin: fajrMinutes);
+
+  /// Meal times for the questions: the sun's on a fasting day, the learned
+  /// ones otherwise. Suhoor's question comes an hour before dawn, when the
+  /// meal is on the table.
+  MealTimes get nudgeTimes => fasting ? mealTimes.withRamadan(iftar: iftarMinutes, suhoor: (fajrMinutes - 60).clamp(0, 24 * 60 - 1)) : mealTimes;
+
+  /// Days of the month with a meal logged, from the history already loaded.
+  int get seasonDaysLogged {
+    final byDay = <String, DayTotals>{};
+    for (final d in dayHistory) {
+      byDay[d.day.toIso8601String().substring(0, 10)] = d;
+    }
+    final todayKey = _clock().toIso8601String().substring(0, 10);
+    if (meals.isNotEmpty) byDay[todayKey] = DayTotals(day: _clock(), kcal: consumed().kcal, meals: meals.length);
+    return byDay.values.where((d) {
+      final day = DateTime(d.day.year, d.day.month, d.day.day);
+      return d.meals > 0 && !day.isBefore(season.startsOn) && !day.isAfter(season.endsOn);
+    }).length;
+  }
+
+  EidReport eidReport() => EidReport.build(
+        season: season,
+        history: dayHistory,
+        weights: weightHistory,
+        targetKcal: target().kcal,
+        iso: iso,
+      );
+
+  Future<void> shareEidReport() async {
+    final s = _sharer;
+    if (s == null) return;
+    await s.shareText(eidReport().text(ar: isAr, site: QamarConfig.site));
+    _track('eid_report_shared');
+  }
+
   Future<void> _refreshInvitations(String uid) async {
     final repo = _invitationRepo;
     if (repo == null) return;
@@ -2660,12 +2773,8 @@ class AppState extends ChangeNotifier {
     final meals = planMeals();
     if (meals.isEmpty) return null;
 
-    final hour = DateTime.now().hour;
-    final wanted = hour < 11
-        ? 'breakfast'
-        : hour < 17
-            ? 'lunch'
-            : 'dinner';
+    final hour = _clock().hour;
+    final wanted = slotForHour(hour, fasting: fasting).name;
     for (final m in meals) {
       if (m.id == wanted) return m;
     }

@@ -4,6 +4,7 @@ import '../models/invitation.dart';
 import '../models/meal.dart';
 import '../models/nudge.dart';
 import '../models/profile.dart';
+import '../models/ramadan.dart';
 import '../models/streak.dart';
 import '../models/water.dart';
 import 'repositories.dart';
@@ -72,7 +73,20 @@ class SupabaseProfileRepository implements ProfileRepository {
       goal: _goalFromDb(row['goal'] as String?),
       activity: (row['activity_factor'] as num?)?.toDouble() ?? 1.5,
       prefs: (row['food_exclusions'] as List?)?.cast<String>() ?? const [],
+      fasting: (row['fasting_mode'] as String?) == 'ramadan' ? FastingMode.ramadan : FastingMode.none,
     );
+  }
+
+  @override
+  Future<Season?> currentSeason() async {
+    final raw = await _client.rpc('qamar_current_season');
+    if (raw is! Map) return null;
+    return Season.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  @override
+  Future<void> saveFastingMode(String userId, FastingMode mode) async {
+    await _client.from('profiles').upsert({'user_id': userId, 'fasting_mode': mode.name});
   }
 
   @override
@@ -90,6 +104,7 @@ class SupabaseProfileRepository implements ProfileRepository {
       'goal': profile.goal.name,
       'activity_factor': profile.activity,
       'food_exclusions': profile.prefs,
+      'fasting_mode': profile.fasting.name,
     });
   }
 

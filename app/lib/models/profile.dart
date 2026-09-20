@@ -5,6 +5,11 @@ enum Goal { lose, maintain, gain }
 /// the male constant to everyone, overstating women's targets by 166 kcal/day.
 enum Gender { male, female }
 
+/// A season the person is keeping. Ramadan changes the plan's meals to iftar
+/// and suhoor and the water card to windows; it lives on the profile so the
+/// night job on the server writes the right kind of day.
+enum FastingMode { none, ramadan }
+
 class Profile {
   final String name;
 
@@ -22,6 +27,7 @@ class Profile {
   final Goal goal;
   final double activity;
   final List<String> prefs;
+  final FastingMode fasting;
 
   const Profile({
     this.name = '',
@@ -35,6 +41,7 @@ class Profile {
     this.goal = Goal.lose,
     this.activity = 1.5,
     this.prefs = const [],
+    this.fasting = FastingMode.none,
   });
 
   /// Whole years elapsed, counting the birthday as it actually falls rather
@@ -75,6 +82,7 @@ class Profile {
     Goal? goal,
     double? activity,
     List<String>? prefs,
+    FastingMode? fasting,
   }) {
     var year = birthYear ?? this.birthYear;
     if (age != null && birthYear == null) {
@@ -97,6 +105,7 @@ class Profile {
       goal: goal ?? this.goal,
       activity: activity ?? this.activity,
       prefs: prefs ?? this.prefs,
+      fasting: fasting ?? this.fasting,
     );
   }
 }

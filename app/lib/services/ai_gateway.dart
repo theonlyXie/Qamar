@@ -353,6 +353,9 @@ const _slotLabels = {
   'lunch': ('غدا', 'Lunch'),
   'dinner': ('عشا', 'Dinner'),
   'snack': ('سناك', 'Snack'),
+  // A fasting day's two meals (Ramadan mode).
+  'iftar': ('الإفطار', 'Iftar'),
+  'suhoor': ('السحور', 'Suhoor'),
 };
 
 int _jsonInt(Object? v) => v is num ? v.round() : 0;

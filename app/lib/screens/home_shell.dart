@@ -17,6 +17,7 @@ import 'today_screen.dart';
 import 'subscription_screen.dart';
 import 'wallet_screen.dart';
 import 'welcome_screen.dart';
+import 'ramadan_screen.dart';
 import 'you_screen.dart';
 
 /// Root of the real app — equivalent to the prototype's single device frame.
@@ -46,6 +47,8 @@ class HomeShell extends StatelessWidget {
         return const WalletScreen();
       case AppScreen.subscription:
         return const SubscriptionScreen();
+      case AppScreen.ramadan:
+        return const RamadanScreen();
     }
   }
 

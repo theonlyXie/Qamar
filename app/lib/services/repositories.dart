@@ -2,6 +2,7 @@ import '../models/invitation.dart';
 import '../models/meal.dart';
 import '../models/nudge.dart';
 import '../models/profile.dart';
+import '../models/ramadan.dart';
 import '../models/streak.dart';
 import '../models/water.dart';
 
@@ -20,6 +21,14 @@ abstract class ProfileRepository {
 
   /// The latest answer on record for [type]; null when never asked.
   Future<bool?> loadConsent(String userId, String type);
+
+  /// The season in view (a week before Ramadan to a week after Eid), with the
+  /// dates the operator confirmed after the sighting; null when none.
+  Future<Season?> currentSeason();
+
+  /// The fasting switch, on the profile so the night job writes the right
+  /// kind of day.
+  Future<void> saveFastingMode(String userId, FastingMode mode);
 }
 
 /// The two consents the schema knows (consents.type).

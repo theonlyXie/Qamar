@@ -10,15 +10,19 @@
 /// hours the meal is usually eaten; holding the orb hears it.
 library;
 
-enum MealSlot { breakfast, lunch, dinner }
+enum MealSlot { breakfast, lunch, dinner, iftar, suhoor }
 
 /// Which slot a clock hour belongs to — the same cut the Today screen uses to
-/// pick the next planned meal.
-MealSlot slotForHour(int hour) => hour < 11
-    ? MealSlot.breakfast
-    : hour < 17
-        ? MealSlot.lunch
-        : MealSlot.dinner;
+/// pick the next planned meal. On a fasting day there are two meals: iftar
+/// from sunset into the night, suhoor in the small hours.
+MealSlot slotForHour(int hour, {bool fasting = false}) {
+  if (fasting) return hour >= 15 || hour < 1 ? MealSlot.iftar : MealSlot.suhoor;
+  return hour < 11
+      ? MealSlot.breakfast
+      : hour < 17
+          ? MealSlot.lunch
+          : MealSlot.dinner;
+}
 
 /// When this person eats, as minutes after midnight on the phone's clock.
 ///
@@ -31,7 +35,18 @@ class MealTimes {
   final int lunch;
   final int dinner;
 
-  const MealTimes({this.breakfast = 9 * 60, this.lunch = 14 * 60, this.dinner = 20 * 60 + 30});
+  /// Ramadan's two meals. Not learned from logs — set from the sun each day
+  /// (iftar at sunset, suhoor ending at dawn) while the mode is on.
+  final int iftar;
+  final int suhoor;
+
+  const MealTimes({
+    this.breakfast = 9 * 60,
+    this.lunch = 14 * 60,
+    this.dinner = 20 * 60 + 30,
+    this.iftar = 18 * 60,
+    this.suhoor = 3 * 60 + 30,
+  });
 
   static const typical = MealTimes();
 
@@ -39,7 +54,12 @@ class MealTimes {
         MealSlot.breakfast => breakfast,
         MealSlot.lunch => lunch,
         MealSlot.dinner => dinner,
+        MealSlot.iftar => iftar,
+        MealSlot.suhoor => suhoor,
       };
+
+  MealTimes withRamadan({required int iftar, required int suhoor}) =>
+      MealTimes(breakfast: breakfast, lunch: lunch, dinner: dinner, iftar: iftar, suhoor: suhoor);
 
   /// From the server's profile: minutes per slot, null where there is not
   /// enough history yet. Anything missing keeps the typical hour.
@@ -70,7 +90,7 @@ class Nudge {
 
   const Nudge({required this.slot, required this.at, required this.dayIndex});
 
-  int get id => 100 + dayIndex * 3 + slot.index;
+  int get id => 100 + dayIndex * MealSlot.values.length + slot.index;
 
   /// Travels with the notification; tapping it routes back into the app.
   String get payload => 'nudge:${slot.name}';
@@ -88,12 +108,16 @@ class NudgeCopy {
     MealSlot.breakfast: ['فطرت إيه النهاردة؟', 'الفطار إيه؟ قول لي وأنا أحسبها.'],
     MealSlot.lunch: ['الغدا إيه النهاردة؟', 'إيه اللي على الغدا؟ صوّره أو قول لي.'],
     MealSlot.dinner: ['العشا إيه النهاردة؟', 'خفيف ولا تقيل العشا؟ قول لي.'],
+    MealSlot.iftar: ['فطرت على إيه النهاردة؟', 'إيه اللي كان على سفرة الإفطار؟ صوّره أو قول لي.'],
+    MealSlot.suhoor: ['السحور إيه النهاردة؟', 'اتسحّرت بإيه؟ قول لي وأنا أحسبها.'],
   };
 
   static const _en = <MealSlot, List<String>>{
     MealSlot.breakfast: ['What did you have for breakfast?', 'Breakfast — what was it? Tell me and I’ll do the numbers.'],
     MealSlot.lunch: ['What’s for lunch today?', 'What’s on the plate? Photograph it or tell me.'],
     MealSlot.dinner: ['What’s for dinner tonight?', 'Light or heavy tonight? Tell me.'],
+    MealSlot.iftar: ['What did you break the fast with today?', 'What was on the iftar table? Photograph it or tell me.'],
+    MealSlot.suhoor: ['What was suhoor today?', 'What did you have for suhoor? Tell me and I’ll do the numbers.'],
   };
 
   static String text(MealSlot slot, DateTime day, {required bool ar}) {
@@ -120,10 +144,11 @@ class NudgeSchedule {
 
   /// Which meals get asked about for a given daily allowance: lunch first,
   /// then dinner. Breakfast is irregular enough in Egypt that asking about
-  /// it reads as nagging.
-  static List<MealSlot> slotsFor(int perDay) {
+  /// it reads as nagging. On a fasting day: iftar, then suhoor.
+  static List<MealSlot> slotsFor(int perDay, {bool fasting = false}) {
     final n = perDay.clamp(0, maxPerDay);
-    return const [MealSlot.lunch, MealSlot.dinner].take(n).toList();
+    final order = fasting ? const [MealSlot.iftar, MealSlot.suhoor] : const [MealSlot.lunch, MealSlot.dinner];
+    return order.take(n).toList();
   }
 
   /// The next [days] days of questions, oldest first. Today's questions for
@@ -137,8 +162,9 @@ class NudgeSchedule {
     Set<MealSlot> loggedToday = const {},
     DateTime? firstDay,
     int days = 3,
+    bool fasting = false,
   }) {
-    final slots = slotsFor(perDay);
+    final slots = slotsFor(perDay, fasting: fasting);
     if (slots.isEmpty) return const [];
     final today = DateTime(now.year, now.month, now.day);
     final first = firstDay == null ? null : DateTime(firstDay.year, firstDay.month, firstDay.day);
@@ -165,9 +191,10 @@ class NudgeSchedule {
     required MealTimes times,
     required DateTime now,
     Set<MealSlot> loggedToday = const {},
+    bool fasting = false,
   }) {
     final today = DateTime(now.year, now.month, now.day);
-    for (final slot in slotsFor(perDay)) {
+    for (final slot in slotsFor(perDay, fasting: fasting)) {
       if (loggedToday.contains(slot)) continue;
       final at = today.add(Duration(minutes: times.of(slot)));
       if (!now.isBefore(at) && now.isBefore(at.add(window))) {

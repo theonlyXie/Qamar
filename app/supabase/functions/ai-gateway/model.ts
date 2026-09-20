@@ -124,7 +124,35 @@ export interface UserContext {
   activityFactor?: number | null;
   exclusions?: string[];
   targetKcal?: number | null;
+  /** 'ramadan' while the person is fasting the month; the day is iftar and suhoor. */
+  fasting?: string | null;
   lang: string;
+}
+
+/** True while the person keeps a fasting month: the plan is two meals, not three. */
+export function isFasting(u: UserContext): boolean {
+  return u.fasting === "ramadan";
+}
+
+/** The slot names a plan may use for this person. */
+export function slotEnum(u: UserContext): string {
+  return isFasting(u) ? "iftar|snack|suhoor" : "breakfast|lunch|dinner";
+}
+
+/** The day's shape, for the plan prompt. */
+export function dayShape(u: UserContext): string {
+  if (isFasting(u)) {
+    return `Write one fasting day of Ramadan: "iftar" at sunset (open with water and one to
+three dates, then the meal), an optional light later meal after taraweeh
+("snack" — fruit, yoghurt, a small dish; leave it out if the target is met),
+and "suhoor" before dawn (slow carbohydrates, protein, water; nothing very
+salty or very sweet, so the thirst of the next day is bearable). Requirements:
+- The meals must total within 5% of the daily target — the fast does not
+  change the day's energy, only when it is eaten.
+- Suhoor is the last chance to drink: say so in its note.`;
+  }
+  return `Write one day of eating: breakfast, lunch and dinner. Requirements:
+- The three meals must total within 5% of the daily target.`;
 }
 
 function describeUser(u: UserContext): string {
@@ -137,6 +165,7 @@ function describeUser(u: UserContext): string {
     u.activityFactor ? `activity factor ${u.activityFactor}` : null,
     u.targetKcal ? `daily target ${u.targetKcal} kcal` : null,
     u.exclusions?.length ? `must never be suggested: ${u.exclusions.join(", ")}` : null,
+    isFasting(u) ? "fasting Ramadan: no food or drink from dawn to sunset; the day's meals are iftar at sunset and suhoor before dawn" : null,
   ].filter(Boolean);
   return bits.length ? bits.join(" · ") : "no profile details yet";
 }
@@ -219,7 +248,7 @@ Return ONLY JSON of this exact shape, no prose around it:
 }
 
 plan_update is how the Plan and Today screens change. Use one of:
-- {"kind":"replace_slot","slot":"breakfast|lunch|dinner","meal":{...}} when one
+- {"kind":"replace_slot","slot":"${slotEnum(u)}","meal":{...}} when one
   slot should change and the rest of the day stays. meal uses the same shape
   as a generated plan meal (name_ar, name_en, note_ar, note_en, portions with
   real amounts and kcal from FOOD DATA, and an alt that is a genuinely
@@ -291,8 +320,7 @@ ${foodBlock}
 WHAT THEY HAVE BEEN SHORT ON (from their own logged meals, last 7 days):
 ${renderGaps(gaps)}
 
-Write one day of eating: breakfast, lunch and dinner. Requirements:
-- The three meals must total within 5% of the daily target.
+${dayShape(u)}
 - Where a shortfall is listed above, choose foods that close it — but only from
   the FOOD DATA, and never at the cost of the calorie target or an exclusion.
   Say so in the rationale when a choice was made for that reason ("عشان الحديد",
@@ -314,7 +342,7 @@ Return ONLY JSON of this exact shape, no prose:
 {
   "meals": [
     {
-      "slot": "breakfast|lunch|dinner",
+      "slot": "${slotEnum(u)}",
       "name_ar": "", "name_en": "",
       "note_ar": "", "note_en": "",
       "portions": [

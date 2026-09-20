@@ -17,6 +17,7 @@ import 'package:qamar/models/nudge.dart';
 import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/models/ramadan.dart';
 import 'package:qamar/models/streak.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/models/billing.dart';
@@ -67,6 +68,18 @@ class FakeProfileRepo implements ProfileRepository {
 
   @override
   Future<bool?> loadConsent(String userId, String type) async => consentOnRecord;
+
+  Season? season;
+  final List<FastingMode> fastingSaves = [];
+
+  @override
+  Future<Season?> currentSeason() async => season;
+
+  @override
+  Future<void> saveFastingMode(String userId, FastingMode mode) async {
+    if (failWith != null) throw failWith!;
+    fastingSaves.add(mode);
+  }
 }
 
 class FakeMealRepo implements MealRepository {
@@ -1779,6 +1792,27 @@ void main() {
       expect(book.invitations.first.status, InvitationStatus.subscribed);
       expect(book.invitations.last.status, InvitationStatus.sent);
       expect(book.invitations.last.link, 'https://dr-qamar.com/i/QMR-BBBBB');
+    });
+  });
+
+  group('Ramadan mode, backed', () {
+    test('the server’s season dates win, and the fasting switch reaches the profile', () async {
+      final profiles = FakeProfileRepo()
+        ..season = Season(key: 'ramadan_1448', nameAr: 'رمضان 1448', nameEn: 'Ramadan 1448', startsOn: DateTime(2027, 2, 9), endsOn: DateTime(2027, 3, 10), eidOn: DateTime(2027, 3, 11));
+      final gateway = FakeGateway();
+      final state = backed(profiles: profiles, ai: gateway, clock: () => DateTime(2027, 2, 10, 12));
+      await settle();
+      expect(state.season.startsOn, DateTime(2027, 2, 9), reason: 'the sighting moved the month; the app follows the server');
+      expect(state.season.dayOf(DateTime(2027, 2, 10)), 2);
+
+      await state.ensurePlan();
+      await settle();
+      final before = gateway.planCalls;
+      await state.setFasting(true);
+      await settle();
+      expect(profiles.fastingSaves, [FastingMode.ramadan]);
+      expect(gateway.planCalls, before + 1, reason: 'a fasting day is a different plan; today is rewritten');
+      expect(state.fasting, isTrue);
     });
   });
 }

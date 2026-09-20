@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/plan.dart';
 import '../models/su_economy.dart';
 import '../models/water.dart';
+import '../models/ramadan.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
@@ -116,6 +117,10 @@ class _TodayScreenState extends State<TodayScreen> {
           ),
         ),
         const SizedBox(height: 14),
+        if (state.fastingPromptDue) ...[
+          _FastingPrompt(state: state),
+          const SizedBox(height: 14),
+        ],
         if (state.nightNote != null) ...[
           _NightCard(state: state),
           const SizedBox(height: 14),
@@ -319,6 +324,10 @@ class _WaterCard extends StatelessWidget {
                   : '$glasses glasses  ·  $bottles bottles',
               style: QText.body(size: 13, color: QColors.textMid),
             ),
+            if (state.fasting) ...[
+              const SizedBox(height: 8),
+              _HydrationLine(state: state),
+            ],
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
@@ -434,6 +443,93 @@ class _MacroRow extends StatelessWidget {
 /// Replaces the old "log a meal" button. The action itself lives in the orb —
 /// tap it, choose Log, pick speak, type or photo — so this only has to teach
 /// the two gestures once.
+/// The one question the season asks, once: fasting this year? Yes turns the
+/// plan into iftar and suhoor and the water card into windows; no leaves the
+/// day as it is. Either way the seventh node stays on the tree in season.
+class _FastingPrompt extends StatelessWidget {
+  final AppState state;
+  const _FastingPrompt({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final until = state.season.daysUntil(state.clockNow());
+    final lead = until == null
+        ? (isAr ? 'رمضان كريم.' : 'Ramadan Kareem.')
+        : (isAr ? 'رمضان بعد ${state.iso('$until')} ${until == 1 ? 'يوم' : 'أيام'}.' : 'Ramadan is $until ${until == 1 ? 'day' : 'days'} away.');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: QColors.gold.withValues(alpha: 0.08),
+        border: Border.all(color: QColors.gold.withValues(alpha: 0.32)),
+        borderRadius: BorderRadius.circular(QRadii.xl),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.nightlight_round, size: 14, color: QColors.gold),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text('$lead ${isAr ? 'صايم السنة دي؟' : 'Fasting this year?'}',
+                  style: QText.body(size: 14, height: 21, weight: FontWeight.w600, color: QColors.textHigh)),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          Text(
+            isAr
+                ? 'لو أيوة: الخطة تبقى إفطار وسحور، والمياه على مواعيد الليل. ببلاش للكل.'
+                : 'If yes: the plan becomes iftar and suhoor, and water moves to the night’s windows. Free for everyone.',
+            style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+          ),
+          const SizedBox(height: 10),
+          Row(children: [
+            QOutlineButton(label: isAr ? 'أيوة، صايم' : 'Yes, fasting', height: 34, color: QColors.gold, onTap: () => state.setFasting(true)),
+            const SizedBox(width: 10),
+            QOutlineButton(label: isAr ? 'لا' : 'No', height: 34, color: QColors.textMuted, onTap: () => state.setFasting(false)),
+          ]),
+        ],
+      ),
+    );
+  }
+}
+
+/// Where the water goes on a fasting day: the window open now, or the next
+/// one, with its glasses. Iftar at sunset, suhoor ending at dawn, both from
+/// the sun for Cairo.
+class _HydrationLine extends StatelessWidget {
+  final AppState state;
+  const _HydrationLine({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final h = state.hydrationWindows;
+    final now = state.clockNow();
+    final nowMin = now.hour * 60 + now.minute;
+    final open = h.current(nowMin);
+    final String text;
+    if (open != null) {
+      text = isAr
+          ? 'دلوقتي: ${open.label(true)} — ${state.iso('${open.glasses}')} كوبايات'
+          : 'Now: ${open.label(false)} — ${open.glasses} glasses';
+    } else if (h.fastingAt(nowMin)) {
+      text = isAr
+          ? 'صايم. الإفطار ${state.iso(SunTimes.clock(h.iftarMin))} — ${state.iso('3')} كوبايات على الإفطار، ${state.iso('3')} بعد التراويح، ${state.iso('2')} على السحور.'
+          : 'Fasting. Iftar ${SunTimes.clock(h.iftarMin)} — 3 glasses at iftar, 3 after taraweeh, 2 at suhoor.';
+    } else {
+      text = isAr
+          ? 'بين النوافذ. السحور لحد ${state.iso(SunTimes.clock(h.fajrMin))}.'
+          : 'Between windows. Suhoor until ${SunTimes.clock(h.fajrMin)}.';
+    }
+    return Row(children: [
+      const Icon(Icons.nightlight_round, size: 13, color: QColors.gold),
+      const SizedBox(width: 6),
+      Expanded(child: Text(text, style: QText.body(size: 12, height: 17, color: QColors.gold))),
+    ]);
+  }
+}
+
 /// Last night's sentence about today — the plan's one line, read in the
 /// morning. On Qamar+ it opens the plan; on the free tier the plan behind it
 /// is locked, and this card is where the wall stands.

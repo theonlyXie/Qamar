@@ -53,14 +53,16 @@ class WaterSip {
 /// Four numbers the Today card shows. All derived from millilitres.
 class WaterStatus {
   final int ml;
-  const WaterStatus(this.ml);
+
+  /// The day's goal: three litres, or the fasting day's two.
+  final int goalMl;
+  const WaterStatus(this.ml, {this.goalMl = Water.goalMl});
 
   double get litres => ml / 1000;
-  double get litresLeft =>
-      ((Water.goalMl - ml).clamp(0, Water.goalMl)) / 1000;
+  double get litresLeft => ((goalMl - ml).clamp(0, goalMl)) / 1000;
   double get glasses => ml / Water.glassMl;
   double get bottles => ml / Water.bottleMl;
-  double get progress => (ml / Water.goalMl).clamp(0, 1).toDouble();
+  double get progress => (ml / goalMl).clamp(0, 1).toDouble();
   bool get isEmpty => ml <= 0;
 
   /// 3, 1.5, 0.25 — no trailing zeros.

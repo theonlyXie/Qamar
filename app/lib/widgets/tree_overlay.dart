@@ -73,6 +73,21 @@ const kTreeNodes = [
   TreeNode('أنا', 'Me', Icons.person_outline, 288, QColors.moonlight, AppScreen.you),
 ];
 
+/// "Modes (Ramadan) appear as a seventh node only when active" — the sixth
+/// on the ring, since Su is reached by holding. In season the five make room
+/// and the ring is six, evenly spaced; out of season it is [kTreeNodes].
+List<TreeNode> treeNodesFor({required bool ramadan}) {
+  if (!ramadan) return kTreeNodes;
+  final all = [
+    ...kTreeNodes,
+    const TreeNode('رمضان', 'Ramadan', Icons.nightlight_round, 300, QColors.gold, AppScreen.ramadan),
+  ];
+  return [
+    for (var i = 0; i < all.length; i++)
+      TreeNode(all[i].labelAr, all[i].labelEn, all[i].icon, i * 360 / all.length, all[i].color, all[i].screen, action: all[i].action),
+  ];
+}
+
 /// The three ways to log a meal, fanned around the ring once Log is chosen.
 class LogMethod {
   final String labelAr, labelEn;
@@ -144,7 +159,8 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
             ? (isAr ? 'كوباية ٢٥٠ مل · زجاجة ٥٠٠ مل · شاي ٢٠٠ مل' : 'Glass 250 ml · bottle 500 ml · tea 200 ml')
             : t.treeHint;
 
-    final beamAngles = state.treeExpanded ? _subAngles : [for (final n in kTreeNodes) n.angle];
+    final nodes = treeNodesFor(ramadan: state.seasonVisible);
+    final beamAngles = state.treeExpanded ? _subAngles : [for (final n in nodes) n.angle];
 
     return Positioned.fill(
       child: GestureDetector(
@@ -196,16 +212,16 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                             child: LivingOrb(size: _orbSize, onTap: state.openChat, state: state.orbState()),
                           ),
                           if (!state.treeExpanded)
-                            for (var i = 0; i < kTreeNodes.length; i++)
+                            for (var i = 0; i < nodes.length; i++)
                               Positioned(
-                                left: kTreeNodes[i].topLeft.dx,
-                                top: kTreeNodes[i].topLeft.dy,
+                                left: nodes[i].topLeft.dx,
+                                top: nodes[i].topLeft.dy,
                                 child: _RingButton(
-                                  icon: kTreeNodes[i].icon,
-                                  label: kTreeNodes[i].label(isAr),
-                                  color: kTreeNodes[i].color,
+                                  icon: nodes[i].icon,
+                                  label: nodes[i].label(isAr),
+                                  color: nodes[i].color,
                                   bob: true,
-                                  onTap: () => _activate(state, i),
+                                  onTap: () => _activate(state, nodes[i], i),
                                 ),
                               ),
                           if (state.treeLogExpanded)
@@ -254,8 +270,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
     return Positioned(left: c.dx - _nodeSize / 2, top: c.dy - _nodeSize / 2, child: child);
   }
 
-  void _activate(AppState state, int i) {
-    final node = kTreeNodes[i];
+  void _activate(AppState state, TreeNode node, int i) {
     switch (node.action) {
       case TreeAction.log:
         state.expandTreeLog(i);
