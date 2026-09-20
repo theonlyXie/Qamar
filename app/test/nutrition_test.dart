@@ -422,49 +422,80 @@ void secondRound() {
   });
 
   group('orb radial menu', () {
-    test('hold opens the menu and clears any stale hover', () {
-      final state = AppState();
-      state.openTreeHold();
+    test('tapping the orb on Today opens the tree, and again closes it', () {
+      final state = AppState()..go(AppScreen.today);
+      state.orbTap();
       expect(state.treeOpen, isTrue);
-      expect(state.treeHold, isTrue);
-      expect(state.treeHoverNode, isNull);
-      expect(state.treeLogExpanded, isFalse);
+      state.orbTap();
+      expect(state.treeOpen, isFalse);
     });
 
-    test('ending the hold tears down all menu state', () {
-      final state = AppState()..openTreeHold();
-      state.setTreeHover(1, null);
-      state.expandTreeLog(1);
-      state.endTreeHold();
+    test('tapping the orb anywhere else is Back to Today, not the menu', () {
+      for (final s in [AppScreen.plan, AppScreen.progress, AppScreen.you, AppScreen.wallet, AppScreen.subscription]) {
+        final state = AppState()..go(s);
+        state.orbTap();
+        expect(state.screen, AppScreen.today, reason: 'from $s');
+        expect(state.treeOpen, isFalse, reason: 'from $s');
+      }
+    });
 
-      expect(state.treeHold, isFalse);
-      expect(state.treeHoverNode, isNull);
-      expect(state.treeHoverSub, isNull);
+    test('holding the orb opens the conversation and tries to listen for real', () async {
+      // No Dictation injected — the device has no recogniser, as far as this
+      // AppState is concerned.
+      final state = AppState()..go(AppScreen.today);
+      state.toggleTree();
+      await state.holdOrb();
+
+      expect(state.chatOpen, isTrue);
+      expect(state.treeOpen, isFalse, reason: 'the menu folds when the conversation opens');
+      // It must NOT pretend to listen: it reports that dictation is unavailable
+      // and leaves typing open, and nothing is said on the user's behalf.
+      expect(state.chatState, ChatState.idle);
+      expect(state.dictationError, isNotNull);
+      expect(state.chat.any((c) => c.who == ChatWho.u), isFalse);
+    });
+
+    test('Log fans out its methods, Water fans out its units, never both', () {
+      final state = AppState()..toggleTree();
+      final log = kTreeNodes.indexWhere((n) => n.action == TreeAction.log);
+      final water = kTreeNodes.indexWhere((n) => n.action == TreeAction.water);
+      state.expandTreeLog(log);
+      expect(state.treeLogExpanded, isTrue);
+      expect(state.treeWaterExpanded, isFalse);
+      state.expandTreeWater(water);
+      expect(state.treeWaterExpanded, isTrue);
       expect(state.treeLogExpanded, isFalse);
+      state.closeTree();
+      expect(state.treeExpanded, isFalse);
+      expect(state.treeOpen, isFalse);
+    });
+
+    test('one tap on a water unit logs it and closes the tree', () {
+      final state = AppState()..toggleTree();
+      final before = state.screen;
+      state.quickWater(WaterUnit.tea);
+      expect(state.treeOpen, isFalse);
+      expect(state.water.ml, Water.teaMl);
+      expect(state.screen, before, reason: 'water never pushes a page');
+      expect(kWaterChoices.map((c) => c.unit).toSet(), WaterUnit.values.toSet());
     });
 
     test('quick logging opens the conversation and never changes screen', () {
-      final state = AppState()..openTreeHold();
+      final state = AppState()..toggleTree();
       final before = state.screen;
       state.quickLog(QuickLog.text);
 
       expect(state.treeOpen, isFalse);
-      expect(state.treeHold, isFalse);
       expect(state.chatOpen, isTrue);
       expect(state.screen, before, reason: 'logging must not push a page');
     });
 
     test('speaking opens the conversation and tries to listen for real', () async {
-      // No Dictation injected — the device has no recogniser, as far as this
-      // AppState is concerned.
-      final state = AppState()..openTreeHold();
+      final state = AppState()..toggleTree();
       state.quickLog(QuickLog.voice);
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
       expect(state.chatOpen, isTrue);
-      // It must NOT pretend to listen. The old implementation sat in
-      // `listening` for 1.5s and then inserted a scripted sentence; the real
-      // one reports that dictation is unavailable and leaves typing open.
       expect(state.chatState, ChatState.idle);
       expect(state.dictationError, isNotNull);
       expect(state.chat.any((c) => c.who == ChatWho.u), isFalse,
@@ -507,27 +538,36 @@ void secondRound() {
       expect(state.lastMealPhotoPath, isNull);
     });
 
-    test('the log methods sit on distinct ring positions', () {
+    test('fanned-out choices sit on distinct ring positions', () {
       final seen = <Offset>{};
       for (var i = 0; i < kLogMethods.length; i++) {
-        final c = TreeGeometry.localSubCenter(1, i);
+        final c = treeSubCenter(i);
         for (final other in seen) {
           // Overlapping circles were why only one of them could be tapped.
-          expect((c - other).distance, greaterThan(60), reason: 'methods overlap');
+          expect((c - other).distance, greaterThan(60), reason: 'choices overlap');
         }
         seen.add(c);
       }
       expect(seen.length, kLogMethods.length);
+      expect(kWaterChoices.length, kLogMethods.length, reason: 'both fan-outs share the three ring slots');
     });
 
-    test('exactly one node is the log action, and it has no destination', () {
+    test('exactly one node logs and one waters, and neither opens a page', () {
       final logs = kTreeNodes.where((n) => n.action == TreeAction.log).toList();
+      final waters = kTreeNodes.where((n) => n.action == TreeAction.water).toList();
       expect(logs.length, 1);
+      expect(waters.length, 1);
       expect(logs.single.screen, isNull, reason: 'logging must not open a page');
+      expect(waters.single.screen, isNull, reason: 'water must not open a page');
     });
 
-    test('the tree still reaches the wallet', () {
-      expect(kTreeNodes.any((n) => n.screen == AppScreen.wallet), isTrue);
+    test('the five nodes are Log, Plan, Water, Review and Me, evenly spaced; Today is the background', () {
+      expect(kTreeNodes.map((n) => n.labelEn).toList(), ['Log', 'Plan', 'Water', 'Review', 'Me']);
+      expect(kTreeNodes.any((n) => n.screen == AppScreen.today), isFalse, reason: 'today is what the orb floats over');
+      expect(kTreeNodes.any((n) => n.screen == AppScreen.wallet), isFalse, reason: 'the wallet lives under Me');
+      for (var i = 0; i < kTreeNodes.length; i++) {
+        expect(kTreeNodes[i].angle, closeTo(i * 360 / kTreeNodes.length, 0.01));
+      }
     });
   });
 

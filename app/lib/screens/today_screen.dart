@@ -427,9 +427,9 @@ class _MacroRow extends StatelessWidget {
 }
 
 
-/// Replaces the old "log a meal" button. The action itself now lives in the
-/// orb — hold it, sweep to Log, and pick speak, type or photo — so this only
-/// has to teach the gesture once.
+/// Replaces the old "log a meal" button. The action itself lives in the orb —
+/// tap it, choose Log, pick speak, type or photo — so this only has to teach
+/// the two gestures once.
 class _OrbLogHint extends StatelessWidget {
   final AppState state;
   const _OrbLogHint({required this.state});
@@ -451,8 +451,8 @@ class _OrbLogHint extends StatelessWidget {
           Expanded(
             child: Text(
               isAr
-                  ? 'عشان تسجّل وجبة: استمر ضاغط على القمر، اسحب لـ«سجّل»، واختار تتكلم أو تكتب — مجاناً. تصوير الطبق لـ Qamar+.'
-                  : 'To log a meal: hold the moon, sweep to Log, then speak or type — free, and it does not spend a Qamar use. Photographing a plate is Qamar+.',
+                  ? 'عشان تسجّل وجبة: دوس على القمر ← «سجّل» ← اتكلم أو اكتب، مجاناً. استمر ضاغط على القمر تتكلم مع قمر على طول.'
+                  : 'To log a meal: tap the moon → Log → speak or type, free. Hold the moon to talk to Qamar directly.',
               style: QText.body(size: 12, height: 18, color: QColors.textMid),
             ),
           ),

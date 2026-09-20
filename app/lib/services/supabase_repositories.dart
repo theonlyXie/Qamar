@@ -269,7 +269,11 @@ class SupabaseWaterRepository implements WaterRepository {
         .lt('logged_at', end)
         .order('logged_at');
     return (rows as List).map((r) {
-      final unit = (r['unit'] as String?) == 'bottle' ? WaterUnit.bottle : WaterUnit.glass;
+      final unit = switch (r['unit'] as String?) {
+        'bottle' => WaterUnit.bottle,
+        'tea' => WaterUnit.tea,
+        _ => WaterUnit.glass,
+      };
       return WaterSip(
         id: r['id'] as String?,
         unit: unit,

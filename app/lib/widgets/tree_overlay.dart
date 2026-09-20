@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../models/water.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -30,8 +31,9 @@ const double _orbSize = 76;
 const double _orbBox = _orbSize * 1.7;
 const double _orbLeft = _canvas / 2 - _orbBox / 2;
 
-/// What activating a node does.
-enum TreeAction { navigate, log }
+/// What activating a node does. Log and Water do not open a page: they swap
+/// the ring for their own choices, which act in place.
+enum TreeAction { navigate, log, water }
 
 class TreeNode {
   final String labelAr, labelEn;
@@ -46,30 +48,32 @@ class TreeNode {
   const TreeNode(this.labelAr, this.labelEn, this.icon, this.angle, this.color, this.screen,
       {this.action = TreeAction.navigate});
 
-  Offset get center => Offset(
-        _center.dx + _ringRadius * math.cos((angle - 90) * math.pi / 180),
-        _center.dy + _ringRadius * math.sin((angle - 90) * math.pi / 180),
-      );
+  Offset get center => _onRing(angle);
   Offset get topLeft => center - const Offset(_nodeSize / 2, _nodeSize / 2);
 
   String label(bool isAr) => isAr ? labelAr : labelEn;
 }
 
-/// Six destinations, all lit by the same moon. The ring used to be six
-/// competing hues; the mangata is one light, so difference is carried by the
-/// icon and the label, not by colour.
+Offset _onRing(double angle) => Offset(
+      _center.dx + _ringRadius * math.cos((angle - 90) * math.pi / 180),
+      _center.dy + _ringRadius * math.sin((angle - 90) * math.pi / 180),
+    );
+
+/// The five destinations — depth one of the blueprint's action tree — evenly
+/// on the ring, all lit by the same moon.
+///
+/// Today is not a node: it is the screen the orb floats over, and tapping the
+/// orb from anywhere else returns to it. Su is not a node either: holding the
+/// orb summons the conversation. The wallet lives under Me.
 const kTreeNodes = [
-  TreeNode('اليوم', 'Today', Icons.wb_twilight, 0, QColors.moonlight, AppScreen.today),
-  // Logging never opens a page: choose this one and its three input methods
-  // take over the ring.
-  TreeNode('سجّل', 'Log', Icons.restaurant_menu, 60, QColors.moonlight, null, action: TreeAction.log),
-  TreeNode('الخطة', 'Plan', Icons.map_outlined, 120, QColors.moonlight, AppScreen.plan),
-  TreeNode('التقدم', 'Progress', Icons.trending_up, 180, QColors.moonlight, AppScreen.progress),
-  TreeNode('المحفظة', 'Wallet', Icons.account_balance_wallet_outlined, 240, QColors.moonlight, AppScreen.wallet),
-  TreeNode('حسابي', 'You', Icons.person_outline, 300, QColors.moonlight, AppScreen.you),
+  TreeNode('سجّل', 'Log', Icons.restaurant_menu, 0, QColors.moonlight, null, action: TreeAction.log),
+  TreeNode('الخطة', 'Plan', Icons.map_outlined, 72, QColors.moonlight, AppScreen.plan),
+  TreeNode('الماء', 'Water', Icons.water_drop_outlined, 144, QColors.moonlight, null, action: TreeAction.water),
+  TreeNode('المراجعة', 'Review', Icons.trending_up, 216, QColors.moonlight, AppScreen.progress),
+  TreeNode('أنا', 'Me', Icons.person_outline, 288, QColors.moonlight, AppScreen.you),
 ];
 
-/// The three ways to log a meal, fanned around the Log node while it is held.
+/// The three ways to log a meal, fanned around the ring once Log is chosen.
 class LogMethod {
   final String labelAr, labelEn;
   final IconData icon;
@@ -84,64 +88,31 @@ const kLogMethods = [
   LogMethod('صوّر', 'Photo', Icons.photo_camera_outlined, QuickLog.photo),
 ];
 
-/// Where the three log methods sit once Log is chosen. They take over the ring
-/// rather than fanning off the Log node: crowding three 46px circles and their
-/// labels into a 60-degree arc stacked them on top of each other and made them
-/// impossible to hit.
-const _logAngles = [0.0, 120.0, 240.0];
-
-Offset _logMethodCenter(int i) => Offset(
-      _center.dx + _ringRadius * math.cos((_logAngles[i] - 90) * math.pi / 180),
-      _center.dy + _ringRadius * math.sin((_logAngles[i] - 90) * math.pi / 180),
-    );
-
-/// Where the tree's nodes currently sit in global coordinates.
-///
-/// The orb drives selection while the user holds it, and the orb is a sibling
-/// of this overlay in the shell's Stack — it cannot reach the nodes through
-/// the widget tree, so their positions are published here instead.
-class TreeGeometry {
-  TreeGeometry._();
-  static final TreeGeometry instance = TreeGeometry._();
-
-  /// Top-left of the 340x340 canvas in global coordinates, or null when the
-  /// tree is closed.
-  Offset? canvasOrigin;
-
-  Offset? nodeCenter(int i) {
-    final o = canvasOrigin;
-    return o == null ? null : o + kTreeNodes[i].center;
-  }
-
-  /// Centre of a log method in canvas-local coordinates.
-  static Offset localSubCenter(int logIndex, int method) => _logMethodCenter(method);
-
-  /// The same point in global coordinates, for hit-testing against the finger.
-  Offset? subCenter(int logIndex, int method) {
-    final o = canvasOrigin;
-    return o == null ? null : o + _logMethodCenter(method);
-  }
-
-  /// Index of the node under [point], or null. Generous radius: this is driven
-  /// by a thumb dragging across the screen, not a mouse.
-  int? hitTestNode(Offset point) {
-    for (var i = 0; i < kTreeNodes.length; i++) {
-      final c = nodeCenter(i);
-      if (c != null && (point - c).distance <= _nodeSize * 0.85) return i;
-    }
-    return null;
-  }
-
-  int? hitTestSub(int logIndex, Offset point) {
-    for (var i = 0; i < kLogMethods.length; i++) {
-      final c = subCenter(logIndex, i);
-      if (c != null && (point - c).distance <= _nodeSize * 0.95) return i;
-    }
-    return null;
-  }
+/// The three things people drink, fanned around the ring once Water is chosen.
+/// One tap each; nothing goes through the assistant.
+class WaterChoice {
+  final String labelAr, labelEn;
+  final IconData icon;
+  final WaterUnit unit;
+  const WaterChoice(this.labelAr, this.labelEn, this.icon, this.unit);
+  String label(bool isAr) => isAr ? labelAr : labelEn;
 }
 
-/// The radial "living tree" — the moon at the centre, six destinations on a
+const kWaterChoices = [
+  WaterChoice('كوباية', 'Glass', Icons.local_drink_outlined, WaterUnit.glass),
+  WaterChoice('زجاجة', 'Bottle', Icons.water_drop, WaterUnit.bottle),
+  WaterChoice('شاي', 'Tea', Icons.emoji_food_beverage_outlined, WaterUnit.tea),
+];
+
+/// Where a fanned-out choice sits. The choices take over the ring rather than
+/// clustering around their parent node: three 58px circles and their labels
+/// crowded into a 72-degree arc stack on top of each other and cannot be hit.
+const _subAngles = [0.0, 120.0, 240.0];
+
+/// Canvas-local centre of the i-th fanned-out choice.
+Offset treeSubCenter(int i) => _onRing(_subAngles[i]);
+
+/// The radial "living tree" — the moon at the centre, five destinations on a
 /// ring, and light beaming out to each of them.
 class TreeOverlay extends StatefulWidget {
   const TreeOverlay({super.key});
@@ -151,122 +122,145 @@ class TreeOverlay extends StatefulWidget {
 
 class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 3400))..repeat();
-  final GlobalKey _canvasKey = GlobalKey();
 
   @override
   void dispose() {
     _c.dispose();
-    TreeGeometry.instance.canvasOrigin = null;
     super.dispose();
-  }
-
-  void _publishGeometry() {
-    final box = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null || !box.hasSize) return;
-    TreeGeometry.instance.canvasOrigin = box.localToGlobal(Offset.zero);
   }
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final t = state.t;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _publishGeometry());
+    final isAr = state.isAr;
 
     final hint = state.treeLogExpanded
-        ? (state.isAr
-            ? 'الكتابة والصوت مجاناً · الصورة لـ Qamar+'
-            : 'Type or speak for free · photo is Qamar+')
-        : state.treeHold
-            ? (state.isAr ? 'اسحب لاختيار وسيب' : 'Drag to choose, then let go')
+        ? (isAr ? 'الكتابة والصوت مجاناً · الصورة لـ Qamar+' : 'Type or speak for free · photo is Qamar+')
+        : state.treeWaterExpanded
+            ? (isAr ? 'كوباية ٢٥٠ مل · زجاجة ٥٠٠ مل · شاي ٢٠٠ مل' : 'Glass 250 ml · bottle 500 ml · tea 200 ml')
             : t.treeHint;
 
+    final beamAngles = state.treeExpanded ? _subAngles : [for (final n in kTreeNodes) n.angle];
+
     return Positioned.fill(
-      // In hold mode the orb owns the pointer, so this must not intercept it.
-      child: IgnorePointer(
-        ignoring: state.treeHold,
-        child: GestureDetector(
-          onTap: state.closeTree,
-          child: ClipRect(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-              child: Container(
-                color: const Color(0xDC070C19),
-                alignment: Alignment.center,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    GestureDetector(
-                      onTap: () {}, // absorb taps inside the ring
-                      child: SizedBox(
-                        key: _canvasKey,
-                        width: _canvas,
-                        height: _canvas,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Positioned.fill(
-                              child: AnimatedBuilder(
-                                animation: _c,
-                                builder: (context, _) => CustomPaint(
-                                  painter: _BeamPainter(
-                                    _c.value,
-                                    state.treeLogExpanded ? _logAngles : [for (final n in kTreeNodes) n.angle],
-                                  ),
+      child: GestureDetector(
+        onTap: state.closeTree,
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Container(
+              color: const Color(0xDC070C19),
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  GestureDetector(
+                    onTap: () {}, // absorb taps inside the ring
+                    child: SizedBox(
+                      width: _canvas,
+                      height: _canvas,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Positioned.fill(
+                            child: AnimatedBuilder(
+                              animation: _c,
+                              builder: (context, _) => CustomPaint(painter: _BeamPainter(_c.value, beamAngles)),
+                            ),
+                          ),
+                          const Positioned(
+                            left: _canvas / 2 - 58,
+                            top: _canvas / 2 - 58,
+                            child: SizedBox(
+                              width: 116,
+                              height: 116,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: RadialGradient(colors: [Color(0x807B6CFF), Colors.transparent], stops: [0.0, 0.68]),
                                 ),
                               ),
                             ),
-                            const Positioned(
-                              left: _canvas / 2 - 58,
-                              top: _canvas / 2 - 58,
-                              child: SizedBox(
-                                width: 116,
-                                height: 116,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: RadialGradient(colors: [Color(0x807B6CFF), Colors.transparent], stops: [0.0, 0.68]),
-                                  ),
+                          ),
+                          // The moon in the middle is the same one as the
+                          // floating orb; tapping it here is the tap-friendly
+                          // route to the conversation for anyone who cannot hold.
+                          Positioned(
+                            left: _orbLeft,
+                            top: _orbLeft,
+                            child: LivingOrb(size: _orbSize, onTap: state.openChat),
+                          ),
+                          if (!state.treeExpanded)
+                            for (var i = 0; i < kTreeNodes.length; i++)
+                              Positioned(
+                                left: kTreeNodes[i].topLeft.dx,
+                                top: kTreeNodes[i].topLeft.dy,
+                                child: _RingButton(
+                                  icon: kTreeNodes[i].icon,
+                                  label: kTreeNodes[i].label(isAr),
+                                  color: kTreeNodes[i].color,
+                                  bob: true,
+                                  onTap: () => _activate(state, i),
                                 ),
                               ),
-                            ),
-                            Positioned(
-                              left: _orbLeft,
-                              top: _orbLeft,
-                              child: LivingOrb(size: _orbSize, onTap: state.openChat),
-                            ),
-                            if (!state.treeLogExpanded)
-                              for (var i = 0; i < kTreeNodes.length; i++)
-                                Positioned(
-                                  left: kTreeNodes[i].topLeft.dx,
-                                  top: kTreeNodes[i].topLeft.dy,
-                                  child: _NodeButton(
-                                    node: kTreeNodes[i],
-                                    label: kTreeNodes[i].label(state.isAr),
-                                    hovered: state.treeHoverNode == i,
-                                    onTap: state.treeHold ? null : () => _activate(state, i),
-                                  ),
+                          if (state.treeLogExpanded)
+                            for (var i = 0; i < kLogMethods.length; i++)
+                              _placeSub(
+                                i,
+                                _RingButton(
+                                  icon: kLogMethods[i].icon,
+                                  label: kLogMethods[i].label(isAr),
+                                  color: QColors.moonlight,
+                                  locked: kLogMethods[i].kind == QuickLog.photo && !state.plusActive,
+                                  onTap: () => _runMethod(context, state, kLogMethods[i].kind),
                                 ),
-                            // Choosing Log swaps the ring for the three input
-                            // methods, so nothing is ever stacked on anything.
-                            if (state.treeLogExpanded) ..._buildSubIcons(state),
-                          ],
-                        ),
+                              ),
+                          if (state.treeWaterExpanded)
+                            for (var i = 0; i < kWaterChoices.length; i++)
+                              _placeSub(
+                                i,
+                                _RingButton(
+                                  icon: kWaterChoices[i].icon,
+                                  label: kWaterChoices[i].label(isAr),
+                                  color: QColors.cyan,
+                                  onTap: () => state.quickWater(kWaterChoices[i].unit),
+                                ),
+                              ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 40),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 30),
-                      child: Text(hint, textAlign: TextAlign.center, style: QText.body(size: 12, color: QColors.textFaint)),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 40),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 30),
+                    child: Text(hint, textAlign: TextAlign.center, style: QText.body(size: 12, color: QColors.textFaint)),
+                  ),
+                ],
               ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _placeSub(int i, Widget child) {
+    final c = treeSubCenter(i);
+    return Positioned(left: c.dx - _nodeSize / 2, top: c.dy - _nodeSize / 2, child: child);
+  }
+
+  void _activate(AppState state, int i) {
+    final node = kTreeNodes[i];
+    switch (node.action) {
+      case TreeAction.log:
+        state.expandTreeLog(i);
+      case TreeAction.water:
+        state.expandTreeWater(i);
+      case TreeAction.navigate:
+        if (node.screen != null) state.go(node.screen!);
+    }
   }
 
   /// Runs a log method inline. Photo opens the camera immediately; the other
@@ -285,7 +279,6 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
       if (!context.mounted) return;
       if (shot == null) {
         // Backed out of the camera: close up rather than logging nothing.
-        state.endTreeHold();
         state.closeTree();
         return;
       }
@@ -298,55 +291,31 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
       state.quickLog(QuickLog.text);
     }
   }
-
-  void _activate(AppState state, int i) {
-    final node = kTreeNodes[i];
-    if (node.action == TreeAction.log) {
-      state.expandTreeLog(i);
-      return;
-    }
-    if (node.screen == AppScreen.wallet) {
-      state.openWallet();
-    } else if (node.screen != null) {
-      state.go(node.screen!);
-    }
-  }
-
-  List<Widget> _buildSubIcons(AppState state) {
-    final logIndex = state.treeLogIndex;
-    if (logIndex == null) return const [];
-    return [
-      for (var i = 0; i < kLogMethods.length; i++)
-        Builder(builder: (context) {
-          final local = TreeGeometry.localSubCenter(logIndex, i);
-          return Positioned(
-            left: local.dx - _nodeSize / 2,
-            top: local.dy - _nodeSize / 2,
-            child: _SubIcon(
-              method: kLogMethods[i],
-              label: kLogMethods[i].label(state.isAr),
-              hovered: state.treeHoverSub == i,
-              locked: kLogMethods[i].kind == QuickLog.photo && !state.plusActive,
-              // Works on a plain tap as well as a hold-and-release.
-              onTap: state.treeHold ? null : () => _runMethod(context, state, kLogMethods[i].kind),
-            ),
-          );
-        }),
-    ];
-  }
 }
 
-class _NodeButton extends StatefulWidget {
-  final TreeNode node;
+/// One circle on the ring: a destination, a log method or a water unit. The
+/// circle is a fixed size; the label is allowed to overflow past it rather
+/// than being squeezed inside and clipped.
+class _RingButton extends StatefulWidget {
+  final IconData icon;
   final String label;
-  final bool hovered;
-  final VoidCallback? onTap;
-  const _NodeButton({required this.node, required this.label, required this.hovered, this.onTap});
+  final Color color;
+  final bool locked;
+  final bool bob;
+  final VoidCallback onTap;
+  const _RingButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.locked = false,
+    this.bob = false,
+  });
   @override
-  State<_NodeButton> createState() => _NodeButtonState();
+  State<_RingButton> createState() => _RingButtonState();
 }
 
-class _NodeButtonState extends State<_NodeButton> with SingleTickerProviderStateMixin {
+class _RingButtonState extends State<_RingButton> with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 5600))..repeat(reverse: true);
   @override
   void dispose() {
@@ -356,80 +325,8 @@ class _NodeButtonState extends State<_NodeButton> with SingleTickerProviderState
 
   @override
   Widget build(BuildContext context) {
-    final color = widget.node.color;
-    final hovered = widget.hovered;
-
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, child) => Transform.translate(offset: Offset(0, -4 * _c.value), child: child),
-      // The circle is a fixed size; the label is allowed to overflow past it
-      // rather than being squeezed inside and clipped.
-      child: SizedBox(
-        width: _nodeSize,
-        height: _nodeSize,
-        child: Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.center,
-          children: [
-            Material(
-              color: Colors.transparent,
-              shape: CircleBorder(side: BorderSide(color: color.withValues(alpha: hovered ? 1.0 : 0.55), width: hovered ? 2 : 1)),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: widget.onTap,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 140),
-                  width: _nodeSize,
-                  height: _nodeSize,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: hovered ? Color.lerp(const Color(0xEB141C2E), color, 0.18) : const Color(0xEB141C2E),
-                    boxShadow: [BoxShadow(color: color.withValues(alpha: hovered ? 0.55 : 0.22), blurRadius: hovered ? 30 : 22)],
-                  ),
-                  child: Icon(widget.node.icon, size: hovered ? 25 : 23, color: color),
-                ),
-              ),
-            ),
-            Positioned(
-              top: _nodeSize + _labelGap,
-              child: Text(
-                widget.label,
-                maxLines: 1,
-                softWrap: false,
-                overflow: TextOverflow.visible,
-                textAlign: TextAlign.center,
-                style: QText.body(
-                  size: 12,
-                  weight: FontWeight.w500,
-                  color: hovered ? QColors.textPrimary : QColors.textMid,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SubIcon extends StatelessWidget {
-  final LogMethod method;
-  final String label;
-  final bool hovered;
-  final bool locked;
-  final VoidCallback? onTap;
-  const _SubIcon({
-    required this.method,
-    required this.label,
-    required this.hovered,
-    this.locked = false,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
+    final color = widget.color;
+    final button = SizedBox(
       width: _nodeSize,
       height: _nodeSize,
       child: Stack(
@@ -438,30 +335,25 @@ class _SubIcon extends StatelessWidget {
         children: [
           Material(
             color: Colors.transparent,
-            shape: CircleBorder(side: BorderSide(color: QColors.moonlight.withValues(alpha: hovered ? 1.0 : 0.5), width: hovered ? 2 : 1)),
+            shape: CircleBorder(side: BorderSide(color: color.withValues(alpha: 0.55))),
             child: InkWell(
               customBorder: const CircleBorder(),
-              onTap: onTap,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 130),
+              onTap: widget.onTap,
+              child: Container(
                 width: _nodeSize,
                 height: _nodeSize,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: hovered ? Color.lerp(const Color(0xF0101828), QColors.moonlight, 0.18) : const Color(0xF0101828),
-                  boxShadow: [BoxShadow(color: QColors.moonlight.withValues(alpha: hovered ? 0.45 : 0.16), blurRadius: hovered ? 26 : 16)],
+                  color: const Color(0xEB141C2E),
+                  boxShadow: [BoxShadow(color: color.withValues(alpha: 0.22), blurRadius: 22)],
                 ),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    Icon(method.icon, size: 23, color: QColors.moonlight),
-                    if (locked)
-                      const Positioned(
-                        right: 8,
-                        bottom: 8,
-                        child: Icon(Icons.lock, size: 11, color: QColors.gold),
-                      ),
+                    Icon(widget.icon, size: 23, color: color),
+                    if (widget.locked)
+                      const Positioned(right: 8, bottom: 8, child: Icon(Icons.lock, size: 11, color: QColors.gold)),
                   ],
                 ),
               ),
@@ -470,27 +362,34 @@ class _SubIcon extends StatelessWidget {
           Positioned(
             top: _nodeSize + _labelGap,
             child: Text(
-              label,
+              widget.label,
               maxLines: 1,
               softWrap: false,
               overflow: TextOverflow.visible,
-              style: QText.body(size: 12, weight: FontWeight.w500, color: hovered ? QColors.textPrimary : QColors.textMid),
+              textAlign: TextAlign.center,
+              style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMid),
             ),
           ),
         ],
       ),
+    );
+    if (!widget.bob) return button;
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, child) => Transform.translate(offset: Offset(0, -4 * _c.value), child: child),
+      child: button,
     );
   }
 }
 
 /// Branches drawn as light thrown off the moon rather than dotted lines.
 /// The mangata: the moon's road, thrown out to each destination as one cool
-/// white light rather than six competing colours.
+/// white light rather than five competing colours.
 class _BeamPainter extends CustomPainter {
   final double t;
 
-  /// Which ring positions to light. In log mode only the three method slots
-  /// exist, so only those get a beam.
+  /// Which ring positions to light. When a node is fanned out only its three
+  /// choices exist, so only those get a beam.
   final List<double> angles;
   _BeamPainter(this.t, this.angles);
 
@@ -501,10 +400,7 @@ class _BeamPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     for (var i = 0; i < angles.length; i++) {
-      final target = Offset(
-        _center.dx + _ringRadius * math.cos((angles[i] - 90) * math.pi / 180),
-        _center.dy + _ringRadius * math.sin((angles[i] - 90) * math.pi / 180),
-      );
+      final target = _onRing(angles[i]);
       final dir = (target - _center) / (target - _center).distance;
       final perp = Offset(-dir.dy, dir.dx);
       final start = _center + dir * _innerGap;

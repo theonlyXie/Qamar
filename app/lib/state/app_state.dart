@@ -1305,10 +1305,7 @@ class AppState extends ChangeNotifier {
   /// Photographing a plate uses the vision model, so it is Qamar+. Typing and
   /// speaking a meal stay on the free tier and do not spend the daily AI cap.
   void refusePhotoLog() {
-    treeHold = false;
-    treeHoverNode = null;
-    treeHoverSub = null;
-    treeLogIndex = null;
+    _collapseTree();
     plusNotice = isAr
         ? 'تصوير الوجبة تحليل بالذكاء الاصطناعي، وده لـ Qamar+. الكتابة والصوت مجاناً ومش بيخصموا من استخدامات قمر.'
         : 'Photographing a meal uses the model, so it is Qamar+. Typing and speaking are free and do not spend Qamar uses.';
@@ -2259,49 +2256,61 @@ class AppState extends ChangeNotifier {
     _notify();
   }
 
-  // ---- radial menu: hold, drag, release ---------------------------------
+  // ---- the orb's gestures ---------------------------------------------
+  //
+  // Blueprint contract. Tap: on Today the tree blooms; anywhere else it is
+  // Back — the orb is the one fixed point, so "tap the orb" always gets home.
+  // Hold: the conversation opens and the moon is already listening. Drag:
+  // move the orb, and drop it on a value to have it explained (the explain
+  // section above).
 
-  /// True while the menu is being driven by a held finger. Tapping the orb
-  /// still opens it in the old sticky way; holding lets the user sweep to a
-  /// destination and release, without a second tap.
-  bool treeHold = false;
+  void orbTap() {
+    if (chatOpen) return;
+    if (screen != AppScreen.today) {
+      _collapseTree();
+      go(AppScreen.today);
+      return;
+    }
+    toggleTree();
+  }
 
-  /// Node under the finger, and — once Log has been dwelt on — the input
-  /// method under it.
-  int? treeHoverNode;
-  int? treeHoverSub;
+  /// Hold to talk. Voice is the default input: the conversation opens and the
+  /// moon starts listening straight away; typing is one tap away inside it.
+  Future<void> holdOrb() async {
+    if (chatOpen) return;
+    _collapseTree();
+    openChat();
+    await tapOrbListen();
+  }
 
   /// Index of the Log node while its input methods are fanned out.
   int? treeLogIndex;
   bool get treeLogExpanded => treeLogIndex != null;
 
-  void openTreeHold() {
-    treeOpen = true;
-    treeHold = true;
-    treeHoverNode = null;
-    treeHoverSub = null;
-    treeLogIndex = null;
-    _notify();
-  }
+  /// Index of the Water node while its units are fanned out.
+  int? treeWaterIndex;
+  bool get treeWaterExpanded => treeWaterIndex != null;
 
-  void setTreeHover(int? node, int? sub) {
-    if (treeHoverNode == node && treeHoverSub == sub) return;
-    treeHoverNode = node;
-    treeHoverSub = sub;
-    _notify();
-  }
+  /// Whether the ring currently shows a node's choices rather than the nodes.
+  bool get treeExpanded => treeLogExpanded || treeWaterExpanded;
 
   void expandTreeLog(int index) {
+    treeWaterIndex = null;
     treeLogIndex = index;
     _notify();
   }
 
-  void endTreeHold() {
-    treeHold = false;
-    treeHoverNode = null;
-    treeHoverSub = null;
+  void expandTreeWater(int index) {
     treeLogIndex = null;
+    treeWaterIndex = index;
     _notify();
+  }
+
+  /// One tap on a unit logs it and closes the tree. Nothing goes through the
+  /// assistant.
+  void quickWater(WaterUnit unit) {
+    closeTree();
+    logWater(unit);
   }
 
   /// How a meal is being logged from the orb.
@@ -2317,11 +2326,7 @@ class AppState extends ChangeNotifier {
       refusePhotoLog();
       return;
     }
-    treeOpen = false;
-    treeHold = false;
-    treeHoverNode = null;
-    treeHoverSub = null;
-    treeLogIndex = null;
+    _collapseTree();
     openChat();
 
     if (kind == QuickLog.photo) return; // the caller hands the shot back
@@ -2359,16 +2364,24 @@ class AppState extends ChangeNotifier {
   }
 
   void toggleTree() {
-    treeOpen = !treeOpen;
+    if (treeOpen) {
+      _collapseTree();
+    } else {
+      treeOpen = true;
+    }
     _notify();
   }
 
   void closeTree() {
-    treeHold = false;
-    treeHoverNode = null;
-    treeHoverSub = null;
-    treeLogIndex = null;
-    treeOpen = false;
+    _collapseTree();
     _notify();
+  }
+
+  /// Closes the ring and folds any fanned-out node back, without notifying —
+  /// every caller goes on to change something else and notifies once.
+  void _collapseTree() {
+    treeLogIndex = null;
+    treeWaterIndex = null;
+    treeOpen = false;
   }
 }

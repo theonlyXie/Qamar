@@ -1,8 +1,6 @@
-import 'dart:async';
-
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../state/app_state.dart';
@@ -10,16 +8,14 @@ import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import 'explain.dart';
 import 'living_orb.dart';
-import 'tree_overlay.dart';
 
-/// The persistent floating orb. Three gestures, deliberately distinct:
+/// The persistent floating orb — the whole navigation. Three gestures, none
+/// of them a swipe:
 ///
-///  * **tap** — opens the tree the sticky way, so it can still be used one
-///    finger at a time,
-///  * **hold** — opens the tree and keeps the pointer: sweep to a destination,
-///    dwell on Log to fan out its input methods, release to activate. This is
-///    the fast path, and the reason the orb exists: getting somewhere or
-///    logging a meal without being pushed into another page,
+///  * **tap** — on Today the action tree blooms; anywhere else it is Back.
+///    The orb is the one fixed point, so "tap the orb" always gets home,
+///  * **hold** (350 ms) — the conversation opens and the moon is already
+///    listening. The one gesture people have to learn; everything else is tap,
 ///  * **drag** — moves the orb, and dropping it on a value explains it.
 class OrbNav extends StatelessWidget {
   const OrbNav({super.key});
@@ -59,10 +55,10 @@ class _DraggableOrb extends StatefulWidget {
 class _DraggableOrbState extends State<_DraggableOrb> {
   double _dragDistance = 0;
   final GlobalKey _moonKey = GlobalKey();
-  final ImagePicker _picker = ImagePicker();
 
-  /// Fires once the finger has rested on the Log node long enough to mean it.
-  Timer? _dwell;
+  /// Blueprint: hold recognises at 350 ms. Flutter's default is 500, which is
+  /// long enough to feel like the app did not hear you.
+  static const _holdAfter = Duration(milliseconds: 350);
 
   /// Centre of the moon in global coordinates — the point the orb "reads"
   /// with, rather than wherever the finger happens to be.
@@ -72,121 +68,26 @@ class _DraggableOrbState extends State<_DraggableOrb> {
     return box.localToGlobal(box.size.center(Offset.zero));
   }
 
-  @override
-  void dispose() {
-    _dwell?.cancel();
-    super.dispose();
+  void _dragUpdate(AppState state, DragUpdateDetails d) {
+    _dragDistance += d.delta.distance;
+    state.setOrbPosition(state.orbX + d.delta.dx, state.orbY + d.delta.dy, maxX: widget.maxX, maxY: widget.maxY);
+    final centre = _moonCentre;
+    final hit = centre == null ? null : ExplainRegistry.instance.hitTest(centre);
+    if (hit != state.explainHoverId && hit != null) HapticFeedback.selectionClick();
+    state.setExplainHover(hit);
   }
 
-  // ---- hold-to-choose ---------------------------------------------------
-
-  void _holdStart(AppState state) {
-    _dwell?.cancel();
-    HapticFeedback.mediumImpact();
-    state.openTreeHold();
-  }
-
-  void _holdMove(AppState state, Offset globalPos) {
-    if (!state.treeHold) return;
-    final geo = TreeGeometry.instance;
-
-    // While the methods are fanned out, they take priority over the ring.
-    final logIndex = state.treeLogIndex;
-    if (logIndex != null) {
-      final sub = geo.hitTestSub(logIndex, globalPos);
-      if (sub != null) {
-        if (state.treeHoverSub != sub) HapticFeedback.selectionClick();
-        state.setTreeHover(logIndex, sub);
-        return;
+  void _dragEnd(AppState state) {
+    final hovering = state.explainHoverId;
+    if (hovering != null && _dragDistance >= 6) {
+      final ex = ExplainRegistry.instance.explanationFor(hovering);
+      state.setExplainHover(null);
+      if (ex != null) {
+        HapticFeedback.mediumImpact();
+        state.openExplain(ex);
       }
-    }
-
-    final node = geo.hitTestNode(globalPos);
-    if (node != state.treeHoverNode) {
-      if (node != null) HapticFeedback.selectionClick();
-      state.setTreeHover(node, null);
-      _armDwell(state, node);
-    } else if (logIndex != null) {
-      state.setTreeHover(logIndex, null);
-    }
-  }
-
-  /// Resting on the Log node expands it. Any other node cancels the timer, so
-  /// sweeping past Log on the way somewhere else does not trigger it.
-  void _armDwell(AppState state, int? node) {
-    _dwell?.cancel();
-    if (node == null) return;
-    if (kTreeNodes[node].action != TreeAction.log) return;
-    if (state.treeLogExpanded) return;
-    _dwell = Timer(const Duration(milliseconds: 320), () {
-      if (!mounted || !state.treeHold) return;
-      HapticFeedback.mediumImpact();
-      state.expandTreeLog(node);
-    });
-  }
-
-  Future<void> _holdEnd(AppState state) async {
-    _dwell?.cancel();
-    if (!state.treeHold) return;
-
-    final node = state.treeHoverNode;
-    final sub = state.treeHoverSub;
-
-    // Released on one of the log methods.
-    if (sub != null) {
-      final kind = kLogMethods[sub].kind;
-      HapticFeedback.mediumImpact();
-      state.endTreeHold();
-      await _runQuickLog(state, kind);
-      return;
-    }
-
-    if (node == null) {
-      // Released on empty space: leave the menu open so a tap still works.
-      state.endTreeHold();
-      return;
-    }
-
-    final target = kTreeNodes[node];
-    if (target.action == TreeAction.log) {
-      // Released on Log without dwelling — expand rather than guess a method.
-      HapticFeedback.mediumImpact();
-      state.treeHold = false;
-      state.expandTreeLog(node);
-      return;
-    }
-
-    HapticFeedback.mediumImpact();
-    state.endTreeHold();
-    if (target.screen == AppScreen.wallet) {
-      state.openWallet();
-    } else if (target.screen != null) {
-      state.go(target.screen!);
-    }
-  }
-
-  /// Photo opens the real camera; the other two drop straight into the
-  /// conversation. Nothing here pushes a screen. The camera is Qamar+:
-  /// typing and speaking never open it.
-  Future<void> _runQuickLog(AppState state, QuickLog kind) async {
-    if (kind != QuickLog.photo) {
-      state.quickLog(kind);
-      return;
-    }
-    if (!state.plusActive) {
-      state.refusePhotoLog();
-      return;
-    }
-    try {
-      final shot = await _picker.pickImage(source: ImageSource.camera, imageQuality: 88, maxWidth: 2000);
-      if (!mounted) return;
-      if (shot == null) return; // backed out of the camera
-      state.quickLog(kind);
-      state.logPhotoTaken(shot.path);
-    } on Exception {
-      if (!mounted) return;
-      // No camera, or permission refused: still let them log by typing.
-      state.quickLog(QuickLog.text);
+    } else {
+      state.setExplainHover(null);
     }
   }
 
@@ -194,46 +95,35 @@ class _DraggableOrbState extends State<_DraggableOrb> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
 
-    return GestureDetector(
+    // One arena, three recognisers. A pan that moves past the touch slop wins
+    // over the hold; a finger that rests wins the hold at 350 ms; a lift
+    // before either is a tap. Same rules as before, one duration changed.
+    return RawGestureDetector(
       behavior: HitTestBehavior.translucent,
-
-      // Tap: sticky tree, unchanged.
-      onTap: () {
-        HapticFeedback.selectionClick();
-        state.toggleTree();
-      },
-
-      // Hold: open and keep the pointer.
-      onLongPressStart: (_) => _holdStart(state),
-      onLongPressMoveUpdate: (d) => _holdMove(state, d.globalPosition),
-      onLongPressEnd: (_) => _holdEnd(state),
-      onLongPressCancel: () {
-        _dwell?.cancel();
-        if (state.treeHold) state.endTreeHold();
-      },
-
-      // Drag: reposition, and drop onto a value to have it explained.
-      onPanStart: (_) => _dragDistance = 0,
-      onPanUpdate: (d) {
-        _dragDistance += d.delta.distance;
-        state.setOrbPosition(state.orbX + d.delta.dx, state.orbY + d.delta.dy, maxX: widget.maxX, maxY: widget.maxY);
-        final centre = _moonCentre;
-        final hit = centre == null ? null : ExplainRegistry.instance.hitTest(centre);
-        if (hit != state.explainHoverId && hit != null) HapticFeedback.selectionClick();
-        state.setExplainHover(hit);
-      },
-      onPanEnd: (_) {
-        final hovering = state.explainHoverId;
-        if (hovering != null && _dragDistance >= 6) {
-          final ex = ExplainRegistry.instance.explanationFor(hovering);
-          state.setExplainHover(null);
-          if (ex != null) {
+      gestures: <Type, GestureRecognizerFactory>{
+        TapGestureRecognizer: GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+          () => TapGestureRecognizer(),
+          (r) => r.onTap = () {
+            HapticFeedback.selectionClick();
+            state.orbTap();
+          },
+        ),
+        LongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+          () => LongPressGestureRecognizer(duration: _holdAfter),
+          (r) => r.onLongPressStart = (_) {
+            // Haptic on the threshold, on the same frame the orb warms.
             HapticFeedback.mediumImpact();
-            state.openExplain(ex);
-          }
-        } else {
-          state.setExplainHover(null);
-        }
+            state.holdOrb();
+          },
+        ),
+        PanGestureRecognizer: GestureRecognizerFactoryWithHandlers<PanGestureRecognizer>(
+          () => PanGestureRecognizer(),
+          (r) {
+            r.onStart = (_) => _dragDistance = 0;
+            r.onUpdate = (d) => _dragUpdate(state, d);
+            r.onEnd = (_) => _dragEnd(state);
+          },
+        ),
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,
