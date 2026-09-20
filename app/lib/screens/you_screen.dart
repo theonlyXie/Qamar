@@ -119,7 +119,7 @@ class YouScreen extends StatelessWidget {
                     Text(
                       state.plusActive
                           ? (isAr ? 'شكراً إنك معانا' : 'Thanks for supporting Qamar')
-                          : (isAr ? 'تحليل الوجبة بالصورة، وخطة أعمق' : 'Photo meal analysis and a deeper plan'),
+                          : (isAr ? 'خطة بكرة، وصور وأسئلة أكتر' : 'Tomorrow’s plan, more photos and questions'),
                       style: QText.body(size: 12, height: 18, color: QColors.textMuted),
                     ),
                   ]),
@@ -152,8 +152,8 @@ class YouScreen extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 isAr
-                    ? 'سيري: «Ask Qamar» أو «Log a meal with Qamar». تسجيل الوجبة من الاختصار مجاناً ومش بيخصم استخدام. سؤال قمر بيستخدم من الخمس استخدامات في اليوم.'
-                    : 'Siri: “Ask Qamar” or “Log a meal with Qamar”. Logging a meal from a shortcut is free and does not spend a use. Asking Qamar still uses the daily five.',
+                    ? 'سيري: «Ask Qamar» أو «Log a meal with Qamar». تسجيل الوجبة من الاختصار مجاناً ومش بيتعد. سؤال قمر بيتعد من التلات أسئلة اليومية.'
+                    : 'Siri: “Ask Qamar” or “Log a meal with Qamar”. Logging a meal from a shortcut is free and never counted. Asking Qamar counts toward the daily three.',
                 style: QText.body(size: 12, height: 18, color: QColors.textFaint),
               ),
             ],

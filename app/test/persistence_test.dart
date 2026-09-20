@@ -140,24 +140,31 @@ class FakeGateway implements AiGateway {
   int planCalls = 0;
   Object? planFailsWith;
   DayPlan plan = const DayPlan(date: '2026-08-15', slots: []);
-  AiQuota quota = AiQuota.empty;
+  AiQuotas quotas = AiQuotas.empty;
 
-  void _useAi() {
-    if (quota.remaining <= 0) {
-      throw AiQuotaException(
-        'That’s today’s five Qamar uses. Log a meal or finish the daily quest to earn Su Points, then spend them on another use from the wallet. They refresh at Cairo midnight.',
-        quota,
-      );
-    }
-    quota = quota.consumed();
+  /// Server-side wall for one bucket: the message the real gateway sends and
+  /// the bucket that was refused, so the app can route the way out.
+  void _use(AiQuota q, String message) {
+    if (q.remaining <= 0) throw AiQuotaException(message, q);
+    quotas = quotas.replacing(q.consumed());
   }
+
+  void _useChat() => _use(
+        quotas.chat,
+        'That’s today’s three questions. Qamar+ answers the fourth — and every one after it.',
+      );
+  void _usePhoto() => _use(
+        quotas.photo,
+        'That’s today’s three photos. Spend Su Points on another from the wallet, or type the meal — that’s always free.',
+      );
+  void _usePlan() => _use(quotas.plan, 'That’s enough plans for today.');
 
   @override
   Future<MealAnalysis> analyzeMeal({required String inputType, String? text, String? imagePath, String lang = 'ar'}) async {
     imagePaths.add(imagePath);
     // Typed and spoken logs are the food graph. Only a photo spends a use.
     if (inputType == 'photo' || (imagePath != null && imagePath.isNotEmpty)) {
-      _useAi();
+      _usePhoto();
     }
     return result;
   }
@@ -172,7 +179,7 @@ class FakeGateway implements AiGateway {
   }) async {
     chatMessages.add(message);
     lastCurrentPlan = currentPlan;
-    _useAi();
+    _useChat();
     if (chatResult.reply == 'grounded answer' && reply != 'grounded answer') {
       return ChatResult(reply: reply);
     }
@@ -201,14 +208,14 @@ class FakeGateway implements AiGateway {
     lastForce = force;
     lastInstruction = instruction;
     if (planFailsWith != null) throw planFailsWith!;
-    _useAi();
+    _usePlan();
     // Stamp the requested date so ensurePlan can cache "today" instead of
     // treating a fixture dated 2026-08-15 as a different day forever.
     return DayPlan(date: date, slots: plan.slots, rationale: plan.rationale);
   }
 
   @override
-  Future<AiQuota> quotaStatus() async => quota;
+  Future<AiQuotas> quotaStatus() async => quotas;
 }
 
 class FakeAccount implements Account {
@@ -416,26 +423,27 @@ void main() {
     await settle();
 
     expect(state.hasProposal, isTrue);
-    expect(ai.quota.remaining, SuEconomy.dailyAiUses);
+    expect(ai.quotas.chat.remaining, SuEconomy.liteChatDaily);
+    expect(ai.quotas.photo.remaining, SuEconomy.litePhotoDaily);
   });
 
-  test('typed meal logging still works after today’s five Qamar uses', () async {
+  test('typed meal logging still works after today’s three questions', () async {
     final ai = FakeGateway();
     final state = backed(ai: ai);
     await settle();
     state.setLang(AppLang.en);
 
-    for (var i = 0; i < SuEconomy.dailyAiUses; i++) {
+    for (var i = 0; i < SuEconomy.liteChatDaily; i++) {
       await state.sendChatMsg('protein?');
     }
-    expect(ai.quota.remaining, 0);
+    expect(ai.quotas.chat.remaining, 0);
 
     state.quickLog(QuickLog.text);
     await state.sendChatMsg('koshary');
     await settle();
 
     expect(state.hasProposal, isTrue);
-    expect(ai.quota.remaining, 0);
+    expect(ai.quotas.chat.remaining, 0);
   });
 
   test('a log shortcut with text does not spend a Qamar use', () async {
@@ -447,35 +455,47 @@ void main() {
     await settle();
 
     expect(state.hasProposal, isTrue);
-    expect(ai.quota.remaining, SuEconomy.dailyAiUses);
+    expect(ai.quotas.chat.remaining, SuEconomy.liteChatDaily);
   });
 
-  test('photographing a meal spends a Qamar use', () async {
+  test('photographing a meal spends a photo, not a question, and needs no Qamar+', () async {
     final ai = FakeGateway();
-    final state = backed(ai: ai)..plusActive = true;
+    final state = backed(ai: ai);
     await settle();
 
+    expect(state.plusActive, isFalse);
     state.logPhotoTaken('/tmp/meal.jpg');
     await settle();
 
     expect(state.hasProposal, isTrue);
-    expect(ai.quota.remaining, SuEconomy.dailyAiUses - 1);
+    expect(ai.quotas.photo.remaining, SuEconomy.litePhotoDaily - 1);
+    expect(ai.quotas.chat.remaining, SuEconomy.liteChatDaily);
+    expect(state.photoQuota.remaining, SuEconomy.litePhotoDaily - 1);
   });
 
-  test('photographing a meal without Qamar+ opens the paywall and does not analyse', () async {
+  test('the fourth photo of the day is refused, and the wallet is the way out', () async {
     final ai = FakeGateway();
     final state = backed(ai: ai);
     await settle();
     state.setLang(AppLang.en);
 
-    state.logPhotoTaken('/tmp/meal.jpg');
+    for (var i = 0; i < SuEconomy.litePhotoDaily; i++) {
+      state.logPhotoTaken('/tmp/meal$i.jpg');
+      await settle();
+      state.discardProposal();
+    }
+    expect(ai.quotas.photo.remaining, 0);
+
+    state.logPhotoTaken('/tmp/meal-extra.jpg');
     await settle();
 
-    expect(ai.imagePaths, isEmpty);
     expect(state.hasProposal, isFalse);
-    expect(state.screen, AppScreen.subscription);
-    expect(state.plusNotice, contains('Qamar+'));
-    expect(state.lastMealPhotoPath, isNull);
+    expect(state.photoQuota.exhausted, isTrue);
+    expect(state.chat.last.openWallet, isTrue);
+    expect(state.chat.last.openPlus, isFalse);
+    expect(state.chat.last.text.toLowerCase(), contains('three photos'));
+    state.chatActionTap();
+    expect(state.screen, AppScreen.wallet);
   });
 
   test('an unreadable InBody report prefills nothing and asks instead', () async {
@@ -563,35 +583,39 @@ void main() {
     expect(state.suAvailable, SuEconomy.dailyQuest);
   });
 
-  test('the sixth Qamar use in a day is refused, and the wallet is the way out', () async {
+  test('the fourth question in a day is refused, and Qamar+ is the way out', () async {
     final ai = FakeGateway();
     final state = backed(ai: ai);
     await settle();
     state.setLang(AppLang.en);
 
-    for (var i = 0; i < SuEconomy.dailyAiUses; i++) {
+    for (var i = 0; i < SuEconomy.liteChatDaily; i++) {
       await state.sendChatMsg('protein?');
     }
-    expect(ai.quota.remaining, 0);
+    expect(ai.quotas.chat.remaining, 0);
 
     await state.sendChatMsg('and now?');
-    expect(state.chat.last.openWallet, isTrue);
-    expect(state.chat.last.text.toLowerCase(), contains('five'));
+    expect(state.chat.last.openPlus, isTrue);
+    expect(state.chat.last.openWallet, isFalse);
+    expect(state.chat.last.text.toLowerCase(), contains('three questions'));
+    expect(state.chat.last.action, contains('Qamar+'));
     state.chatActionTap();
-    expect(state.screen, AppScreen.wallet);
+    expect(state.screen, AppScreen.subscription);
     expect(state.chatOpen, isFalse);
   });
 
-  test('spending Su lengthens today’s allowance instead of unlocking unlimited AI', () {
+  test('spending Su buys another photo today, never another question', () {
     final state = AppState()
       ..suAvailable = SuEconomy.extraAiUse
-      ..aiQuota = const AiQuota(used: 5, limit: 5, extra: 0, remaining: 0);
+      ..photoQuota = const AiQuota(bucket: 'photo', used: 3, limit: 3, extra: 0, remaining: 0)
+      ..aiQuota = const AiQuota(bucket: 'chat', used: 3, limit: 3, extra: 0, remaining: 0);
 
     state.redeem(kSpendCatalog.first);
 
     expect(kSpendCatalog.first.id, 'ai_extra');
-    expect(state.aiQuota.extra, 1);
-    expect(state.aiQuota.remaining, 1);
+    expect(state.photoQuota.extra, 1);
+    expect(state.photoQuota.remaining, 1);
+    expect(state.aiQuota.remaining, 0);
     expect(state.suAvailable, 0);
   });
 

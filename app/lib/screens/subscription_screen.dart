@@ -55,8 +55,8 @@ class SubscriptionScreen extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           isAr
-              ? 'قمر بيشتغل معاك من غير اشتراك. الكتابة والصوت مجاناً ومش بيخصموا استخدامات. Qamar+ بيفتح تحليل الوجبة بالصورة والخطة الكاملة.'
-              : 'Qamar works without a subscription. Typing and speaking a meal are free and do not spend Qamar uses. Qamar+ unlocks photo analysis and the full plan.',
+              ? 'قمر بيشتغل معاك من غير اشتراك: خطة اليوم، تلات صور وتلات أسئلة كل يوم، والكتابة والصوت بلا حد. Qamar+ بيفتح خطة بكرة وصور وأسئلة أكتر.'
+              : 'Qamar works without a subscription: today’s plan, three photos and three questions a day, and unlimited typing and speaking. Qamar+ opens tomorrow’s plan and more photos and questions.',
           textAlign: TextAlign.center,
           style: QText.body(size: 14, height: 22, color: QColors.textMuted),
         ),
@@ -282,14 +282,14 @@ class _TierCard extends StatelessWidget {
 typedef PlusFeature = ({String ar, String en, bool inFree});
 
 const _features = <PlusFeature>[
-  (ar: 'تسجيل الوجبات بالكتابة أو الصوت', en: 'Log meals by typing or speaking', inFree: true),
-  (ar: 'هدف يومي وخطة أساسية', en: 'Daily target and a basic plan', inFree: true),
-  (ar: '٥ استخدامات لقمر في اليوم — سؤال أو خطة', en: '5 Qamar uses a day — chat or the plan', inFree: true),
+  (ar: 'تسجيل الوجبات بالكتابة أو الصوت، بلا حد', en: 'Log meals by typing or speaking, unlimited', inFree: true),
+  (ar: 'خطة اليوم بأطباق حقيقية', en: 'Today’s plan in real dishes', inFree: true),
+  (ar: 'تصوير الوجبة — ٣ في اليوم (٣٠ مع Qamar+)', en: 'Photograph a meal — 3 a day (30 with Qamar+)', inFree: true),
+  (ar: 'أسئلة لقمر — ٣ في اليوم (٥٠ مع Qamar+)', en: 'Questions to Qamar — 3 a day (50 with Qamar+)', inFree: true),
+  (ar: 'صورة زيادة من المحفظة بنقاط Su', en: 'An extra photo from the wallet with Su Points', inFree: true),
   (ar: 'نقاط Su والمهام اليومية', en: 'Su Points and daily quests', inFree: true),
-  (ar: 'استخدام زيادة من المحفظة بنقاط Su', en: 'Buy extra uses from the wallet with Su Points', inFree: true),
-  (ar: 'تحليل الوجبة بالصورة', en: 'Photograph a meal and have Qamar read it', inFree: false),
-  (ar: 'خطة أسبوعية كاملة بالمقادير', en: 'Full weekly plan with portions', inFree: false),
-  (ar: 'تقارير تقدم أعمق', en: 'Deeper progress reports', inFree: false),
+  (ar: 'خطة بكرة، مكتوبة بالليل', en: 'Tomorrow’s plan, written overnight', inFree: false),
+  (ar: 'المراجعة الأسبوعية الكاملة والمشاركة', en: 'The full weekly review, shareable', inFree: false),
   (ar: 'أولوية في المزايا الجديدة', en: 'Early access to new features', inFree: false),
 ];
 

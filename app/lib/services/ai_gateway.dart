@@ -103,8 +103,8 @@ abstract class AiGateway {
     String? instruction,
   });
 
-  /// Remaining shared uses for chat, photographing a meal, and the plan today.
-  Future<AiQuota> quotaStatus();
+  /// Every bucket's counters for today: photos, questions, plan rebuilds.
+  Future<AiQuotas> quotaStatus();
 }
 
 /// Talks to your own server gateway (supabase/functions/ai-gateway). The
@@ -308,7 +308,7 @@ class HttpAiGateway implements AiGateway {
   }
 
   @override
-  Future<AiQuota> quotaStatus() async {
+  Future<AiQuotas> quotaStatus() async {
     final res = await _client.post(
       Uri.parse('$baseUrl/quota'),
       headers: _headers,
@@ -318,8 +318,7 @@ class HttpAiGateway implements AiGateway {
       throw AiGatewayException('quotaStatus failed: ${res.statusCode} ${res.body}');
     }
     final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-    lastQuota = AiQuota.fromJson(json);
-    return lastQuota!;
+    return AiQuotas.fromJson(json);
   }
 }
 

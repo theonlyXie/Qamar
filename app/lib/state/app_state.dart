@@ -222,7 +222,11 @@ class AppState extends ChangeNotifier {
   bool treeOpen = false;
   int suAvailable = 0;
   int suLifetime = 0;
+
+  /// Today's counters. [aiQuota] is the question bucket the conversation shows;
+  /// [photoQuota] is the photo bucket the Log ring shows.
   AiQuota aiQuota = AiQuota.empty;
+  AiQuota photoQuota = AiQuota.emptyPhoto;
   bool questDone = false;
   /// Meal slots the user has swapped to their alternative, keyed by slot id
   /// ('breakfast' | 'lunch' | 'dinner'). Previously a single bool, which meant
@@ -298,6 +302,7 @@ class AppState extends ChangeNotifier {
     suAvailable = 0;
     suLifetime = 0;
     aiQuota = AiQuota.empty;
+    photoQuota = AiQuota.emptyPhoto;
     redeemed.clear();
     ledgerExtra.clear();
     serverLedger.clear();
@@ -1302,16 +1307,6 @@ class AppState extends ChangeNotifier {
       plusQuote ??
       PlusPricing.quote(plan: plusPlan.name, firstPurchase: plusFirstPurchase);
 
-  /// Photographing a plate uses the vision model, so it is Qamar+. Typing and
-  /// speaking a meal stay on the free tier and do not spend the daily AI cap.
-  void refusePhotoLog() {
-    _collapseTree();
-    plusNotice = isAr
-        ? 'تصوير الوجبة تحليل بالذكاء الاصطناعي، وده لـ Qamar+. الكتابة والصوت مجاناً ومش بيخصموا من استخدامات قمر.'
-        : 'Photographing a meal uses the model, so it is Qamar+. Typing and speaking are free and do not spend Qamar uses.';
-    go(AppScreen.subscription);
-  }
-
   void openSubscription() {
     screen = AppScreen.subscription;
     treeOpen = false;
@@ -1503,14 +1498,31 @@ class AppState extends ChangeNotifier {
 
   bool isRedeemed(String id) => redeemed.contains(id);
 
-  /// Remaining Qamar uses today, from the last gateway response or /quota.
+  /// Files a bucket's counters where the screens read them.
+  void _absorb(AiQuota q) {
+    switch (q.bucket) {
+      case 'photo':
+        photoQuota = q;
+      case 'plan':
+        break; // the plan wall speaks through planError
+      default:
+        aiQuota = q;
+    }
+  }
+
+  void _absorbAll(AiQuotas all) {
+    aiQuota = all.chat;
+    photoQuota = all.photo;
+  }
+
+  /// Today's counters, from the last gateway response or /quota.
   Future<void> _pullQuota(AiGateway gateway) async {
     if (gateway is HttpAiGateway && gateway.lastQuota != null) {
-      aiQuota = gateway.lastQuota!;
+      _absorb(gateway.lastQuota!);
       return;
     }
     try {
-      aiQuota = await gateway.quotaStatus();
+      _absorbAll(await gateway.quotaStatus());
     } catch (_) {}
   }
 
@@ -1518,7 +1530,7 @@ class AppState extends ChangeNotifier {
     final gateway = _ai;
     if (gateway == null) return;
     try {
-      aiQuota = await gateway.quotaStatus();
+      _absorbAll(await gateway.quotaStatus());
       _notify();
     } catch (_) {
       // A missing counter is not worth blocking Today. The next AI call
@@ -1526,14 +1538,19 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// The wall, in the conversation. Each bucket has its own way out and the
+  /// button goes there: another photo is bought with Su in the wallet; the
+  /// fourth question is Qamar+.
   void _onQuotaHit(AiQuotaException e) {
-    aiQuota = e.quota;
+    _absorb(e.quota);
     chatState = ChatState.idle;
+    final photo = e.quota.bucket == 'photo';
     chat.add(ChatTurn(
       who: ChatWho.q,
       text: e.message,
-      action: isAr ? 'افتح المحفظة' : 'Open the wallet',
-      openWallet: true,
+      action: photo ? (isAr ? 'افتح المحفظة' : 'Open the wallet') : (isAr ? 'شوف Qamar+' : 'See Qamar+'),
+      openWallet: photo,
+      openPlus: !photo,
     ));
     _notify();
   }
@@ -1545,7 +1562,7 @@ class AppState extends ChangeNotifier {
     suAvailable -= item.price;
     if (item.once) redeemed.add(item.id);
     if (item.grantsAiUses > 0) {
-      aiQuota = aiQuota.withExtra(item.grantsAiUses);
+      photoQuota = photoQuota.withExtra(item.grantsAiUses);
     }
     ledgerExtra.insert(0, LedgerEntry(label: isAr ? item.nameAr : item.nameEn, amount: -item.price, when: isAr ? 'دلوقتي' : 'Just now'));
     _notify();
@@ -1977,7 +1994,7 @@ class AppState extends ChangeNotifier {
       _installPlan(built);
     } on AiQuotaException catch (e) {
       if (_disposed) return;
-      aiQuota = e.quota;
+      _absorb(e.quota);
       planError = e.message;
     } catch (e) {
       if (_disposed) return;
@@ -2204,9 +2221,13 @@ class AppState extends ChangeNotifier {
   void chatSuggestionTap(String label) => sendChatMsg(label);
 
   void chatActionTap() {
-    final toWallet = chat.isNotEmpty && chat.last.openWallet;
+    final last = chat.isNotEmpty ? chat.last : null;
     chatOpen = false;
-    screen = toWallet ? AppScreen.wallet : AppScreen.plan;
+    if (last?.openPlus == true) {
+      openSubscription();
+      return;
+    }
+    screen = last?.openWallet == true ? AppScreen.wallet : AppScreen.plan;
     _notify();
   }
 
@@ -2322,10 +2343,6 @@ class AppState extends ChangeNotifier {
   ///  * photo — the caller opens the camera first and hands the shot back
   ///    through [logPhotoTaken].
   void quickLog(QuickLog kind) {
-    if (kind == QuickLog.photo && !plusActive) {
-      refusePhotoLog();
-      return;
-    }
     _collapseTree();
     openChat();
 
@@ -2349,12 +2366,9 @@ class AppState extends ChangeNotifier {
 
   /// A meal photographed from the orb. The picture is sent to the assistant,
   /// which reads it and proposes items — all inside the conversation, with no
-  /// analysing page and no confirm page. Qamar+ only: vision spends a daily use.
+  /// analysing page and no confirm page. Three a day are free; the server says
+  /// so when they are gone, and the wallet sells a fourth for Su.
   void logPhotoTaken(String path) {
-    if (!plusActive) {
-      refusePhotoLog();
-      return;
-    }
     lastMealPhotoPath = path;
     _loggingMeal = false;
     proposalInput = 'photo';

@@ -18,7 +18,7 @@ Professional payouts: the nutritionist taps **Redeem EGP** once the wallet has a
 ## What is already settled
 
 - Talking to Qamar writes the meal plan.
-- Five shared AI uses per Cairo day; extras are bought with earned Su, not cash.
+- Lite is three meal photos and three questions a day. Extra photos are bought with earned Su, not cash; the fourth question is Qamar+.
 - Qamar+ checkout opens Paymob’s hosted page. The phone **never** marks someone as paid. Paymob tells our server; the server turns Qamar+ on.
 
 ## Steps for you

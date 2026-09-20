@@ -527,15 +527,16 @@ void secondRound() {
       expect(state.chat.any((c) => c.who == ChatWho.u), isTrue);
     });
 
-    test('photographing a meal without Qamar+ opens the paywall', () {
+    test('photographing a meal needs no Qamar+: Lite gets three a day', () {
       final state = AppState();
       state.setLang(AppLang.en);
+      expect(state.plusActive, isFalse);
+      expect(state.photoQuota.remaining, SuEconomy.litePhotoDaily);
+
       state.quickLog(QuickLog.photo);
 
-      expect(state.screen, AppScreen.subscription);
-      expect(state.plusNotice, contains('Qamar+'));
-      expect(state.chatOpen, isFalse);
-      expect(state.lastMealPhotoPath, isNull);
+      expect(state.screen, isNot(AppScreen.subscription));
+      expect(state.plusNotice, isNull);
     });
 
     test('fanned-out choices sit on distinct ring positions', () {

@@ -7,12 +7,13 @@
 // Routes:
 //   POST /ai-gateway/chat/reply     { message, lang, date?, current_plan?, swapped_slots? }
 //   POST /ai-gateway/meal/analyze   { inputType, text?, imageBase64?, imageMediaType? }
-//     text/voice: food graph only — no model, no daily AI use
-//     photo: takeAiUse + vision model (Qamar+ on the client)
+//     text/voice: food graph only — no model, never counted
+//     photo: the photo bucket (3/day on Lite, more with Su) + vision model
 //   POST /ai-gateway/plan/generate  { date?, lang?, force?, instruction? }
+//     the plan bucket — a small cap for everyone
 //   POST /ai-gateway/scan/read      { imageBase64, imageMediaType, lang }
-//     takeAiUse + vision model — metered like a meal photo
-//   POST /ai-gateway/quota          {}
+//     the photo bucket + vision model
+//   POST /ai-gateway/quota          {}  → every bucket
 //
 // Secrets (supabase secrets set ...):
 //   ANTHROPIC_API_KEY   required
@@ -86,7 +87,7 @@ import {
   mergePlanUpdate,
   type PlanUpdate,
 } from "./plan_edit.ts";
-import { asQuota, quotaExceededMessage, quotaPayload, type Quota } from "./quota.ts";
+import { asQuota, quotaExceededMessage, quotaPayload, type Bucket, type Quota } from "./quota.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -110,29 +111,42 @@ async function rpcJson(name: string, args: Record<string, unknown>): Promise<unk
   return await res.json();
 }
 
-/** Spends one of today's five (or extra) uses. Body scan never calls this. */
-async function consumeAi(userId: string): Promise<Quota> {
-  const q = asQuota(await rpcJson("qamar_ai_try_consume", { p_user_id: userId }));
+/** Spends one of today's uses in the named bucket. Typed and spoken logs never call this. */
+async function consumeAi(userId: string, bucket: Bucket): Promise<Quota> {
+  const q = asQuota(await rpcJson("qamar_ai_try_consume", { p_user_id: userId, p_bucket: bucket }), bucket);
   if (!q) throw new Error("quota consume returned nothing usable");
   return q;
 }
 
-async function refundAi(userId: string): Promise<void> {
+async function refundAi(userId: string, bucket: Bucket): Promise<void> {
   try {
-    await rpcJson("qamar_ai_refund_consume", { p_user_id: userId });
+    await rpcJson("qamar_ai_refund_consume", { p_user_id: userId, p_bucket: bucket });
   } catch (e) {
     console.error("ai-gateway refund", e);
   }
 }
 
-async function quotaStatus(userId: string): Promise<Quota> {
-  const q = asQuota(await rpcJson("qamar_ai_quota_snapshot", { p_user_id: userId }));
+/**
+ * Every bucket at once, as the database reports it: the flat fields are the
+ * chat bucket for anything reading the old shape, and `photo`, `chat`, `plan`
+ * carry each bucket in full. Passed to the app untouched.
+ */
+async function quotaSnapshot(userId: string): Promise<Record<string, unknown>> {
+  const raw = await rpcJson("qamar_ai_quota_snapshot", { p_user_id: userId });
+  if (!raw || typeof raw !== "object") throw new Error("quota snapshot returned nothing usable");
+  return raw as Record<string, unknown>;
+}
+
+/** One bucket out of the snapshot, for a response that spent nothing. */
+async function quotaStatus(userId: string, bucket: Bucket): Promise<Quota> {
+  const snap = await quotaSnapshot(userId);
+  const q = asQuota(snap[bucket], bucket);
   if (!q) throw new Error("quota snapshot returned nothing usable");
   return q;
 }
 
 function quotaDenied(lang: "ar" | "en", q: Quota): Response {
-  const message = quotaExceededMessage(lang);
+  const message = quotaExceededMessage(lang, q.bucket);
   return json({
     error: message,
     reply: message,
@@ -142,9 +156,9 @@ function quotaDenied(lang: "ar" | "en", q: Quota): Response {
   }, 429);
 }
 
-async function takeAiUse(userId: string, lang: "ar" | "en"): Promise<Quota | Response> {
+async function takeAiUse(userId: string, lang: "ar" | "en", bucket: Bucket): Promise<Quota | Response> {
   try {
-    const q = await consumeAi(userId);
+    const q = await consumeAi(userId, bucket);
     if (!q.allowed) return quotaDenied(lang, q);
     return q;
   } catch (e) {
@@ -450,7 +464,8 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
   const [resolved, resolveMs] = await timed(() =>
     resolveFoods(SUPABASE_URL, SERVICE_KEY, lookup)
   );
-  const taken = await takeAiUse(userId, lang);
+  // The fourth question of the day is the paywall.
+  const taken = await takeAiUse(userId, lang, "chat");
   if (taken instanceof Response) return taken;
   const quota = taken;
 
@@ -463,7 +478,7 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
       prefill: "{",
     });
   } catch (e) {
-    await refundAi(userId);
+    await refundAi(userId, "chat");
     throw e;
   }
   const { text, model, usage, latencyMs } = called;
@@ -673,11 +688,13 @@ async function analyzeMealFromGraph(
   const sources = resolvedSources([], resolved);
   const verification = verifyMeal(items);
 
+  // Nothing was spent; report the photo bucket so the app can show what a
+  // photo would cost next.
   let quota: Quota;
   try {
-    quota = await quotaStatus(userId);
+    quota = await quotaStatus(userId, "photo");
   } catch {
-    quota = { allowed: true, used: 0, limit: 5, extra: 0, remaining: 5 };
+    quota = { bucket: "photo", allowed: true, used: 0, limit: 3, extra: 0, remaining: 3 };
   }
 
   const id = await record(userId, "meal_analysis", {
@@ -791,7 +808,9 @@ async function analyzeMeal(
     : described;
 
   const foodBlock = renderResolutions(resolved);
-  const taken = await takeAiUse(userId, lang);
+  // A photo is the photo bucket: three a day on Lite, more with Su, and never
+  // a paywall on its own.
+  const taken = await takeAiUse(userId, lang, "photo");
   if (taken instanceof Response) return taken;
   const quota = taken;
 
@@ -807,7 +826,7 @@ async function analyzeMeal(
       image: image ?? undefined,
     });
   } catch (e) {
-    await refundAi(userId);
+    await refundAi(userId, "photo");
     throw e;
   }
   const { text, model, usage, latencyMs } = called;
@@ -829,7 +848,7 @@ async function analyzeMeal(
       candidateDecision: { parse_failed: true, raw: text.slice(0, 1000) },
       uncertainty: { parse: "model did not return the requested JSON" },
     }, stages);
-    await refundAi(userId);
+    await refundAi(userId, "photo");
     return json({ error: "could not analyse" }, 502);
   }
 
@@ -1009,7 +1028,7 @@ async function readBodyScan(
     await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", "[body scan]");
     return json({ error: "not eligible" }, 403);
   }
-  const taken = await takeAiUse(userId, lang);
+  const taken = await takeAiUse(userId, lang, "photo");
   if (taken instanceof Response) return taken;
   const quota = taken;
 
@@ -1023,7 +1042,7 @@ async function readBodyScan(
       image,
     });
   } catch (e) {
-    await refundAi(userId);
+    await refundAi(userId, "photo");
     throw e;
   }
   const { text, model, usage, latencyMs } = called;
@@ -1036,7 +1055,7 @@ async function readBodyScan(
       uncertainty: { parse: "model did not return the requested JSON" },
     }, stages);
     // Unusable output is our failure, not a use of theirs.
-    await refundAi(userId);
+    await refundAi(userId, "photo");
     return json({ error: "could not read the report" }, 502);
   }
 
@@ -1123,9 +1142,9 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
   if (!force && !instruction) {
     const existing = await loadSavedPlan(userId, day);
     if (existing) {
-      let quota: Record<string, number> | undefined;
+      let quota: Record<string, unknown> | undefined;
       try {
-        quota = quotaPayload(await quotaStatus(userId));
+        quota = quotaPayload(await quotaStatus(userId, "plan"));
       } catch {
         // A saved day still belongs on the screen even if the counter is down.
       }
@@ -1204,7 +1223,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
   // to generate is the wrong order.
   const [gaps, gapsMs] = await timed(() => nutrientGaps(SUPABASE_URL, SERVICE_KEY, userId, 7));
 
-  const taken = await takeAiUse(userId, lang);
+  const taken = await takeAiUse(userId, lang, "plan");
   if (taken instanceof Response) return taken;
   const quota = taken;
 
@@ -1217,7 +1236,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
       prefill: "{",
     });
   } catch (e) {
-    await refundAi(userId);
+    await refundAi(userId, "plan");
     throw e;
   }
   const { text, model, usage, latencyMs } = called;
@@ -1234,7 +1253,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
       candidateDecision: { parse_failed: true, raw: text.slice(0, 1000) },
       uncertainty: { parse: "model did not return the requested JSON" },
     }, stages);
-    await refundAi(userId);
+    await refundAi(userId, "plan");
     return json({ error: "could not generate a plan" }, 502);
   }
 
@@ -1293,7 +1312,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
       safetyFlags: [...flags, "restricted_food_in_output"],
       uncertainty: { staples_withheld: excludedFoods },
     }, stages, verifications);
-    await refundAi(userId);
+    await refundAi(userId, "plan");
     return json({
       error: lang === "ar"
         ? "الخطة اللي اتولدت فيها حاجة مش مفروض تاكلها، فمنفعش أعرضهالك. جرّب تاني من فضلك."
@@ -1314,7 +1333,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
     model,
   );
   if (!saved.ok) {
-    await refundAi(userId);
+    await refundAi(userId, "plan");
     return json({ error: `could not save plan: ${await saved.text()}` }, 500);
   }
 
@@ -1427,7 +1446,7 @@ Deno.serve(async (req) => {
           lang?: string;
         });
       case "/quota":
-        return json(quotaPayload(await quotaStatus(userId)));
+        return json(await quotaSnapshot(userId));
       default:
         return json({ error: `unknown route ${route}` }, 404);
     }

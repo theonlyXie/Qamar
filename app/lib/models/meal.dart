@@ -95,18 +95,19 @@ class SpendItemDef {
   });
 }
 
-/// Su Points redemptions. Extra Qamar uses are how the five-a-day cap flexes;
-/// cosmetics are the prestige sink for a later leaderboard.
+/// Su Points redemptions. Extra photos are how the three-a-day wall flexes;
+/// questions have no Su path — the fourth is Qamar+. Cosmetics are the
+/// prestige sink for a later leaderboard.
 const List<SpendItemDef> kSpendCatalog = [
   SpendItemDef(
     id: 'ai_extra',
     price: SuEconomy.extraAiUse,
     once: false,
     grantsAiUses: 1,
-    nameAr: 'استخدام زيادة لقمر',
-    nameEn: 'Extra Qamar use',
-    whatAr: 'استخدام إضافي النهارده — سؤال، تصوير طبق، أو كتابة الخطة.',
-    whatEn: 'One more use today — a question, photographing a plate, or writing the plan.',
+    nameAr: 'صورة زيادة النهارده',
+    nameEn: 'Extra photo today',
+    whatAr: 'صوّر وجبة رابعة النهارده بعد التلاتة المجانية.',
+    whatEn: 'Photograph a fourth meal today, after the free three.',
     limitAr: 'لحد ١٠ زيادة في اليوم · بكرة الصبح بيتجددوا',
     limitEn: 'Up to 10 extras a day · refreshes at Cairo midnight',
   ),

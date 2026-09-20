@@ -90,9 +90,9 @@ const kExplanations = <String, Explanation>{
     titleAr: 'نقاط Su',
     titleEn: 'Su Points',
     bodyAr:
-        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة (+١٠٠، وأول وجبة +٥٠٠)، تخلّص مهمة اليوم (+٢٥٠). بتتصرف على استخدام زيادة لقمر بعد الخمس استخدامات اليومية.',
+        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة (+١٠٠، وأول وجبة +٥٠٠)، تخلّص مهمة اليوم (+٢٥٠). بتتصرف على صورة زيادة بعد التلات صور اليومية. الأسئلة مش بتتشترى بالنقط — الرابع في Qamar+.',
     bodyEn:
-        'Earned when you do something useful for yourself — logging a meal (+100, first meal +500), finishing the day’s quest (+250). Spent on another Qamar use after today’s five.',
+        'Earned when you do something useful for yourself — logging a meal (+100, first meal +500), finishing the day’s quest (+250). Spent on another photo after today’s three. Questions are never bought with points — the fourth is Qamar+.',
     soWhatAr: 'النقط دي بتتكسب بس. مش بتتشترى بفلوس ومالهاش قيمة نقدية.',
     soWhatEn: 'They are only ever earned. They cannot be bought with money and have no cash value.',
   ),

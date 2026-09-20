@@ -135,8 +135,11 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
     final t = state.t;
     final isAr = state.isAr;
 
+    final photosLeft = state.photoQuota.remaining;
     final hint = state.treeLogExpanded
-        ? (isAr ? 'الكتابة والصوت مجاناً · الصورة لـ Qamar+' : 'Type or speak for free · photo is Qamar+')
+        ? (isAr
+            ? 'الكتابة والصوت مجاناً بلا حد · باقي ${state.iso('$photosLeft')} صور النهارده'
+            : 'Type or speak, unlimited · $photosLeft photos left today')
         : state.treeWaterExpanded
             ? (isAr ? 'كوباية ٢٥٠ مل · زجاجة ٥٠٠ مل · شاي ٢٠٠ مل' : 'Glass 250 ml · bottle 500 ml · tea 200 ml')
             : t.treeHint;
@@ -213,7 +216,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                                   icon: kLogMethods[i].icon,
                                   label: kLogMethods[i].label(isAr),
                                   color: QColors.moonlight,
-                                  locked: kLogMethods[i].kind == QuickLog.photo && !state.plusActive,
+                                  locked: kLogMethods[i].kind == QuickLog.photo && state.photoQuota.exhausted,
                                   onTap: () => _runMethod(context, state, kLogMethods[i].kind),
                                 ),
                               ),
@@ -264,14 +267,12 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
   }
 
   /// Runs a log method inline. Photo opens the camera immediately; the other
-  /// two drop straight into the conversation. Nothing here pushes a screen.
+  /// two drop straight into the conversation. Nothing here pushes a screen,
+  /// and nothing here asks for Qamar+ — the server counts the photo and says
+  /// so when today's are gone.
   Future<void> _runMethod(BuildContext context, AppState state, QuickLog kind) async {
     if (kind != QuickLog.photo) {
       state.quickLog(kind);
-      return;
-    }
-    if (!state.plusActive) {
-      state.refusePhotoLog();
       return;
     }
     try {
