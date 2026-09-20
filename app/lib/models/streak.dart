@@ -125,8 +125,8 @@ class OrbState {
   static const rest = OrbState(fill: 0, over: false, glow: 0, streak: Streak.none);
 
   /// The moon painter's phase: 0 is fully lit, 1 fully dark. An empty day is
-  /// a thin crescent, a day at target is a near-full moon.
-  double get moonPhase => 0.9 - 0.8 * fill;
+  /// a thin crescent, a day at target a moon a day from full.
+  double get moonPhase => 0.92 - 0.86 * fill;
 
   factory OrbState.derive({
     required int consumedKcal,

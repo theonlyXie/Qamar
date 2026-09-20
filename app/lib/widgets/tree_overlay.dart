@@ -193,7 +193,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                           Positioned(
                             left: _orbLeft,
                             top: _orbLeft,
-                            child: LivingOrb(size: _orbSize, onTap: state.openChat),
+                            child: LivingOrb(size: _orbSize, onTap: state.openChat, state: state.orbState()),
                           ),
                           if (!state.treeExpanded)
                             for (var i = 0; i < kTreeNodes.length; i++)

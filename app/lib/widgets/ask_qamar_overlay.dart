@@ -415,7 +415,7 @@ class _ProposalCard extends StatelessWidget {
                         SizedBox(width: 40, child: Text('${items[i].q}×', textAlign: TextAlign.center, style: QText.number(size: 14, weight: FontWeight.w600, color: QColors.textMid))),
                         QRoundIconButton(icon: Icons.add, onTap: () => state.incQty(i), size: 28),
                         const Spacer(),
-                        Text('${items[i].def.kcal * items[i].q} kcal',
+                        Text(isAr ? '${state.iso('${items[i].def.kcal * items[i].q}')} سعر' : '${items[i].def.kcal * items[i].q} kcal',
                             style: QText.number(size: 14, weight: FontWeight.w600, color: QColors.cyan)),
                       ],
                     ),

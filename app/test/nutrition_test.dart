@@ -461,14 +461,14 @@ void streakAndOrb() {
       expect(o.fill, 0);
       expect(o.glow, 0);
       expect(o.over, isFalse);
-      expect(o.moonPhase, closeTo(0.9, 1e-9), reason: 'the painter reads 1 as dark');
+      expect(o.moonPhase, closeTo(0.92, 1e-9), reason: 'the painter reads 1 as dark');
     });
 
     test('a day at target is a near-full moon', () {
       final o = OrbState.derive(consumedKcal: 2000, targetKcal: 2000, mealsToday: 3, planSlots: 3, streak: Streak.none);
       expect(o.fill, 1);
       expect(o.glow, 1);
-      expect(o.moonPhase, closeTo(0.1, 1e-9));
+      expect(o.moonPhase, closeTo(0.06, 1e-9));
       expect(o.over, isFalse);
     });
 

@@ -26,7 +26,7 @@ class YouScreen extends StatelessWidget {
     // regardless of whether it knew anything at all.
     final remembered = state.rememberedCount();
     final rows = <(String, String)>[
-      (isAr ? 'الهدف والسعرات' : 'Target and calories', '${tg.kcal} kcal'),
+      (isAr ? 'الهدف والسعرات' : 'Target and calories', isAr ? '${state.iso('${tg.kcal}')} سعر' : '${tg.kcal} kcal'),
       (isAr ? 'ما يجب تجنبه' : 'What to avoid', state.profile.prefs.isNotEmpty ? '${state.profile.prefs.length}' : (isAr ? 'مفيش' : 'None')),
       (
         isAr ? 'ذاكرة قمر' : 'Qamar memory',
@@ -109,7 +109,7 @@ class YouScreen extends StatelessWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
-                      Text('Qamar+', style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFE9ECFF))),
+                      Text('Qamar+', textDirection: TextDirection.ltr, style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFE9ECFF))),
                       if (state.plusActive) ...[
                         const SizedBox(width: 8),
                         Text(isAr ? 'مفعّل' : 'Active',
@@ -254,7 +254,7 @@ class YouScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Qamar+', style: QText.display(size: 24, height: 30, color: const Color(0xFFF5F7FF))),
+              Text('Qamar+', textDirection: TextDirection.ltr, style: QText.display(size: 24, height: 30, color: const Color(0xFFF5F7FF))),
               const SizedBox(height: 4),
               Text(t.plusSub, style: QText.body(size: 13, height: 20, color: QColors.textMid)),
               const SizedBox(height: 10),

@@ -11,6 +11,12 @@ import 'colors.dart';
 class QText {
   QText._();
 
+  /// Neither the serif nor Inter carries Arabic. Any Arabic word or Eastern
+  /// digit set in those styles falls back to the bundled Noto rather than to
+  /// whatever the phone happens to have, so a streak count, an EGP price or a
+  /// greeting looks the same on every device.
+  static const _arabicFallback = ['Noto Sans Arabic'];
+
   /// Cormorant Garamond — display/serif headers ("Qamar", screen titles).
   static TextStyle display({
     required double size,
@@ -21,6 +27,7 @@ class QText {
   }) =>
       TextStyle(
         fontFamily: 'Cormorant Garamond',
+        fontFamilyFallback: _arabicFallback,
         fontSize: size,
         height: height != null ? height / size : null,
         fontWeight: weight,
@@ -55,6 +62,7 @@ class QText {
   }) =>
       TextStyle(
         fontFamily: 'Inter',
+        fontFamilyFallback: _arabicFallback,
         fontSize: size,
         height: height != null ? height / size : null,
         fontWeight: weight,

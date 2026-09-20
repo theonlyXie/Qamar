@@ -103,9 +103,19 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
           child: SizedBox(
             width: s * 1.7,
             height: s * 1.7,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
+            // The footprint may be squeezed by a tight parent (the nav gives
+            // the orb a box the size of the moon); the painting must not be,
+            // or the halo and the streak ring end up hidden under the moon.
+            // The geometry keeps its own size and overflows, as the halo
+            // always visually did.
+            child: OverflowBox(
+              minWidth: s * 1.7,
+              maxWidth: s * 1.7,
+              minHeight: s * 1.7,
+              maxHeight: s * 1.7,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
                 Transform.scale(
                   scale: haloScale,
                   child: Opacity(
@@ -145,6 +155,7 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
                   ),
                 ),
               ],
+              ),
             ),
           ),
         );

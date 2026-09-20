@@ -84,7 +84,7 @@ class _QamarMoonState extends State<QamarMoon> with SingleTickerProviderStateMix
         // surface is the thing you actually look at.
         painter: _MoonPainter(
           phase: widget.phase == null
-              ? 0.28 + 0.16 * controller.value
+              ? 0.58 + 0.09 * controller.value
               : (widget.phase! - 0.02 + 0.04 * controller.value).clamp(0.0, 1.0),
         ),
       ),
@@ -269,8 +269,10 @@ class _MoonPainter extends CustomPainter {
   /// unlit limb. Semi-axis [r * phaseWidth] horizontally, [r] vertically.
   Path _terminatorPath(Offset c, double r) {
     // How far the terminator bulges past the centre line, signed: positive
-    // sweeps the shadow toward the lit limb, thinning the crescent.
-    final bulge = r * (phase.clamp(0.0, 1.0) * 1.05 - 0.14);
+    // sweeps the shadow toward the lit limb, thinning the crescent. The full
+    // range is used: 0 leaves a sliver of night at the limb (a moon a day
+    // from full), 1 a sliver of light (a moon a day from new).
+    final bulge = r * (phase.clamp(0.0, 1.0) * 1.9 - 0.95);
     final path = Path()..moveTo(c.dx, c.dy - r);
 
     const steps = 72;

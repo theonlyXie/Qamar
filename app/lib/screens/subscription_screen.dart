@@ -49,7 +49,7 @@ class SubscriptionScreen extends StatelessWidget {
         Center(
           child: ShaderMask(
             shaderCallback: (r) => QColors.brandGradient.createShader(r),
-            child: Text('Qamar+', style: QText.display(size: 34, height: 42, color: Colors.white)),
+            child: Text('Qamar+', textDirection: TextDirection.ltr, style: QText.display(size: 34, height: 42, color: Colors.white)),
           ),
         ),
         const SizedBox(height: 6),
@@ -340,7 +340,7 @@ class _FeatureTable extends StatelessWidget {
               ),
               SizedBox(
                 width: 52,
-                child: Text('Qamar+',
+                child: Text('Qamar+', textDirection: TextDirection.ltr,
                     textAlign: TextAlign.center,
                     style: QText.body(size: 10, weight: FontWeight.w600, color: QColors.violetSoft)),
               ),
