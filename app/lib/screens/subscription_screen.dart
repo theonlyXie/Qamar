@@ -70,21 +70,19 @@ class SubscriptionScreen extends StatelessWidget {
           ),
           child: Text(
             isAr
-                ? 'السعر ٥٠٠ ج.م في الشهر. أول اشتراك خصم ٣٠٪ (٣٥٠ ج.م). السنة بـ ٢٤٩ ج.م — نفس سعر باقة ٣ شهور، ودي العرض اللي بنشجّع عليه.'
-                : 'List is EGP 500 a month. Your first subscription is 30% off (EGP 350). One year is EGP 249 — the same cash as the 3-month pack, and the plan we push.',
+                ? '٥٠٠ ج.م في الشهر — أقل من زيارة واحدة لأخصائي. مفيش سنة ومفيش خصومات؛ سعر واحد، والإلغاء بضغطة من «حسابي».'
+                : 'EGP 500 a month — less than one visit to a nutritionist. No annual tier and no discounts; one price, and cancel in one tap from Me.',
             style: QText.body(size: 13, height: 20, color: QColors.textHigh),
           ),
         ),
         const SizedBox(height: 16),
 
-        for (final plan in const [PlusPlan.annual, PlusPlan.quarterly, PlusPlan.monthly]) ...[
-          _TierCard(state: state, plan: plan),
-          const SizedBox(height: 10),
-        ],
+        _TierCard(state: state, plan: PlusPlan.monthly),
+        const SizedBox(height: 10),
 
         const SizedBox(height: 4),
         Text(
-          isAr ? 'كود عرض أو صديق' : 'A friend’s code or a promo',
+          isAr ? 'كود الأخصائي أو المدرّب' : 'Your nutritionist’s or coach’s code',
           style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.textMuted),
         ),
         const SizedBox(height: 6),
@@ -93,11 +91,11 @@ class SubscriptionScreen extends StatelessWidget {
         Text(
           quote.pricingReason == 'affiliate'
               ? (isAr
-                  ? 'بالكود ده الشهر بـ ٢٩٩ ج.م. صاحبك ياخد ٥٠ ج.م كاش في محفظة العمولة (مش نقاط Su)، وصافي قمر ٢٤٩ ج.م.'
-                  : 'With this code the month is EGP 299. Your friend earns EGP 50 cash in their affiliate wallet (not Su Points). Qamar’s net is EGP 249.')
+                  ? 'الكود شغال. السعر زي ما هو، وأخصائيك بيتابع خطتك وبياخد نصيب من الاشتراك لمدة سنة.'
+                  : 'Code applied. Your price is unchanged; your nutritionist follows your plan and earns a share of this subscription for a year.')
               : (isAr
-                  ? 'لو حد بعتلك كود، اكتبه هنا: الشهر يبقى ٢٩٩ ج.م، وهو ياخد ٥٠ ج.م كاش نبعتهاله من طرفنا.'
-                  : 'If someone sent you a code, enter it here: monthly Plus is EGP 299, and they earn EGP 50 cash we send from our end.'),
+                  ? 'لو أخصائي أو مدرّب بعتك، اكتب الكود هنا. السعر مش بيتغير — الكود بيربط خطتك بيه وبيديه نصيب من الاشتراك.'
+                  : 'If a nutritionist or coach sent you, enter their code. The price does not change — the code links your plan to them and pays them a share.'),
           style: QText.body(size: 12, height: 18, color: QColors.textFaint),
         ),
         if (quote.promoError != null) ...[
@@ -226,113 +224,56 @@ class _TierCard extends StatelessWidget {
   final PlusPlan plan;
   const _TierCard({required this.state, required this.plan});
 
-  PlusQuote _quote() {
-    if (state.plusPlan == plan) return state.displayPlusQuote;
-    return PlusPricing.quote(plan: plan.name, firstPurchase: state.plusFirstPurchase);
-  }
-
   @override
   Widget build(BuildContext context) {
     final isAr = state.isAr;
-    final selected = state.plusPlan == plan;
-    final quote = _quote();
-    final title = switch (plan) {
-      PlusPlan.annual => (isAr ? 'سنة' : '1 year'),
-      PlusPlan.quarterly => (isAr ? '٣ شهور' : '3 months'),
-      PlusPlan.monthly => (isAr ? 'شهري' : 'Monthly'),
-    };
-    final sub = switch (plan) {
-      PlusPlan.annual => isAr
-          ? 'خصم ٥٠٪ · نفس سعر ٣ شهور، و١٢ شهر'
-          : '50% off · same cash as 3 months, for 12',
-      PlusPlan.quarterly => isAr ? '٩٠ يوم · نفس سعر السنة نقداً' : '90 days · same cash price as a year',
-      PlusPlan.monthly => quote.pricingReason == 'affiliate'
-          ? (isAr ? 'بكود الصديق · ٣٠ يوم' : 'with a friend’s code · 30 days')
-          : quote.pricingReason == 'first_user'
-              ? (isAr ? 'أول اشتراك · خصم ٣٠٪' : 'first subscription · 30% off')
-              : (isAr ? '٣٠ يوم' : '30 days'),
-    };
-    final badge = switch (plan) {
-      PlusPlan.annual => isAr ? 'الأفضل' : 'Best value',
-      PlusPlan.quarterly => null,
-      PlusPlan.monthly => quote.discounted ? (isAr ? 'عرض' : 'Offer') : null,
-    };
+    final quote = state.displayPlusQuote;
+    final title = isAr ? 'شهري' : 'Monthly';
+    final sub = quote.pricingReason == 'affiliate'
+        ? (isAr ? '٣٠ يوم · بكود أخصائيك' : '30 days · with your nutritionist’s code')
+        : (isAr ? '٣٠ يوم · إلغاء بضغطة' : '30 days · cancel in one tap');
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
+        border: Border.all(color: QColors.violet, width: 1.6),
         borderRadius: BorderRadius.circular(QRadii.xl),
-        onTap: () => state.selectPlusPlan(plan),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: selected
-                ? const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep])
-                : null,
-            color: selected ? null : QColors.cardNavy,
-            border: Border.all(
-              color: selected ? QColors.violet : QColors.borderSoft,
-              width: selected ? 1.6 : 1,
+        boxShadow: [BoxShadow(color: QColors.violet.withValues(alpha: 0.22), blurRadius: 26)],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.radio_button_checked, size: 20, color: QColors.violet),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textPrimary)),
+                const SizedBox(height: 2),
+                Text(sub, style: QText.body(size: 12, color: QColors.textMuted)),
+              ],
             ),
-            borderRadius: BorderRadius.circular(QRadii.xl),
-            boxShadow: selected
-                ? [BoxShadow(color: QColors.violet.withValues(alpha: 0.22), blurRadius: 26)]
-                : null,
           ),
-          child: Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                size: 20,
-                color: selected ? QColors.violet : QColors.textFaint,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(title,
-                            style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textPrimary)),
-                        if (badge != null) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: QColors.green.withValues(alpha: 0.16),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(badge,
-                                style: QText.body(size: 10, weight: FontWeight.w600, color: QColors.green)),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(sub, style: QText.body(size: 12, color: QColors.textMuted)),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (quote.discounted)
-                    Text(
-                      formatEgp(quote.listPounds, ar: isAr),
-                      style: QText.number(size: 11, color: QColors.textFaint).copyWith(
-                        decoration: TextDecoration.lineThrough,
-                      ),
-                    ),
-                  Text(
-                    formatEgp(quote.amountPounds, ar: isAr),
-                    style: QText.number(size: 16, weight: FontWeight.w600, color: QColors.textPrimary),
+              // A campaign code is the one thing that can lower the price; when
+              // it has, show what it came down from.
+              if (quote.discounted)
+                Text(
+                  formatEgp(quote.listPounds, ar: isAr),
+                  style: QText.number(size: 11, color: QColors.textFaint).copyWith(
+                    decoration: TextDecoration.lineThrough,
                   ),
-                ],
+                ),
+              Text(
+                formatEgp(quote.amountPounds, ar: isAr),
+                style: QText.number(size: 16, weight: FontWeight.w600, color: QColors.textPrimary),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }

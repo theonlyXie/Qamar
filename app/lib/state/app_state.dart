@@ -21,8 +21,8 @@ import '../models/profile.dart';
 import '../models/water.dart';
 import 'chat_replies.dart';
 
-/// Qamar+ billing period.
-enum PlusPlan { monthly, quarterly, annual }
+/// Qamar+ billing period. One plan; annual and family wait on retention.
+enum PlusPlan { monthly }
 
 /// How a meal gets logged straight from the orb, with no page in between.
 enum QuickLog { voice, text, photo }
@@ -280,7 +280,7 @@ class AppState extends ChangeNotifier {
     plusActive = false;
     plusUntil = null;
     plusNotice = null;
-    plusPlan = PlusPlan.annual;
+    plusPlan = PlusPlan.monthly;
     plusPromoCode = '';
     plusQuote = null;
     plusFirstPurchase = true;
@@ -1272,9 +1272,9 @@ class AppState extends ChangeNotifier {
 
   // ---- Qamar+ subscription --------------------------------------------
 
-  /// Which tier the paywall has selected. Annual is preselected because it is
-  /// the better-value option; nothing is charged until Paymob confirms.
-  PlusPlan plusPlan = PlusPlan.annual;
+  /// The plan the paywall sells. There is one; nothing is charged until
+  /// Paymob confirms.
+  PlusPlan plusPlan = PlusPlan.monthly;
 
   /// Entitlement. In production this is set only from a Paymob-verified
   /// payment — never decided on the client (spec_mvp.txt §29.1). Here it is

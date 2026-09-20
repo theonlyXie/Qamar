@@ -4,10 +4,11 @@
 /// charges. The paywall shows the pound figure. The server, not the phone,
 /// is the price list — the client only names the plan and, optionally, a code.
 ///
-/// List is 500 EGP a month. First purchase is 30% off (350). An affiliate
-/// code is 299 for the buyer and 50 EGP cash for the marketer (net 249).
-/// The 3-month pack and the 1-year plan are both 249 — the year is the one
-/// we push. Su Points are never part of this wallet.
+/// One plan, 500 EGP a month. Annual and family tiers wait on month-2
+/// retention; discount marketing is out. A professional's code does not
+/// change what the client pays — it sends 20% of each payment (EGP 100) to
+/// the nutritionist or coach for twelve months. Su Points are never part of
+/// this wallet.
 class PlusCatalog {
   PlusCatalog._();
 
@@ -15,12 +16,11 @@ class PlusCatalog {
   static const provider = 'paymob';
 
   static const listMonthlyCents = 50000;
-  static const firstUserOffPercent = 30;
-  static const firstUserMonthlyCents = 35000;
-  static const affiliateMonthlyCents = 29900;
-  static const affiliateCommissionCents = 5000;
-  static const affiliateNetCents = 24900;
-  static const packCents = 24900;
+
+  /// The professional's share of every payment their referral makes.
+  static const proSharePercent = 20;
+  static const proShareMonths = 12;
+  static const proShareCents = listMonthlyCents * proSharePercent ~/ 100;
   static const minPayoutCents = 5000;
 
   static const monthly = PlusProduct(
@@ -31,32 +31,9 @@ class PlusCatalog {
     nameEn: 'Qamar+ monthly',
   );
 
-  static const quarterly = PlusProduct(
-    id: 'quarterly',
-    amountCents: packCents,
-    periodDays: 90,
-    nameAr: 'قمر+ ٣ شهور',
-    nameEn: 'Qamar+ 3 months',
-  );
-
-  static const annual = PlusProduct(
-    id: 'annual',
-    amountCents: packCents,
-    periodDays: 365,
-    nameAr: 'قمر+ سنوي',
-    nameEn: 'Qamar+ 1 year',
-  );
-
-  static PlusProduct byId(String id) {
-    switch (id) {
-      case 'annual':
-        return annual;
-      case 'quarterly':
-        return quarterly;
-      default:
-        return monthly;
-    }
-  }
+  /// Only the monthly plan is sold; any other id falls back to it so an old
+  /// server answer cannot crash the paywall.
+  static PlusProduct byId(String id) => monthly;
 }
 
 class PlusProduct {
@@ -161,16 +138,7 @@ class PlusPricing {
   }) {
     final product = PlusCatalog.byId(plan);
     var amount = product.amountCents;
-    var reason = plan == 'annual'
-        ? 'annual_half'
-        : plan == 'quarterly'
-            ? 'quarterly_pack'
-            : 'list';
-
-    if (plan == 'monthly' && firstPurchase) {
-      amount = PlusCatalog.firstUserMonthlyCents;
-      reason = 'first_user';
-    }
+    var reason = 'list';
 
     String? promoCode;
     String? promoKind;
@@ -184,14 +152,12 @@ class PlusPricing {
       promoKind = code.kind;
       if (code.isAffiliate) {
         if (code.ownerUserId != null && code.ownerUserId == buyerUserId) {
-          error = 'You cannot use your own affiliate code';
-        } else if (plan != 'monthly') {
-          note =
-              'Affiliate codes apply to monthly Plus at EGP 299. The 3-month and 1-year packs are already EGP 249.';
+          error = 'You cannot use your own code';
         } else {
-          amount = PlusCatalog.affiliateMonthlyCents;
+          // The price does not move; the professional's share comes out of it.
           reason = 'affiliate';
-          commission = PlusCatalog.affiliateCommissionCents;
+          commission = amount * PlusCatalog.proSharePercent ~/ 100;
+          note = 'Your nutritionist follows your plan and earns a share of this subscription. The price is the same.';
         }
       } else {
         final applies = code.appliesToPlans;

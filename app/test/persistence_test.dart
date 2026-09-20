@@ -898,29 +898,10 @@ void main() {
     expect(state.plusActive, isFalse);
     await state.startPlusPurchase();
 
-    expect(billing.lastPlan, 'annual');
+    expect(billing.lastPlan, 'monthly');
     expect(opened.single, contains('accept.paymob.com/unifiedcheckout'));
     expect(state.plusActive, isFalse, reason: 'only a verified Paymob callback may grant Plus');
     expect(state.plusNotice, contains('Paymob'));
-  });
-
-  test('a promo code is sent with checkout and still does not mark Plus on the phone', () async {
-    final billing = FakeBilling();
-    final state = AppState(
-      userId: 'user-1',
-      billing: billing,
-      openCheckout: (url) async => true,
-    )..setLang(AppLang.en);
-    await settle();
-
-    state.selectPlusPlan(PlusPlan.monthly);
-    state.setPlusPromoCode('qmr 7k2p');
-    await settle();
-    await state.startPlusPurchase();
-
-    expect(billing.lastPlan, 'monthly');
-    expect(billing.lastPromo, 'QMR7K2P');
-    expect(state.plusActive, isFalse);
   });
 
   test('a promo code is sent with checkout and still does not mark Plus on the phone', () async {

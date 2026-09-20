@@ -2,22 +2,24 @@
 // (and the checkout that calls it) may stamp what Paymob is asked to collect.
 // Amounts are piastres (cents of an Egyptian pound).
 //
-// List:            500 EGP a month
-// First purchase:  30% off → 350 EGP a month
-// Affiliate code:  buyer pays 299 EGP; affiliate is owed 50 EGP cash (not Su);
-//                  Qamar's net is 249 EGP
-// 3-month pack:    249 EGP (90 days)
-// 1-year:          249 EGP (365 days) — 50% off the 500 list, and the plan we push
+// One plan: 500 EGP a month. That is the blueprint's decision, not a gap —
+// annual and family tiers wait on month-2 retention, and discount marketing
+// is out entirely. The only thing that ever moves the price is a campaign
+// code, which the schema supports and nobody has issued.
+//
+// A professional's code (a nutritionist, a coach) does not change what the
+// client pays. It attaches a 20% recurring share — EGP 100 of the 500 — to
+// the professional for twelve months. "You earn EGP 100 a month for every
+// patient on it, for a year" is the pitch, and the arithmetic here is that
+// sentence.
 
 export const CURRENCY = "EGP";
 
 export const LIST_MONTHLY_CENTS = 50_000;
-export const FIRST_USER_OFF_PERCENT = 30;
-export const FIRST_USER_MONTHLY_CENTS = 35_000;
-export const AFFILIATE_MONTHLY_CENTS = 29_900;
-export const AFFILIATE_COMMISSION_CENTS = 5_000;
-export const AFFILIATE_NET_CENTS = 24_900;
-export const PACK_CENTS = 24_900;
+
+/** The professional's recurring share of every payment their referral makes. */
+export const PRO_SHARE_PERCENT = 20;
+export const PRO_SHARE_MONTHS = 12;
 export const MIN_PAYOUT_CENTS = 5_000;
 
 export const PLANS = {
@@ -27,37 +29,29 @@ export const PLANS = {
     nameAr: "قمر+ شهري",
     nameEn: "Qamar+ monthly",
   },
-  quarterly: {
-    days: 90,
-    listCents: PACK_CENTS,
-    nameAr: "قمر+ ٣ شهور",
-    nameEn: "Qamar+ 3 months",
-  },
-  annual: {
-    days: 365,
-    listCents: PACK_CENTS,
-    nameAr: "قمر+ سنوي",
-    nameEn: "Qamar+ 1 year",
-  },
 } as const;
 
 export type PlanId = keyof typeof PLANS;
 export type PromoKind = "affiliate" | "campaign";
-export type PricingReason =
-  | "list"
-  | "first_user"
-  | "affiliate"
-  | "campaign"
-  | "annual_half"
-  | "quarterly_pack";
+
+/**
+ * Why the order carries the amount it does. "affiliate" means the list price
+ * with a professional's share attached, not a discount — the client pays 500
+ * either way.
+ */
+export type PricingReason = "list" | "affiliate" | "campaign";
 
 export function isPlanId(value: string): value is PlanId {
-  return value === "monthly" || value === "quarterly" || value === "annual";
+  return value === "monthly";
 }
 
 export function normalizePromoCode(raw: string | null | undefined): string {
   if (!raw) return "";
   return raw.trim().toUpperCase().replace(/\s+/g, "");
+}
+
+export function proShareCents(amountCents: number): number {
+  return Math.round(amountCents * PRO_SHARE_PERCENT / 100);
 }
 
 export type Promo = {
@@ -81,6 +75,7 @@ export type Quote = {
   listCents: number;
   amountCents: number;
   pricingReason: PricingReason;
+  /** Kept for the client's copy ("your first month"); it never moves the price. */
   firstPurchase: boolean;
   promoCode: string | null;
   promoKind: PromoKind | null;
@@ -99,12 +94,6 @@ function promoLive(promo: Promo, now: Date): boolean {
     return false;
   }
   return true;
-}
-
-function baseReason(plan: PlanId): PricingReason {
-  if (plan === "annual") return "annual_half";
-  if (plan === "quarterly") return "quarterly_pack";
-  return "list";
 }
 
 function campaignAmount(plan: PlanId, promo: Promo): number | null {
@@ -129,12 +118,7 @@ export function quotePlus(input: {
   const now = input.now ?? new Date();
   const spec = PLANS[input.plan];
   let amountCents: number = spec.listCents;
-  let pricingReason = baseReason(input.plan);
-
-  if (input.plan === "monthly" && input.firstPurchase) {
-    amountCents = FIRST_USER_MONTHLY_CENTS;
-    pricingReason = "first_user";
-  }
+  let pricingReason: PricingReason = "list";
 
   let promoCode: string | null = null;
   let promoKind: PromoKind | null = null;
@@ -156,17 +140,15 @@ export function quotePlus(input: {
         promoError = "This code is not active";
         promoId = null;
       } else if (promo.ownerUserId === input.buyerUserId) {
-        promoError = "You cannot use your own affiliate code";
-        promoId = null;
-      } else if (input.plan !== "monthly") {
-        promoNote =
-          "Affiliate codes apply to monthly Plus at EGP 299. The 3-month and 1-year packs are already EGP 249.";
+        promoError = "You cannot use your own code";
         promoId = null;
       } else {
-        amountCents = AFFILIATE_MONTHLY_CENTS;
+        // The price does not move. The professional's share is carved out of
+        // the same 500 the client was paying anyway.
         pricingReason = "affiliate";
         affiliateUserId = promo.ownerUserId;
-        affiliateCommissionCents = AFFILIATE_COMMISSION_CENTS;
+        affiliateCommissionCents = proShareCents(amountCents);
+        promoNote = "Your nutritionist follows your plan and earns a share of this subscription. The price is the same.";
       }
     } else {
       const next = campaignAmount(input.plan, promo);

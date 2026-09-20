@@ -142,9 +142,43 @@ async function loadPromo(code: string): Promise<Promo | null> {
   };
 }
 
+/**
+ * The professional this client was referred by, if the referral is still
+ * inside its twelve months. Written by qamar_apply_paid_order on the first
+ * paid order that carried a professional's code, so a renewal attaches the
+ * same share without the client typing the code again.
+ */
+async function loadReferral(userId: string): Promise<Promo | null> {
+  const res = await db(
+    `pro_referrals?user_id=eq.${userId}&ends_at=gt.${encodeURIComponent(new Date().toISOString())}` +
+      `&select=promo_code_id,affiliate_user_id,promo_codes(code,active)&limit=1`,
+  );
+  if (!res.ok) return null;
+  const rows = await res.json() as Array<Record<string, unknown>>;
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row || typeof row.affiliate_user_id !== "string") return null;
+  const code = row.promo_codes as { code?: unknown; active?: unknown } | null;
+  return {
+    id: typeof row.promo_code_id === "string" ? row.promo_code_id : undefined,
+    code: typeof code?.code === "string" ? code.code : "PRO",
+    kind: "affiliate",
+    ownerUserId: row.affiliate_user_id,
+    percentOff: null,
+    amountCents: null,
+    appliesToPlans: null,
+    // A professional who has been switched off stops earning, but the client
+    // is not asked to do anything about it.
+    active: code?.active !== false,
+    startsAt: null,
+    endsAt: null,
+    maxRedemptions: null,
+    redemptionCount: 0,
+  };
+}
+
 async function buildQuote(userId: string, planRaw: unknown, codeRaw: unknown): Promise<Quote | Response> {
   if (typeof planRaw !== "string" || !isPlanId(planRaw)) {
-    return json({ error: "choose monthly, 3 months, or 1 year" }, 400);
+    return json({ error: "only the monthly plan exists" }, 400);
   }
   const code = normalizePromoCode(typeof codeRaw === "string" ? codeRaw : "");
   let promo: Promo | null = null;
@@ -157,6 +191,8 @@ async function buildQuote(userId: string, planRaw: unknown, codeRaw: unknown): P
       q.promoCode = code;
       return q;
     }
+  } else {
+    promo = await loadReferral(userId);
   }
   const first = await firstPurchase(userId);
   return quotePlus({ plan: planRaw, firstPurchase: first, buyerUserId: userId, promo });

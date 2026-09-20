@@ -8,15 +8,12 @@ The app and the server are already wired for this. Your job is the business side
 
 | Plan | What they pay | What you keep in mind |
 |---|---|---|
-| Monthly list | **500** | The headline price |
-| First subscription | **350** | 30% off, once, on monthly |
-| Affiliate code | **299** | Buyer pays 299. The person who shared the code is owed **50 EGP cash** in their affiliate wallet. Your net is **249**. This is not Su Points. |
-| 3 months | **249** | Same cash as a year, shorter access — so the year is the obvious deal |
-| 1 year | **249** | 50% off the 500 list. This is the plan the paywall pushes |
+| Monthly | **500** | The only plan. No annual, no family tier, no discounts — those wait on month-2 retention. |
+| Professional's code | **500** | The client pays the same 500. The nutritionist or coach who gave the code is owed **100 EGP a month (20%) for 12 months** from the client's first payment, in their EGP wallet. This is not Su Points. |
 
-The phone never decides the price. Checkout asks the server; the server stamps the amount Paymob collects. Later campaign codes (Ramadan, etc.) go in the `promo_codes` table as `kind = campaign` — you do not need another app release to add one.
+The phone never decides the price. Checkout asks the server; the server stamps the amount Paymob collects. A later campaign code (the earned-month promo, Ramadan) goes in the `promo_codes` table as `kind = campaign` — you do not need another app release to add one.
 
-Affiliate payouts: the marketer taps **Redeem EGP** once the wallet has at least 50 EGP. That opens a `requested` payout. You send the money from the company account (bank / wallet) and mark the row `sent`. Do not pay this out of Su Points.
+Professional payouts: the nutritionist taps **Redeem EGP** once the wallet has at least 50 EGP. That opens a `requested` payout. You send the money from the company account (bank / InstaPay) and mark the row `sent`. Do not pay this out of Su Points.
 
 ## What is already settled
 
@@ -93,7 +90,7 @@ If the dashboard has a field for “notification URL” / “callback URL”, pa
 ### 7. Do one test payment
 
 1. Open Qamar while signed in (a guest must link an account first — we have to know who paid).
-2. You → Qamar+ → pick 1 year (EGP 249), 3 months (EGP 249), or monthly → **Start Qamar+**. A friend’s code on monthly is EGP 299.
+2. You → Qamar+ → **Start Qamar+** (EGP 500). With a professional's code the price is still 500; the code only attaches their share.
 3. Paymob’s page opens. Use Paymob’s **test card** from their documentation (not a real card).
 4. Finish. You come back to the app. Tap **Confirm subscription** if Qamar+ is not on yet — Paymob’s confirmation can land a few seconds later.
 
@@ -104,14 +101,14 @@ If it never turns on: the HMAC secret is usually wrong, or the webhook URL is no
 When test payments succeed and Paymob has approved the merchant file:
 
 1. Replace the four secrets with the **live** keys and live integration IDs.
-2. Make one real payment of 249 EGP (the 1-year plan) on a real card or wallet, then refund it from the Paymob dashboard if you do not want to keep it.
+2. Make one real payment of 500 EGP on a real card or wallet, then refund it from the Paymob dashboard if you do not want to keep it.
 3. Confirm the bank settlement account is the company account.
 
 ### 9. After that, leave it alone
 
 - Refunds and chargebacks are handled in the Paymob dashboard. The next time the app checks, Qamar+ follows what Paymob last confirmed.
-- Auto-renew (charge the card every month without asking) is a separate Paymob product called Subscriptions. This first version is **pay for a month, 3 months, or a year**. When you want auto-renew, turn Subscriptions on in the Paymob dashboard and tell us — the app does not invent a renewal it cannot collect.
-- Su Points stay earned. Never sell them through Paymob. Affiliate commission is a separate EGP wallet.
+- Auto-renew (charge the card every month without asking) is a separate Paymob product called Subscriptions. This first version is **pay for a month at a time**. When you want auto-renew, turn Subscriptions on in the Paymob dashboard and tell us — the app does not invent a renewal it cannot collect.
+- Su Points stay earned. Never sell them through Paymob. The professional's share is a separate EGP wallet.
 
 ## If you later put Qamar on the Apple App Store
 

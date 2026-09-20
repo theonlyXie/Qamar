@@ -287,13 +287,13 @@ class _AffiliateCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(isAr ? 'عمولة الأفلييت' : 'Affiliate wallet',
+          Text(isAr ? 'برنامج الأخصائيين' : 'Professional programme',
               style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
           const SizedBox(height: 4),
           Text(
             isAr
-                ? 'ابعتهالكود لحد: يشترك بـ ٢٩٩ ج.م، وإنت يوصلك ٥٠ ج.م كاش نبعتهالك من طرفنا. مش نقاط Su.'
-                : 'Share your code: they subscribe at EGP 299, and you earn EGP 50 cash we send from our end. Not Su Points.',
+                ? 'لو إنت أخصائي تغذية أو مدرّب: اديلي الكود ده لعميلك. يشترك بـ ٥٠٠ ج.م زي أي حد، وإنت يوصلك ١٠٠ ج.م كل شهر لمدة سنة. كاش بالجنيه، مش نقاط Su.'
+                : 'For nutritionists and coaches: give this code to a client. They subscribe at EGP 500 like anyone else, and you earn EGP 100 a month for a year. EGP cash, not Su Points.',
             style: QText.body(size: 12, height: 18, color: QColors.textMuted),
           ),
           const SizedBox(height: 10),

@@ -1,22 +1,21 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import {
-  AFFILIATE_COMMISSION_CENTS,
-  AFFILIATE_MONTHLY_CENTS,
-  AFFILIATE_NET_CENTS,
-  FIRST_USER_MONTHLY_CENTS,
-  FIRST_USER_OFF_PERCENT,
   LIST_MONTHLY_CENTS,
-  PACK_CENTS,
+  PLANS,
+  PRO_SHARE_MONTHS,
+  PRO_SHARE_PERCENT,
+  isPlanId,
   normalizePromoCode,
+  proShareCents,
   quotePlus,
   type Promo,
 } from "./pricing.ts";
 
-const AFFILIATE: Promo = {
+const PRO: Promo = {
   id: "promo-1",
   code: "QMR7K2P",
   kind: "affiliate",
-  ownerUserId: "affiliate-user",
+  ownerUserId: "dr-sara",
   percentOff: null,
   amountCents: null,
   appliesToPlans: null,
@@ -27,113 +26,64 @@ const AFFILIATE: Promo = {
   redemptionCount: 0,
 };
 
-Deno.test("list Plus is 500 EGP a month", () => {
+Deno.test("Plus is 500 EGP a month, and that is the only plan", () => {
   const q = quotePlus({ plan: "monthly", firstPurchase: false, buyerUserId: "buyer", promo: null });
   assertEquals(q.amountCents, LIST_MONTHLY_CENTS);
   assertEquals(LIST_MONTHLY_CENTS, 50_000);
   assertEquals(q.pricingReason, "list");
+  assertEquals(Object.keys(PLANS), ["monthly"]);
+  assertEquals(isPlanId("annual"), false);
+  assertEquals(isPlanId("quarterly"), false);
 });
 
-Deno.test("every first user gets 30% off the 500 list", () => {
-  assertEquals(FIRST_USER_OFF_PERCENT, 30);
-  assertEquals(FIRST_USER_MONTHLY_CENTS, Math.round(LIST_MONTHLY_CENTS * 0.7));
-  const q = quotePlus({ plan: "monthly", firstPurchase: true, buyerUserId: "buyer", promo: null });
-  assertEquals(q.amountCents, 35_000);
-  assertEquals(q.pricingReason, "first_user");
+Deno.test("a first purchase costs the same as every other one", () => {
+  const first = quotePlus({ plan: "monthly", firstPurchase: true, buyerUserId: "buyer", promo: null });
+  assertEquals(first.amountCents, LIST_MONTHLY_CENTS);
+  assertEquals(first.pricingReason, "list");
+  assertEquals(first.firstPurchase, true);
 });
 
-Deno.test("an affiliate code is 299 for the buyer, 50 for the marketer, 249 net", () => {
-  const q = quotePlus({
-    plan: "monthly",
-    firstPurchase: true,
-    buyerUserId: "buyer",
-    promo: AFFILIATE,
-  });
-  assertEquals(q.amountCents, AFFILIATE_MONTHLY_CENTS);
-  assertEquals(AFFILIATE_MONTHLY_CENTS, 29_900);
-  assertEquals(q.affiliateCommissionCents, AFFILIATE_COMMISSION_CENTS);
-  assertEquals(AFFILIATE_COMMISSION_CENTS, 5_000);
-  assertEquals(q.amountCents - q.affiliateCommissionCents, AFFILIATE_NET_CENTS);
-  assertEquals(AFFILIATE_NET_CENTS, PACK_CENTS);
+Deno.test("a professional's code leaves the client's price alone and pays the professional 20%", () => {
+  const q = quotePlus({ plan: "monthly", firstPurchase: true, buyerUserId: "client", promo: PRO });
+  assertEquals(q.amountCents, LIST_MONTHLY_CENTS);
   assertEquals(q.pricingReason, "affiliate");
-  assertEquals(q.affiliateUserId, "affiliate-user");
+  assertEquals(q.affiliateUserId, "dr-sara");
+  assertEquals(PRO_SHARE_PERCENT, 20);
+  assertEquals(PRO_SHARE_MONTHS, 12);
+  assertEquals(q.affiliateCommissionCents, 10_000);
+  assertEquals(proShareCents(50_000), 10_000);
+  assertEquals(q.promoError, null);
 });
 
-Deno.test("you cannot use your own affiliate code", () => {
-  const q = quotePlus({
-    plan: "monthly",
-    firstPurchase: true,
-    buyerUserId: "affiliate-user",
-    promo: AFFILIATE,
-  });
-  assertEquals(q.pricingReason, "first_user");
-  assertEquals(q.amountCents, FIRST_USER_MONTHLY_CENTS);
+Deno.test("you cannot use your own code", () => {
+  const q = quotePlus({ plan: "monthly", firstPurchase: true, buyerUserId: "dr-sara", promo: PRO });
+  assertEquals(q.pricingReason, "list");
+  assertEquals(q.amountCents, LIST_MONTHLY_CENTS);
   assertEquals(q.affiliateCommissionCents, 0);
-  assertEquals(q.promoError, "You cannot use your own affiliate code");
+  assertEquals(q.affiliateUserId, null);
+  assertEquals(q.promoError, "You cannot use your own code");
 });
 
-Deno.test("affiliate codes do not raise the 249 packs", () => {
-  for (const plan of ["quarterly", "annual"] as const) {
-    const q = quotePlus({
-      plan,
-      firstPurchase: true,
-      buyerUserId: "buyer",
-      promo: AFFILIATE,
-    });
-    assertEquals(q.amountCents, PACK_CENTS);
-    assertEquals(q.affiliateCommissionCents, 0);
-    assertEquals(q.promoNote?.includes("299"), true);
-  }
-});
-
-Deno.test("1 year is 50% off the 500 list, priced at 249, and 3 months matches that cash", () => {
-  assertEquals(PACK_CENTS, 24_900);
-  const year = quotePlus({ plan: "annual", firstPurchase: false, buyerUserId: "buyer", promo: null });
-  const three = quotePlus({ plan: "quarterly", firstPurchase: false, buyerUserId: "buyer", promo: null });
-  assertEquals(year.amountCents, PACK_CENTS);
-  assertEquals(three.amountCents, PACK_CENTS);
-  assertEquals(year.days, 365);
-  assertEquals(three.days, 90);
-  assertEquals(year.pricingReason, "annual_half");
-  assertEquals(three.pricingReason, "quarterly_pack");
-});
-
-Deno.test("a later campaign code can undercut the list without touching affiliate math", () => {
-  const campaign: Promo = {
-    ...AFFILIATE,
-    id: "sale",
-    code: "RAMADAN",
-    kind: "campaign",
-    ownerUserId: null,
-    percentOff: 50,
-  };
-  const q = quotePlus({
+Deno.test("an inactive or exhausted code attaches nothing", () => {
+  const dead = quotePlus({ plan: "monthly", firstPurchase: false, buyerUserId: "client", promo: { ...PRO, active: false } });
+  assertEquals(dead.promoError, "This code is not active");
+  assertEquals(dead.affiliateCommissionCents, 0);
+  const spent = quotePlus({
     plan: "monthly",
     firstPurchase: false,
-    buyerUserId: "buyer",
-    promo: campaign,
+    buyerUserId: "client",
+    promo: { ...PRO, maxRedemptions: 1, redemptionCount: 1 },
   });
+  assertEquals(spent.promoError, "This code is not active");
+});
+
+Deno.test("a campaign code is the one thing that can move the price, and it never touches the pro share", () => {
+  const campaign: Promo = { ...PRO, id: "sale", code: "RAMADAN", kind: "campaign", ownerUserId: null, percentOff: 50 };
+  const q = quotePlus({ plan: "monthly", firstPurchase: false, buyerUserId: "buyer", promo: campaign });
   assertEquals(q.amountCents, 25_000);
   assertEquals(q.pricingReason, "campaign");
   assertEquals(q.affiliateCommissionCents, 0);
-});
-
-Deno.test("first-user 350 beats a weaker campaign", () => {
-  const campaign: Promo = {
-    ...AFFILIATE,
-    kind: "campaign",
-    ownerUserId: null,
-    percentOff: 20,
-    code: "SAVE20",
-  };
-  const q = quotePlus({
-    plan: "monthly",
-    firstPurchase: true,
-    buyerUserId: "buyer",
-    promo: campaign,
-  });
-  assertEquals(q.amountCents, FIRST_USER_MONTHLY_CENTS);
-  assertEquals(q.pricingReason, "first_user");
+  assertEquals(q.affiliateUserId, null);
 });
 
 Deno.test("promo codes are compared in uppercase without spaces", () => {
