@@ -72,6 +72,71 @@ sources, licence permitting:
 Check each licence before storing text verbatim; `kb_documents.licence` is
 there to record what you may quote.
 
+## The food graph has names but no numbers until you fill it
+
+Migrations 0017 and 0034 seed `foods`, `food_aliases`, `food_portions` and
+`recipes` — every Egyptian name, portion and recipe composition — and
+deliberately **not one nutrient value**. Per-100g figures come from USDA
+FoodData Central through `ingest_usda.ts`, so every number traces to a
+laboratory analysis, and a composite dish (koshary, a taameya sandwich) is
+computed from its ingredients by `qamar_nutrients_per_100g` rather than looked
+up. Until the ingest has run, every dish is a resolvable name with no
+nutrition, and the gateway falls back to an external lookup for it.
+
+```bash
+USDA_API_KEY=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+  deno run --allow-net --allow-env supabase/functions/ai-gateway/ingest_usda.ts [--limit N] [--dry-run]
+```
+
+How it decides:
+
+- It takes every `foods` row with `is_recipe = false` and searches USDA for
+  `name_en` plus `food_state` (`"Beef, ground, 80% lean meat / 20% fat raw"`).
+  The ingredient rows in 0034 are named to overlap the USDA description on
+  purpose; keep doing that when adding one.
+- A match below the token-overlap floor (0.45) is left alone and listed at the
+  end. A wrong food is worse than a missing one.
+- A **hand-mapped id wins over the search.** For an item USDA cannot find under
+  any English name — عيش بلدي, جبنة قريش, فسيخ — decide the closest generic USDA
+  food yourself, then insert a `food_source_links` row with `source_id =
+  'usda_fdc'`, `external_type = 'fdc_id'` and the id, and re-run. The importer
+  fetches that id directly. The row is the record of who decided what.
+- Zero is a value. Water, salt and brewed tea report 0 kcal and are loaded;
+  only a food with *no* energy field at all is skipped.
+- A food counts as done when it carries the current `NUTRIENT_SET_VERSION`;
+  widening `NUTRIENT_MAP` and bumping the version re-fetches everything.
+
+Then check what the dishes can do with it:
+
+```sql
+select * from dish_nutrient_readiness where not computable;
+```
+
+One row per recipe dish; `missing_ingredients` names the ingredient without an
+energy value that is holding the dish back. A dish returns no nutrition at all
+until every non-optional ingredient has one, rather than an undercount from the
+ingredients that happened to load.
+
+Ingredients 0034 added for the new recipes, expected to match USDA by name:
+wheat flour, semolina, phyllo dough, puff pastry, bread crumbs, cornstarch,
+rice flour, couscous, white and whole-wheat toast, heavy cream, dry whole milk,
+sweetened condensed milk, mozzarella, cheddar, cream cheese, ground beef,
+ground lamb, chicken liver, roasted and stewed whole chicken, duck, squab
+(pigeon), quail, rabbit, beef tripe, beef brain, beef shank, beef bologna,
+fried squid, blue crab, sea bass, Atlantic mackerel, tomato paste, green beans,
+artichoke, sweet corn, pumpkin, mushrooms, celery, peppermint, spring onion,
+beets, turnip, dill pickles, Swiss chard, french fries, dried apricots, dried
+figs, prunes, raisins, tamarind, brewed hibiscus tea, raw orange juice, tap
+water, table salt, cumin, coriander seed, anise, fenugreek, ground cinnamon,
+ginger root, distilled vinegar, mayonnaise, pistachios, desiccated coconut, jam,
+vanilla ice cream.
+
+Items that will need a hand-mapped id, because USDA has no Egyptian row: the
+three breads (baladi, fino, shami), areesh / white / roumy / istanbouli cheese,
+laban rayeb, eshta, samna, Egyptian sausage, basterma, feseekh, molokhia leaves,
+taro, halawa, erksous, sugarcane juice, and the generic soft drink. Map each to
+the closest USDA relative and say so in the row.
+
 ## Costs and limits, before this goes live
 
 Nothing here rate-limits per user yet. `ai_interactions` records every call and
