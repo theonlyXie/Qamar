@@ -201,6 +201,12 @@ Future<bool> openPaymobCheckout(String url) {
   return launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
 }
 
+/// Opens a partner's page in the system browser or their app — the grocery
+/// basket, for one. Same posture as checkout: the person sees the address.
+Future<bool> openExternalUrl(String url) {
+  return launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+}
+
 class BillingException implements Exception {
   final String message;
   BillingException(this.message);

@@ -192,6 +192,15 @@ the truthful state.
 
 Add `--dart-define=POSTHOG_API_KEY=<project token>` (and, if not EU,
 `--dart-define=POSTHOG_HOST=https://us.i.posthog.com`) to turn analytics on.
+
+**Shop this plan** appears on the Plan screen only when a grocery partner is
+configured: `--dart-define=GROCERY_PARTNER_URL=<deep-link template>` (with
+`{items}`, `{ref}` and `{lang}` placeholders, or a plain URL that receives
+them as query parameters), `--dart-define=GROCERY_PARTNER_NAME=Breadfast` for
+the button, and `--dart-define=GROCERY_AFFILIATE_ID=<Qamar's reference>`.
+The basket is the day's portions in household units; converting them to the
+partner's SKUs is the partner-side half of the integration. Opening the
+basket is counted as `basket_opened {items, partner}`.
 Without the key the SDK is never initialised. With it, three rules hold:
 
 - **Nothing is sent before consent.** The SDK starts only when the person

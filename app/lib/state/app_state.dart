@@ -24,6 +24,7 @@ import '../services/payments.dart';
 import '../services/repositories.dart';
 import '../models/activity.dart';
 import '../models/billing.dart';
+import '../models/basket.dart';
 import '../models/invitation.dart';
 import '../widgets/explain.dart';
 import '../models/profile.dart';
@@ -72,6 +73,7 @@ class AppState extends ChangeNotifier {
     AiGateway? ai,
     BillingGateway? billing,
     Future<bool> Function(String url)? openCheckout,
+    GroceryPartner? grocery,
     Dictation? dictation,
     Account? auth,
     String? userId,
@@ -89,6 +91,8 @@ class AppState extends ChangeNotifier {
         _ai = ai,
         _billing = billing,
         _openCheckout = openCheckout,
+        _grocery = grocery ??
+            const GroceryPartner(url: QamarConfig.groceryPartnerUrl, name: QamarConfig.groceryPartnerName, ref: QamarConfig.groceryAffiliateId),
         _dictation = dictation,
         _auth = auth,
         _userId = userId,
@@ -200,6 +204,33 @@ class AppState extends ChangeNotifier {
   /// pretending a card was charged.
   final BillingGateway? _billing;
   final Future<bool> Function(String url)? _openCheckout;
+
+  // ---- shop this plan ----------------------------------------------------------
+  //
+  // Blueprint: "the plan sends every user to a grocery basket, and the
+  // commission on that basket is the second income line". One signed
+  // partner, by configuration; the basket is today's portions; the link
+  // carries Qamar's reference. Absent a partner, absent from the app.
+
+  final GroceryPartner _grocery;
+  GroceryPartner get groceryPartner => _grocery;
+
+  GroceryBasket get basket => GroceryBasket.fromMeals(planMeals());
+
+  bool get canShopPlan => _grocery.enabled && hasPlan && !basket.isEmpty;
+
+  String? shopNotice;
+
+  Future<void> shopThisPlan() async {
+    if (!canShopPlan) return;
+    final b = basket;
+    _track('basket_opened', {'items': b.count, 'partner': _grocery.name});
+    final opener = _openCheckout ?? openExternalUrl;
+    final ok = await opener(b.link(_grocery, ar: isAr).toString());
+    if (_disposed) return;
+    shopNotice = ok ? null : (isAr ? 'مقدرتش أفتح ${_grocery.name}. جرّب تاني.' : 'Could not open ${_grocery.name}. Try again.');
+    _notify();
+  }
   bool get hasBilling => _billing != null;
 
   /// The device's speech recogniser. Null in tests and on platforms without

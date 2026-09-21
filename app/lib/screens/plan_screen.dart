@@ -67,6 +67,10 @@ class _PlanScreenState extends State<PlanScreen> {
               explanation: mealExplanation(m),
               child: _MealCard(state: state, meal: m),
             ),
+          if (state.canShopPlan) ...[
+            _ShopCard(state: state),
+            const SizedBox(height: 14),
+          ],
         ],
         Container(
           padding: const EdgeInsets.all(16),
@@ -304,6 +308,69 @@ class _NudgePrompt extends StatelessWidget {
               child: Text(isAr ? 'لا، شكراً' : 'No, thanks', style: QText.body(size: 13, color: QColors.textMuted)),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shop this plan: the plan's portions as a basket at the signed partner.
+/// Only when a partner is configured; the commission is said out loud.
+class _ShopCard extends StatelessWidget {
+  final AppState state;
+  const _ShopCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final basket = state.basket;
+    final partner = state.groceryPartner;
+    final shown = basket.lines.take(4).toList();
+    final more = basket.count - shown.length;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: QColors.green.withValues(alpha: 0.07),
+        border: Border.all(color: QColors.green.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(QRadii.xl),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.shopping_basket_outlined, size: 16, color: QColors.green),
+            const SizedBox(width: 6),
+            Text(isAr ? 'اشتري خطة النهاردة' : 'Shop this plan',
+                style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+          ]),
+          const SizedBox(height: 6),
+          Text(
+            isAr
+                ? '${state.iso('${basket.count}')} صنف من أطباق النهاردة، في سلة ${partner.name}. قمر بياخد عمولة صغيرة من الشريك؛ الخطة نفسها مش بتتغير عشانها.'
+                : '${basket.count} item${basket.count == 1 ? '' : 's'} from today’s dishes, into ${partner.name}’s basket. Qamar earns a small commission from the partner; the plan itself never changes for it.',
+            style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+          ),
+          const SizedBox(height: 10),
+          for (final l in shown)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(children: [
+                Expanded(child: Text(l.name(ar: isAr), style: QText.body(size: 13, color: QColors.textHigh))),
+                Text(l.amount(ar: isAr), style: QText.body(size: 12, color: QColors.textMuted)),
+              ]),
+            ),
+          if (more > 0)
+            Text(isAr ? '+${state.iso('$more')} كمان' : '+$more more', style: QText.body(size: 12, color: QColors.textMuted)),
+          const SizedBox(height: 10),
+          QPrimaryButton(
+            label: isAr ? 'افتح السلة في ${partner.name}' : 'Open the basket at ${partner.name}',
+            height: 44,
+            onTap: () { state.shopThisPlan(); },
+          ),
+          if (state.shopNotice != null) ...[
+            const SizedBox(height: 8),
+            Text(state.shopNotice!, style: QText.body(size: 12, color: QColors.amberSoft)),
+          ],
         ],
       ),
     );

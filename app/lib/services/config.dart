@@ -42,6 +42,14 @@ class QamarConfig {
   /// Paymob billing Edge Function. Defaults to the same Supabase project as
   /// the rest of the backend so Egypt checkout needs no extra dart-define.
   static const billingUrlOverride = String.fromEnvironment('BILLING_URL');
+
+  /// Shop this plan. The signed grocery partner's deep-link template
+  /// (`{items}`, `{ref}`, `{lang}` are filled in), the name on the button and
+  /// Qamar's affiliate reference. With no template, nothing about shopping
+  /// appears in the app.
+  static const groceryPartnerUrl = String.fromEnvironment('GROCERY_PARTNER_URL');
+  static const groceryPartnerName = String.fromEnvironment('GROCERY_PARTNER_NAME', defaultValue: 'the partner');
+  static const groceryAffiliateId = String.fromEnvironment('GROCERY_AFFILIATE_ID');
   static String get billingUrl {
     if (billingUrlOverride.isNotEmpty) return billingUrlOverride;
     if (supabaseUrl.isEmpty) return '';

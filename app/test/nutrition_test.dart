@@ -8,10 +8,11 @@ import 'dart:ui' show Offset, Rect;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qamar/models/activity.dart';
+import 'package:qamar/models/basket.dart';
+import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/onboarding.dart';
-import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/streak.dart';
 import 'package:qamar/models/su_economy.dart';
@@ -61,6 +62,7 @@ class PlanOnlyGateway extends HttpAiGateway {
 }
 
 void main() {
+  basketTests();
   group('Mifflin-St Jeor', () {
     test('applies the sex-specific constant', () {
       final male = AppState()..profile = const Profile(gender: Gender.male);
@@ -861,6 +863,48 @@ void languageTests() {
         expect(e.value.soWhatAr.trim(), isNotEmpty, reason: e.key);
         expect(e.value.soWhatEn.trim(), isNotEmpty, reason: e.key);
       }
+    });
+  });
+}
+
+void basketTests() {
+  const koshary = (ar: 'كشري', en: 'Koshary', amountAr: 'طبق', amountEn: '1 bowl', kcal: 520);
+  const salad = (ar: 'سلطة', en: 'Salad', amountAr: 'طبق صغير', amountEn: '1 small plate', kcal: 60);
+  const chicken = (ar: 'فراخ مشوية', en: 'Grilled chicken', amountAr: 'ربع', amountEn: '1/4', kcal: 290);
+  const lunch = (
+    id: 'lunch', slotAr: 'غدا', slotEn: 'Lunch', nameAr: 'كشري', nameEn: 'Koshary', noteAr: '', noteEn: '',
+    portions: <PlanPortion>[koshary, salad],
+  );
+  const dinner = (
+    id: 'dinner', slotAr: 'عشا', slotEn: 'Dinner', nameAr: 'فراخ', nameEn: 'Chicken', noteAr: '', noteEn: '',
+    portions: <PlanPortion>[chicken, salad],
+  );
+
+  group('shop this plan', () {
+    test('the basket is every distinct portion of the day, first occurrence wins', () {
+      final b = GroceryBasket.fromMeals(const [lunch, dinner]);
+      expect(b.lines.map((l) => l.en).toList(), ['Koshary', 'Salad', 'Grilled chicken']);
+      expect(b.count, 3);
+      expect(b.lines[1].amount(ar: true), 'طبق صغير');
+    });
+
+    test('a template with placeholders is filled and encoded; one without gets query parameters', () {
+      final b = GroceryBasket.fromMeals(const [lunch]);
+      const templated = GroceryPartner(url: 'https://partner.example/basket?q={items}&aff={ref}&l={lang}', name: 'Breadfast', ref: 'qamar aff');
+      final u = b.link(templated, ar: false);
+      expect(u.toString(), 'https://partner.example/basket?q=Koshary%2CSalad&aff=qamar%20aff&l=en');
+
+      const plain = GroceryPartner(url: 'https://partner.example/basket?src=qamar', name: 'Rabbit', ref: 'QMR');
+      final v = b.link(plain, ar: true);
+      expect(v.queryParameters['src'], 'qamar', reason: 'the partner’s own parameters are kept');
+      expect(v.queryParameters['items'], 'كشري,سلطة');
+      expect(v.queryParameters['ref'], 'QMR');
+      expect(v.queryParameters['lang'], 'ar');
+    });
+
+    test('no partner, no shopping', () {
+      expect(GroceryPartner.none.enabled, isFalse);
+      expect(const GroceryPartner(url: '  ', name: 'x', ref: '').enabled, isFalse);
     });
   });
 }

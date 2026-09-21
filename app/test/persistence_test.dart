@@ -21,6 +21,7 @@ import 'package:qamar/models/ramadan.dart';
 import 'package:qamar/models/streak.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/models/activity.dart';
+import 'package:qamar/models/basket.dart';
 import 'package:qamar/models/billing.dart';
 import 'package:qamar/models/invitation.dart';
 import 'package:qamar/models/water.dart';
@@ -2171,6 +2172,49 @@ void main() {
       expect(list.first.until!.year, 2027);
       expect(list.last.name, '—', reason: 'a client with no name on file is still a row, not a crash');
       expect(list.last.targetKcal, isNull);
+    });
+  });
+
+  group('shop this plan', () {
+    const lunchMeal = (
+      id: 'lunch', slotAr: 'غدا', slotEn: 'Lunch',
+      nameAr: 'كشري', nameEn: 'Koshary', noteAr: '', noteEn: '',
+      portions: <PlanPortion>[(ar: 'كشري', en: 'Koshary', amountAr: 'طبق', amountEn: '1 bowl', kcal: 520)],
+    );
+    const partner = GroceryPartner(url: 'https://partner.example/b?items={items}&ref={ref}', name: 'Breadfast', ref: 'qamar-aff-1');
+
+    test('with a partner configured, the plan offers its basket and the link carries the reference', () async {
+      final a = MemoryAnalytics();
+      final opened = <String>[];
+      final state = AppState(analytics: a, grocery: partner, openCheckout: (url) async { opened.add(url); return true; })..setLang(AppLang.en);
+      await state.setImprove(true);
+      expect(state.canShopPlan, isFalse, reason: 'no plan yet');
+
+      state.plan = const DayPlan(date: '2026-09-21', slots: [(lunchMeal, lunchMeal)]);
+      expect(state.canShopPlan, isTrue);
+      expect(state.basket.count, 1);
+
+      await state.shopThisPlan();
+      expect(opened.single, 'https://partner.example/b?items=Koshary&ref=qamar-aff-1');
+      expect(a.named('basket_opened').single, containsPair('items', 1));
+      expect(a.named('basket_opened').single['partner'], 'Breadfast');
+      expect(state.shopNotice, isNull);
+    });
+
+    test('a link that will not open says so, and nothing is counted twice', () async {
+      final state = AppState(grocery: partner, openCheckout: (url) async => false)..setLang(AppLang.en);
+      state.plan = const DayPlan(date: '2026-09-21', slots: [(lunchMeal, lunchMeal)]);
+      await state.shopThisPlan();
+      expect(state.shopNotice, 'Could not open Breadfast. Try again.');
+    });
+
+    test('without a partner there is nothing to shop, whatever the plan', () async {
+      final opened = <String>[];
+      final state = AppState(grocery: GroceryPartner.none, openCheckout: (url) async { opened.add(url); return true; });
+      state.plan = const DayPlan(date: '2026-09-21', slots: [(lunchMeal, lunchMeal)]);
+      expect(state.canShopPlan, isFalse);
+      await state.shopThisPlan();
+      expect(opened, isEmpty);
     });
   });
 }
