@@ -251,6 +251,8 @@ class FakeGateway implements AiGateway {
     return result;
   }
 
+  final List<String?> chatImagePaths = [];
+
   @override
   Future<ChatResult> chatReply({
     required String message,
@@ -258,10 +260,17 @@ class FakeGateway implements AiGateway {
     String? date,
     Map<String, dynamic>? currentPlan,
     List<String>? swappedSlots,
+    String? imagePath,
   }) async {
     chatMessages.add(message);
+    chatImagePaths.add(imagePath);
     lastCurrentPlan = currentPlan;
-    _useChat();
+    // A photo in the conversation is one of the day's photos, not a question.
+    if (imagePath != null) {
+      _usePhoto();
+    } else {
+      _useChat();
+    }
     if (chatResult.reply == 'grounded answer' && reply != 'grounded answer') {
       return ChatResult(reply: reply);
     }
@@ -1918,6 +1927,74 @@ void main() {
       await settle();
       expect(state.activityMinutesToday, 45);
       expect(state.activityKcalToday, 300);
+    });
+  });
+
+  group('a photo in the conversation', () {
+    test('a menu photo with no words asks the implied question and spends a photo, not a question', () async {
+      final ai = FakeGateway();
+      final a = MemoryAnalytics();
+      final state = backed(ai: ai, analytics: a);
+      await settle();
+      state.setLang(AppLang.en);
+      await state.setImprove(true);
+
+      state.attachChatPhoto('/tmp/menu.jpg');
+      expect(state.chatOpen, isTrue, reason: 'the photo lands in the conversation');
+      state.sendChat();
+      await settle();
+
+      expect(state.chatPhotoPath, isNull, reason: 'one photo goes with one message');
+      expect(ai.chatMessages.single, 'What should I order here?');
+      expect(ai.chatImagePaths.single, '/tmp/menu.jpg');
+      expect(ai.quotas.photo.remaining, SuEconomy.litePhotoDaily - 1);
+      expect(ai.quotas.chat.remaining, SuEconomy.liteChatDaily, reason: 'metered as a photo');
+      final mine = state.chat.where((c) => c.who == ChatWho.u).single;
+      expect(mine.photoPath, '/tmp/menu.jpg');
+      expect(mine.text, 'What should I order here?');
+      expect(a.named('question_asked').single['photo'], true);
+    });
+
+    test('words typed with the photo are kept; a detached photo is not sent', () async {
+      final ai = FakeGateway();
+      final state = backed(ai: ai);
+      await settle();
+      state.setLang(AppLang.en);
+
+      state.attachChatPhoto('/tmp/menu.jpg');
+      state.onChatDraftChanged('Is the grilled chicken a good pick?');
+      state.sendChat();
+      await settle();
+      expect(ai.chatMessages.single, 'Is the grilled chicken a good pick?');
+      expect(ai.chatImagePaths.single, '/tmp/menu.jpg');
+
+      state.attachChatPhoto('/tmp/again.jpg');
+      state.detachChatPhoto();
+      state.sendChat();
+      await settle();
+      expect(ai.chatMessages, hasLength(1), reason: 'nothing to send without words or a photo');
+      expect(state.chatPhotoPath, isNull);
+    });
+
+    test('the fourth photo of the day in the conversation goes to the wallet, not Qamar+', () async {
+      final ai = FakeGateway();
+      final state = backed(ai: ai);
+      await settle();
+      state.setLang(AppLang.en);
+
+      for (var i = 0; i < SuEconomy.litePhotoDaily; i++) {
+        state.attachChatPhoto('/tmp/m$i.jpg');
+        await state.sendChatMsg('');
+      }
+      expect(ai.quotas.photo.remaining, 0);
+
+      state.attachChatPhoto('/tmp/m4.jpg');
+      await state.sendChatMsg('');
+      final last = state.chat.last;
+      expect(last.who, ChatWho.q);
+      expect(last.openWallet, isTrue);
+      expect(last.openPlus, isFalse);
+      expect(ai.quotas.chat.remaining, SuEconomy.liteChatDaily, reason: 'no question was spent along the way');
     });
   });
 }

@@ -5,7 +5,7 @@ this decides whether the question may be answered at all, gathers evidence,
 calls the model, and records what happened.
 
 ```
-POST /ai-gateway/chat/reply     { message, lang }
+POST /ai-gateway/chat/reply     { message, lang, imageBase64?, imageMediaType? }   # a photo (a menu) is metered as a photo
 POST /ai-gateway/meal/analyze   { inputType, text?, mediaPath?, lang? }
 POST /ai-gateway/plan/generate  { date?, lang? }
 ```

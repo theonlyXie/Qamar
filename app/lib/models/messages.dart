@@ -30,5 +30,9 @@ class ChatTurn {
 
   /// The action button opens Qamar+ — the fourth question of the day.
   final bool openPlus;
-  const ChatTurn({required this.who, required this.text, this.sub, this.action, this.openWallet = false, this.openPlus = false});
+
+  /// The photo the person sent with these words — a menu, a label, a plate.
+  /// Shown in their bubble; never kept anywhere but this device.
+  final String? photoPath;
+  const ChatTurn({required this.who, required this.text, this.sub, this.action, this.openWallet = false, this.openPlus = false, this.photoPath});
 }

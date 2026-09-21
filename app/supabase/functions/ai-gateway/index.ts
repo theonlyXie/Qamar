@@ -5,7 +5,7 @@
 // calls the model, and records what happened.
 //
 // Routes:
-//   POST /ai-gateway/chat/reply     { message, lang, date?, current_plan?, swapped_slots? }
+//   POST /ai-gateway/chat/reply     { message, lang, date?, current_plan?, swapped_slots?, imageBase64?, imageMediaType? }
 //   POST /ai-gateway/meal/analyze   { inputType, text?, imageBase64?, imageMediaType? }
 //     text/voice: food graph only — no model, never counted
 //     photo: the photo bucket (3/day on Lite, more with Su) + vision model
@@ -436,12 +436,32 @@ function mealsFromBody(plan: unknown): Meal[] | null {
 
 // ---- routes -------------------------------------------------------------
 
+/** The question a menu photo asks when the person typed nothing with it. */
+function menuQuestion(lang: "ar" | "en"): string {
+  return lang === "ar" ? "أطلب إيه من هنا؟" : "What should I order from this menu?";
+}
+
 async function chatReply(userId: string, body: Record<string, unknown>): Promise<Response> {
-  const message = (asString(body.message) ?? "").trim();
   const lang = asString(body.lang) === "ar" ? "ar" : "en";
   const day = (asString(body.date) ?? new Date().toISOString().slice(0, 10));
 
-  const verdict = classify(message);
+  // A photo in the conversation — a restaurant menu, a label, a plate on the
+  // table — rides the same route as a question. It is metered as a photo,
+  // because that is what costs the model call, and the words with it may be
+  // empty: the question is implied.
+  const image = readImage(body as { imageBase64?: string; imageMediaType?: string });
+  if (typeof image === "string") return json({ error: image }, 400);
+  const typed = (asString(body.message) ?? "").trim();
+  const message = typed || (image ? menuQuestion(lang) : "");
+  const bucket: Bucket = image ? "photo" : "chat";
+
+  // The safety gate reads the words either way. Only the "not about food"
+  // outcome is overridden by a photo, since "what do I order here" carries no
+  // food term and the picture is the food.
+  let verdict = classify(message);
+  if (!verdict.allowed && verdict.reason === "off_topic" && image) {
+    verdict = { allowed: true, domain: "nutrition" };
+  }
   if (!verdict.allowed) {
     const id = await record(userId, "chat", {
       inScope: false,
@@ -468,10 +488,16 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
     ? JSON.stringify({ date: day, meals: currentMeals, swapped_slots: swapped })
     : "";
 
+  const domain = verdict.domain;
   const [passages, retrievalMs] = await timed(() =>
-    retrieve(SUPABASE_URL, SERVICE_KEY, message, verdict.domain)
+    retrieve(
+      SUPABASE_URL,
+      SERVICE_KEY,
+      image ? `${message} — choosing from a restaurant menu, eating out, portion size` : message,
+      domain,
+    )
   );
-  if (passages.length === 0) {
+  if (passages.length === 0 && !image) {
     // No grounding, no answer. This is the rule that stops the assistant
     // becoming a general chatbot the moment retrieval is empty.
     const reply = lang === "ar"
@@ -485,21 +511,22 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
   const [resolved, resolveMs] = await timed(() =>
     resolveFoods(SUPABASE_URL, SERVICE_KEY, lookup)
   );
-  // The fourth question of the day is the paywall.
-  const taken = await takeAiUse(userId, lang, "chat");
+  // The fourth question of the day is the paywall; a photo spends a photo.
+  const taken = await takeAiUse(userId, lang, bucket);
   if (taken instanceof Response) return taken;
   const quota = taken;
 
   let called: Awaited<ReturnType<typeof callModel>>;
   try {
     called = await callModel({
-      system: chatSystemPrompt(ctx, passages, renderResolutions(resolved), menuJson),
+      system: chatSystemPrompt(ctx, passages, renderResolutions(resolved), menuJson, { photo: image !== null }),
       user: message,
       maxTokens: 1600,
       prefill: "{",
+      ...(image ? { image } : {}),
     });
   } catch (e) {
-    await refundAi(userId, "chat");
+    await refundAi(userId, bucket);
     throw e;
   }
   const { text, model, usage, latencyMs } = called;
@@ -572,9 +599,11 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
   }
 
   const sources = resolvedSources(passages, resolved);
+  // The audit row notes that a photo was attached; the photo itself is never
+  // stored.
   const id = await record(userId, "chat", {
     inScope: true,
-    question: message,
+    question: image ? `[photo] ${message}` : message,
     answer: reply,
     sources,
     model,
@@ -607,7 +636,8 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
     excludedRules: rules.excluded,
     candidateDecision: {
       reply: reply.slice(0, 2000),
-      domain: verdict.domain,
+      domain,
+      input: image ? "photo" : "text",
       sources,
       plan_update: planUpdate,
     },

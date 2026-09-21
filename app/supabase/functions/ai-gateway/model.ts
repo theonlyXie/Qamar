@@ -215,11 +215,29 @@ export function chatSystemPrompt(
   passages: Passage[],
   foodBlock: string,
   currentMenu?: string,
+  opts: { photo?: boolean } = {},
 ): string {
   const menuBlock = currentMenu?.trim()
     ? `TODAY'S MENU (what is on their Plan and Today screens right now — you own this, they do not edit it by hand):
 ${currentMenu.trim()}`
     : `TODAY'S MENU: none on their screens yet. If they need food for the rest of the day, rebuild.`;
+
+  // A picture in the conversation is almost always a restaurant menu, and the
+  // person is standing there deciding. Read what is printed; recommend from
+  // it against what is left of the day; never price a dish the photo and
+  // FOOD DATA do not price.
+  const photoBlock = opts.photo
+    ? `
+THE PHOTO: the person attached a picture — usually a restaurant menu, sometimes
+a food label or a plate. Read only what is actually legible in it; do not
+guess at items you cannot read. Pick one or two things from it that fit what
+is left of today's target after TODAY'S MENU, name the portion and what to
+leave out, and give the reason in one clause. Numbers come only from FOOD DATA
+or figures printed in the photo; anything else is a rough estimate and is
+called one. If the picture is not readable or not about food, say so plainly.
+plan_update stays null unless they say they ate it.
+`
+    : "";
 
   return `${COMMON_RULES}
 
@@ -233,7 +251,7 @@ menu those screens show. Logging a meal they already ate is a different path
 and is not what this reply does.
 
 ${menuBlock}
-
+${photoBlock}
 RETRIEVED GUIDANCE:
 ${renderPassages(passages)}
 

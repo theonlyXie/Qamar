@@ -724,6 +724,7 @@ class AppState extends ChangeNotifier {
     proposalQty = [];
     proposalRaw = null;
     lastMealPhotoPath = null;
+    chatPhotoPath = null;
     scanned = false;
     scanReading = false;
     suAvailable = 0;
@@ -2927,8 +2928,31 @@ class AppState extends ChangeNotifier {
 
   void sendChat() {
     final v = chatDraft.trim();
-    if (v.isNotEmpty) sendChatMsg(v);
+    if (v.isNotEmpty || chatPhotoPath != null) sendChatMsg(v);
   }
+
+  // ---- a photo in the conversation ----------------------------------------
+  //
+  // "Photograph the menu, ask what to order." The picture attaches to the next
+  // message; the words with it may be empty, in which case the question is
+  // implied. The gateway meters it as one of the day's photos.
+
+  /// The photo waiting to go with the next message, if one was taken.
+  String? chatPhotoPath;
+
+  void attachChatPhoto(String path) {
+    chatPhotoPath = path;
+    chatOpen = true;
+    _notify();
+  }
+
+  void detachChatPhoto() {
+    chatPhotoPath = null;
+    _notify();
+  }
+
+  /// What a photo asks when nothing was typed with it.
+  String get menuPhotoQuestion => isAr ? 'أطلب إيه من هنا؟' : 'What should I order here?';
 
   /// Sends a message and answers it with the real assistant.
   ///
@@ -2936,7 +2960,10 @@ class AppState extends ChangeNotifier {
   /// call fails, Qamar says so — a health app inventing a plausible-sounding
   /// reply is worse than one admitting it is not connected.
   Future<void> sendChatMsg(String text) async {
-    chat.add(ChatTurn(who: ChatWho.u, text: text));
+    final photo = chatPhotoPath;
+    chatPhotoPath = null;
+    if (text.trim().isEmpty && photo != null) text = menuPhotoQuestion;
+    chat.add(ChatTurn(who: ChatWho.u, text: text, photoPath: photo));
     lastUser = text;
     chatDraft = '';
     chatState = ChatState.thinking;
@@ -2944,13 +2971,14 @@ class AppState extends ChangeNotifier {
 
     // Armed by quick-logging: this message describes a meal, so it goes to the
     // analyser rather than the chat model, and comes back as something to
-    // confirm instead of something to read.
+    // confirm instead of something to read. A photo taken meanwhile is the
+    // meal's photo.
     if (_loggingMeal) {
       _loggingMeal = false;
-      await _analyseMeal(inputType: proposalInput, text: text);
+      await _analyseMeal(inputType: photo != null ? 'photo' : proposalInput, text: text, imagePath: photo);
       return;
     }
-    _track('question_asked');
+    _track('question_asked', photo != null ? {'photo': true} : const {});
 
     final gateway = _ai;
     if (gateway == null) {
@@ -2973,6 +3001,7 @@ class AppState extends ChangeNotifier {
         date: _today(),
         currentPlan: plan == null ? null : planToWire(plan!),
         swappedSlots: swappedSlots.toList(),
+        imagePath: photo,
       );
       if (_disposed) return;
 

@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { dayShape, isFasting, planSystemPrompt, slotEnum, type UserContext } from "./model.ts";
+import { chatSystemPrompt, dayShape, isFasting, planSystemPrompt, slotEnum, type UserContext } from "./model.ts";
 
 const base: UserContext = { age: 30, gender: "male", targetKcal: 2000, lang: "ar" };
 
@@ -21,4 +21,13 @@ Deno.test("the plan prompt asks for iftar and suhoor while fasting, three meals 
   const q = planSystemPrompt(base, [], "(no food data)");
   assert(q.includes('"slot": "breakfast|lunch|dinner"'));
   assert(!q.includes("fasting Ramadan"));
+});
+
+Deno.test("a photo in the conversation is read as a menu; a plain question is not", () => {
+  const withPhoto = chatSystemPrompt(base, [], "(no food data)", "", { photo: true });
+  assert(withPhoto.includes("THE PHOTO"));
+  assert(withPhoto.includes("plan_update stays null unless they say they ate it"));
+  assert(withPhoto.includes("(no guidance retrieved)"), "an empty retrieval does not stop a menu reading");
+  const plain = chatSystemPrompt(base, [], "(no food data)", "");
+  assert(!plain.includes("THE PHOTO"));
 });

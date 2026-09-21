@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../models/meal.dart';
@@ -218,6 +219,41 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> {
                           ),
                         ),
                       ],
+                      // A menu photographed at the table, waiting to go with the
+                      // next words — or with none: "what do I order here?" is
+                      // implied.
+                      if (state.chatPhotoPath != null && !kIsWeb) ...[
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xE5111827),
+                              border: Border.all(color: QColors.borderStrong),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: _photoThumb(state.chatPhotoPath!, 44),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(state.isAr ? 'صورة المنيو' : 'Menu photo',
+                                    style: QText.body(size: 12, color: QColors.textMuted)),
+                                const SizedBox(width: 4),
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: state.detachChatPhoto,
+                                  child: const SizedBox(width: 30, height: 30, child: Icon(Icons.close, size: 16, color: QColors.textMuted)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                       Container(
                         padding: const EdgeInsetsDirectional.only(start: 16, end: 5, top: 5, bottom: 5),
                         decoration: BoxDecoration(color: const Color(0xE5111827), border: Border.all(color: QColors.borderStrong), borderRadius: BorderRadius.circular(999)),
@@ -230,13 +266,19 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> {
                                 onSubmitted: (_) => state.sendChat(),
                                 style: QText.body(size: 15, color: QColors.textPrimary),
                                 decoration: InputDecoration(
-                                  hintText: t.chatPlaceholder,
+                                  hintText: state.chatPhotoPath != null
+                                      ? (state.isAr ? 'اسأل عن المنيو، أو ابعت الصورة بس' : 'Ask about the menu, or just send the photo')
+                                      : t.chatPlaceholder,
                                   hintStyle: QText.body(size: 15, color: QColors.textFaint),
                                   border: InputBorder.none,
                                   isDense: true,
                                 ),
                               ),
                             ),
+                            if (!kIsWeb) ...[
+                              QRoundIcon(icon: Icons.photo_camera_outlined, size: 40, onTap: () => _photographMenu(context, state), filled: false),
+                              const SizedBox(width: 6),
+                            ],
                             QRoundIcon(icon: Icons.circle, size: 40, onTap: state.tapOrbListen, filled: false),
                             const SizedBox(width: 6),
                             QRoundIcon(icon: Icons.arrow_upward, size: 40, onTap: state.sendChat, filled: true),
@@ -253,6 +295,36 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> {
       ),
     );
   }
+}
+
+/// Opens the camera for a menu, a label or a plate and attaches the shot to
+/// the next message. Sized for reading print, not for keeping: 1280 px on
+/// the long side at quality 80 is a few hundred kilobytes.
+Future<void> _photographMenu(BuildContext context, AppState state) async {
+  try {
+    final shot = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 80, maxWidth: 1280);
+    if (!context.mounted || shot == null) return;
+    state.attachChatPhoto(shot.path);
+  } on Exception {
+    // No camera or a refused permission: the conversation stays as it was.
+  }
+}
+
+Widget _photoThumb(String path, double size) {
+  return Image.file(
+    File(path),
+    width: size,
+    height: size,
+    fit: BoxFit.cover,
+    errorBuilder: (_, __, ___) => SizedBox(
+      width: size,
+      height: size,
+      child: const DecoratedBox(
+        decoration: BoxDecoration(color: Color(0xFF182137)),
+        child: Icon(Icons.photo_camera_outlined, size: 18, color: QColors.textMuted),
+      ),
+    ),
+  );
 }
 
 class QRoundIcon extends StatelessWidget {
@@ -299,7 +371,17 @@ class _ChatBubble extends StatelessWidget {
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.96),
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
             decoration: BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.circular(18)),
-            child: Text(turn.text, style: QText.body(size: 15, height: 23, color: Colors.white)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (turn.photoPath != null && !kIsWeb) ...[
+                  ClipRRect(borderRadius: BorderRadius.circular(12), child: _photoThumb(turn.photoPath!, 120)),
+                  const SizedBox(height: 8),
+                ],
+                Text(turn.text, style: QText.body(size: 15, height: 23, color: Colors.white)),
+              ],
+            ),
           ),
         ),
       );

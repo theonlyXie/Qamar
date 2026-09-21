@@ -81,12 +81,16 @@ abstract class AiGateway {
     String lang = 'ar',
   });
 
+  /// [imagePath] is a photo taken inside the conversation — a restaurant
+  /// menu, a label, a plate — read alongside the words. The gateway meters it
+  /// as a photo, not a question, and [message] may be empty with it.
   Future<ChatResult> chatReply({
     required String message,
     required String lang,
     String? date,
     Map<String, dynamic>? currentPlan,
     List<String>? swappedSlots,
+    String? imagePath,
   });
 
   /// Reads an InBody or similar body-composition printout.
@@ -194,8 +198,10 @@ class HttpAiGateway implements AiGateway {
     String? date,
     Map<String, dynamic>? currentPlan,
     List<String>? swappedSlots,
+    String? imagePath,
   }) async {
     final day = date ?? DateTime.now().toIso8601String().substring(0, 10);
+    final (data: imageBase64, mediaType: imageMediaType) = await _encode(imagePath);
     final res = await _client.post(
       Uri.parse('$baseUrl/chat/reply'),
       headers: _headers,
@@ -205,6 +211,8 @@ class HttpAiGateway implements AiGateway {
         'date': day,
         if (currentPlan != null) 'current_plan': currentPlan,
         if (swappedSlots != null && swappedSlots.isNotEmpty) 'swapped_slots': swappedSlots,
+        if (imageBase64 != null) 'imageBase64': imageBase64,
+        if (imageMediaType != null) 'imageMediaType': imageMediaType,
       }),
     );
     if (res.statusCode == 429) {
