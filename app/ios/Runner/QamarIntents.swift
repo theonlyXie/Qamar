@@ -22,7 +22,27 @@ enum QamarQuickBridge {
     }
   }
 
+  /// An invitation code carried by a link, or nil: qamar://i/<code>,
+  /// com.qamar.app://i/<code>, https://dr-qamar.com/i/<code>.
+  static func inviteCode(in url: URL) -> String? {
+    let scheme = (url.scheme ?? "").lowercased()
+    let host = (url.host ?? "").lowercased()
+    let parts = url.path.split(separator: "/").map(String.init).filter { !$0.isEmpty }
+    if (scheme == "qamar" || scheme == "com.qamar.app") && host == "i", let code = parts.first {
+      return code
+    }
+    if (scheme == "https" || scheme == "http") && (host == "dr-qamar.com" || host == "www.dr-qamar.com"),
+       parts.count >= 2, parts[0] == "i" {
+      return parts[1]
+    }
+    return nil
+  }
+
   static func enqueue(url: URL) {
+    if let code = inviteCode(in: url) {
+      enqueue(action: "invite", text: code)
+      return
+    }
     guard url.scheme == "com.qamar.app" else { return }
     let host = url.host ?? ""
     let parts = url.path.split(separator: "/").map(String.init)

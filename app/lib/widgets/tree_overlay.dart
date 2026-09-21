@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
+import '../services/photos.dart';
 import 'package:provider/provider.dart';
 
 import '../models/water.dart';
@@ -367,7 +369,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
       return;
     }
     try {
-      final shot = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 88, maxWidth: 2000);
+      final shot = await pickCompressedPhoto(ImageSource.camera);
       if (!context.mounted) return;
       if (shot == null) {
         // Backed out of the camera: close up rather than logging nothing.

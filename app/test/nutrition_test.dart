@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qamar/models/activity.dart';
 import 'package:qamar/models/basket.dart';
+import 'package:qamar/models/pending_write.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/messages.dart';
@@ -63,6 +64,7 @@ class PlanOnlyGateway extends HttpAiGateway {
 
 void main() {
   basketTests();
+  pendingWriteTests();
   group('Mifflin-St Jeor', () {
     test('applies the sex-specific constant', () {
       final male = AppState()..profile = const Profile(gender: Gender.male);
@@ -905,6 +907,41 @@ void basketTests() {
     test('no partner, no shopping', () {
       expect(GroceryPartner.none.enabled, isFalse);
       expect(const GroceryPartner(url: '  ', name: 'x', ref: '').enabled, isFalse);
+    });
+  });
+}
+
+void pendingWriteTests() {
+  group('the queue’s wire shape', () {
+    test('every durable write round-trips through JSON', () {
+      final meal = LoggedMeal(name: 'Koshary', sub: 'Lunch', kcal: 520, p: 14, c: 90, f: 10, at: DateTime.utc(2026, 9, 21, 13));
+      final item = const ConfirmItemDef(ar: 'كشري', en: 'Koshary', portionAr: 'طبق', portionEn: '1 bowl', conf: Confidence.high, kcal: 520, p: 14, c: 90, f: 10, qamarFoodId: 'food-1', grams: 350, portionMatched: true);
+      final sip = WaterSip(unit: WaterUnit.tea, ml: 150, at: DateTime.utc(2026, 9, 21, 9));
+      final act = ActivityLog(kind: ActivityKind.run, minutes: 25, kcal: 290, at: DateTime.utc(2026, 9, 21, 18));
+
+      final writes = [
+        PendingWrite(kind: PendingKind.meal, payload: {'meal': meal.toJson(), 'items': [{'def': item.toJson(), 'qty': 2}], 'input': 'text', 'raw': 'koshary'}, at: DateTime.utc(2026, 9, 21, 13)),
+        PendingWrite(kind: PendingKind.water, payload: sip.toJson(), at: DateTime.utc(2026, 9, 21, 9), attempts: 2),
+        PendingWrite(kind: PendingKind.activity, payload: act.toJson(), at: DateTime.utc(2026, 9, 21, 18)),
+      ];
+      final back = PendingWrite.decode(PendingWrite.encode(writes));
+      expect(back.map((w) => w.kind).toList(), [PendingKind.meal, PendingKind.water, PendingKind.activity]);
+      expect(back[1].attempts, 2);
+
+      final m = LoggedMeal.fromJson((back[0].payload['meal'] as Map).cast<String, dynamic>());
+      expect((m.name, m.kcal, m.at), ('Koshary', 520, DateTime.utc(2026, 9, 21, 13)));
+      final d = ConfirmItemDef.fromJson(((back[0].payload['items'] as List).first['def'] as Map).cast<String, dynamic>());
+      expect((d.en, d.conf, d.qamarFoodId, d.grams, d.portionMatched), ('Koshary', Confidence.high, 'food-1', 350.0, true));
+      final w = WaterSip.fromJson(back[1].payload);
+      expect((w.unit, w.ml), (WaterUnit.tea, 150));
+      final a = ActivityLog.fromJson(back[2].payload);
+      expect((a.kind, a.minutes, a.kcal), (ActivityKind.run, 25, 290));
+    });
+
+    test('garbage in the preferences is an empty queue, not a crash', () {
+      expect(PendingWrite.decode(null), isEmpty);
+      expect(PendingWrite.decode('not json'), isEmpty);
+      expect(PendingWrite.decode('[{"kind":"teleport","payload":{},"at":"2026-09-21T00:00:00Z"}]'), isEmpty);
     });
   });
 }

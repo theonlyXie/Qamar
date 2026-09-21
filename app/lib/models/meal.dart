@@ -27,6 +27,18 @@ class LoggedMeal {
   /// When it was logged. Null only for rows written before this existed.
   final DateTime? at;
   const LoggedMeal({required this.name, required this.sub, required this.kcal, required this.p, required this.c, required this.f, this.at});
+
+  Map<String, dynamic> toJson() => {'name': name, 'sub': sub, 'kcal': kcal, 'p': p, 'c': c, 'f': f, if (at != null) 'at': at!.toIso8601String()};
+
+  factory LoggedMeal.fromJson(Map<String, dynamic> j) => LoggedMeal(
+        name: (j['name'] ?? '') as String,
+        sub: (j['sub'] ?? '') as String,
+        kcal: (j['kcal'] as num?)?.round() ?? 0,
+        p: (j['p'] as num?)?.round() ?? 0,
+        c: (j['c'] as num?)?.round() ?? 0,
+        f: (j['f'] as num?)?.round() ?? 0,
+        at: j['at'] is String ? DateTime.tryParse(j['at'] as String) : null,
+      );
 }
 
 enum Confidence { high, med, low }
@@ -69,6 +81,36 @@ class ConfirmItemDef {
     this.grams,
     this.portionMatched = false,
   });
+  /// The same keys the gateway sends, so a queued item reads back like a fresh one.
+  Map<String, dynamic> toJson() => {
+        'ar': ar,
+        'en': en,
+        'portionAr': portionAr,
+        'portionEn': portionEn,
+        'confidence': conf.name,
+        'kcal': kcal,
+        'proteinG': p,
+        'carbsG': c,
+        'fatG': f,
+        if (qamarFoodId != null) 'qamar_food_id': qamarFoodId,
+        if (grams != null) 'grams': grams,
+        'portion_matched': portionMatched,
+      };
+
+  factory ConfirmItemDef.fromJson(Map<String, dynamic> j) => ConfirmItemDef(
+        ar: (j['ar'] ?? j['en'] ?? '') as String,
+        en: (j['en'] ?? j['ar'] ?? '') as String,
+        portionAr: (j['portionAr'] ?? '') as String,
+        portionEn: (j['portionEn'] ?? '') as String,
+        conf: Confidence.values.asNameMap()[j['confidence']?.toString()] ?? Confidence.low,
+        kcal: (j['kcal'] as num?)?.round() ?? 0,
+        p: (j['proteinG'] as num?)?.round() ?? 0,
+        c: (j['carbsG'] as num?)?.round() ?? 0,
+        f: (j['fatG'] as num?)?.round() ?? 0,
+        qamarFoodId: j['qamar_food_id'] as String?,
+        grams: (j['grams'] as num?)?.toDouble(),
+        portionMatched: j['portion_matched'] == true,
+      );
 }
 
 class LedgerEntry {

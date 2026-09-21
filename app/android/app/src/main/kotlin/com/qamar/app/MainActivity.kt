@@ -55,6 +55,15 @@ class MainActivity : FlutterActivity() {
         when {
             action == "com.qamar.app.QUICK_ASK" -> enqueue("ask", intent.getStringExtra("q"))
             action == "com.qamar.app.QUICK_LOG" -> enqueue("log", intent.getStringExtra("q"))
+            // Invitation links: qamar://i/<code> and https://dr-qamar.com/i/<code>.
+            data != null && data.scheme == "qamar" && data.host == "i" && data.pathSegments.isNotEmpty() ->
+                enqueue("invite", data.pathSegments[0])
+            data != null && (data.scheme == "https" || data.scheme == "http") &&
+                (data.host == "dr-qamar.com" || data.host == "www.dr-qamar.com") &&
+                data.pathSegments.size >= 2 && data.pathSegments[0] == "i" ->
+                enqueue("invite", data.pathSegments[1])
+            data != null && data.scheme == "com.qamar.app" && data.host == "i" && data.pathSegments.isNotEmpty() ->
+                enqueue("invite", data.pathSegments[0])
             data != null && data.scheme == "com.qamar.app" -> {
                 val host = data.host ?: ""
                 val segs = data.pathSegments

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/services/quick_invoke.dart';
 import 'package:qamar/state/app_state.dart';
 
@@ -23,6 +24,26 @@ void main() {
     expect(QuickInvoke.parseUri(Uri.parse('com.qamar.app://plus/return'))?.kind, 'plus');
     expect(QuickInvoke.parseUri(Uri.parse('com.qamar.app://login-callback')), isNull);
     expect(QuickInvoke.parseUri(Uri.parse('https://example.com/quick/ask')), isNull);
+  });
+
+  test('invitation links carry the code, from the site or the scheme', () {
+    expect(QuickInvoke.parseUri(Uri.parse('https://dr-qamar.com/i/QMR-7H2K9'))?.kind, 'invite');
+    expect(QuickInvoke.parseUri(Uri.parse('https://dr-qamar.com/i/QMR-7H2K9'))?.text, 'QMR-7H2K9');
+    expect(QuickInvoke.parseUri(Uri.parse('https://www.dr-qamar.com/i/abc/'))?.text, 'abc');
+    expect(QuickInvoke.parseUri(Uri.parse('qamar://i/QMR-1'))?.text, 'QMR-1');
+    expect(QuickInvoke.parseUri(Uri.parse('com.qamar.app://i/QMR-2'))?.text, 'QMR-2');
+    expect(QuickInvoke.parseUri(Uri.parse('https://dr-qamar.com/privacy')), isNull, reason: 'only /i/ is an invitation');
+    expect(QuickInvoke.parseUri(Uri.parse('https://evil.example/i/QMR-1')), isNull, reason: 'only the site’s own host');
+    expect(QuickInvoke.parseMap({'action': 'invite', 'text': ' QMR-3 '})?.text, 'QMR-3');
+    expect(QuickInvoke.parseMap({'action': 'invite'}), isNull);
+  });
+
+  test('a link before there is an account waits on the phone, with a word on Welcome', () async {
+    final state = AppState()..setLang(AppLang.en);
+    QuickInvoke.apply(state, const QuickAction(kind: 'invite', text: 'QMR-9'));
+    await Future<void>.delayed(Duration.zero);
+    expect(state.pendingInvitationCode, 'QMR-9');
+    expect(state.invitationNotice, contains('You have an invitation'));
   });
 
   test('parses native payload maps', () {

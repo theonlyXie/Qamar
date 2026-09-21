@@ -54,5 +54,14 @@ class ActivityLog {
 
   ActivityLog copyWith({String? id}) => ActivityLog(id: id ?? this.id, kind: kind, minutes: minutes, kcal: kcal, at: at);
 
+  Map<String, dynamic> toJson() => {'kind': kind.name, 'minutes': minutes, 'kcal': kcal, 'at': at.toIso8601String()};
+
+  factory ActivityLog.fromJson(Map<String, dynamic> j) => ActivityLog(
+        kind: ActivityKind.values.asNameMap()[j['kind']?.toString()] ?? ActivityKind.other,
+        minutes: (j['minutes'] as num?)?.round() ?? 0,
+        kcal: (j['kcal'] as num?)?.round() ?? 0,
+        at: DateTime.tryParse(j['at']?.toString() ?? '') ?? DateTime.now(),
+      );
+
   String label({required bool ar}) => ActivityCatalog.label(kind, ar: ar);
 }

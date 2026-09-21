@@ -193,6 +193,23 @@ the truthful state.
 Add `--dart-define=POSTHOG_API_KEY=<project token>` (and, if not EU,
 `--dart-define=POSTHOG_HOST=https://us.i.posthog.com`) to turn analytics on.
 
+**Invitation links.** The shared invitation carries `https://dr-qamar.com/i/<code>`;
+the app also answers `qamar://i/<code>`. Opened before there is an account, the
+code waits on the phone and is redeemed on the first connected start. For the
+https link to open the app rather than the browser, the site must publish
+`/.well-known/assetlinks.json` (Android, naming `com.qamar.app` and the signing
+certificate's SHA-256) and `/.well-known/apple-app-site-association` (iOS,
+team id + bundle id, path `/i/*`), and the Runner target needs the Associated
+Domains capability attached in Xcode (`ios/Runner/Runner.entitlements`).
+
+**Photos** are taken at one setting for the whole app (`lib/services/photos.dart`:
+1280 px, JPEG quality 72, roughly 200 KB) and the cached shot is deleted once
+its verdict is in. **Offline logging**: a meal, a glass or a walk that fails to
+reach the server is kept on the phone (`pending_writes_<user>`) and replayed
+when the app returns to the foreground, when the next write succeeds, or on the
+next start — oldest first, stopping at the first failure; a write refused six
+times is dropped and the reason shown.
+
 **Shop this plan** appears on the Plan screen only when a grocery partner is
 configured: `--dart-define=GROCERY_PARTNER_URL=<deep-link template>` (with
 `{items}`, `{ref}` and `{lang}` placeholders, or a plain URL that receives

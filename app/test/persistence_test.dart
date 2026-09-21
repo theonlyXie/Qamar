@@ -23,6 +23,7 @@ import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/models/activity.dart';
 import 'package:qamar/models/basket.dart';
 import 'package:qamar/models/billing.dart';
+import 'package:qamar/models/pending_write.dart';
 import 'package:qamar/models/invitation.dart';
 import 'package:qamar/models/water.dart';
 import 'package:qamar/services/ai_gateway.dart';
@@ -90,18 +91,25 @@ class FakeProfileRepo implements ProfileRepository {
 
 class FakeMealRepo implements MealRepository {
   final List<LoggedMeal> saved = [];
+  final List<List<({ConfirmItemDef def, int qty})>> savedItems = [];
   List<LoggedMeal> today = [];
   int drafts = 0;
 
+  /// While set, every write fails — the phone has no signal.
+  Object? offline;
+
   @override
   Future<String> saveDraft(String userId, MealAnalysisDraft draft) async {
+    if (offline != null) throw offline!;
     drafts++;
     return 'draft-$drafts';
   }
 
   @override
   Future<void> confirmMeal(String userId, {required String draftId, required LoggedMeal meal, List<({ConfirmItemDef def, int qty})> items = const []}) async {
+    if (offline != null) throw offline!;
     saved.add(meal);
+    savedItems.add(items);
   }
 
   @override
@@ -150,8 +158,12 @@ class FakeWaterRepo implements WaterRepository {
   List<WaterSip> today = [];
   int adds = 0;
 
+  /// While set, every write fails — the phone has no signal.
+  Object? offline;
+
   @override
   Future<String> addSip(String userId, WaterSip sip) async {
+    if (offline != null) throw offline!;
     adds++;
     final id = 'water-$adds';
     saved.add(sip.copyWith(id: id));
@@ -375,8 +387,11 @@ class FakeActivityRepo implements ActivityRepository {
   final List<ActivityLog> added = [];
   List<ActivityLog> today = [];
 
+  Object? offline;
+
   @override
   Future<String> add(String userId, ActivityLog entry) async {
+    if (offline != null) throw offline!;
     added.add(entry);
     final w = wallet;
     if (w != null) {
@@ -2215,6 +2230,116 @@ void main() {
       expect(state.canShopPlan, isFalse);
       await state.shopThisPlan();
       expect(opened, isEmpty);
+    });
+  });
+
+  group('the offline logging queue', () {
+    test('a glass logged without a signal is kept on the phone and goes up when the signal returns', () async {
+      final water = FakeWaterRepo()..offline = Exception('SocketException: no route');
+      final prefs = MemoryDevicePrefs();
+      final state = backed(water: water, prefs: prefs, clock: () => DateTime(2026, 9, 21, 12));
+      await settle();
+      state.setLang(AppLang.en);
+
+      state.logWater(WaterUnit.glass);
+      await settle();
+      expect(state.waterToday, hasLength(1), reason: 'the screen never waits for the server');
+      expect(water.saved, isEmpty);
+      expect(state.pendingWrites, hasLength(1));
+      expect(state.pendingWrites.single.kind, PendingKind.water);
+      expect(state.syncError, 'Saved on the phone; it syncs when the connection is back.');
+      expect(PendingWrite.decode(await prefs.getString('pending_writes_user-1')), hasLength(1), reason: 'survives a restart');
+
+      water.offline = null;
+      await state.drainPending();
+      expect(water.saved.single.ml, state.waterToday.single.ml);
+      expect(state.pendingWrites, isEmpty);
+      expect(state.syncError, isNull);
+      expect(PendingWrite.decode(await prefs.getString('pending_writes_user-1')), isEmpty);
+    });
+
+    test('a meal queued on one run is replayed on the next start, items and all, before today is read', () async {
+      final meals = FakeMealRepo()..offline = Exception('offline');
+      final prefs = MemoryDevicePrefs();
+      final first = backed(meals: meals, ai: FakeGateway(), prefs: prefs);
+      await settle();
+      first.setLang(AppLang.en);
+      first.quickLog(QuickLog.text);
+      await first.sendChatMsg('koshary');
+      await settle();
+      first.confirmProposal();
+      await settle();
+      expect(meals.saved, isEmpty);
+      expect(first.pendingWrites.single.kind, PendingKind.meal);
+      first.dispose();
+
+      meals.offline = null;
+      final second = backed(meals: meals, prefs: prefs);
+      await settle();
+      expect(meals.saved.single.name, 'Koshary');
+      expect(meals.savedItems.single.single.def.en, 'Koshary', reason: 'the confirmed items travel with the meal');
+      expect(meals.drafts, 1, reason: 'the draft is written with the replay, not before');
+      expect(second.pendingWrites, isEmpty);
+    });
+
+    test('movement queues too, and a write the server keeps refusing is dropped with its reason', () async {
+      final acts = FakeActivityRepo()..offline = StateError('check constraint');
+      final state = backed(activities: acts, clock: () => DateTime(2026, 9, 21, 18));
+      await settle();
+      state.chooseActivity(ActivityKind.walk);
+      await state.logActivity(30);
+      expect(state.pendingWrites.single.kind, PendingKind.activity);
+
+      for (var i = 0; i < AppState.pendingMaxAttempts; i++) {
+        await state.drainPending();
+      }
+      expect(state.pendingWrites, isEmpty, reason: 'six refusals is not a signal problem');
+      expect(state.syncError, contains('activity'));
+      expect(acts.added, isEmpty);
+    });
+
+    test('writes replay oldest first and stop at the first failure so order is kept', () async {
+      final water = FakeWaterRepo()..offline = Exception('offline');
+      final state = backed(water: water, clock: () => DateTime(2026, 9, 21, 12));
+      await settle();
+      state.logWater(WaterUnit.glass);
+      state.logWater(WaterUnit.bottle);
+      await settle();
+      expect(state.pendingWrites.map((w) => w.payload['unit']).toList(), ['glass', 'bottle']);
+
+      var calls = 0;
+      water.offline = null;
+      // The first replay succeeds, the second finds the signal gone again.
+      final repoWithFlap = water;
+      await state.drainPending();
+      calls = repoWithFlap.saved.length;
+      expect(calls, 2);
+      expect(state.pendingWrites, isEmpty);
+    });
+  });
+
+  group('invitation links', () {
+    test('a link opened with an account redeems at once; opened before, it waits and redeems on the next start', () async {
+      final inv = FakeInvitationRepo();
+      final backedNow = backed(invitations: inv);
+      await settle();
+      await backedNow.acceptInvitationLink('QMR-LIVE');
+      await settle();
+      expect(inv.redeemCodes, ['QMR-LIVE']);
+      expect(backedNow.invitedBy, 'Basel');
+
+      final prefs = MemoryDevicePrefs();
+      final guest = AppState(prefs: prefs);
+      await guest.acceptInvitationLink('QMR-LATER');
+      expect(guest.pendingInvitationCode, 'QMR-LATER');
+      expect(await prefs.getString('pending_invitation'), 'QMR-LATER');
+
+      final later = FakeInvitationRepo();
+      final signedIn = backed(invitations: later, prefs: prefs);
+      await settle();
+      expect(later.redeemCodes, ['QMR-LATER']);
+      expect(signedIn.pendingInvitationCode, isNull);
+      expect(await prefs.getString('pending_invitation'), '');
     });
   });
 }

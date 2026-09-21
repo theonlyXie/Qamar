@@ -62,6 +62,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.qamar.app</string>
+				<string>qamar</string>
 			</array>
 		</dict>
 	</array>

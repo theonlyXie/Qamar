@@ -79,6 +79,25 @@
                 <data android:scheme="com.qamar.app" android:host="log"/>
                 <data android:scheme="com.qamar.app" android:host="plus"/>
             </intent-filter>
+            <!-- Invitation links. The shared message carries
+                 https://dr-qamar.com/i/<code>; qamar://i/<code> is the same
+                 door for a QR code or a chat that strips links. The https
+                 filter is an App Link: the site must publish
+                 /.well-known/assetlinks.json naming this package and its
+                 signing certificate, or Android opens the browser instead. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="qamar" android:host="i"/>
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="dr-qamar.com" android:pathPrefix="/i/"/>
+                <data android:scheme="https" android:host="www.dr-qamar.com" android:pathPrefix="/i/"/>
+            </intent-filter>
             <intent-filter>
                 <action android:name="com.qamar.app.QUICK_ASK"/>
                 <action android:name="com.qamar.app.QUICK_LOG"/>

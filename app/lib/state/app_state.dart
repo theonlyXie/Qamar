@@ -18,6 +18,7 @@ import '../services/auth_service.dart';
 import '../services/device_prefs.dart';
 import '../services/dictation.dart';
 import '../services/nudger.dart';
+import '../services/photos.dart';
 import '../services/sharer.dart';
 import '../services/config.dart';
 import '../services/payments.dart';
@@ -25,6 +26,7 @@ import '../services/repositories.dart';
 import '../models/activity.dart';
 import '../models/billing.dart';
 import '../models/basket.dart';
+import '../models/pending_write.dart';
 import '../models/invitation.dart';
 import '../widgets/explain.dart';
 import '../models/profile.dart';
@@ -267,6 +269,130 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  // ---- the offline logging queue ----------------------------------------------
+  //
+  // A meal, a glass or a walk is on the screen the instant it is tapped; the
+  // server's copy follows. When that write fails — the metro, a lift, a bad
+  // 3G day — the entry is kept on the phone and replayed when the app comes
+  // back to the foreground, when the next write goes through, or on the next
+  // start. The payload is everything the repository needs, so nothing on
+  // screen has to survive for the replay to work.
+
+  final List<PendingWrite> pendingWrites = [];
+  bool _draining = false;
+
+  /// After this many failed replays the write is dropped and the failure
+  /// shown: a row the server refuses six times is not a signal problem.
+  static const pendingMaxAttempts = 6;
+
+  String _pendingKey(String uid) => 'pending_writes_$uid';
+
+  void _savePending(String uid) {
+    _prefs?.setString(_pendingKey(uid), PendingWrite.encode(pendingWrites)).catchError((_) {});
+  }
+
+  /// A write that must land. [write] does only the repository call(s), so a
+  /// replay never duplicates a row that did land; [after] is the wallet or
+  /// streak re-read that follows a success and is allowed to fail quietly.
+  Future<void> _pushDurable(
+    PendingWrite w,
+    Future<void> Function(String userId) write, {
+    Future<void> Function(String userId)? after,
+  }) async {
+    final uid = _userId;
+    if (uid == null) return;
+    try {
+      await write(uid);
+    } catch (_) {
+      pendingWrites.add(w);
+      _savePending(uid);
+      syncError = isAr ? 'محفوظ على الموبايل، وهيتزامن لما النت يرجع.' : 'Saved on the phone; it syncs when the connection is back.';
+      _notify();
+      return;
+    }
+    if (syncError != null) {
+      syncError = null;
+      _notify();
+    }
+    if (after != null) {
+      try {
+        await after(uid);
+      } catch (_) {
+        // The write landed; a re-read that did not is the next hydrate's job.
+      }
+    }
+    await drainPending();
+  }
+
+  /// Replays what is queued, oldest first, stopping at the first failure so
+  /// order is kept. Safe to call any time.
+  Future<void> drainPending() async {
+    final uid = _userId;
+    if (uid == null || _draining || pendingWrites.isEmpty) return;
+    _draining = true;
+    try {
+      while (pendingWrites.isNotEmpty && !_disposed) {
+        final w = pendingWrites.first;
+        try {
+          await _replay(uid, w);
+          pendingWrites.removeAt(0);
+          _savePending(uid);
+        } catch (e) {
+          final next = w.copyWith(attempts: w.attempts + 1);
+          if (next.attempts >= pendingMaxAttempts) {
+            pendingWrites.removeAt(0);
+            syncError = '${w.kind.name}: $e';
+          } else {
+            pendingWrites[0] = next;
+          }
+          _savePending(uid);
+          break;
+        }
+      }
+      if (pendingWrites.isEmpty && syncError != null && !syncError!.contains(':')) syncError = null;
+      _notify();
+    } finally {
+      _draining = false;
+    }
+  }
+
+  Future<void> _replay(String uid, PendingWrite w) async {
+    switch (w.kind) {
+      case PendingKind.meal:
+        final repo = _mealRepo;
+        if (repo == null) return;
+        final meal = LoggedMeal.fromJson((w.payload['meal'] as Map).cast<String, dynamic>());
+        final items = [
+          for (final raw in (w.payload['items'] as List? ?? const []))
+            if (raw is Map)
+              (def: ConfirmItemDef.fromJson((raw['def'] as Map).cast<String, dynamic>()), qty: (raw['qty'] as num?)?.round() ?? 1),
+        ];
+        final draftId = await repo.saveDraft(
+          uid,
+          MealAnalysisDraft(inputType: (w.payload['input'] ?? 'text') as String, items: items, rawText: w.payload['raw'] as String?),
+        );
+        await repo.confirmMeal(uid, draftId: draftId, meal: meal, items: items);
+        try {
+          await _refreshStreak(uid);
+          await _refreshWallet(uid);
+        } catch (_) {}
+      case PendingKind.water:
+        final repo = _waterRepo;
+        if (repo == null) return;
+        await repo.addSip(uid, WaterSip.fromJson(w.payload));
+        try {
+          await _refreshWallet(uid);
+        } catch (_) {}
+      case PendingKind.activity:
+        final repo = _activityRepo;
+        if (repo == null) return;
+        await repo.add(uid, ActivityLog.fromJson(w.payload));
+        try {
+          await _refreshWallet(uid);
+        } catch (_) {}
+    }
+  }
+
   /// The ledger is the wallet. Read after anything that earns — a meal, a
   /// glass, the quest, onboarding — so the phone's optimistic number and the
   /// server's agree within a second, and a point never has to vanish on the
@@ -290,6 +416,13 @@ class AppState extends ChangeNotifier {
     final uid = _userId;
     if (uid == null) return;
     try {
+      // Whatever was logged without a signal goes up before today is read
+      // back, so it is part of what comes back.
+      pendingWrites
+        ..clear()
+        ..addAll(PendingWrite.decode(await _prefs?.getString(_pendingKey(uid))));
+      await drainPending();
+
       final saved = await _profileRepo?.loadProfile(uid);
       if (saved != null) profile = saved;
 
@@ -367,6 +500,7 @@ class AppState extends ChangeNotifier {
 
       _notify();
       _rescheduleNudges();
+      await _redeemPendingInvitation();
     } catch (e) {
       syncError = 'load: $e';
       _notify();
@@ -1551,17 +1685,22 @@ class AppState extends ChangeNotifier {
     if (!isBacked) return;
     final repo = _waterRepo;
     if (repo == null) return;
-    _push('log water', (uid) async {
-      final id = await repo.addSip(uid, sip);
-      final i = waterToday.indexOf(sip);
-      if (i >= 0) {
-        waterToday[i] = sip.copyWith(id: id);
-        _notify();
-      }
+    _pushDurable(
+      PendingWrite(kind: PendingKind.water, payload: sip.toJson(), at: _clock()),
+      (uid) async {
+        final id = await repo.addSip(uid, sip);
+        final i = waterToday.indexOf(sip);
+        if (i >= 0) {
+          waterToday[i] = sip.copyWith(id: id);
+          _notify();
+        }
+      },
       // A glass earns on the server (half rate on Lite, first eight a day).
-      await _refreshWallet(uid);
-      _notify();
-    });
+      after: (uid) async {
+        await _refreshWallet(uid);
+        _notify();
+      },
+    );
   }
 
   void undoWater() {
@@ -1635,6 +1774,7 @@ class AppState extends ChangeNotifier {
     proposal = null;
     proposalQty = [];
     proposalRaw = null;
+    discardPhoto(lastMealPhotoPath);
     lastMealPhotoPath = null;
     _notify();
   }
@@ -1758,6 +1898,8 @@ class AppState extends ChangeNotifier {
     proposal = null;
     proposalQty = [];
     proposalRaw = null;
+    // The verdict is in and acted on; the picture has no further use here.
+    discardPhoto(lastMealPhotoPath);
     lastMealPhotoPath = null;
     _notify();
     _rescheduleNudges();
@@ -1767,17 +1909,31 @@ class AppState extends ChangeNotifier {
     if (isBacked) {
       final repo = _mealRepo!;
       final input = proposalInput;
-      _push('log meal', (uid) async {
-        final draftId = await repo.saveDraft(
-          uid,
-          MealAnalysisDraft(inputType: input, items: drafted, rawText: raw),
-        );
-        await repo.confirmMeal(uid, draftId: draftId, meal: meal, items: drafted);
-        await _refreshStreak(uid);
-        // The insert earned points on the server; show the server's number.
-        await _refreshWallet(uid);
-        _notify();
-      });
+      _pushDurable(
+        PendingWrite(
+          kind: PendingKind.meal,
+          payload: {
+            'meal': meal.toJson(),
+            'items': [for (final it in drafted) {'def': it.def.toJson(), 'qty': it.qty}],
+            'input': input,
+            'raw': raw,
+          },
+          at: _clock(),
+        ),
+        (uid) async {
+          final draftId = await repo.saveDraft(
+            uid,
+            MealAnalysisDraft(inputType: input, items: drafted, rawText: raw),
+          );
+          await repo.confirmMeal(uid, draftId: draftId, meal: meal, items: drafted);
+        },
+        after: (uid) async {
+          await _refreshStreak(uid);
+          // The insert earned points on the server; show the server's number.
+          await _refreshWallet(uid);
+          _notify();
+        },
+      );
     }
   }
 
@@ -2037,6 +2193,48 @@ class AppState extends ChangeNotifier {
   /// The friend's side: a code typed on the welcome screen. The sender's
   /// name is the first thing they see, and the fortnight starts if a trial
   /// is still open to them.
+  // ---- invitation links ---------------------------------------------------------
+  //
+  // The shared message carries dr-qamar.com/i/<code>; the app also answers
+  // qamar://i/<code>. Opened before there is an account, the code waits on
+  // the phone and is redeemed the moment the app is connected.
+
+  static const _kPendingInvite = 'pending_invitation';
+
+  /// A code that arrived by link before the account existed.
+  String? pendingInvitationCode;
+
+  Future<void> acceptInvitationLink(String code) async {
+    final c = code.trim();
+    if (c.isEmpty) return;
+    _track('invitation_link_opened');
+    if (isBacked && _invitationRepo != null) {
+      pendingInvitationCode = null;
+      _prefs?.setString(_kPendingInvite, '').catchError((_) {});
+      await redeemInvitation(c);
+      return;
+    }
+    pendingInvitationCode = c;
+    _prefs?.setString(_kPendingInvite, c).catchError((_) {});
+    invitationNotice = isAr ? 'وصلتك دعوة. هتتفعّل أول ما تدخل.' : 'You have an invitation. It is redeemed the moment you are in.';
+    _notify();
+  }
+
+  Future<void> _redeemPendingInvitation() async {
+    var code = pendingInvitationCode;
+    if (code == null || code.trim().isEmpty) {
+      try {
+        code = await _prefs?.getString(_kPendingInvite);
+      } catch (_) {
+        code = null;
+      }
+    }
+    if (code == null || code.trim().isEmpty || _invitationRepo == null) return;
+    pendingInvitationCode = null;
+    _prefs?.setString(_kPendingInvite, '').catchError((_) {});
+    await redeemInvitation(code);
+  }
+
   Future<void> redeemInvitation(String code) async {
     invitationNotice = null;
     final repo = _invitationRepo;
@@ -3441,13 +3639,22 @@ class AppState extends ChangeNotifier {
     _rescheduleNudges();
     if (isBacked && _mealRepo != null) {
       final repo = _mealRepo;
-      _push('repeat meal', (uid) async {
-        final draftId = await repo.saveDraft(uid, MealAnalysisDraft(inputType: 'recent', items: const [], rawText: source.name));
-        await repo.confirmMeal(uid, draftId: draftId, meal: meal);
-        await _refreshStreak(uid);
-        await _refreshWallet(uid);
-        _notify();
-      });
+      _pushDurable(
+        PendingWrite(
+          kind: PendingKind.meal,
+          payload: {'meal': meal.toJson(), 'items': const [], 'input': 'recent', 'raw': source.name},
+          at: _clock(),
+        ),
+        (uid) async {
+          final draftId = await repo.saveDraft(uid, MealAnalysisDraft(inputType: 'recent', items: const [], rawText: source.name));
+          await repo.confirmMeal(uid, draftId: draftId, meal: meal);
+        },
+        after: (uid) async {
+          await _refreshStreak(uid);
+          await _refreshWallet(uid);
+          _notify();
+        },
+      );
     }
   }
 
@@ -3487,13 +3694,18 @@ class AppState extends ChangeNotifier {
     _notify();
     final repo = _activityRepo;
     if (!isBacked || repo == null) return;
-    await _push('log activity', (uid) async {
-      final id = await repo.add(uid, entry);
-      final i = activitiesToday.indexOf(entry);
-      if (i >= 0) activitiesToday[i] = entry.copyWith(id: id);
-      await _refreshWallet(uid);
-      _notify();
-    });
+    await _pushDurable(
+      PendingWrite(kind: PendingKind.activity, payload: entry.toJson(), at: _clock()),
+      (uid) async {
+        final id = await repo.add(uid, entry);
+        final i = activitiesToday.indexOf(entry);
+        if (i >= 0) activitiesToday[i] = entry.copyWith(id: id);
+      },
+      after: (uid) async {
+        await _refreshWallet(uid);
+        _notify();
+      },
+    );
   }
 
   /// One tap on a unit logs it and closes the tree. Nothing goes through the

@@ -42,6 +42,14 @@ class WaterSip {
     required this.at,
   });
 
+  Map<String, dynamic> toJson() => {'unit': unit.name, 'ml': ml, 'at': at.toIso8601String()};
+
+  factory WaterSip.fromJson(Map<String, dynamic> j) => WaterSip(
+        unit: WaterUnit.values.asNameMap()[j['unit']?.toString()] ?? WaterUnit.glass,
+        ml: (j['ml'] as num?)?.round() ?? 0,
+        at: DateTime.tryParse(j['at']?.toString() ?? '') ?? DateTime.now(),
+      );
+
   WaterSip copyWith({String? id}) => WaterSip(
         id: id ?? this.id,
         unit: unit,

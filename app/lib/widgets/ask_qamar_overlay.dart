@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../models/meal.dart';
 import '../models/messages.dart';
+import '../services/photos.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -298,11 +299,10 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> {
 }
 
 /// Opens the camera for a menu, a label or a plate and attaches the shot to
-/// the next message. Sized for reading print, not for keeping: 1280 px on
-/// the long side at quality 80 is a few hundred kilobytes.
+/// the next message. Sized for reading print, not for keeping (see photos.dart).
 Future<void> _photographMenu(BuildContext context, AppState state) async {
   try {
-    final shot = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 80, maxWidth: 1280);
+    final shot = await pickCompressedPhoto(ImageSource.camera);
     if (!context.mounted || shot == null) return;
     state.attachChatPhoto(shot.path);
   } on Exception {

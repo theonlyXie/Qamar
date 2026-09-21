@@ -156,7 +156,7 @@ class WelcomeScreen extends StatelessWidget {
 }
 
 Future<void> _askInvitationCode(BuildContext context, AppState state) async {
-  final controller = TextEditingController();
+  final controller = TextEditingController(text: state.pendingInvitationCode ?? '');
   final isAr = state.isAr;
   final code = await showDialog<String>(
     context: context,

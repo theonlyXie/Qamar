@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../services/photos.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -18,7 +19,6 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  final ImagePicker _picker = ImagePicker();
   bool _busy = false;
 
   /// Opens the device camera (or the photo library) for the InBody report.
@@ -32,11 +32,7 @@ class _ScanScreenState extends State<ScanScreen> {
     final state = context.read<AppState>();
     setState(() => _busy = true);
     try {
-      final shot = await _picker.pickImage(
-        source: source,
-        imageQuality: 88,
-        maxWidth: 2000,
-      );
+      final shot = await pickCompressedPhoto(source);
       if (!mounted) return;
       // A null result means the user backed out of the camera — not an error.
       if (shot == null) return;
