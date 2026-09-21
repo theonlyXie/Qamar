@@ -131,11 +131,14 @@ water, table salt, cumin, coriander seed, anise, fenugreek, ground cinnamon,
 ginger root, distilled vinegar, mayonnaise, pistachios, desiccated coconut, jam,
 vanilla ice cream.
 
-Items that will need a hand-mapped id, because USDA has no Egyptian row: the
-three breads (baladi, fino, shami), areesh / white / roumy / istanbouli cheese,
-laban rayeb, eshta, samna, Egyptian sausage, basterma, feseekh, molokhia leaves,
-taro, halawa, erksous, sugarcane juice, and the generic soft drink. Map each to
-the closest USDA relative and say so in the row.
+Migration 0052 already carries the hand-mapped ids for every 0051 ingredient
+and for the 0017 ingredients the first ingest left empty (the three breads,
+laban rayeb, corn oil, almonds, mango and the other Foundation-Foods rows that
+have no energy value). Items still to map if the search misses them, because
+USDA has no Egyptian row: areesh / white / roumy / istanbouli cheese, eshta,
+samna, Egyptian sausage, basterma, feseekh, molokhia leaves, taro, halawa,
+erksous, sugarcane juice, and the generic soft drink. Map each to the closest
+USDA relative and say so in the row.
 
 ## Costs and limits, before this goes live
 

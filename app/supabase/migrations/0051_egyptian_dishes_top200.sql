@@ -1417,15 +1417,21 @@ select fo.qamar_food_id, a.alias, a.lang, a.misspell, case when a.misspell then 
 from a join public.foods fo on fo.slug = a.slug
 on conflict (qamar_food_id, alias, lang) do nothing;
 
--- Every food answers to its own three names, as in 0017.
+-- Every Egyptian food answers to its own three names, as in 0017. Scoped to
+-- the Egyptian graph on purpose: a bulk USDA import (source_rank 10) carries
+-- its own English aliases at its own priority, and promoting 87,000 of them
+-- to 120 would let a branded product outrank a dish on a tie.
 insert into public.food_aliases (qamar_food_id, alias, lang, priority)
-select qamar_food_id, name_en, 'en', 120 from public.foods where name_en is not null
+select qamar_food_id, name_en, 'en', 120 from public.foods
+ where name_en is not null and country_region = 'EG'
 on conflict (qamar_food_id, alias, lang) do nothing;
 insert into public.food_aliases (qamar_food_id, alias, lang, priority)
-select qamar_food_id, name_ar, 'ar', 120 from public.foods where name_ar is not null
+select qamar_food_id, name_ar, 'ar', 120 from public.foods
+ where name_ar is not null and country_region = 'EG'
 on conflict (qamar_food_id, alias, lang) do nothing;
 insert into public.food_aliases (qamar_food_id, alias, lang, priority)
-select qamar_food_id, name_eg, 'eg', 130 from public.foods where name_eg is not null
+select qamar_food_id, name_eg, 'eg', 130 from public.foods
+ where name_eg is not null and country_region = 'EG'
 on conflict (qamar_food_id, alias, lang) do nothing;
 
 -- Systematic misspellings of every Egyptian name, generated rather than typed
@@ -1435,7 +1441,8 @@ on conflict (qamar_food_id, alias, lang) do nothing;
 -- Each variant is a misspelling alias at priority 50, so it never beats a
 -- name spelled as the dictionary spells it.
 with base as (
-  select qamar_food_id, name_eg as n from public.foods where name_eg is not null
+  select qamar_food_id, name_eg as n from public.foods
+   where name_eg is not null and country_region = 'EG'
 ),
 variants as (
   select qamar_food_id, regexp_replace(n, 'ة(\M)', 'ه\1', 'g') as v from base
@@ -3050,17 +3057,23 @@ on conflict (qamar_food_id, label_en) do nothing;
 -- contested; 0027's tie-break then offers the dish first and graph.ts reports
 -- the ingredient as "could also be".
 
+-- Only the Egyptian graph takes part. A bulk USDA import shares English words
+-- with the dishes ("kebab", "steak", "toast"); levelling against it would lift
+-- thousands of imported aliases to a dish's priority for no gain.
 with contested as (
   select a.alias, max(a.priority) as top
   from public.food_aliases a
   join public.foods f on f.qamar_food_id = a.qamar_food_id
+  where f.country_region = 'EG'
   group by a.alias
   having count(distinct f.is_recipe) > 1
 )
 update public.food_aliases a
    set priority = c.top
-  from contested c
+  from contested c, public.foods f
  where a.alias = c.alias
+   and f.qamar_food_id = a.qamar_food_id
+   and f.country_region = 'EG'
    and a.priority <> c.top;
 
 -- ---------------------------------------------------------------------
