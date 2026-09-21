@@ -1,3 +1,4 @@
+import '../models/activity.dart';
 import '../models/invitation.dart';
 import '../models/meal.dart';
 import '../models/nudge.dart';
@@ -75,6 +76,17 @@ abstract class MealRepository {
   /// Last night's sentence about [day], written by the gateway's night job;
   /// null when none was written (a new account, an empty day, no job yet).
   Future<NightNote?> nightNote(String userId, DateTime day);
+
+  /// The last [days] days of meals, newest first — what "repeat a meal"
+  /// offers. Duplicates by name are the caller's to fold.
+  Future<List<LoggedMeal>> recentMeals(String userId, {int days = 7});
+}
+
+/// Movement logged by hand (activity_logs, migration 0051).
+abstract class ActivityRepository {
+  /// Writes the row and returns its id.
+  Future<String> add(String userId, ActivityLog entry);
+  Future<List<ActivityLog>> forDay(String userId, DateTime day);
 }
 
 /// The referral loop's server side (migration 0049). Every call is the

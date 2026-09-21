@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/activity.dart';
 import '../models/invitation.dart';
 import '../models/meal.dart';
 import '../models/nudge.dart';
@@ -44,6 +45,50 @@ class SupabaseInvitationRepository implements InvitationRepository {
     } on PostgrestException catch (e) {
       throw InvitationException(e.message);
     }
+  }
+}
+
+class SupabaseActivityRepository implements ActivityRepository {
+  final SupabaseClient _client;
+  const SupabaseActivityRepository(this._client);
+
+  @override
+  Future<String> add(String userId, ActivityLog entry) async {
+    final row = await _client
+        .from('activity_logs')
+        .insert({
+          'user_id': userId,
+          'kind': entry.kind.name,
+          'minutes': entry.minutes,
+          'kcal_est': entry.kcal,
+          'logged_at': entry.at.toUtc().toIso8601String(),
+        })
+        .select('id')
+        .single();
+    return row['id'] as String;
+  }
+
+  @override
+  Future<List<ActivityLog>> forDay(String userId, DateTime day) async {
+    final start = DateTime(day.year, day.month, day.day).toIso8601String();
+    final end = DateTime(day.year, day.month, day.day + 1).toIso8601String();
+    final rows = await _client
+        .from('activity_logs')
+        .select()
+        .eq('user_id', userId)
+        .gte('logged_at', start)
+        .lt('logged_at', end)
+        .order('logged_at');
+    return (rows as List).map((r) {
+      final kind = ActivityKind.values.asNameMap()[r['kind'] as String? ?? ''] ?? ActivityKind.other;
+      return ActivityLog(
+        id: r['id'] as String?,
+        kind: kind,
+        minutes: (r['minutes'] as num).toInt(),
+        kcal: (r['kcal_est'] as num).toInt(),
+        at: DateTime.tryParse(r['logged_at'] as String? ?? '')?.toLocal() ?? DateTime.now(),
+      );
+    }).toList();
   }
 }
 
@@ -294,6 +339,29 @@ class SupabaseMealRepository implements MealRepository {
     final raw = await _client.rpc('qamar_streak_snapshot', params: {'p_user_id': userId});
     if (raw is! Map) return null;
     return Streak.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  @override
+  Future<List<LoggedMeal>> recentMeals(String userId, {int days = 7}) async {
+    final from = DateTime.now().subtract(Duration(days: days)).toIso8601String();
+    final rows = await _client
+        .from('meal_logs')
+        .select()
+        .eq('user_id', userId)
+        .gte('logged_at', from)
+        .order('logged_at', ascending: false)
+        .limit(40);
+    return (rows as List)
+        .map((r) => LoggedMeal(
+              name: r['name'] as String,
+              sub: r['source'] as String,
+              kcal: r['kcal'] as int,
+              p: r['protein_g'] as int,
+              c: r['carbs_g'] as int,
+              f: r['fat_g'] as int,
+              at: DateTime.tryParse(r['logged_at'] as String? ?? '')?.toLocal(),
+            ))
+        .toList();
   }
 
   @override

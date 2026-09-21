@@ -22,6 +22,7 @@ import '../services/sharer.dart';
 import '../services/config.dart';
 import '../services/payments.dart';
 import '../services/repositories.dart';
+import '../models/activity.dart';
 import '../models/billing.dart';
 import '../models/invitation.dart';
 import '../widgets/explain.dart';
@@ -35,7 +36,11 @@ import 'chat_replies.dart';
 enum PlusPlan { monthly }
 
 /// How a meal gets logged straight from the orb, with no page in between.
-enum QuickLog { voice, text, photo }
+enum QuickLog { voice, text, photo, repeat, activity }
+
+/// The Log node's third level: the ring shows kinds of movement, or recent
+/// meals to repeat.
+enum TreeSub { activity, repeat }
 
 /// The orb's whole vocabulary. Tap opens the tree (or comes back to Today),
 /// hold talks to Qamar, dragging it onto a number explains that number.
@@ -63,6 +68,7 @@ class AppState extends ChangeNotifier {
     WaterRepository? waterRepo,
     WalletRepository? walletRepo,
     InvitationRepository? invitationRepo,
+    ActivityRepository? activityRepo,
     AiGateway? ai,
     BillingGateway? billing,
     Future<bool> Function(String url)? openCheckout,
@@ -79,6 +85,7 @@ class AppState extends ChangeNotifier {
         _waterRepo = waterRepo,
         _walletRepo = walletRepo,
         _invitationRepo = invitationRepo,
+        _activityRepo = activityRepo,
         _ai = ai,
         _billing = billing,
         _openCheckout = openCheckout,
@@ -107,6 +114,9 @@ class AppState extends ChangeNotifier {
   /// The referral loop's server side. Null offline; then invitations are
   /// not offered, rather than offered and lost.
   final InvitationRepository? _invitationRepo;
+
+  /// Movement logged by hand. Null offline; the day still shows it.
+  final ActivityRepository? _activityRepo;
 
   /// Product analytics. Null in tests and in any build without a key; and
   /// even when present, silent until the person consents (see [setImprove]).
@@ -265,6 +275,20 @@ class AppState extends ChangeNotifier {
         meals
           ..clear()
           ..addAll(today);
+      }
+
+      final recent = await _mealRepo?.recentMeals(uid);
+      if (recent != null) {
+        recentMeals
+          ..clear()
+          ..addAll(recent);
+      }
+
+      final acts = await _activityRepo?.forDay(uid, DateTime.now());
+      if (acts != null) {
+        activitiesToday
+          ..clear()
+          ..addAll(acts);
       }
 
       final water = await _waterRepo?.sipsForDay(uid, DateTime.now());
@@ -3176,6 +3200,116 @@ class AppState extends ChangeNotifier {
     _notify();
   }
 
+  /// The Log node's third level, while a branch of it is fanned out.
+  TreeSub? treeLogSub;
+
+  void expandTreeSub(TreeSub sub) {
+    treeLogSub = sub;
+    _notify();
+  }
+
+  // ---- repeat a meal ---------------------------------------------------
+
+  /// The last week's meals from the server, newest first; today's local
+  /// meals come first in [repeatChoices] whatever the server has.
+  final List<LoggedMeal> recentMeals = [];
+
+  /// Up to five distinct recent meals, newest first — the ring's choices.
+  List<LoggedMeal> get repeatChoices {
+    final seen = <String>{};
+    final out = <LoggedMeal>[];
+    for (final m in [...meals.reversed, ...recentMeals]) {
+      final key = m.name.trim().toLowerCase();
+      if (key.isEmpty || !seen.add(key)) continue;
+      out.add(m);
+      if (out.length == 5) break;
+    }
+    return out;
+  }
+
+  /// Logs [source] again, now, with the same numbers. No model, no
+  /// confirmation step: repeating is the two-tap path the blueprint asks for.
+  void repeatMeal(LoggedMeal source) {
+    _collapseTree();
+    final first = meals.isEmpty;
+    final meal = LoggedMeal(
+      name: source.name,
+      sub: isAr ? 'مكرر' : 'Repeated',
+      kcal: source.kcal,
+      p: source.p,
+      c: source.c,
+      f: source.f,
+      at: _clock(),
+    );
+    meals.add(meal);
+    final award = first ? SuEconomy.firstMeal : SuEconomy.mealLogged;
+    _credit(award, ar: first ? 'أول وجبة' : 'تأكيد وجبة', en: first ? 'First meal logged' : 'Meal confirmed');
+    _track('meal_logged', {'source': 'recent', 'first': first, 'items': 1, 'nudged': _nudgedRecently});
+    _nudgeTappedAt = null;
+    chat.add(ChatTurn(
+      who: ChatWho.q,
+      text: isAr ? 'اتسجّلت تاني: ${meal.kcal} سعرة.' : 'Logged again: ${meal.kcal} kcal.',
+      sub: isAr ? '+${formatSu(award)} نقطة' : '+${formatSu(award)} Su',
+    ));
+    _notify();
+    _rescheduleNudges();
+    if (isBacked && _mealRepo != null) {
+      final repo = _mealRepo;
+      _push('repeat meal', (uid) async {
+        final draftId = await repo.saveDraft(uid, MealAnalysisDraft(inputType: 'recent', items: const [], rawText: source.name));
+        await repo.confirmMeal(uid, draftId: draftId, meal: meal);
+        await _refreshStreak(uid);
+        await _refreshWallet(uid);
+        _notify();
+      });
+    }
+  }
+
+  // ---- activity --------------------------------------------------------
+
+  final List<ActivityLog> activitiesToday = [];
+
+  /// The kind chosen on the ring, while the duration is being asked.
+  ActivityKind? pendingActivity;
+
+  int get activityMinutesToday => activitiesToday.fold(0, (s, a) => s + a.minutes);
+  int get activityKcalToday => activitiesToday.fold(0, (s, a) => s + a.kcal);
+
+  void chooseActivity(ActivityKind kind) {
+    pendingActivity = kind;
+    _collapseTree();
+    _notify();
+  }
+
+  void cancelActivity() {
+    pendingActivity = null;
+    _notify();
+  }
+
+  /// Writes the movement with an estimate of its cost. Shown, never added to
+  /// the food budget: the consultation's activity factor already carries the
+  /// person's usual movement, and counting a match twice would be the
+  /// tracker habit this app is not building.
+  Future<void> logActivity(int minutes) async {
+    final kind = pendingActivity;
+    if (kind == null) return;
+    final entry = ActivityLog(kind: kind, minutes: minutes, kcal: ActivityCatalog.kcalFor(kind, minutes, profile.weight), at: _clock());
+    activitiesToday.add(entry);
+    pendingActivity = null;
+    _credit(SuEconomy.activityLogged, ar: 'حركة', en: 'Activity logged');
+    _track('activity_logged', {'kind': kind.name, 'minutes': minutes});
+    _notify();
+    final repo = _activityRepo;
+    if (!isBacked || repo == null) return;
+    await _push('log activity', (uid) async {
+      final id = await repo.add(uid, entry);
+      final i = activitiesToday.indexOf(entry);
+      if (i >= 0) activitiesToday[i] = entry.copyWith(id: id);
+      await _refreshWallet(uid);
+      _notify();
+    });
+  }
+
   /// One tap on a unit logs it and closes the tree. Nothing goes through the
   /// assistant.
   void quickWater(WaterUnit unit) {
@@ -3244,6 +3378,7 @@ class AppState extends ChangeNotifier {
   /// every caller goes on to change something else and notifies once.
   void _collapseTree() {
     treeLogIndex = null;
+    treeLogSub = null;
     treeWaterIndex = null;
     treeOpen = false;
   }

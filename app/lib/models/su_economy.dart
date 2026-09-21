@@ -32,6 +32,10 @@ class SuEconomy {
   static const int mealLogged = 100;
   static const int dailyQuest = 250;
 
+  /// A stretch of movement logged by hand. The operator's number, under the
+  /// daily cap like everything else.
+  static const int activityLogged = 50;
+
   /// A glass of water, for the first eight glasses of the day. Half rate on
   /// the free tier.
   static const int waterSip = 10;

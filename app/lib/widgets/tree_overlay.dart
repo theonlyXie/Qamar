@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../models/water.dart';
+import '../models/activity.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -101,6 +102,26 @@ const kLogMethods = [
   LogMethod('اتكلم', 'Speak', Icons.mic_none, QuickLog.voice),
   LogMethod('اكتب', 'Type', Icons.keyboard_outlined, QuickLog.text),
   LogMethod('صوّر', 'Photo', Icons.photo_camera_outlined, QuickLog.photo),
+  LogMethod('كرّر', 'Repeat', Icons.replay, QuickLog.repeat),
+  LogMethod('حركة', 'Activity', Icons.directions_run, QuickLog.activity),
+];
+
+/// The kinds of movement people actually name, fanned out once Activity is
+/// chosen. How long comes next, as chips.
+class ActivityChoice {
+  final String labelAr, labelEn;
+  final IconData icon;
+  final ActivityKind kind;
+  const ActivityChoice(this.labelAr, this.labelEn, this.icon, this.kind);
+  String label(bool isAr) => isAr ? labelAr : labelEn;
+}
+
+const kActivityChoices = [
+  ActivityChoice('كورة', 'Football', Icons.sports_soccer, ActivityKind.football),
+  ActivityChoice('مشي', 'Walk', Icons.directions_walk, ActivityKind.walk),
+  ActivityChoice('جيم', 'Gym', Icons.fitness_center, ActivityKind.gym),
+  ActivityChoice('جري', 'Run', Icons.directions_run, ActivityKind.run),
+  ActivityChoice('غيره', 'Other', Icons.accessibility_new, ActivityKind.other),
 ];
 
 /// The three things people drink, fanned around the ring once Water is chosen.
@@ -119,13 +140,14 @@ const kWaterChoices = [
   WaterChoice('شاي', 'Tea', Icons.emoji_food_beverage_outlined, WaterUnit.tea),
 ];
 
-/// Where a fanned-out choice sits. The choices take over the ring rather than
-/// clustering around their parent node: three 58px circles and their labels
+/// Where fanned-out choices sit. They take over the whole ring rather than
+/// clustering around their parent node: 58px circles and their labels
 /// crowded into a 72-degree arc stack on top of each other and cannot be hit.
-const _subAngles = [0.0, 120.0, 240.0];
+/// Evenly spaced, however many there are.
+List<double> subAnglesFor(int count) => [for (var i = 0; i < count; i++) i * 360 / count];
 
-/// Canvas-local centre of the i-th fanned-out choice.
-Offset treeSubCenter(int i) => _onRing(_subAngles[i]);
+/// Canvas-local centre of the i-th of [of] fanned-out choices.
+Offset treeSubCenter(int i, {int of = 3}) => _onRing(subAnglesFor(of)[i]);
 
 /// The radial "living tree" — the moon at the centre, five destinations on a
 /// ring, and light beaming out to each of them.
@@ -151,7 +173,21 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
     final isAr = state.isAr;
 
     final photosLeft = state.photoQuota.remaining;
-    final hint = state.treeLogExpanded
+    final repeatChoices = state.repeatChoices;
+    final int fanCount = state.treeLogSub == TreeSub.activity
+        ? kActivityChoices.length
+        : state.treeLogSub == TreeSub.repeat
+            ? repeatChoices.length
+            : state.treeLogExpanded
+                ? kLogMethods.length
+                : kWaterChoices.length;
+    final hint = state.treeLogSub == TreeSub.activity
+        ? (isAr ? 'اختار نوع الحركة، وبعدين قد إيه.' : 'Pick the movement, then how long.')
+        : state.treeLogSub == TreeSub.repeat
+            ? (repeatChoices.isEmpty
+                ? (isAr ? 'سجّل وجبة الأول، وهتظهر هنا عشان تكرّرها بدوسة.' : 'Log a meal first and it will be here to repeat with one tap.')
+                : (isAr ? 'دوسة واحدة تسجّل الوجبة تاني بنفس أرقامها.' : 'One tap logs the meal again with the same numbers.'))
+        : state.treeLogExpanded
         ? (isAr
             ? 'الكتابة والصوت مجاناً بلا حد · باقي ${state.iso('$photosLeft')} صور النهارده'
             : 'Type or speak, unlimited · $photosLeft photos left today')
@@ -160,7 +196,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
             : t.treeHint;
 
     final nodes = treeNodesFor(ramadan: state.seasonVisible);
-    final beamAngles = state.treeExpanded ? _subAngles : [for (final n in nodes) n.angle];
+    final beamAngles = state.treeExpanded ? subAnglesFor(fanCount) : [for (final n in nodes) n.angle];
 
     return Positioned.fill(
       child: GestureDetector(
@@ -224,10 +260,11 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                                   onTap: () => _activate(state, nodes[i], i),
                                 ),
                               ),
-                          if (state.treeLogExpanded)
+                          if (state.treeLogExpanded && state.treeLogSub == null)
                             for (var i = 0; i < kLogMethods.length; i++)
                               _placeSub(
                                 i,
+                                kLogMethods.length,
                                 _RingButton(
                                   icon: kLogMethods[i].icon,
                                   label: kLogMethods[i].label(isAr),
@@ -236,10 +273,35 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                                   onTap: () => _runMethod(context, state, kLogMethods[i].kind),
                                 ),
                               ),
+                          if (state.treeLogSub == TreeSub.activity)
+                            for (var i = 0; i < kActivityChoices.length; i++)
+                              _placeSub(
+                                i,
+                                kActivityChoices.length,
+                                _RingButton(
+                                  icon: kActivityChoices[i].icon,
+                                  label: kActivityChoices[i].label(isAr),
+                                  color: QColors.green,
+                                  onTap: () => state.chooseActivity(kActivityChoices[i].kind),
+                                ),
+                              ),
+                          if (state.treeLogSub == TreeSub.repeat)
+                            for (var i = 0; i < repeatChoices.length; i++)
+                              _placeSub(
+                                i,
+                                repeatChoices.length,
+                                _RingButton(
+                                  icon: Icons.restaurant,
+                                  label: _short(repeatChoices[i].name),
+                                  color: QColors.moonlight,
+                                  onTap: () => state.repeatMeal(repeatChoices[i]),
+                                ),
+                              ),
                           if (state.treeWaterExpanded)
                             for (var i = 0; i < kWaterChoices.length; i++)
                               _placeSub(
                                 i,
+                                kWaterChoices.length,
                                 _RingButton(
                                   icon: kWaterChoices[i].icon,
                                   label: kWaterChoices[i].label(isAr),
@@ -265,9 +327,15 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
     );
   }
 
-  Widget _placeSub(int i, Widget child) {
-    final c = treeSubCenter(i);
+  Widget _placeSub(int i, int of, Widget child) {
+    final c = treeSubCenter(i, of: of);
     return Positioned(left: c.dx - _nodeSize / 2, top: c.dy - _nodeSize / 2, child: child);
+  }
+
+  /// A meal name short enough to sit under a ring circle.
+  static String _short(String name) {
+    final one = name.split(' + ').first.trim();
+    return one.length <= 14 ? one : '${one.substring(0, 13)}…';
   }
 
   void _activate(AppState state, TreeNode node, int i) {
@@ -286,6 +354,14 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
   /// and nothing here asks for Qamar+ — the server counts the photo and says
   /// so when today's are gone.
   Future<void> _runMethod(BuildContext context, AppState state, QuickLog kind) async {
+    if (kind == QuickLog.repeat) {
+      state.expandTreeSub(TreeSub.repeat);
+      return;
+    }
+    if (kind == QuickLog.activity) {
+      state.expandTreeSub(TreeSub.activity);
+      return;
+    }
     if (kind != QuickLog.photo) {
       state.quickLog(kind);
       return;

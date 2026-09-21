@@ -162,6 +162,10 @@ class _TodayScreenState extends State<TodayScreen> {
         const SizedBox(height: 14),
         const _WaterCard(),
         const SizedBox(height: 14),
+        if (state.activitiesToday.isNotEmpty) ...[
+          _ActivityCard(state: state),
+          const SizedBox(height: 14),
+        ],
         if (nextMeal != null)
           Explainable(
             id: 'next_meal',
@@ -443,6 +447,55 @@ class _MacroRow extends StatelessWidget {
 /// Replaces the old "log a meal" button. The action itself lives in the orb —
 /// tap it, choose Log, pick speak, type or photo — so this only has to teach
 /// the two gestures once.
+/// Today's movement, as logged from the ring: what, how long, and an estimate
+/// of what it cost. Shown beside the food, never subtracted from it.
+class _ActivityCard extends StatelessWidget {
+  final AppState state;
+  const _ActivityCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Expanded(
+              child: Text(isAr ? 'حركة النهاردة' : 'Today’s movement',
+                  style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+            ),
+            Text(
+              isAr
+                  ? '${state.iso('${state.activityMinutesToday}')} د · ~${state.iso('${state.activityKcalToday}')} سعرة'
+                  : '${state.activityMinutesToday} min · ~${state.activityKcalToday} kcal',
+              style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.green),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          for (final a in state.activitiesToday)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(children: [
+                const Icon(Icons.directions_run, size: 14, color: QColors.green),
+                const SizedBox(width: 8),
+                Expanded(child: Text(a.label(ar: isAr), style: QText.body(size: 14, color: QColors.textHigh))),
+                Text(isAr ? '${state.iso('${a.minutes}')} د' : '${a.minutes} min', style: QText.number(size: 12, color: QColors.textMuted)),
+              ]),
+            ),
+          const SizedBox(height: 6),
+          Text(
+            isAr ? 'تقدير. بنسجّل الحركة جنب الأكل ومش بنزوّد سعرات عليها.' : 'An estimate. Movement is logged beside the food, not added to its budget.',
+            style: QText.body(size: 11, height: 16, color: QColors.textFaint),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// The one question the season asks, once: fasting this year? Yes turns the
 /// plan into iftar and suhoor and the water card into windows; no leaves the
 /// day as it is. Either way the seventh node stays on the tree in season.

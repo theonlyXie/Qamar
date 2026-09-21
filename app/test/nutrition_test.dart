@@ -7,6 +7,7 @@ import 'dart:ui' show Offset, Rect;
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:qamar/models/activity.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/onboarding.dart';
@@ -728,18 +729,26 @@ void secondRound() {
       expect(state.plusNotice, isNull);
     });
 
-    test('fanned-out choices sit on distinct ring positions', () {
-      final seen = <Offset>{};
-      for (var i = 0; i < kLogMethods.length; i++) {
-        final c = treeSubCenter(i);
-        for (final other in seen) {
-          // Overlapping circles were why only one of them could be tapped.
-          expect((c - other).distance, greaterThan(60), reason: 'choices overlap');
+    test('fanned-out choices sit on distinct ring positions, however many there are', () {
+      for (final count in [kLogMethods.length, kWaterChoices.length, kActivityChoices.length, 1, 5]) {
+        final seen = <Offset>{};
+        for (var i = 0; i < count; i++) {
+          final c = treeSubCenter(i, of: count);
+          for (final other in seen) {
+            // Overlapping circles were why only one of them could be tapped.
+            expect((c - other).distance, greaterThan(60), reason: 'choices overlap at $count');
+          }
+          seen.add(c);
         }
-        seen.add(c);
+        expect(seen.length, count);
       }
-      expect(seen.length, kLogMethods.length);
-      expect(kWaterChoices.length, kLogMethods.length, reason: 'both fan-outs share the three ring slots');
+    });
+
+    test('the Log node has the blueprint’s four branches plus typing, and Activity fans out the movements people name', () {
+      expect(kLogMethods.map((m) => m.labelEn).toList(), ['Speak', 'Type', 'Photo', 'Repeat', 'Activity']);
+      expect(kActivityChoices.map((a) => a.kind).toSet(), ActivityKind.values.toSet());
+      expect(ActivityCatalog.kcalFor(ActivityKind.football, 30, 82), 287, reason: '7 MET × 82 kg × 0.5 h');
+      expect(ActivityCatalog.kcalFor(ActivityKind.walk, 60, 70), 245);
     });
 
     test('exactly one node logs and one waters, and neither opens a page', () {

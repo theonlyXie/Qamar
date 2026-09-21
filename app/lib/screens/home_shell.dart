@@ -17,6 +17,7 @@ import 'today_screen.dart';
 import 'subscription_screen.dart';
 import 'wallet_screen.dart';
 import 'welcome_screen.dart';
+import '../widgets/activity_sheet.dart';
 import 'ramadan_screen.dart';
 import 'you_screen.dart';
 
@@ -73,6 +74,7 @@ class HomeShell extends StatelessWidget {
               if (state.chatOpen) const AskQamarOverlay(),
               if (state.whyOpen) const WhySheet(),
               if (state.authOpen) const AccountSheet(),
+              if (state.pendingActivity != null) const ActivitySheet(),
               if (state.explainOpen != null) const ExplainSheet(),
             ],
           ),

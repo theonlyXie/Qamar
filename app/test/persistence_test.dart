@@ -20,6 +20,7 @@ import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/ramadan.dart';
 import 'package:qamar/models/streak.dart';
 import 'package:qamar/models/su_economy.dart';
+import 'package:qamar/models/activity.dart';
 import 'package:qamar/models/billing.dart';
 import 'package:qamar/models/invitation.dart';
 import 'package:qamar/models/water.dart';
@@ -120,6 +121,11 @@ class FakeMealRepo implements MealRepository {
 
   @override
   Future<NightNote?> nightNote(String userId, DateTime day) async => note;
+
+  List<LoggedMeal> recent = [];
+
+  @override
+  Future<List<LoggedMeal>> recentMeals(String userId, {int days = 7}) async => recent;
 
   @override
   Future<Streak?> streak(String userId) async {
@@ -346,6 +352,29 @@ class FakeAccount implements Account {
   Future<void> confirmSignIn({required String email, required String token}) async => linked = true;
 }
 
+class FakeActivityRepo implements ActivityRepository {
+  FakeActivityRepo({this.wallet});
+
+  /// Stands in for the 0051 trigger: the insert itself earns the Su, so the
+  /// balance the phone reads back after writing already carries it.
+  final FakeWalletRepo? wallet;
+  final List<ActivityLog> added = [];
+  List<ActivityLog> today = [];
+
+  @override
+  Future<String> add(String userId, ActivityLog entry) async {
+    added.add(entry);
+    final w = wallet;
+    if (w != null) {
+      w.stored = (available: w.stored.available + SuEconomy.activityLogged, lifetime: w.stored.lifetime + SuEconomy.activityLogged);
+    }
+    return 'act-${added.length}';
+  }
+
+  @override
+  Future<List<ActivityLog>> forDay(String userId, DateTime day) async => today;
+}
+
 class FakeInvitationRepo implements InvitationRepository {
   InvitationBook book = const InvitationBook(quarter: '2026Q3', limit: 3, invitations: []);
   final List<String> issued = [];
@@ -386,6 +415,7 @@ AppState backed({
   FakeWaterRepo? water,
   FakeWalletRepo? wallet,
   FakeInvitationRepo? invitations,
+  FakeActivityRepo? activities,
   FakeGateway? ai,
   FakeAccount? auth,
   MemoryAnalytics? analytics,
@@ -400,6 +430,7 @@ AppState backed({
       waterRepo: water ?? FakeWaterRepo(),
       walletRepo: wallet ?? FakeWalletRepo(),
       invitationRepo: invitations,
+      activityRepo: activities,
       ai: ai,
       auth: auth,
       userId: 'user-1',
@@ -1813,6 +1844,80 @@ void main() {
       expect(profiles.fastingSaves, [FastingMode.ramadan]);
       expect(gateway.planCalls, before + 1, reason: 'a fasting day is a different plan; today is rewritten');
       expect(state.fasting, isTrue);
+    });
+  });
+
+  group('the Log node’s other two branches', () {
+    test('repeat offers the last week’s distinct meals, today’s first, and one tap logs one again', () async {
+      final meals = FakeMealRepo()
+        ..recent = [
+          LoggedMeal(name: 'Koshary', sub: 'by text', kcal: 520, p: 16, c: 96, f: 9, at: DateTime(2026, 9, 20, 14)),
+          LoggedMeal(name: 'Foul', sub: 'by voice', kcal: 380, p: 18, c: 50, f: 9, at: DateTime(2026, 9, 19, 9)),
+          LoggedMeal(name: 'koshary', sub: 'by photo', kcal: 600, p: 18, c: 100, f: 12, at: DateTime(2026, 9, 18, 14)),
+        ];
+      final a = MemoryAnalytics();
+      final state = backed(meals: meals, analytics: a, clock: () => DateTime(2026, 9, 21, 13));
+      await state.setImprove(true);
+      await settle();
+
+      expect(state.repeatChoices.map((m) => m.name), ['Koshary', 'Foul'], reason: 'the same dish twice is one choice');
+
+      state.expandTreeLog(0);
+      state.expandTreeSub(TreeSub.repeat);
+      expect(state.treeLogSub, TreeSub.repeat);
+      state.repeatMeal(state.repeatChoices.first);
+      await settle();
+
+      expect(state.treeOpen, isFalse);
+      expect(state.treeLogSub, isNull);
+      expect(state.meals.single.name, 'Koshary');
+      expect(state.meals.single.kcal, 520);
+      expect(meals.saved.single.name, 'Koshary');
+      expect(meals.drafts, 1, reason: 'the repeat is traceable like any other log');
+      expect(a.named('meal_logged').single['source'], 'recent');
+      expect(state.repeatChoices.first.name, 'Koshary', reason: 'today’s meal leads the list');
+    });
+
+    test('activity: a kind on the ring, a duration on the sheet, an estimate on the card', () async {
+      final wallet = FakeWalletRepo();
+      final repo = FakeActivityRepo(wallet: wallet);
+      final state = backed(activities: repo, wallet: wallet, clock: () => DateTime(2026, 9, 21, 18));
+      await settle();
+      final before = state.suAvailable;
+
+      state.expandTreeLog(0);
+      state.expandTreeSub(TreeSub.activity);
+      state.chooseActivity(ActivityKind.football);
+      expect(state.treeOpen, isFalse, reason: 'the sheet takes over from the ring');
+      expect(state.pendingActivity, ActivityKind.football);
+
+      await state.logActivity(30);
+      await settle();
+      expect(state.pendingActivity, isNull);
+      expect(state.activitiesToday.single.kcal, ActivityCatalog.kcalFor(ActivityKind.football, 30, state.profile.weight));
+      expect(state.activityMinutesToday, 30);
+      expect(repo.added.single.minutes, 30);
+      expect(state.activitiesToday.single.id, 'act-1', reason: 'the server’s id comes back onto the row');
+      expect(state.suAvailable, before + SuEconomy.activityLogged, reason: 'movement earns; the server’s balance carries it after the write');
+      expect(state.consumed().kcal, 0, reason: 'movement is never subtracted from the food');
+    });
+
+    test('cancelling the sheet logs nothing', () async {
+      final repo = FakeActivityRepo();
+      final state = backed(activities: repo);
+      state.chooseActivity(ActivityKind.walk);
+      state.cancelActivity();
+      await state.logActivity(30);
+      expect(state.activitiesToday, isEmpty);
+      expect(repo.added, isEmpty);
+    });
+
+    test('today’s movement comes back on hydrate', () async {
+      final repo = FakeActivityRepo()..today = [ActivityLog(id: 'x', kind: ActivityKind.gym, minutes: 45, kcal: 300, at: DateTime(2026, 9, 21, 8))];
+      final state = backed(activities: repo);
+      await settle();
+      expect(state.activityMinutesToday, 45);
+      expect(state.activityKcalToday, 300);
     });
   });
 }
