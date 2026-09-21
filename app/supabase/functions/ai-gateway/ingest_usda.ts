@@ -16,6 +16,21 @@
 // wrong one shows as a confident number that is wrong. Anything below the
 // score floor is left alone and reported for a human to map by hand.
 
+import {
+  NUTRIENT_SET_VERSION,
+  USDA_NUTRIENT_MAP as NUTRIENT_MAP,
+  USDA_PREFERRED_IDS as PREFERRED_IDS,
+} from "./catalog.ts";
+
+// The nutrient set, the folate preference and the version marker moved to
+// catalog.ts when the whole-catalogue importers arrived, and are imported here
+// rather than kept in step by hand. Two scripts writing different sets of
+// nutrients under the same nutrient_definition_version would make the version
+// string a lie, and the "is this food done" check that rests on it would start
+// skipping foods missing half their values — the same shape as the bug the
+// version marker was introduced to fix. Adding a code means adding it in one
+// place and bumping the version there; both importers pick it up.
+
 const USDA_KEY = Deno.env.get("USDA_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -28,73 +43,6 @@ if (!USDA_KEY || !SUPABASE_URL || !SERVICE_KEY) {
 const args = new Set(Deno.args);
 const DRY_RUN = args.has("--dry-run");
 const LIMIT = Number(Deno.args.find((a) => a.startsWith("--limit="))?.split("=")[1] ?? 0);
-
-// USDA nutrient IDs to Qamar nutrient codes. Anything not listed is ignored
-// rather than guessed at.
-const NUTRIENT_MAP: Record<number, string> = {
-  1008: "energy_kcal",
-  1003: "protein_g",
-  1005: "carbs_g",
-  1004: "fat_g",
-  1079: "fiber_g",
-  2000: "sugars_g",
-  1258: "sat_fat_g",
-  1093: "sodium_mg",
-  1092: "potassium_mg",
-  1087: "calcium_mg",
-  1089: "iron_mg",
-  1095: "zinc_mg",
-  1114: "vitamin_d_ug",
-  1178: "vitamin_b12_ug",
-  1177: "folate_ug",
-  1190: "folate_ug", // Folate, DFE — see PREFERRED_IDS
-  1162: "vitamin_c_mg",
-  1106: "vitamin_a_ug",
-  1100: "iodine_ug",
-  1051: "water_g",
-  // Added with the DRI seed in 0031. A target with no food values behind it is
-  // a number the app can display and never act on, so the importer has to reach
-  // these before the gap report means anything.
-  1090: "magnesium_mg",
-  1103: "selenium_ug",
-  1109: "vitamin_e_mg", // alpha-tocopherol, which is what the DRI is set on
-  1165: "thiamin_mg",
-  1166: "riboflavin_mg",
-  1167: "niacin_mg",
-  1175: "vitamin_b6_mg",
-};
-
-/**
- * When two USDA fields map to one Qamar code, the one listed here wins
- * regardless of which arrives first in the response.
- *
- * Folate is the case that matters. USDA reports both "Folate, total" (1177, in
- * µg of folate) and "Folate, DFE" (1190, in dietary folate equivalents), and
- * the DRI is set in DFE. Fortified flour — Egyptian baladi bread included —
- * carries folic acid, which is absorbed roughly 1.7 times better than the
- * natural form, so the two numbers diverge exactly where bread is the staple.
- * Taking whichever came last in the array would have made the folate column
- * silently mean different things for different foods.
- */
-const PREFERRED_IDS = new Set([1190]);
-
-/**
- * Which set of nutrients this importer knows how to fetch.
- *
- * Bump this whenever NUTRIENT_MAP gains a code. It is stored on every row it
- * writes, and it is how the run below decides a food is done.
- *
- * Skipping "foods that already have nutrients" was right exactly once. The
- * moment the map grew, every food loaded by the old map — all of them — looked
- * finished while missing the seven nutrients that had just been added, and no
- * amount of re-running would have fixed it. Same shape as the bug in the
- * knowledge-base ingest: a skip rule that was true when written and quietly
- * false after the thing it skipped for changed.
- *
- * The write is an upsert on (food, nutrient, basis), so re-fetching a food
- * updates its rows rather than duplicating them.
- */
-const NUTRIENT_SET_VERSION = "fdc-2026-08";
 
 /** Below this, we do not claim a match. */
 const SCORE_FLOOR = 0.45;

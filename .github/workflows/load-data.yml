@@ -3,13 +3,28 @@
 # Run it from the Actions tab: "Load Qamar's data" → "Run workflow" → pick what
 # to load.
 #
-# Both loads are safe to run more than once, and safe to run again after a
-# failure — which is the case that matters, because a rate-limited embedding
-# provider will interrupt a first run. The ingest reads what is already in the
-# database, skips whole documents, and repairs the specific half-finished state
-# a killed run leaves behind: a document row with no chunks, which looks
-# ingested and is invisible to search. The nutrient importer refuses to store
-# anything the source registry has not granted storage rights for.
+# Four loads, in the order they are worth running:
+#
+#   knowledge base     WHO and Egyptian guidance, embedded for retrieval.
+#   nutrient values    laboratory numbers onto the 131 authored Egyptian foods.
+#   food catalogue     USDA's own ~15,000 generic foods, as new rows.
+#   packaged foods     Open Food Facts, Egyptian market by default.
+#
+# Run "nutrient values" before "food catalogue". Both write USDA data, and the
+# first one maps fdcIds onto the hand-authored Egyptian foods. The catalogue
+# importer then recognises those fdcIds and refreshes their numbers instead of
+# creating a second, worse row for the same food.
+#
+# Every load is safe to run more than once, and safe to run again after a
+# failure — which is the case that matters, because a rate limit will interrupt
+# a first run of any of them. Each reads what is already in the database and
+# resumes, and each repairs the specific half-finished state a killed run
+# leaves behind: for the knowledge base, a document row with no chunks, which
+# looks ingested and is invisible to search; for the food loads, a food row
+# with no nutrients, which looks imported and cannot be shown anywhere in the
+# app. All four refuse to store anything the source registry has not granted
+# storage rights for — which is also the off switch. Set a source to 'blocked'
+# there and its importer stops, without a code change.
 
 name: Load Qamar's data
 
@@ -24,6 +39,25 @@ on:
           - both
           - knowledge base only
           - nutrient values only
+          - food catalogue only
+          - packaged foods only
+          - everything
+      catalogue_datasets:
+        description: "Food catalogue: which USDA datasets"
+        type: string
+        default: foundation,sr_legacy,survey
+      catalogue_limit:
+        description: "Food catalogue: stop after N foods (0 = no limit)"
+        type: string
+        default: "0"
+      packaged_countries:
+        description: "Packaged foods: market to import (egypt, or world)"
+        type: string
+        default: egypt
+      packaged_limit:
+        description: "Packaged foods: stop after N products (0 = no limit)"
+        type: string
+        default: "0"
 
 env:
   SUPABASE_URL: https://stqirjlqzchcoeegumoq.supabase.co
@@ -53,12 +87,17 @@ jobs:
         run: |
           missing=""
           [ -z "$SERVICE" ] && missing="$missing SUPABASE_SERVICE_ROLE_KEY"
-          if [ "$WHAT" != "nutrient values only" ] && [ -z "$VOYAGE" ]; then
-            missing="$missing VOYAGE_API_KEY"
-          fi
-          if [ "$WHAT" != "knowledge base only" ] && [ -z "$USDA" ]; then
-            missing="$missing USDA_API_KEY"
-          fi
+          case "$WHAT" in
+            both|everything|"knowledge base only")
+              [ -z "$VOYAGE" ] && missing="$missing VOYAGE_API_KEY" ;;
+          esac
+          case "$WHAT" in
+            both|everything|"nutrient values only"|"food catalogue only")
+              [ -z "$USDA" ] && missing="$missing USDA_API_KEY" ;;
+          esac
+          # Open Food Facts needs no key. It asks for an identifying
+          # User-Agent and a modest request rate instead, both of which
+          # catalog_off.ts honours.
           if [ -n "$missing" ]; then
             echo "::error::Missing repository secrets:$missing"
             echo "Add them under Settings -> Secrets and variables -> Actions."
@@ -69,7 +108,7 @@ jobs:
       # build_sources.ts writes sources.json beside itself, so it runs from its
       # own directory; the ingest below then reads that path relative to app/.
       - name: Build the source manifest
-        if: ${{ inputs.what != 'nutrient values only' }}
+        if: ${{ contains(fromJSON('["both","everything","knowledge base only"]'), inputs.what) }}
         working-directory: app/supabase/knowledge
         run: deno run --allow-read --allow-write build_sources.ts
 
@@ -79,7 +118,7 @@ jobs:
       # meant one bad key silently costing you the other half.
       - name: Load the knowledge base
         id: kb
-        if: ${{ inputs.what != 'nutrient values only' }}
+        if: ${{ contains(fromJSON('["both","everything","knowledge base only"]'), inputs.what) }}
         continue-on-error: true
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -90,17 +129,50 @@ jobs:
 
       - name: Load the nutrient values
         id: usda
-        if: ${{ inputs.what != 'knowledge base only' }}
+        if: ${{ contains(fromJSON('["both","everything","nutrient values only"]'), inputs.what) }}
         continue-on-error: true
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           USDA_API_KEY: ${{ secrets.USDA_API_KEY }}
         run: deno run --allow-net --allow-env supabase/functions/ai-gateway/ingest_usda.ts
 
-      - name: Fail if either load failed
-        if: ${{ steps.kb.outcome == 'failure' || steps.usda.outcome == 'failure' }}
+      # Timeouts, not because the scripts hang, but because they are the only
+      # thing standing between a rate limit and six hours of a runner asking a
+      # closed door the same question. Both resume from the database, so a
+      # timed-out run costs nothing but the time it already spent.
+      - name: Load the food catalogue
+        id: catalogue
+        if: ${{ contains(fromJSON('["everything","food catalogue only"]'), inputs.what) }}
+        continue-on-error: true
+        timeout-minutes: 180
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          USDA_API_KEY: ${{ secrets.USDA_API_KEY }}
         run: |
-          echo "::error::knowledge base: ${{ steps.kb.outcome }}, nutrients: ${{ steps.usda.outcome }}"
+          deno run --allow-net --allow-env \
+            supabase/functions/ai-gateway/catalog_usda.ts \
+            "--datasets=${{ inputs.catalogue_datasets }}" \
+            "--limit=${{ inputs.catalogue_limit }}"
+
+      - name: Load the packaged foods
+        id: packaged
+        if: ${{ contains(fromJSON('["everything","packaged foods only"]'), inputs.what) }}
+        continue-on-error: true
+        timeout-minutes: 180
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          deno run --allow-net --allow-env --allow-read \
+            supabase/functions/ai-gateway/catalog_off.ts \
+            "--countries=${{ inputs.packaged_countries }}" \
+            "--limit=${{ inputs.packaged_limit }}"
+
+      - name: Fail if any load failed
+        if: >-
+          ${{ steps.kb.outcome == 'failure' || steps.usda.outcome == 'failure'
+              || steps.catalogue.outcome == 'failure' || steps.packaged.outcome == 'failure' }}
+        run: |
+          echo "::error::knowledge base: ${{ steps.kb.outcome }}, nutrients: ${{ steps.usda.outcome }}, catalogue: ${{ steps.catalogue.outcome }}, packaged: ${{ steps.packaged.outcome }}"
           echo "Re-running this workflow resumes rather than duplicating."
           exit 1
 
@@ -113,7 +185,13 @@ jobs:
           echo '```sql' >> $GITHUB_STEP_SUMMARY
           echo "select count(*) from kb_chunks where embedding is null;  -- must be 0" >> $GITHUB_STEP_SUMMARY
           echo "select count(*) from food_nutrients;                     -- should not be 0" >> $GITHUB_STEP_SUMMARY
+          echo "select * from food_catalog_coverage;                     -- one row per source" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "In food_catalog_coverage, read with_energy against foods. A food" >> $GITHUB_STEP_SUMMARY
+          echo "with no energy value cannot be shown anywhere in the app, so a gap" >> $GITHUB_STEP_SUMMARY
+          echo "between those two columns means the load half-finished — usually a" >> $GITHUB_STEP_SUMMARY
+          echo "USDA rate limit at request 1,001. Run it again; it resumes." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "A chunk with no embedding is invisible to search, so a non-zero" >> $GITHUB_STEP_SUMMARY
           echo "count there means the load half-finished and should be re-run." >> $GITHUB_STEP_SUMMARY
