@@ -67,8 +67,12 @@ class FakeProfileRepo implements ProfileRepository {
     consents.add((type: type, granted: granted, version: version));
   }
 
+  /// The adherence answer on record, kept apart from the improve one.
+  bool? adherenceOnRecord;
+
   @override
-  Future<bool?> loadConsent(String userId, String type) async => consentOnRecord;
+  Future<bool?> loadConsent(String userId, String type) async =>
+      type == ConsentType.adherence ? adherenceOnRecord : consentOnRecord;
 
   Season? season;
   final List<FastingMode> fastingSaves = [];
@@ -2091,6 +2095,84 @@ void main() {
       expect(hours.screen, AppScreen.subscription);
     });
   });
+
+  group('the professional programme’s second half: adherence, with consent', () {
+    test('saying yes is recorded like the other consents, on the phone and on the account', () async {
+      final a = MemoryAnalytics();
+      final profiles = FakeProfileRepo();
+      final prefs = MemoryDevicePrefs();
+      final state = backed(profiles: profiles, analytics: a, prefs: prefs);
+      await settle();
+      await state.setImprove(true);
+      await settle();
+      expect(state.adherenceShare, isFalse, reason: 'off until said yes to');
+
+      await state.setAdherenceShare(true);
+      await settle();
+      expect(state.adherenceShare, isTrue);
+      expect(profiles.consents.last, (type: 'adherence_share', granted: true, version: '1.1'));
+      expect(await prefs.getBool('adherence_consent'), isTrue);
+      expect(a.named('adherence_consent').single['granted'], true);
+
+      await state.setAdherenceShare(false);
+      await settle();
+      expect(profiles.consents.last, (type: 'adherence_share', granted: false, version: '1.1'));
+      expect(a.named('adherence_consent'), hasLength(2));
+    });
+
+    test('the account’s answer wins over the phone’s on hydrate', () async {
+      final profiles = FakeProfileRepo()..adherenceOnRecord = true;
+      final prefs = MemoryDevicePrefs();
+      final state = backed(profiles: profiles, prefs: prefs);
+      await settle();
+      expect(state.adherenceShare, isTrue);
+      expect(await prefs.getBool('adherence_consent'), isTrue);
+      expect(state.improve, isFalse, reason: 'one consent does not imply the other');
+    });
+
+    test('a professional sees their consenting clients as the week’s numbers; anyone else sees no card', () async {
+      final fb = FakeBilling()
+        ..clients = [
+          const ProClient(name: 'Mona', daysLogged: 6, onTargetDays: 4, avgKcal: 1820, targetKcal: 1900),
+          const ProClient(name: 'Omar', daysLogged: 0, onTargetDays: 0, avgKcal: 0, targetKcal: 2200),
+        ];
+      final pro = backed(billing: fb);
+      await settle();
+      expect(pro.proClients.map((c) => c.name).toList(), ['Mona', 'Omar']);
+      expect(fb.clientReads, 1);
+
+      final nobody = backed(billing: FakeBilling()..wallet = const AffiliateWallet(code: null));
+      await settle();
+      expect(nobody.proClients, isEmpty, reason: 'no code, no dashboard call');
+    });
+
+    test('the wire shape is read as the database writes it', () {
+      final list = ProClient.listFromJson({
+        'from': '2026-09-15',
+        'to': '2026-09-21',
+        'count': 1,
+        'clients': [
+          {
+            'name': 'Mona',
+            'since': '2026-08-01T10:00:00+00:00',
+            'until': '2027-08-01T10:00:00+00:00',
+            'target_kcal': 1900,
+            'days_logged': 6,
+            'on_target_days': 4,
+            'avg_kcal': 1820,
+            'last_logged_at': '2026-09-21T09:30:00+00:00',
+          },
+          {'name': '  ', 'days_logged': 0, 'on_target_days': 0, 'avg_kcal': 0, 'target_kcal': null},
+        ],
+      });
+      expect(list, hasLength(2));
+      expect(list.first.name, 'Mona');
+      expect(list.first.onTargetDays, 4);
+      expect(list.first.until!.year, 2027);
+      expect(list.last.name, '—', reason: 'a client with no name on file is still a row, not a crash');
+      expect(list.last.targetKcal, isNull);
+    });
+  });
 }
 
 class FakeBilling implements BillingGateway {
@@ -2186,6 +2268,15 @@ class FakeBilling implements BillingGateway {
 
   @override
   Future<AffiliateWallet> affiliate() async => wallet;
+
+  List<ProClient> clients = const [];
+  int clientReads = 0;
+
+  @override
+  Future<List<ProClient>> affiliateClients() async {
+    clientReads++;
+    return clients;
+  }
 
   @override
   Future<AffiliateWallet> requestAffiliatePayout({int? amountCents}) async {

@@ -102,6 +102,26 @@ class SubscriptionScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Text(quote.promoError!, style: QText.body(size: 12, color: QColors.amber)),
         ],
+        // The code's second half: the client's yes to the professional seeing
+        // the week as numbers. Off until turned on; also on Me.
+        if (quote.pricingReason == 'affiliate' || state.plusPromoCode.trim().isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(
+              child: Text(
+                isAr
+                    ? 'شاركه التزامي الأسبوعي (أيام التسجيل والمتوسط مقابل الهدف، بس)'
+                    : 'Share my weekly adherence with them (days logged and the average against my target, nothing else)',
+                style: QText.body(size: 12, height: 17, color: QColors.textMuted),
+              ),
+            ),
+            Switch.adaptive(
+              value: state.adherenceShare,
+              activeThumbColor: QColors.violet,
+              onChanged: (v) => state.setAdherenceShare(v),
+            ),
+          ]),
+        ],
         if (quote.promoNote != null) ...[
           const SizedBox(height: 8),
           Text(quote.promoNote!, style: QText.body(size: 12, height: 18, color: QColors.textMuted)),

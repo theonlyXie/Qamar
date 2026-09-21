@@ -11,6 +11,7 @@
 //   POST /billing/earned/claim   {}   grant it, once 28/30 is reached     JWT
 //   POST /billing/affiliate      {}                                    JWT
 //   POST /billing/affiliate/payout { amount_cents? }                   JWT
+//   POST /billing/affiliate/clients {}  the professional's consenting clients, this week   JWT
 //   POST /billing/webhook        Paymob transaction callback           HMAC
 //
 // Secrets:
@@ -375,6 +376,13 @@ async function affiliate(userId: string): Promise<Response> {
   return json(snap);
 }
 
+// The professional's dashboard (0053): each client who typed this person's
+// code and said yes to sharing, with the week's adherence. The consent gate
+// is in the database function; a client who withdraws disappears here.
+async function affiliateClients(userId: string): Promise<Response> {
+  return json(await rpc("qamar_pro_clients", { p_user_id: userId }));
+}
+
 async function affiliatePayout(userId: string, body: Record<string, unknown>): Promise<Response> {
   const raw = body.amount_cents;
   const amount = typeof raw === "number" && Number.isFinite(raw) ? Math.floor(raw) : null;
@@ -517,6 +525,8 @@ Deno.serve(async (req) => {
         return await affiliate(user.id);
       case "/affiliate/payout":
         return await affiliatePayout(user.id, body);
+      case "/affiliate/clients":
+        return await affiliateClients(user.id);
       default:
         return json({ error: `unknown route ${route}` }, 404);
     }

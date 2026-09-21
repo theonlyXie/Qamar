@@ -131,6 +131,10 @@ class YouScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         _AffiliateCard(state: state),
+        if (state.proClients.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _ClientsCard(state: state),
+        ],
         const SizedBox(height: 14),
         _InvitationsCard(state: state),
         const SizedBox(height: 14),
@@ -249,6 +253,31 @@ class YouScreen extends StatelessWidget {
               value: state.improve,
               activeThumbColor: QColors.violet,
               onChanged: (v) => state.setImprove(v),
+            ),
+          ]),
+        ),
+        // The professional programme's one condition: the client's yes.
+        Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(isAr ? 'مشاركة الالتزام مع أخصائيي' : 'Share adherence with my nutritionist',
+                    style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+                Text(
+                  isAr
+                      ? 'أرقام الأسبوع بس — أيام التسجيل والمتوسط مقابل الهدف. لصاحب الكود اللي على اشتراكك، وبس.'
+                      : 'The week as numbers only — days logged and the average against your target. To whoever’s code is on your subscription, and no one else.',
+                  style: QText.body(size: 12, height: 16, color: QColors.textMuted),
+                ),
+              ]),
+            ),
+            Switch.adaptive(
+              value: state.adherenceShare,
+              activeThumbColor: QColors.violet,
+              onChanged: (v) => state.setAdherenceShare(v),
             ),
           ]),
         ),
@@ -556,6 +585,72 @@ class _AffiliateCard extends StatelessWidget {
           if (state.affiliateNotice != null) ...[
             const SizedBox(height: 8),
             Text(state.affiliateNotice!, style: QText.body(size: 12, height: 18, color: QColors.amberSoft)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The professional's dashboard, as the blueprint bounds it: each client who
+/// said yes, and their week as numbers. No meals, no photos, no weight.
+class _ClientsCard extends StatelessWidget {
+  final AppState state;
+  const _ClientsCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final clients = state.proClients;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(isAr ? 'عملاؤك، الأسبوع ده' : 'Your clients, this week',
+              style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+          const SizedBox(height: 4),
+          Text(
+            isAr
+                ? 'اللي وافقوا على المشاركة بس. أيام التسجيل من ٧، وكام يوم منهم قريب من الهدف.'
+                : 'Only those who said yes to sharing. Days logged out of 7, and how many of them landed near the target.',
+            style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+          ),
+          const SizedBox(height: 10),
+          for (final c in clients) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(c.name, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textHigh)),
+                      const SizedBox(height: 2),
+                      Text(
+                        c.daysLogged == 0
+                            ? (isAr ? 'مفيش تسجيل الأسبوع ده' : 'Nothing logged this week')
+                            : c.targetKcal == null
+                                ? (isAr
+                                    ? 'متوسط ${state.iso('${c.avgKcal}')} سعر في اليوم'
+                                    : 'avg ${c.avgKcal} kcal a day')
+                                : (isAr
+                                    ? 'متوسط ${state.iso('${c.avgKcal}')} من ${state.iso('${c.targetKcal}')} سعر · ${state.iso('${c.onTargetDays}')} يوم قريب من الهدف'
+                                    : 'avg ${c.avgKcal} of ${c.targetKcal} kcal · ${c.onTargetDays} day${c.onTargetDays == 1 ? '' : 's'} near target'),
+                        style: QText.body(size: 12, height: 17, color: QColors.textMuted),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    isAr ? '${state.iso('${c.daysLogged}')}/${state.iso('7')}' : '${c.daysLogged}/7',
+                    style: QText.number(size: 18, weight: FontWeight.w600, color: c.daysLogged >= 5 ? QColors.green : QColors.textPrimary),
+                  ),
+                ],
+              ),
+            ),
+            if (c != clients.last) const Divider(height: 1, color: QColors.borderFaint),
           ],
         ],
       ),

@@ -13,6 +13,8 @@ The app and the server are already wired for this. Your job is the business side
 
 The phone never decides the price. Checkout asks the server; the server stamps the amount Paymob collects. A later campaign code (the earned-month promo, Ramadan) goes in the `promo_codes` table as `kind = campaign` — you do not need another app release to add one.
 
+The professional's dashboard: `POST /billing/affiliate/clients` lists the clients who typed this professional's code **and said yes to sharing** (consent type `adherence_share`, migration 0053 — a switch under the code field and on Me, off until turned on, withdrawable), with the last seven days as numbers only: days logged, days within 10% of the target, the average, the target. Never meals, photos or weight. A client is listed only while their twelve months with the professional run.
+
 Professional payouts: the nutritionist taps **Redeem EGP** once the wallet has at least 50 EGP. That opens a `requested` payout. You send the money from the company account (bank / InstaPay) and mark the row `sent`. Do not pay this out of Su Points.
 
 ## What is already settled

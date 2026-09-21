@@ -31,6 +31,10 @@ abstract class BillingGateway {
   Future<EarnedMonthClaim> claimEarnedMonth();
   Future<AffiliateWallet> affiliate();
   Future<AffiliateWallet> requestAffiliatePayout({int? amountCents});
+
+  /// The professional's clients who said yes to sharing, with this week's
+  /// adherence. Empty for anyone who is not a professional.
+  Future<List<ProClient>> affiliateClients();
 }
 
 class HttpBillingGateway implements BillingGateway {
@@ -152,6 +156,15 @@ class HttpBillingGateway implements BillingGateway {
       throw BillingException(reason);
     }
     return EarnedMonthClaim.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<List<ProClient>> affiliateClients() async {
+    final res = await _client.post(Uri.parse('$baseUrl/affiliate/clients'), headers: _headers, body: jsonEncode({}));
+    if (res.statusCode != 200) {
+      throw BillingException('clients failed: ${res.statusCode} ${res.body}');
+    }
+    return ProClient.listFromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
   }
 
   @override

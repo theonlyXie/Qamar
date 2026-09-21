@@ -40,6 +40,10 @@ abstract final class ConsentType {
   /// Using anonymised usage to improve the service — optional, and the gate
   /// on analytics.
   static const improve = 'improve_optional';
+
+  /// Share weekly adherence with the nutritionist whose code is on the
+  /// subscription. Optional, off until said yes to, withdrawable.
+  static const adherence = 'adherence_share';
 }
 
 abstract class MealRepository {

@@ -139,6 +139,7 @@ class AppState extends ChangeNotifier {
   static const _kFirstDay = 'first_day';
   static const _kReviewNumbers = 'review_numbers';
   static const _kImprove = 'improve_consent';
+  static const _kAdherence = 'adherence_consent';
   static const _kRamadanAsked = 'ramadan_asked';
 
   Future<void> _loadDevicePrefs() async {
@@ -153,6 +154,8 @@ class AppState extends ChangeNotifier {
       final first = DateTime.tryParse(await p.getString(_kFirstDay) ?? '');
       final reviewNumbers = await p.getBool(_kReviewNumbers);
       final consent = await p.getBool(_kImprove);
+      final adherence = await p.getBool(_kAdherence);
+      if (adherence != null) adherenceShare = adherence;
       final asked = await p.getString(_kRamadanAsked);
       if (_disposed) return;
       if (asked != null) ramadanAskedFor = asked;
@@ -265,6 +268,11 @@ class AppState extends ChangeNotifier {
           improve = consent;
           _prefs?.setBool(_kImprove, consent).catchError((_) {});
           _syncAnalytics().ignore();
+        }
+        final sharing = await _profileRepo?.loadConsent(uid, ConsentType.adherence);
+        if (sharing != null && sharing != adherenceShare) {
+          adherenceShare = sharing;
+          _prefs?.setBool(_kAdherence, sharing).catchError((_) {});
         }
       } catch (_) {
         // The phone's own record stands until the server answers.
@@ -412,6 +420,30 @@ class AppState extends ChangeNotifier {
     }
     await _syncAnalytics(consentEvent: changed && on);
   }
+
+  // ---- sharing adherence with a nutritionist --------------------------------
+  //
+  // Blueprint: "enter a nutritionist's code; consent to share adherence". The
+  // professional whose code is on the subscription sees the week as numbers
+  // — days logged, days near the target, the average — and nothing else.
+  // Off until said yes to; withdrawable; recorded like the other consents.
+
+  bool adherenceShare = false;
+
+  Future<void> setAdherenceShare(bool on) async {
+    final changed = adherenceShare != on;
+    adherenceShare = on;
+    _notify();
+    _prefs?.setBool(_kAdherence, on).catchError((_) {});
+    if (changed) _track('adherence_consent', {'granted': on});
+    if (changed && isBacked && _profileRepo != null) {
+      _push('save consent', (uid) => _profileRepo.saveConsent(uid, ConsentType.adherence, granted: on, version: QamarConfig.consentVersion));
+    }
+  }
+
+  /// The professional's side: clients who said yes, with this week's numbers.
+  /// Empty for anyone without clients, so the card simply does not appear.
+  List<ProClient> proClients = const [];
 
   Future<void> _syncAnalytics({bool consentEvent = false}) async {
     final a = _analytics;
@@ -721,6 +753,8 @@ class AppState extends ChangeNotifier {
     plusIsEarned = false;
     earnedMonth = EarnedMonth.none;
     earnedMonthJustGranted = false;
+    adherenceShare = false;
+    proClients = const [];
     plusUntil = null;
     plusTrialEligible = false;
     plusIsTrial = false;
@@ -2273,6 +2307,10 @@ class AppState extends ChangeNotifier {
     try {
       affiliateWallet = await billing.affiliate();
       _notify();
+      if (affiliateWallet.code != null) {
+        proClients = await billing.affiliateClients();
+        _notify();
+      }
     } catch (_) {
       // The paywall still works without the affiliate card.
     }

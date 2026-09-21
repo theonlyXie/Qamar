@@ -375,3 +375,52 @@ class EarnedMonthClaim {
         earned: EarnedMonth.fromJson((json['earned'] as Map?)?.cast<String, dynamic>() ?? const {}),
       );
 }
+
+/// One client on a professional's dashboard: the week as the database saw
+/// it. Only clients who said yes to sharing appear, and only while their
+/// twelve months with this professional run.
+class ProClient {
+  final String name;
+  final DateTime? since;
+  final DateTime? until;
+
+  /// Distinct Cairo days with a meal in the last seven.
+  final int daysLogged;
+
+  /// Of those, days within 10% of the target.
+  final int onTargetDays;
+
+  /// Average kcal on the days that were logged; 0 when none were.
+  final int avgKcal;
+  final int? targetKcal;
+  final DateTime? lastLoggedAt;
+
+  const ProClient({
+    required this.name,
+    this.since,
+    this.until,
+    required this.daysLogged,
+    required this.onTargetDays,
+    required this.avgKcal,
+    this.targetKcal,
+    this.lastLoggedAt,
+  });
+
+  factory ProClient.fromJson(Map<String, dynamic> json) {
+    int n(String k) => json[k] is num ? (json[k] as num).round() : 0;
+    DateTime? when(String k) => json[k] is String ? DateTime.tryParse(json[k] as String)?.toUtc() : null;
+    return ProClient(
+      name: (json['name'] as String?)?.trim().isNotEmpty == true ? (json['name'] as String).trim() : '—',
+      since: when('since'),
+      until: when('until'),
+      daysLogged: n('days_logged'),
+      onTargetDays: n('on_target_days'),
+      avgKcal: n('avg_kcal'),
+      targetKcal: json['target_kcal'] is num ? (json['target_kcal'] as num).round() : null,
+      lastLoggedAt: when('last_logged_at'),
+    );
+  }
+
+  static List<ProClient> listFromJson(Map<String, dynamic> json) =>
+      ((json['clients'] as List?) ?? const []).whereType<Map>().map((e) => ProClient.fromJson(e.cast<String, dynamic>())).toList();
+}
