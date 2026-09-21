@@ -230,6 +230,7 @@ with f(slug, en, ar, eg, state) as (values
 ('ferakh_mahmara','Roast chicken','فراخ محمرة','فراخ محمرة','baked'),
 ('ferakh_masloua','Boiled chicken','فراخ مسلوقة','فراخ مسلوقة','boiled'),
 ('ferakh_panee','Chicken pane (breaded fried breast)','فراخ بانيه','بانيه','fried'),
+('ferakh_broasted','Broasted chicken (pressure-fried, breaded)','فراخ بروستد','فراخ بروستد','fried'),
 ('shish_tawook','Shish tawook','شيش طاووق','شيش طاووق','grilled'),
 ('ferakh_bel_batates','Chicken and potato tray','صينية فراخ بالبطاطس','فراخ بالبطاطس','baked'),
 ('hamam_mahshi','Stuffed pigeon with freekeh','حمام محشي','حمام محشي','baked'),
@@ -917,6 +918,13 @@ with a(slug, alias, lang, misspell) as (values
 ('ferakh_panee','panee','translit',false),
 ('ferakh_panee','chicken pane','en',false),
 ('ferakh_panee','breaded chicken','en',false),
+('ferakh_broasted','بروستد','eg',false),
+('ferakh_broasted','بروستيد','eg',true),
+('ferakh_broasted','دجاج بروستد','eg',false),
+('ferakh_broasted','فراخ مقلية','eg',false),
+('ferakh_broasted','broasted','translit',false),
+('ferakh_broasted','broasted chicken','en',false),
+('ferakh_broasted','fried chicken','en',false),
 ('shish_tawook','شيش طاووك','eg',true),
 ('shish_tawook','شيش','eg',false),
 ('shish_tawook','طاووق','eg',false),
@@ -1572,6 +1580,7 @@ from (values
 ('ferakh_mahmara','baked',1.0,null),
 ('ferakh_masloua','boiled',1.0,null),
 ('ferakh_panee','fried',0.9,null),
+('ferakh_broasted','fried',0.9,null),
 ('shish_tawook','grilled',0.8,null),
 ('ferakh_bel_batates','baked',0.9,null),
 ('hamam_mahshi','baked',0.85,'REVIEW: proportions need a nutritionist''s eye.'),
@@ -2255,6 +2264,11 @@ with ri(recipe, ingredient, grams, ord, note) as (values
 ('ferakh_panee','eggs',25,4,null),
 ('ferakh_panee','corn_oil',25,5,null),
 ('ferakh_panee','salt',1,6,null),
+('ferakh_broasted','chicken_thigh',200,1,null),
+('ferakh_broasted','wheat_flour',20,2,null),
+('ferakh_broasted','breadcrumbs',10,3,null),
+('ferakh_broasted','corn_oil',20,4,null),
+('ferakh_broasted','salt',1.5,5,null),
 ('shish_tawook','chicken_breast',180,1,null),
 ('shish_tawook','yogurt',30,2,null),
 ('shish_tawook','garlic',5,3,null),
@@ -2863,6 +2877,7 @@ with p(slug, label_en, label_ar) as (values
 ('ferakh_mahmara','quarter chicken','ربع فرخة محمرة'),
 ('ferakh_masloua','quarter chicken','ربع فرخة مسلوقة'),
 ('ferakh_panee','2 pieces','قطعتين بانيه'),
+('ferakh_broasted','2 pieces','قطعتين بروستد'),
 ('shish_tawook','1 skewer plate','طبق شيش طاووق'),
 ('ferakh_bel_batates','1 plate','طبق فراخ بالبطاطس'),
 ('hamam_mahshi','1 pigeon','حمامة محشية'),
@@ -3275,7 +3290,7 @@ select 'food_resolution',
        '{"min_score":0.6}'::jsonb
 from public.foods f
 where f.is_recipe and f.name_eg is not null
-  and f.slug in ('ahwa_mazbout', 'aish_el_saraya', 'amar_el_din', 'areesh_bel_tamatem', 'arnabeet_meqly', 'asal_eswed_bel_tahina', 'aseer_farawla', 'aseer_guava', 'aseer_lamoon', 'aseer_manga_bel_laban', 'baba_ghanoug', 'baklava', 'balah_bel_laban', 'balah_el_sham', 'bamia_bel_zeit', 'bamia_meat', 'basbousa', 'basbousa_bel_eshta', 'basterma_sandwich', 'batates_bel_beid', 'batates_bel_forn', 'batates_bel_salsa', 'batates_bouree', 'batates_sandwich', 'beid_bel_basterma', 'beid_bel_gebna', 'beid_bel_sogo2', 'beid_meqly', 'beid_sandwich', 'belila', 'besela_bel_lahma', 'bessara', 'betengan_mekhalel', 'betengan_meqly', 'betengan_sandwich', 'burger_sandwich', 'cake', 'calamari', 'dawood_basha', 'dokka', 'eggah', 'erfa', 'eshta_bel_asal', 'fasolia_bel_lahma', 'fasolia_bel_zeit', 'fasolia_khadra', 'fatta', 'ferakh_bel_batates', 'ferakh_mahmara', 'ferakh_mashwiya', 'ferakh_masloua', 'ferakh_panee', 'fesikh_plate', 'feteer', 'feteer_bel_gebna', 'feteer_bel_lahma', 'feteer_bel_sokkar', 'feteer_helw', 'filet_samak', 'foul_bel_beid', 'foul_bel_samna', 'foul_eskandarani', 'foul_sandwich', 'foul_tahina', 'freekeh_bel_ferakh', 'gambari_mashwi', 'gambari_meqly', 'ganzabeel', 'gateau', 'gebna_beida_bel_tamatem', 'gebna_beida_sandwich', 'gebna_roumy_sandwich', 'ghorayeba', 'goulash', 'halabessa', 'halawa_sandwich', 'hamam_mahshi', 'hamam_mashwi', 'hawawshi', 'hawawshi_forn', 'helba', 'kahk', 'karkade', 'kawareh', 'kebab', 'kebab_halla', 'kebda_eskandarani', 'kebda_ferakh', 'kebda_sandwich', 'kersha', 'keshk', 'khodar_sotee', 'khoshaf', 'kobeba', 'kofta', 'kofta_bel_roz', 'kofta_bel_tahina', 'kofta_sandwich', 'kofta_wa_kebab', 'kolkas', 'konafa', 'konafa_bel_eshta', 'konafa_bel_gebna', 'konafa_bel_manga', 'kosa_bel_bechamel', 'koskosi', 'kunafa_nutella', 'lahma_mafrouma_bel_basal', 'lahma_mashwiya', 'lanshon_sandwich', 'lobia_bel_lahma', 'macarona_bel_lahma_mafrouma', 'macarona_bel_salsa', 'mahalabia', 'mahshi_basal', 'mahshi_betengan', 'mahshi_felfel', 'mahshi_grape', 'mahshi_kosa', 'mahshi_mashakel', 'mahshi_tamatem', 'mango_juice', 'mashwiyat', 'mesaqaa', 'mesaqaa_bel_lahma', 'mokh', 'molokhia_bel_araneb', 'molokhia_bel_gambari', 'molokhia_bel_lahma', 'mombar', 'moz_bel_laban', 'nescafe_bel_laban', 'om_ali', 'omelette', 'panee_sandwich', 'petit_four', 'qatayef', 'reyash', 'rice_pudding', 'ringa_bel_basal', 'roqaq_bel_lahma', 'roz_bel_ads', 'roz_bel_ferakh', 'roz_bel_khalta', 'roz_bel_laban_bel_eshta', 'roz_bel_lahma', 'roz_bel_sha3reya', 'roz_me3ammar', 'sabanekh_bel_lahma', 'sahlab', 'salatet_batates', 'salatet_bengar', 'salatet_fawakeh', 'salatet_gargeer', 'salatet_koronb', 'salatet_tuna', 'salatet_zabadi', 'samak_mashwi', 'samak_meqly', 'sambousek', 'sanyet_batates', 'sayadeya', 'semit', 'semman_mashwi', 'sha3reya_bel_laban', 'shai_bel_laban', 'shai_bel_na3na3', 'shai_bel_sokkar', 'shakshouka', 'shawarma', 'shawarma_lahma', 'shish_tawook', 'shofan_bel_laban', 'shorbat_ads', 'shorbat_ferakh', 'shorbat_foul_nabet', 'shorbat_khodar', 'shorbat_lahma', 'shorbat_lesan_asfour', 'shorbat_mashroom', 'shorbat_sha3reya', 'shorbat_tamatem', 'sobia', 'sogo2_eskandarani', 'sogo2_sandwich', 'taameya_sandwich', 'tagen_gambari', 'tahina_salad', 'tamr_hindi', 'tomeya', 'torly', 'torshi', 'tuna_sandwich', 'yansoon', 'zabadi_bel_asal', 'zabadi_bel_fakha', 'zalabia')
+  and f.slug in ('ahwa_mazbout', 'aish_el_saraya', 'amar_el_din', 'areesh_bel_tamatem', 'arnabeet_meqly', 'asal_eswed_bel_tahina', 'aseer_farawla', 'aseer_guava', 'aseer_lamoon', 'aseer_manga_bel_laban', 'baba_ghanoug', 'baklava', 'balah_bel_laban', 'balah_el_sham', 'bamia_bel_zeit', 'bamia_meat', 'basbousa', 'basbousa_bel_eshta', 'basterma_sandwich', 'batates_bel_beid', 'batates_bel_forn', 'batates_bel_salsa', 'batates_bouree', 'batates_sandwich', 'beid_bel_basterma', 'beid_bel_gebna', 'beid_bel_sogo2', 'beid_meqly', 'beid_sandwich', 'belila', 'besela_bel_lahma', 'bessara', 'betengan_mekhalel', 'betengan_meqly', 'betengan_sandwich', 'burger_sandwich', 'cake', 'calamari', 'dawood_basha', 'dokka', 'eggah', 'erfa', 'eshta_bel_asal', 'fasolia_bel_lahma', 'fasolia_bel_zeit', 'fasolia_khadra', 'fatta', 'ferakh_bel_batates', 'ferakh_broasted', 'ferakh_mahmara', 'ferakh_mashwiya', 'ferakh_masloua', 'ferakh_panee', 'fesikh_plate', 'feteer', 'feteer_bel_gebna', 'feteer_bel_lahma', 'feteer_bel_sokkar', 'feteer_helw', 'filet_samak', 'foul_bel_beid', 'foul_bel_samna', 'foul_eskandarani', 'foul_sandwich', 'foul_tahina', 'freekeh_bel_ferakh', 'gambari_mashwi', 'gambari_meqly', 'ganzabeel', 'gateau', 'gebna_beida_bel_tamatem', 'gebna_beida_sandwich', 'gebna_roumy_sandwich', 'ghorayeba', 'goulash', 'halabessa', 'halawa_sandwich', 'hamam_mahshi', 'hamam_mashwi', 'hawawshi', 'hawawshi_forn', 'helba', 'kahk', 'karkade', 'kawareh', 'kebab', 'kebab_halla', 'kebda_eskandarani', 'kebda_ferakh', 'kebda_sandwich', 'kersha', 'keshk', 'khodar_sotee', 'khoshaf', 'kobeba', 'kofta', 'kofta_bel_roz', 'kofta_bel_tahina', 'kofta_sandwich', 'kofta_wa_kebab', 'kolkas', 'konafa', 'konafa_bel_eshta', 'konafa_bel_gebna', 'konafa_bel_manga', 'kosa_bel_bechamel', 'koskosi', 'kunafa_nutella', 'lahma_mafrouma_bel_basal', 'lahma_mashwiya', 'lanshon_sandwich', 'lobia_bel_lahma', 'macarona_bel_lahma_mafrouma', 'macarona_bel_salsa', 'mahalabia', 'mahshi_basal', 'mahshi_betengan', 'mahshi_felfel', 'mahshi_grape', 'mahshi_kosa', 'mahshi_mashakel', 'mahshi_tamatem', 'mango_juice', 'mashwiyat', 'mesaqaa', 'mesaqaa_bel_lahma', 'mokh', 'molokhia_bel_araneb', 'molokhia_bel_gambari', 'molokhia_bel_lahma', 'mombar', 'moz_bel_laban', 'nescafe_bel_laban', 'om_ali', 'omelette', 'panee_sandwich', 'petit_four', 'qatayef', 'reyash', 'rice_pudding', 'ringa_bel_basal', 'roqaq_bel_lahma', 'roz_bel_ads', 'roz_bel_ferakh', 'roz_bel_khalta', 'roz_bel_laban_bel_eshta', 'roz_bel_lahma', 'roz_bel_sha3reya', 'roz_me3ammar', 'sabanekh_bel_lahma', 'sahlab', 'salatet_batates', 'salatet_bengar', 'salatet_fawakeh', 'salatet_gargeer', 'salatet_koronb', 'salatet_tuna', 'salatet_zabadi', 'samak_mashwi', 'samak_meqly', 'sambousek', 'sanyet_batates', 'sayadeya', 'semit', 'semman_mashwi', 'sha3reya_bel_laban', 'shai_bel_laban', 'shai_bel_na3na3', 'shai_bel_sokkar', 'shakshouka', 'shawarma', 'shawarma_lahma', 'shish_tawook', 'shofan_bel_laban', 'shorbat_ads', 'shorbat_ferakh', 'shorbat_foul_nabet', 'shorbat_khodar', 'shorbat_lahma', 'shorbat_lesan_asfour', 'shorbat_mashroom', 'shorbat_sha3reya', 'shorbat_tamatem', 'sobia', 'sogo2_eskandarani', 'sogo2_sandwich', 'taameya_sandwich', 'tagen_gambari', 'tahina_salad', 'tamr_hindi', 'tomeya', 'torly', 'torshi', 'tuna_sandwich', 'yansoon', 'zabadi_bel_asal', 'zabadi_bel_fakha', 'zalabia')
 on conflict (slug) do nothing;
 
 insert into public.eval_cases (family, slug, description, input, expected, tolerance) values
@@ -3350,3 +3365,22 @@ insert into public.eval_cases (family, slug, description, input, expected, toler
 ('food_resolution','res_modifier_kebda_ferakh','Liver plus its animal is the chicken-liver dish, not Alexandrian liver',
  '{"runner":"sql","kind":"resolve_food","phrase":"كبدة فراخ"}','{"slug":"kebda_ferakh","is_recipe":true}','{"min_score":0.6}')
 on conflict (slug) do nothing;
+
+-- Four guards written before these dishes existed asserted that a phrase must
+-- not resolve at all, because every candidate was wrong: a burger is not raw
+-- beef, broasted chicken is not a plain breast, boiled rice is not eggs. Now
+-- that the right food exists, the same phrases have a right answer, and each
+-- guard becomes a positive case. Present only on a database that carried the
+-- coverage evals; elsewhere this updates nothing.
+update public.eval_cases set
+  expected = case slug
+    when 'res_burger_is_not_beef' then '{"slug":"burger_sandwich","is_recipe":true}'::jsonb
+    when 'res_broasted_is_not_a_breast' then '{"slug":"ferakh_broasted","is_recipe":true}'::jsonb
+    when 'res_fried_chicken_is_not_a_thigh' then '{"slug":"ferakh_broasted","is_recipe":true}'::jsonb
+    when 'res_boiled_rice_is_not_eggs' then '{"slug":"white_rice"}'::jsonb
+  end,
+  tolerance = '{"min_score":0.5}'::jsonb,
+  description = description || ' Since 0051 the phrase has a right answer, so the guard expects it.'
+where slug in ('res_burger_is_not_beef', 'res_broasted_is_not_a_breast',
+               'res_fried_chicken_is_not_a_thigh', 'res_boiled_rice_is_not_eggs')
+  and expected ? 'resolves';
