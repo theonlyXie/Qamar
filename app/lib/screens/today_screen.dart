@@ -125,6 +125,14 @@ class _TodayScreenState extends State<TodayScreen> {
           _NightCard(state: state),
           const SizedBox(height: 14),
         ],
+        if (state.trialEndingSoon) ...[
+          _TrialEndingCard(state: state),
+          const SizedBox(height: 14),
+        ],
+        if (state.earnedMonthJustGranted || (state.plusActive && state.earnedMonth.inProgress)) ...[
+          _EarnedMonthCard(state: state),
+          const SizedBox(height: 14),
+        ],
         Container(
           padding: const EdgeInsets.all(20),
           decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardSlate]), border: QColors.borderStrong, radius: QRadii.xxxl,
@@ -634,6 +642,125 @@ class _NightCard extends StatelessWidget {
                   style: QText.body(size: 12, color: locked ? QColors.gold : QColors.textMuted),
                 ),
               ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The last 48 hours of the free week, in the same words the reminder used.
+class _TrialEndingCard extends StatelessWidget {
+  final AppState state;
+  const _TrialEndingCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final when = state.trialEndsIn();
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(QRadii.xl),
+        onTap: state.openTrialEnd,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            color: QColors.gold.withValues(alpha: 0.08),
+            border: Border.all(color: QColors.gold.withValues(alpha: 0.35)),
+            borderRadius: BorderRadius.circular(QRadii.xl),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.hourglass_bottom_rounded, size: 18, color: QColors.gold),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isAr ? 'أسبوعك المجاني بيخلص $when. نكمّل الخطة؟' : 'Your free week ends $when. Keep the plan going?',
+                      style: QText.body(size: 14, height: 21, color: QColors.textHigh),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      isAr ? '٥٠٠ ج.م/شهر · إلغاء بضغطة' : 'EGP 500/month · cancel in one tap',
+                      style: QText.body(size: 12, color: QColors.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_outward, size: 14, color: QColors.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The earned month: progress while it is being earned, the grant when it
+/// lands. Only for members — it is their first month being rewarded.
+class _EarnedMonthCard extends StatelessWidget {
+  final AppState state;
+  const _EarnedMonthCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final e = state.earnedMonth;
+    final granted = state.earnedMonthJustGranted;
+    final until = state.plusUntil?.toLocal();
+    final when = until == null ? '' : state.iso('${until.day}/${until.month}');
+    final title = granted
+        ? (isAr ? 'شهر علينا' : 'A month on us')
+        : (isAr ? 'شهر علينا — قيد الكسب' : 'A month on us — being earned');
+    final body = granted
+        ? (isAr ? 'سجّلت ${state.iso('${e.loggedDays}')} يوم من أول ${state.iso('${e.windowDays}')}. قمر+ شغال لحد $when.' : 'You logged ${e.loggedDays} of your first ${e.windowDays} days. Qamar+ runs until $when.')
+        : (isAr
+            ? 'سجّلت ${state.iso('${e.loggedDays}')} يوم من ${state.iso('${e.needed}')} · باقي ${state.iso('${e.daysLeft}')} يوم'
+            : '${e.loggedDays} of ${e.needed} days logged · ${e.daysLeft} days left');
+    final note = granted
+        ? (isAr ? 'اضغط للإخفاء' : 'Tap to dismiss')
+        : (isAr ? 'سجّل ${state.iso('${e.needed}')} يوم من أول ${state.iso('${e.windowDays}')} والشهر اللي بعده علينا.' : 'Log ${e.needed} of your first ${e.windowDays} days and the next month is free.');
+    final pct = e.needed == 0 ? 1.0 : (e.loggedDays / e.needed).clamp(0.0, 1.0);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(QRadii.xl),
+        onTap: granted ? state.dismissEarnedMonthCard : null,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            color: QColors.green.withValues(alpha: 0.07),
+            border: Border.all(color: QColors.green.withValues(alpha: 0.3)),
+            borderRadius: BorderRadius.circular(QRadii.xl),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.workspace_premium_outlined, size: 15, color: QColors.green),
+                const SizedBox(width: 6),
+                Text(title, style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.green, letterSpacing: 0.3)),
+              ]),
+              const SizedBox(height: 8),
+              Text(body, style: QText.body(size: 14, height: 21, color: QColors.textHigh)),
+              if (!granted) ...[
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: pct,
+                    minHeight: 5,
+                    backgroundColor: QColors.green.withValues(alpha: 0.15),
+                    valueColor: const AlwaysStoppedAnimation<Color>(QColors.green),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Text(note, style: QText.body(size: 12, height: 18, color: QColors.textMuted)),
             ],
           ),
         ),

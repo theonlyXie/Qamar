@@ -431,6 +431,7 @@ AppState backed({
   MemoryDevicePrefs? prefs,
   MemorySharer? sharer,
   FakeBilling? billing,
+  MemoryNudger? nudger,
   DateTime Function()? clock,
 }) =>
     AppState(
@@ -447,6 +448,7 @@ AppState backed({
       prefs: prefs,
       sharer: sharer,
       billing: billing,
+      nudger: nudger,
       clock: clock,
     );
 
@@ -1997,6 +1999,98 @@ void main() {
       expect(ai.quotas.chat.remaining, SuEconomy.liteChatDaily, reason: 'no question was spent along the way');
     });
   });
+
+  group('the earned month and the free week’s reminder', () {
+    test('28 logged days in the first 30 grant a month on us, once, appended to the running month', () async {
+      final a = MemoryAnalytics();
+      final end = DateTime.utc(2026, 10, 15, 12);
+      final fb = FakeBilling()
+        ..current = PlusEntitlement(status: 'active', plan: 'monthly', provider: 'paymob', periodEnd: end, firstPurchase: false)
+        ..earned = const EarnedMonth(open: true, loggedDays: 12, needed: 28, windowDays: 30, daysLeft: 18, eligible: false, claimed: false);
+      final state = backed(billing: fb, analytics: a, clock: () => DateTime(2026, 9, 27, 9));
+      await settle();
+      state.setLang(AppLang.en);
+      await state.setImprove(true);
+
+      expect(state.earnedMonth.inProgress, isTrue, reason: 'the progress is read on hydrate');
+      expect(fb.earnedClaims, 0, reason: 'nothing is claimed before the days are logged');
+
+      fb.earned = const EarnedMonth(open: true, loggedDays: 28, needed: 28, windowDays: 30, daysLeft: 2, eligible: true, claimed: false);
+      await state.restorePlusPurchases();
+
+      expect(fb.earnedClaims, 1);
+      expect(state.earnedMonth.claimed, isTrue);
+      expect(state.earnedMonthJustGranted, isTrue);
+      expect(state.plusUntil, end.add(const Duration(days: 30)), reason: 'appended to the paid month, not replacing it');
+      expect(state.plusIsEarned, isFalse, reason: 'the paid month is still the one running');
+      expect(state.plusNotice, contains('A month on us'));
+      expect(a.named('earned_month_granted').single['logged_days'], 28);
+
+      await state.restorePlusPurchases();
+      expect(fb.earnedClaims, 1, reason: 'once per account: a granted month is never claimed again');
+
+      state.dismissEarnedMonthCard();
+      expect(state.earnedMonthJustGranted, isFalse);
+    });
+
+    test('earned after the paid month lapsed, the month runs on its own', () async {
+      final fb = FakeBilling()
+        ..current = PlusEntitlement(status: 'expired', plan: 'monthly', provider: 'paymob', periodEnd: DateTime.utc(2026, 9, 1), firstPurchase: false)
+        ..earned = const EarnedMonth(open: true, loggedDays: 28, needed: 28, windowDays: 30, daysLeft: 0, eligible: true, claimed: false);
+      final state = backed(billing: fb);
+      await settle();
+      expect(state.plusActive, isTrue);
+      expect(state.plusIsEarned, isTrue);
+      expect(state.earnedMonth.claimed, isTrue);
+    });
+
+    test('the free week schedules its reminder 48 hours before the end, outside the meal questions', () async {
+      final nudger = MemoryNudger();
+      final fb = FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: true);
+      final state = backed(billing: fb, nudger: nudger, clock: () => DateTime(2026, 9, 21, 10));
+      await settle();
+      await state.allowNudges();
+      expect(nudger.scheduled.where((n) => n.kind == NudgeKind.trialEnding), isEmpty, reason: 'no trial, no reminder');
+
+      await state.startPlusTrial();
+      await settle();
+      final reminder = nudger.scheduled.where((n) => n.kind == NudgeKind.trialEnding).single;
+      expect(reminder.at, fb.current.periodEnd!.subtract(NudgeSchedule.trialLead));
+      expect(reminder.payload, Nudge.trialPayload);
+      expect(reminder.text(ar: false), contains('Keep the plan going?'));
+
+      await state.setNudgesPerDay(0);
+      expect(nudger.scheduled.map((n) => n.kind).toList(), [NudgeKind.trialEnding],
+          reason: 'zero meal questions a day does not silence the week’s one reminder');
+
+      nudger.tap(Nudge.trialPayload);
+      await settle();
+      expect(state.screen, AppScreen.subscription);
+    });
+
+    test('the Today card takes over inside the last 48 hours', () async {
+      final end = DateTime.utc(2026, 9, 23, 12);
+      final fb = FakeBilling()
+        ..current = PlusEntitlement(status: 'active', plan: 'monthly', provider: 'trial', periodEnd: end, trialEligible: false, trialEndsAt: end);
+      final early = backed(billing: fb, clock: () => DateTime.utc(2026, 9, 20, 12));
+      await settle();
+      expect(early.plusIsTrial, isTrue);
+      expect(early.trialEndingSoon, isFalse);
+
+      final late = backed(billing: fb, clock: () => DateTime.utc(2026, 9, 22, 6));
+      await settle();
+      expect(late.trialEndingSoon, isTrue);
+      late.setLang(AppLang.en);
+      expect(late.trialEndsIn(), 'tomorrow');
+
+      final hours = backed(billing: fb, clock: () => DateTime.utc(2026, 9, 23, 7));
+      await settle();
+      hours.setLang(AppLang.en);
+      expect(hours.trialEndsIn(), 'in 5 hours');
+      hours.openTrialEnd();
+      expect(hours.screen, AppScreen.subscription);
+    });
+  });
 }
 
 class FakeBilling implements BillingGateway {
@@ -2050,6 +2144,44 @@ class FakeBilling implements BillingGateway {
       trialEndsAt: DateTime.now().toUtc().add(const Duration(days: 7)),
     );
     return current;
+  }
+
+  EarnedMonth earned = EarnedMonth.none;
+  int earnedClaims = 0;
+
+  @override
+  Future<EarnedMonth> earnedMonth() async => earned;
+
+  @override
+  Future<EarnedMonthClaim> claimEarnedMonth() async {
+    earnedClaims++;
+    if (earned.claimed) throw BillingException('The earned month has already been granted on this account.');
+    if (!earned.eligible) throw BillingException('Not earned yet: 28 logged days in the first 30 are needed.');
+    // As 0052 does: appended to a running month, a fresh 30 days otherwise.
+    final running = current.active && current.periodEnd != null;
+    final until = (running ? current.periodEnd! : DateTime.now().toUtc()).add(const Duration(days: 30));
+    current = PlusEntitlement(
+      status: 'active',
+      plan: 'monthly',
+      provider: running ? current.provider : 'earned',
+      periodEnd: until,
+      firstPurchase: current.firstPurchase,
+      trialEligible: false,
+      trialEndsAt: current.trialEndsAt,
+    );
+    earned = EarnedMonth(
+      open: false,
+      loggedDays: earned.loggedDays,
+      needed: earned.needed,
+      windowDays: earned.windowDays,
+      daysLeft: earned.daysLeft,
+      eligible: false,
+      claimed: true,
+      grantedUntil: until,
+      windowStart: earned.windowStart,
+      windowEnd: earned.windowEnd,
+    );
+    return EarnedMonthClaim(entitlement: current, earned: earned);
   }
 
   @override

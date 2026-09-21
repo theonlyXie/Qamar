@@ -7,6 +7,8 @@
 //   POST /billing/checkout       { plan, promo_code?, first_name? }    JWT
 //   POST /billing/entitlement    {}                                    JWT
 //   POST /billing/trial/start    {}                                    JWT
+//   POST /billing/earned         {}   where the earned month stands       JWT
+//   POST /billing/earned/claim   {}   grant it, once 28/30 is reached     JWT
 //   POST /billing/affiliate      {}                                    JWT
 //   POST /billing/affiliate/payout { amount_cents? }                   JWT
 //   POST /billing/webhook        Paymob transaction callback           HMAC
@@ -349,6 +351,24 @@ async function startTrial(userId: string): Promise<Response> {
   }
 }
 
+// The earned month (0052): 28 logged days in the first 30 of membership, and
+// the next 30 are on us. The status is a read; the claim re-checks under a
+// lock in the database and refuses with a reason the app can show.
+async function earnedStatus(userId: string): Promise<Response> {
+  return json(await rpc("qamar_earned_month_status", { p_user_id: userId }));
+}
+
+async function earnedClaim(userId: string): Promise<Response> {
+  try {
+    return json(await rpc("qamar_claim_earned_month", { p_user_id: userId }));
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "claim failed";
+    if (message.includes("already granted")) return json({ error: "The earned month has already been granted on this account." }, 400);
+    if (message.includes("not yet earned")) return json({ error: "Not earned yet: 28 logged days in the first 30 are needed." }, 400);
+    throw e;
+  }
+}
+
 async function affiliate(userId: string): Promise<Response> {
   await rpc("qamar_ensure_affiliate_code", { p_user_id: userId });
   const snap = await rpc("qamar_affiliate_snapshot", { p_user_id: userId });
@@ -489,6 +509,10 @@ Deno.serve(async (req) => {
         return await entitlement(user.id);
       case "/trial/start":
         return await startTrial(user.id);
+      case "/earned":
+        return await earnedStatus(user.id);
+      case "/earned/claim":
+        return await earnedClaim(user.id);
       case "/affiliate":
         return await affiliate(user.id);
       case "/affiliate/payout":

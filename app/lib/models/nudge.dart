@@ -77,6 +77,10 @@ class MealTimes {
   }
 }
 
+/// What a scheduled notification is about. Almost always a meal; once per
+/// free week, the week ending.
+enum NudgeKind { meal, trialEnding }
+
 /// One scheduled question.
 class Nudge {
   final MealSlot slot;
@@ -88,14 +92,26 @@ class Nudge {
   /// makes the notification id, so a reschedule replaces rather than stacks.
   final int dayIndex;
 
-  const Nudge({required this.slot, required this.at, required this.dayIndex});
+  final NudgeKind kind;
 
-  int get id => 100 + dayIndex * MealSlot.values.length + slot.index;
+  const Nudge({required this.slot, required this.at, required this.dayIndex, this.kind = NudgeKind.meal});
+
+  /// The free week's one reminder, 48 hours before it ends — scheduled the
+  /// moment the trial starts, as the blueprint has it.
+  const Nudge.trialEnding({required this.at})
+      : slot = MealSlot.lunch,
+        dayIndex = 0,
+        kind = NudgeKind.trialEnding;
+
+  static const trialPayload = 'trial:ending';
+
+  int get id => kind == NudgeKind.trialEnding ? 90 : 100 + dayIndex * MealSlot.values.length + slot.index;
 
   /// Travels with the notification; tapping it routes back into the app.
-  String get payload => 'nudge:${slot.name}';
+  String get payload => kind == NudgeKind.trialEnding ? trialPayload : 'nudge:${slot.name}';
 
-  String text({required bool ar}) => NudgeCopy.text(slot, at, ar: ar);
+  String text({required bool ar}) =>
+      kind == NudgeKind.trialEnding ? NudgeCopy.trialEnding(ar: ar) : NudgeCopy.text(slot, at, ar: ar);
 }
 
 /// Qamar's voice, and nothing else. Two phrasings per meal, alternating by
@@ -127,6 +143,11 @@ class NudgeCopy {
   }
 
   static Iterable<String> get all => [..._ar.values.expand((v) => v), ..._en.values.expand((v) => v)];
+
+  /// Two days before the free week ends. A question, in the same voice —
+  /// not "your trial is expiring".
+  static String trialEnding({required bool ar}) =>
+      ar ? 'باقي يومين في أسبوعك مع قمر+. نكمّل الخطة؟' : 'Two days left of your week with Qamar+. Keep the plan going?';
 }
 
 /// What to put on the phone's notification schedule, from the day as it is.
@@ -141,6 +162,18 @@ class NudgeSchedule {
 
   /// How long a meal's question stays "waiting" on the orb after its time.
   static const window = Duration(hours: 3);
+
+  /// How long before the free week ends its one reminder fires.
+  static const trialLead = Duration(hours: 48);
+
+  /// The free week's reminder, or null when there is no trial running or
+  /// the 48-hour mark has already passed (then the Today card carries it).
+  static Nudge? trialReminder({required DateTime? trialEnd, required DateTime now}) {
+    if (trialEnd == null) return null;
+    final at = trialEnd.subtract(trialLead);
+    if (!at.isAfter(now)) return null;
+    return Nudge.trialEnding(at: at);
+  }
 
   /// Which meals get asked about for a given daily allowance: lunch first,
   /// then dinner. Breakfast is irregular enough in Egypt that asking about

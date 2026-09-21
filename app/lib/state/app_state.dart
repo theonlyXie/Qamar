@@ -604,21 +604,27 @@ class AppState extends ChangeNotifier {
     final n = _nudger;
     if (n == null) return;
     try {
-      if (!nudgesAllowed || nudgesPerDay == 0) {
+      if (!nudgesAllowed) {
         await n.replaceAll(const [], ar: isAr);
         return;
       }
-      await n.replaceAll(
-        NudgeSchedule.build(
-          perDay: nudgesPerDay,
-          times: nudgeTimes,
-          now: _clock(),
-          loggedToday: slotsLoggedToday,
-          firstDay: firstDay,
-          fasting: fasting,
-        ),
-        ar: isAr,
-      );
+      final list = <Nudge>[
+        if (nudgesPerDay > 0)
+          ...NudgeSchedule.build(
+            perDay: nudgesPerDay,
+            times: nudgeTimes,
+            now: _clock(),
+            loggedToday: slotsLoggedToday,
+            firstDay: firstDay,
+            fasting: fasting,
+          ),
+      ];
+      // The free week's one reminder, 48 hours before it ends. It is not a
+      // meal question, so the person's zero-a-day does not silence it; the
+      // OS permission does.
+      final trial = NudgeSchedule.trialReminder(trialEnd: plusIsTrial ? plusUntil : null, now: _clock());
+      if (trial != null) list.add(trial);
+      await n.replaceAll(list, ar: isAr);
     } catch (_) {
       // A schedule that could not be written is a missing nudge, not an error
       // the person needs to see.
@@ -639,6 +645,11 @@ class AppState extends ChangeNotifier {
   /// A tapped question opens the conversation with that question and
   /// listens — voice is the default input, and the meal is what they say.
   void _onNudgeTap(String payload) {
+    if (payload == Nudge.trialPayload) {
+      _track('trial_reminder_tapped');
+      go(AppScreen.subscription);
+      return;
+    }
     if (!payload.startsWith('nudge:')) return;
     final slot = MealSlot.values.asNameMap()[payload.substring(6)] ?? MealSlot.lunch;
     _nudgeTappedAt = _clock();
@@ -707,6 +718,9 @@ class AppState extends ChangeNotifier {
     explainHoverId = null;
     explainOpen = null;
     plusActive = false;
+    plusIsEarned = false;
+    earnedMonth = EarnedMonth.none;
+    earnedMonthJustGranted = false;
     plusUntil = null;
     plusTrialEligible = false;
     plusIsTrial = false;
@@ -2110,6 +2124,79 @@ class AppState extends ChangeNotifier {
     plusFirstPurchase = ent.firstPurchase;
     plusTrialEligible = ent.trialEligible;
     plusIsTrial = ent.isTrial;
+    plusIsEarned = ent.isEarned;
+    // The free week's reminder is scheduled the moment the trial starts and
+    // withdrawn the moment it is over or paid for.
+    _rescheduleNudges();
+  }
+
+  /// Qamar+ right now is the earned month, running after the paid one lapsed.
+  bool plusIsEarned = false;
+
+  /// True in the last 48 hours of the free week: the Today card carries the
+  /// question the reminder asked.
+  bool get trialEndingSoon {
+    final end = plusUntil;
+    if (!plusIsTrial || end == null) return false;
+    final left = end.difference(_clock());
+    return left > Duration.zero && left <= NudgeSchedule.trialLead;
+  }
+
+  /// "tomorrow" or "in N hours", for the Today card.
+  String trialEndsIn() {
+    final end = plusUntil;
+    if (end == null) return '';
+    final hours = end.difference(_clock()).inHours;
+    if (hours >= 24) return isAr ? 'بكرة' : 'tomorrow';
+    final h = hours < 1 ? 1 : hours;
+    return isAr ? 'خلال ${iso('$h')} ساعة' : 'in $h hour${h == 1 ? '' : 's'}';
+  }
+
+  void openTrialEnd() {
+    _track('wall_tapped', {'wall': 'trial_end'});
+    go(AppScreen.subscription);
+  }
+
+  // ---- the earned month -----------------------------------------------------
+  //
+  // "Earned-month promo (28/30 days), starts day 1." The server counts the
+  // days and grants the month; the phone reads where things stand, asks for
+  // the grant the moment it is due, and shows the progress while it is being
+  // earned.
+
+  EarnedMonth earnedMonth = EarnedMonth.none;
+
+  /// The month landed during this session: a card on Today until dismissed.
+  bool earnedMonthJustGranted = false;
+
+  void dismissEarnedMonthCard() {
+    earnedMonthJustGranted = false;
+    _notify();
+  }
+
+  Future<void> _refreshEarnedMonth(BillingGateway billing) async {
+    if (!isBacked) return;
+    try {
+      var status = await billing.earnedMonth();
+      if (_disposed) return;
+      if (status.eligible && !status.claimed) {
+        final claim = await billing.claimEarnedMonth();
+        if (_disposed) return;
+        _absorbEntitlement(claim.entitlement);
+        status = claim.earned;
+        earnedMonthJustGranted = true;
+        _track('earned_month_granted', {'logged_days': status.loggedDays});
+        final until = plusUntil?.toLocal();
+        final when = until == null ? '' : iso('${until.day}/${until.month}');
+        plusNotice = isAr
+            ? 'شهر علينا: سجّلت ${iso('${status.loggedDays}')} يوم من أول ${iso('${status.windowDays}')}. قمر+ شغال لحد $when.'
+            : 'A month on us: you logged ${status.loggedDays} of your first ${status.windowDays} days. Qamar+ runs until $when.';
+      }
+      earnedMonth = status;
+      _notify();
+    } catch (_) {
+      // The promo not being readable is not something the person needs told.
+    }
   }
 
   /// Seven days of Qamar+, free, once. The server grants it — the phone only
@@ -2168,6 +2255,7 @@ class AppState extends ChangeNotifier {
                 : 'Paymob has not confirmed a payment yet. If you just finished, wait a moment and tap Restore.');
       }
       _notify();
+      await _refreshEarnedMonth(billing);
       await refreshPlusQuote();
     } catch (e) {
       if (announce) {

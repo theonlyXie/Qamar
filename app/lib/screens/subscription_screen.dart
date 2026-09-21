@@ -245,13 +245,22 @@ class _TierCard extends StatelessWidget {
     final quote = state.displayPlusQuote;
     final title = isAr ? 'شهري' : 'Monthly';
     final until = state.plusUntil?.toLocal();
+    final earned = state.earnedMonth;
     final sub = state.plusIsTrial && until != null
         ? (isAr
             ? 'الأسبوع المجاني شغال · لحد ${state.iso('${until.day}/${until.month}')}'
             : 'Free week on · until ${until.day}/${until.month}')
-        : quote.pricingReason == 'affiliate'
-            ? (isAr ? '٣٠ يوم · بكود أخصائيك' : '30 days · with your nutritionist’s code')
-            : (isAr ? '٣٠ يوم · إلغاء بضغطة' : '30 days · cancel in one tap');
+        : state.plusIsEarned && until != null
+            ? (isAr
+                ? 'شهر علينا · لحد ${state.iso('${until.day}/${until.month}')}'
+                : 'A month on us · until ${until.day}/${until.month}')
+            : state.plusActive && earned.inProgress
+                ? (isAr
+                    ? 'شهر علينا: ${state.iso('${earned.loggedDays}')} من ${state.iso('${earned.needed}')} يوم مسجّلين'
+                    : 'A month on us: ${earned.loggedDays} of ${earned.needed} days logged')
+                : quote.pricingReason == 'affiliate'
+                    ? (isAr ? '٣٠ يوم · بكود أخصائيك' : '30 days · with your nutritionist’s code')
+                    : (isAr ? '٣٠ يوم · إلغاء بضغطة' : '30 days · cancel in one tap');
 
     return Container(
       padding: const EdgeInsets.all(16),

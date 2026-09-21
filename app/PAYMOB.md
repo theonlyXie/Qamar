@@ -17,7 +17,8 @@ Professional payouts: the nutritionist taps **Redeem EGP** once the wallet has a
 
 ## What is already settled
 
-- **A free week, once.** `POST /billing/trial/start` gives seven days of Qamar+ with no card. The database (`plus_trials`, migration 0043) allows one per account, never after a payment, and a later Paymob payment simply replaces the trial entitlement. Nothing renews on its own: when the week ends the person is back on Lite.
+- **The earned month, once.** `POST /billing/earned` says where a member stands in the promo — 28 logged days in the first 30 days of paid membership — and `POST /billing/earned/claim` grants 30 more days of Qamar+ when they are reached (migration 0052, `earned_months`). The days are counted from `meal_logs` when asked, the window opens on the Cairo day of the first paid order, and the grant is appended to the running month the way a renewal is; a lapsed member gets a fresh 30 days with `provider = 'earned'`. The app claims it the moment it is due and shows the progress while it is being earned.
+- **A free week, once.** `POST /billing/trial/start` gives seven days of Qamar+ with no card. Its one reminder is scheduled on the phone the moment the trial starts, 48 hours before the week ends, and the Today card carries the same question inside those 48 hours. The database (`plus_trials`, migration 0043) allows one per account, never after a payment, and a later Paymob payment simply replaces the trial entitlement. Nothing renews on its own: when the week ends the person is back on Lite.
 
 - Talking to Qamar writes the meal plan.
 - Lite is three meal photos and three questions a day. Extra photos are bought with earned Su, not cash; the fourth question is Qamar+.

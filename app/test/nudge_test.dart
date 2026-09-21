@@ -77,6 +77,34 @@ void main() {
     });
   });
 
+  group('the free week’s reminder', () {
+    final end = DateTime(2026, 9, 28, 12);
+
+    test('fires 48 hours before the week ends, with its own id and payload', () {
+      final n = NudgeSchedule.trialReminder(trialEnd: end, now: DateTime(2026, 9, 22, 9));
+      expect(n, isNotNull);
+      expect(n!.at, DateTime(2026, 9, 26, 12));
+      expect(n.kind, NudgeKind.trialEnding);
+      expect(n.id, 90, reason: 'never collides with a meal question’s id');
+      expect(n.payload, 'trial:ending');
+      expect(n.text(ar: false), 'Two days left of your week with Qamar+. Keep the plan going?');
+      expect(n.text(ar: true), contains('قمر+'));
+    });
+
+    test('nothing to schedule without a trial, or once the 48-hour mark has passed', () {
+      expect(NudgeSchedule.trialReminder(trialEnd: null, now: DateTime(2026, 9, 22)), isNull);
+      expect(NudgeSchedule.trialReminder(trialEnd: end, now: DateTime(2026, 9, 27)), isNull);
+      expect(NudgeSchedule.trialReminder(trialEnd: end, now: DateTime(2026, 9, 26, 12)), isNull, reason: 'exactly at the mark is too late to schedule');
+    });
+
+    test('the reminder’s words are not a nag', () {
+      for (final ar in [true, false]) {
+        final t = NudgeCopy.trialEnding(ar: ar).toLowerCase();
+        expect(t.contains('expir') || t.contains('don’t forget') || t.contains('reminder'), isFalse);
+      }
+    });
+  });
+
   group('voice', () {
     test('every line is a question in Qamar\'s voice; none says log, forget or reminder', () {
       for (final line in NudgeCopy.all) {

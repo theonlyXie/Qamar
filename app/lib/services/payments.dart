@@ -22,6 +22,13 @@ abstract class BillingGateway {
   /// Starts the free week. The server refuses a second one; the message
   /// in the [BillingException] says why.
   Future<PlusEntitlement> startTrial();
+
+  /// Where the earned month stands: logged days in the first 30 of membership.
+  Future<EarnedMonth> earnedMonth();
+
+  /// Grants the earned month once 28 days are logged. The server re-checks;
+  /// the [BillingException] says why when it refuses.
+  Future<EarnedMonthClaim> claimEarnedMonth();
   Future<AffiliateWallet> affiliate();
   Future<AffiliateWallet> requestAffiliatePayout({int? amountCents});
 }
@@ -122,6 +129,29 @@ class HttpBillingGateway implements BillingGateway {
       throw BillingException(reason);
     }
     return PlusEntitlement.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<EarnedMonth> earnedMonth() async {
+    final res = await _client.post(Uri.parse('$baseUrl/earned'), headers: _headers, body: jsonEncode({}));
+    if (res.statusCode != 200) {
+      throw BillingException('earned month failed: ${res.statusCode} ${res.body}');
+    }
+    return EarnedMonth.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<EarnedMonthClaim> claimEarnedMonth() async {
+    final res = await _client.post(Uri.parse('$baseUrl/earned/claim'), headers: _headers, body: jsonEncode({}));
+    if (res.statusCode != 200) {
+      String reason = 'earned month claim failed: ${res.statusCode}';
+      try {
+        final body = jsonDecode(utf8.decode(res.bodyBytes));
+        if (body is Map && body['error'] is String) reason = body['error'] as String;
+      } catch (_) {}
+      throw BillingException(reason);
+    }
+    return EarnedMonthClaim.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
   }
 
   @override

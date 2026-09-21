@@ -225,6 +225,10 @@ class PlusEntitlement {
   /// Qamar+ right now is the free week, not a payment.
   bool get isTrial => provider == 'trial' && active;
 
+  /// Qamar+ right now is the earned month — 28 logged days in the first 30 —
+  /// running on its own after the paid month lapsed.
+  bool get isEarned => provider == 'earned' && active;
+
   bool get active {
     if (status != 'active') return false;
     final end = periodEnd;
@@ -302,4 +306,72 @@ String formatEgp(int pounds, {required bool ar, bool eastern = true}) {
     return i >= 0 ? easternDigits[i] : c;
   }).join();
   return '$mapped ج.م';
+}
+
+/// The earned-month promo, as the server computes it: 28 logged days in the
+/// first 30 of paid membership, and the next 30 days of Qamar+ are on us.
+/// Once per account. The phone never counts the days itself.
+class EarnedMonth {
+  /// The window is running and nothing has been granted yet.
+  final bool open;
+  final int loggedDays;
+  final int needed;
+  final int windowDays;
+
+  /// Window days still to come, today excluded.
+  final int daysLeft;
+  final bool eligible;
+  final bool claimed;
+  final DateTime? grantedUntil;
+  final DateTime? windowStart;
+  final DateTime? windowEnd;
+
+  const EarnedMonth({
+    required this.open,
+    required this.loggedDays,
+    required this.needed,
+    required this.windowDays,
+    required this.daysLeft,
+    required this.eligible,
+    required this.claimed,
+    this.grantedUntil,
+    this.windowStart,
+    this.windowEnd,
+  });
+
+  /// No paid membership yet, so no window.
+  static const none = EarnedMonth(open: false, loggedDays: 0, needed: 28, windowDays: 30, daysLeft: 0, eligible: false, claimed: false);
+
+  /// Still being earned: the window is open and the month is not yet reached.
+  bool get inProgress => open && !eligible && !claimed;
+
+  factory EarnedMonth.fromJson(Map<String, dynamic> json) {
+    int n(String k, int def) => json[k] is num ? (json[k] as num).round() : def;
+    DateTime? when(String k) => json[k] is String ? DateTime.tryParse(json[k] as String)?.toUtc() : null;
+    return EarnedMonth(
+      open: json['open'] == true,
+      loggedDays: n('logged_days', 0),
+      needed: n('needed', 28),
+      windowDays: n('window_days', 30),
+      daysLeft: n('days_left', 0),
+      eligible: json['eligible'] == true,
+      claimed: json['claimed'] == true,
+      grantedUntil: when('granted_until'),
+      windowStart: when('window_start'),
+      windowEnd: when('window_end'),
+    );
+  }
+}
+
+/// What the claim returns: the entitlement with the month appended, and the
+/// promo now marked granted.
+class EarnedMonthClaim {
+  final PlusEntitlement entitlement;
+  final EarnedMonth earned;
+  const EarnedMonthClaim({required this.entitlement, required this.earned});
+
+  factory EarnedMonthClaim.fromJson(Map<String, dynamic> json) => EarnedMonthClaim(
+        entitlement: PlusEntitlement.fromJson((json['entitlement'] as Map?)?.cast<String, dynamic>() ?? const {}),
+        earned: EarnedMonth.fromJson((json['earned'] as Map?)?.cast<String, dynamic>() ?? const {}),
+      );
 }
