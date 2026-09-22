@@ -99,6 +99,9 @@ import {
   type NightlyReport,
   nightSentence,
   planKcal,
+  RETURN_DAYS,
+  returningAudience,
+  returnSentence,
   RUN_BUDGET_MS,
 } from "./nightly.ts";
 
@@ -1495,7 +1498,7 @@ async function nightlyPlans(now: Date, force: boolean): Promise<NightlyReport> {
   const date = cairoDatePlus(now, 1);
   const today = cairoNow(now).date;
   const report: NightlyReport = {
-    date, ran: false, plus: 0, lite: 0, written: 0, noted: 0, skipped: 0, failed: 0, remaining: 0, failures: [],
+    date, ran: false, plus: 0, lite: 0, written: 0, noted: 0, returning: 0, skipped: 0, failed: 0, remaining: 0, failures: [],
   };
   if (!force && !isNightlyWindow(now)) {
     report.reason = "outside the 22:00 Cairo window";
@@ -1517,6 +1520,9 @@ async function nightlyPlans(now: Date, force: boolean): Promise<NightlyReport> {
   const lite = active.filter((id) => !plusSet.has(id));
   report.plus = members.length;
   report.lite = lite.length;
+  // Anyone who logged this week but not today wakes to a line too, with no
+  // plan behind it: no model call, so members keep the run's budget.
+  report.returning = await writeReturningNotes(date, members, active);
   const audience = [...members, ...lite];
   if (audience.length === 0) return report;
 
@@ -1574,6 +1580,43 @@ async function nightlyPlans(now: Date, force: boolean): Promise<NightlyReport> {
     }
   }
   return report;
+}
+
+/**
+ * The returning lines (0062): one batched write, no plan and no model call.
+ * A note already written for [date] is never overwritten; plan_kcal 0 tells
+ * the phone there is no plan behind the sentence. Returns how many were
+ * written.
+ */
+async function writeReturningNotes(date: string, members: string[], active: string[]): Promise<number> {
+  const res = await db("rpc/qamar_returning", { method: "POST", body: JSON.stringify({ p_days: RETURN_DAYS }) });
+  if (!res.ok) {
+    console.error("ai-gateway returning audience", res.status, await res.text());
+    return 0;
+  }
+  const returning = await res.json() as Array<{ user_id: string; meal_name: string }>;
+  if (returning.length === 0) return 0;
+  const noted: string[] = [];
+  for (const group of chunks(returning.map((r) => r.user_id))) {
+    const notedRes = await db(`night_notes?day=eq.${date}&user_id=in.(${group.join(",")})&select=user_id`);
+    if (notedRes.ok) for (const r of await notedRes.json() as Array<{ user_id: string }>) noted.push(r.user_id);
+  }
+  const due = returningAudience(returning, members, active, noted);
+  if (due.length === 0) return 0;
+  const rows = due.map((r) => {
+    const s = returnSentence(r.meal_name);
+    return { user_id: r.user_id, day: date, sentence_ar: s.ar, sentence_en: s.en, plan_kcal: 0, today_kcal: 0 };
+  });
+  const write = await db("night_notes?on_conflict=user_id,day", {
+    method: "POST",
+    headers: { Prefer: "resolution=ignore-duplicates" },
+    body: JSON.stringify(rows),
+  });
+  if (!write.ok) {
+    console.error("ai-gateway returning notes", write.status, await write.text());
+    return 0;
+  }
+  return rows.length;
 }
 
 /**

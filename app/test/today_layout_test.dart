@@ -298,6 +298,18 @@ void main() {
       expect(s.screen, AppScreen.subscription);
     });
 
+    testWidgets('a returning line (no plan behind it) is the sentence, with no plan link', (tester) async {
+      for (final lang in AppLang.values) {
+        final s = _state(lang);
+        s.nightNote = NightNote(day: _now, ar: 'لو كشري تاني النهارده، هتلاقيه في سجّل ← كرّر.', en: 'If it’s Koshary again today, you’ll find it under Log → Repeat.', planKcal: 0, todayKcal: 0);
+        await _pump(tester, s, _phone);
+        expect(find.text(lang == AppLang.ar ? 'لو كشري تاني النهارده، هتلاقيه في سجّل ← كرّر.' : 'If it’s Koshary again today, you’ll find it under Log → Repeat.'), findsOneWidget);
+        for (final link in const ['الخطة الكاملة في قمر+', 'افتح خطة النهارده', 'The full plan is Qamar+', 'Open today’s plan']) {
+          expect(find.text(link), findsNothing, reason: 'there is no plan to open');
+        }
+      }
+    });
+
     testWidgets('the billing moment is the card seat 1 built, which never says "cancel"', (tester) async {
       final s = _state(AppLang.en, due: [TodayCard.billing]);
       await _pump(tester, s, _phone);

@@ -1,5 +1,6 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { cairoDatePlus, cairoNow, chunks, dueMembers, isNightlyWindow, MAX_PER_RUN, nightSentence, planKcal } from "./nightly.ts";
+import { cairoDatePlus, cairoNow, chunks, dueMembers, isNightlyWindow, MAX_PER_RUN, nightSentence, planKcal, returningAudience, returnSentence } from "./nightly.ts";
+import { mentionsScore } from "./notes.ts";
 
 Deno.test("Cairo is UTC+3 in summer and UTC+2 in winter", () => {
   // 2026-07-01 19:00Z → 22:00 Cairo (EEST).
@@ -67,4 +68,28 @@ Deno.test("the night sentence compares tomorrow with today and names no dish", (
 Deno.test("audiences are chunked for the URL", () => {
   assertEquals(chunks([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
   assertEquals(chunks([], 2), []);
+});
+
+Deno.test("the returning line names their own meal and where to log it again, and nothing about the days missed", () => {
+  const en = returnSentence(" Koshary ");
+  assertEquals(en.en, "If it's Koshary again today, you'll find it under Log → Repeat.");
+  const ar = returnSentence("كشري");
+  assertEquals(ar.ar, "لو كشري تاني النهارده، هتلاقيه في سجّل ← كرّر.");
+  for (const s of [en, ar]) {
+    const both = s.ar + " " + s.en;
+    assert(!/miss|haven|didn|streak|since|days|lost|فات|وحشت|مسجلتش|بقالك|سلسلة/i.test(both), both);
+    assert(!mentionsScore(both), both);
+  }
+});
+
+Deno.test("the returning audience leaves out members, today's loggers and anyone already written", () => {
+  const rows = [
+    { user_id: "quiet", meal_name: "Koshary" },
+    { user_id: "member", meal_name: "Ful" },
+    { user_id: "today", meal_name: "Ful" },
+    { user_id: "noted", meal_name: "Ful" },
+    { user_id: "blank", meal_name: "  " },
+    { user_id: "quiet", meal_name: "Ful" },
+  ];
+  assertEquals(returningAudience(rows, ["member"], ["today"], ["noted"]), [{ user_id: "quiet", meal_name: "Koshary" }]);
 });

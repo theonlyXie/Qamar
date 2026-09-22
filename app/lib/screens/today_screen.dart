@@ -219,8 +219,10 @@ class QamarCard extends StatelessWidget {
               ),
             ],
           ),
-          if (line.fromNight)
-            // The night note's way on: today's plan, or where the wall is.
+          // The night note's way on: today's plan, or where the wall is. A
+          // returning line has no plan behind it (plan_kcal 0, 0062), so
+          // there is nothing to open and no link.
+          if (line.fromNight && (state.nightNote?.planKcal ?? 0) > 0)
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: InkWell(

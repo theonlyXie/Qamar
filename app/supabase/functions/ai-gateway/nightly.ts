@@ -75,6 +75,8 @@ export interface NightlyReport {
   written: number;
   /** Night sentences written (for plans written tonight or already there). */
   noted: number;
+  /** Returning lines written: logged this week, not today, no plan behind them. */
+  returning: number;
   skipped: number;
   failed: number;
   remaining: number;
@@ -136,5 +138,46 @@ export function nightSentence(input: { planKcal: number; todayKcal: number; meal
 export function chunks<T>(ids: T[], size = 100): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+  return out;
+}
+
+// ---- the returning line -----------------------------------------------------
+
+/** How far back a quiet person still gets a morning line. */
+export const RETURN_DAYS = 7;
+
+/**
+ * The morning line for someone who logged this week but not today. No plan
+ * is written for them, so there is no model call, and nothing in it is about
+ * the days that were not logged: their own most-logged meal, and where to
+ * log it again. Read in the morning, so it speaks of today.
+ */
+export function returnSentence(meal: string): NightSentence {
+  const m = meal.trim();
+  return {
+    ar: `لو ${m} تاني النهارده، هتلاقيه في سجّل ← كرّر.`,
+    en: `If it's ${m} again today, you'll find it under Log → Repeat.`,
+  };
+}
+
+/**
+ * Who gets a returning line tonight: logged this week and not today (the
+ * query's own rule), not a member (members get tomorrow's plan and its line),
+ * not in today's audience, and not already written for [date].
+ */
+export function returningAudience(
+  returning: Array<{ user_id: string; meal_name: string }>,
+  members: Iterable<string>,
+  active: Iterable<string>,
+  noted: Iterable<string>,
+): Array<{ user_id: string; meal_name: string }> {
+  const skip = new Set([...members, ...active, ...noted]);
+  const seen = new Set<string>();
+  const out: Array<{ user_id: string; meal_name: string }> = [];
+  for (const r of returning) {
+    if (!r?.user_id || !r.meal_name?.trim() || skip.has(r.user_id) || seen.has(r.user_id)) continue;
+    seen.add(r.user_id);
+    out.push(r);
+  }
   return out;
 }
