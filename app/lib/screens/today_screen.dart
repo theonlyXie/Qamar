@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/plan.dart';
+import '../models/streak.dart';
 import '../models/su_economy.dart';
 import '../models/water.dart';
 import '../models/ramadan.dart';
@@ -146,9 +147,10 @@ class _Header extends StatelessWidget {
 }
 
 /// The streak line's words: Qamar's one sentence under the name, from the
-/// second day ("Fourth day running." / "رابع يوم ورا بعض."). Seat 3 writes
-/// it (O4). Until then there is none, and the header closes up.
-String? streakLineFor(AppState state) => null;
+/// second day ("Fourth day running." / "رابع يوم ورا بعض.", O4). It shows
+/// once today's meal has joined the run, so it never asks anyone to keep
+/// anything; with no line the header closes up. See [streakSentence].
+String? streakLineFor(AppState state) => streakSentence(state.streak(), ar: state.isAr, iso: state.iso);
 
 /// The streak line, a named piece of the header so it can go whole.
 class TodayStreakLine extends StatelessWidget {

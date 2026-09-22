@@ -3896,7 +3896,7 @@ class AppState extends ChangeNotifier {
   /// answer wins when it exists — it knows about freezes — but a meal logged
   /// this minute counts before the server has been asked again.
   Streak streak() {
-    final now = DateTime.now();
+    final now = _clock();
     final today = DateTime(now.year, now.month, now.day);
     final server = serverStreak;
     final local = Streak.fromDays(

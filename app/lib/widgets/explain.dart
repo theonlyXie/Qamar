@@ -99,8 +99,8 @@ const kExplanations = <String, Explanation>{
   'streak': Explanation(
     titleAr: 'السلسلة',
     titleEn: 'Streak',
-    bodyAr: 'أيام ورا بعض سجّلت فيها وجبة واحدة على الأقل. اليوم ميقطعش السلسلة قبل ما يخلص — بس لازم وجبة قبل نص الليل. الحلقة حوالين القمر هي السلسلة دي.',
-    bodyEn: 'Days in a row with at least one logged meal. Today never breaks the streak before it ends — but it needs a meal before midnight. The ring around the moon is this streak.',
+    bodyAr: 'أيام ورا بعض سجّلت فيها وجبة واحدة على الأقل. اليوم ميقطعش السلسلة قبل ما يخلص — بس لازم وجبة قبل نص الليل. الحلقة حوالين القمر هي السلسلة دي، ولما وجبة النهارده تكمّل يومين ورا بعض أو أكتر بقولها تحت اسمك في النهارده.',
+    bodyEn: 'Days in a row with at least one logged meal. Today never breaks the streak before it ends — but it needs a meal before midnight. The ring around the moon is this streak, and once today’s meal makes a run of two days or more, Qamar says so under your name on Today.',
     soWhatAr: 'وجبة واحدة مسجلة بتكفي. وتجميد السلسلة من المحفظة بيغطي يوم واحد فايت في الشهر.',
     soWhatEn: 'One logged meal is enough. A streak freeze from the wallet covers one missed day a month.',
   ),

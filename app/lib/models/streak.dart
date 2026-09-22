@@ -105,6 +105,25 @@ class Streak {
   }
 }
 
+/// The streak as Qamar says it under the name on Today (O4): one sentence,
+/// from the second day of a run.
+///
+/// It appears only once today's meal has joined a run of two days or more,
+/// so it is always news about something done, never a reminder of something
+/// to keep: nothing here speaks of risk, deadlines or midnight (those stay
+/// on Progress). When a run ends the line is simply not there. Null means
+/// no line.
+String? streakSentence(Streak s, {required bool ar, required String Function(String) iso}) {
+  if (!s.todayCounted || s.current < 2) return null;
+  final n = s.current;
+  if (n <= 10) {
+    const ordAr = ['تاني', 'تالت', 'رابع', 'خامس', 'سادس', 'سابع', 'تامن', 'تاسع', 'عاشر'];
+    const ordEn = ['Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
+    return ar ? '${ordAr[n - 2]} يوم ورا بعض.' : '${ordEn[n - 2]} day running.';
+  }
+  return ar ? '${iso('$n')} يوم ورا بعض.' : '$n days running.';
+}
+
 /// What the orb looks like right now, derived from the day rather than from
 /// a clock. The moon fills as today's intake approaches the target; the glow
 /// follows how much of the day's rhythm has happened; the ring is the streak.
