@@ -2408,6 +2408,30 @@ void main() {
       expect(a.named('dish_shown').single, containsPair('placement', 'intake'));
     });
 
+    test('the welcome’s dishes read the live graph too, asked once, and the reveal does not ask again', () async {
+      final graph = shipped()..['koshary'] = (kcal: 150.0, protein: 5.0, carbs: 22.0, fat: 4.0);
+      final meals = FakeMealRepo()..graph = graph;
+      final a = MemoryAnalytics();
+      final state = backed(meals: meals, analytics: a);
+      await settle();
+      await state.setImprove(true);
+      final koshary = kEgyptianDishes.firstWhere((d) => d.id == 'koshary');
+      expect(state.dishFactsFor(koshary).live, isFalse, reason: 'shipped until the graph is asked');
+
+      state.openWelcomeDishes();
+      await settle();
+      expect(meals.graphAsks, hasLength(1));
+      expect(state.dishFactsFor(koshary), koshary.facts(live: graph));
+      expect(state.dishFactsFor(koshary).live, isTrue);
+      state.welcomeDishShown(koshary);
+      expect(a.named('dish_shown').single, containsPair('placement', 'welcome'));
+      expect(a.named('dish_shown').single, containsPair('live', true));
+
+      state.startOnboarding();
+      await settle();
+      expect(meals.graphAsks, hasLength(1), reason: 'the same numbers serve the reveal');
+    });
+
     test('a graph that does not answer leaves the shipped numbers in place', () async {
       final meals = FakeMealRepo(); // answers nothing
       final state = backed(meals: meals, clock: () => DateTime(2026, 9, 21, 13, 0));

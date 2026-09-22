@@ -2119,6 +2119,24 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Any shipped dish's numbers, the live graph's when it has answered for
+  /// every part (O5): the welcome's dishes read the same numbers as the
+  /// reveal.
+  DishFacts dishFactsFor(EgyptianDish dish) => dish.facts(live: _liveDishFacts);
+
+  /// The welcome's dishes are open: ask the graph for their numbers, once.
+  /// Only the dishes' slugs are sent, nothing about the person.
+  void openWelcomeDishes() {
+    _track('welcome_dishes_opened');
+    ensureDishFacts().then((_) => _notify());
+  }
+
+  /// A dish chosen on the welcome, before any question (O5). The event names
+  /// no food, as at the reveal.
+  void welcomeDishShown(EgyptianDish dish) {
+    _track('dish_shown', {'placement': 'welcome', 'live': dishFactsFor(dish).live});
+  }
+
   EgyptianDish? _pickRevealDish() {
     final slot = slotForHour(_clock().hour, fasting: fasting);
     final dish = pickDish(

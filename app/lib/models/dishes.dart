@@ -237,3 +237,38 @@ EgyptianDish? pickDish({
   }
   return best;
 }
+
+
+/// The three dishes the welcome offers before any question (O5): the street's
+/// everyday plates, one tap each, no typing.
+const List<String> kWelcomeDishIds = ['koshary', 'ful_bread', 'taameya_sandwich'];
+
+/// A dish's chip label on the welcome, short.
+String welcomeDishLabel(EgyptianDish d, bool ar) => switch (d.id) {
+      'koshary' => ar ? 'كشري' : 'Koshary',
+      'ful_bread' => ar ? 'فول بالعيش' : 'Ful and bread',
+      'taameya_sandwich' => ar ? 'سندوتش طعمية' : 'Taameya sandwich',
+      _ => ar ? d.nameAr : d.nameEn,
+    };
+
+/// One plain sentence about a dish, from its own numbers, so it is always
+/// true of the card above it: where most of its energy comes from, and its
+/// protein. The share of the person's day waits until there is a target.
+String dishSentence(DishFacts f, {required bool ar, required String Function(String) iso}) {
+  final carbs = f.carbs * 4, protein = f.protein * 4, fat = f.fat * 9;
+  final total = carbs + protein + fat;
+  String n(int v) => ar ? iso('$v') : '$v';
+  if (total <= 0) {
+    return ar ? 'ولما أعرفك هقولك ده قد إيه من يومك.' : 'Once I know you, I’ll say what share of your day that is.';
+  }
+  final (partAr, partEn, part) = carbs >= protein && carbs >= fat
+      ? ('الكربوهيدرات', 'carbs', carbs)
+      : fat >= protein
+          ? ('الدهون', 'fat', fat)
+          : ('البروتين', 'protein', protein);
+  final pct = n((part * 100 / total).round());
+  final p = n(f.protein);
+  return ar
+      ? 'أغلب طاقته من $partAr ($pct٪)، وفيه $p جم بروتين — ولما أعرفك هقولك ده قد إيه من يومك.'
+      : 'Most of its energy is $partEn ($pct%), with $p g of protein — once I know you, I’ll say what share of your day that is.';
+}

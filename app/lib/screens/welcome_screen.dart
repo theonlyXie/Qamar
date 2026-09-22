@@ -8,6 +8,7 @@ import '../theme/text_styles.dart';
 import '../widgets/account_sheet.dart';
 import '../widgets/common.dart';
 import '../widgets/living_orb.dart';
+import '../widgets/welcome_dishes.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -53,8 +54,11 @@ class WelcomeScreen extends StatelessWidget {
                       left: -4,
                       child: _FloatingPill(
                         label: t.chatDirect,
+                        sub: t.chatDirectSub,
                         dot: QColors.violet,
-                        onTap: state.startOnboarding,
+                        // Something real before the first question (O5): a
+                        // dish first. A consultation left part-way carries on.
+                        onTap: () => state.consultationPaused ? state.startOnboarding() : WelcomeDishes.show(context, state),
                         emphasis: true,
                       ),
                     ),
@@ -184,10 +188,13 @@ Future<void> _askInvitationCode(BuildContext context, AppState state) async {
 
 class _FloatingPill extends StatelessWidget {
   final String label;
+
+  /// What the pill opens, in a line under its label. Null: the label alone.
+  final String? sub;
   final Color? dot;
   final VoidCallback onTap;
   final bool emphasis;
-  const _FloatingPill({required this.label, required this.dot, required this.onTap, required this.emphasis});
+  const _FloatingPill({required this.label, this.sub, required this.dot, required this.onTap, required this.emphasis});
 
   @override
   Widget build(BuildContext context) {
@@ -200,7 +207,7 @@ class _FloatingPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
         child: Container(
-          height: 52,
+          height: sub == null ? 52 : 60,
           constraints: BoxConstraints(maxWidth: maxWidth),
           padding: const EdgeInsets.symmetric(horizontal: 18),
           decoration: BoxDecoration(
@@ -220,10 +227,21 @@ class _FloatingPill extends StatelessWidget {
                 const SizedBox(width: 9),
               ],
               Flexible(
-                child: Text(label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFF1F5FF))),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFF1F5FF))),
+                    if (sub != null)
+                      Text(sub!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: QText.body(size: 12, height: 16, color: QColors.textMuted)),
+                  ],
+                ),
               ),
             ],
           ),
