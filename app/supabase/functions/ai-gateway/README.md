@@ -57,10 +57,28 @@ the gateway, so calling the API directly does not get around what the app shows.
 reasons from. **Until they have content, every chat call refuses with
 `no_grounding`** — by design, not a bug.
 
-To ingest: chunk each source to roughly 500–800 tokens, embed with the same
-model as `EMBEDDING_MODEL` (default `voyage-3`, 1024 dims — it must match
-`kb_chunks.embedding`), and insert with the service role. Sensible starting
-sources, licence permitting:
+`kb_sources.json` holds the corpus in the shape `ingest.ts` reads. Run it with
+an embedding key and it chunks, embeds and inserts:
+
+```bash
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... VOYAGE_API_KEY=... \
+  deno run --allow-net --allow-env --allow-read ingest.ts kb_sources.json
+```
+
+**Retrieval only sees a chunk that carries an embedding**, so this is the whole
+of the work — a row inserted by hand with a null vector is invisible.
+
+Size the corpus against what the retriever asks for. `retrieve()` takes the top
+6 chunks within one domain (8 for plan generation) above a 0.25 similarity
+floor. A domain holding 6 chunks therefore returns all of them for every
+question, whatever was asked, and retrieval is doing no work at all. The live
+project sat at 10 nutrition and 2 training chunks; `kb_sources.json` adds 4 and
+7. That is enough for the retriever to start choosing, and it is still a thin
+corpus — the number to aim at is several times the top-k per domain, which
+means a real content pass with a nutritionist rather than more files like this
+one.
+
+Sensible sources to grow it with, licence permitting:
 
 | Domain | Source |
 |---|---|
@@ -74,7 +92,7 @@ there to record what you may quote.
 
 ## The food graph has names but no numbers until you fill it
 
-Migrations 0017 and 0051 seed `foods`, `food_aliases`, `food_portions` and
+Migrations 0017 and 0054 seed `foods`, `food_aliases`, `food_portions` and
 `recipes` — every Egyptian name, portion and recipe composition — and
 deliberately **not one nutrient value**. Per-100g figures come from USDA
 FoodData Central through `ingest_usda.ts`, so every number traces to a
@@ -92,7 +110,7 @@ How it decides:
 
 - It takes every `foods` row with `is_recipe = false` and searches USDA for
   `name_en` plus `food_state` (`"Beef, ground, 80% lean meat / 20% fat raw"`).
-  The ingredient rows in 0051 are named to overlap the USDA description on
+  The ingredient rows in 0054 are named to overlap the USDA description on
   purpose; keep doing that when adding one.
 - A match below the token-overlap floor (0.45) is left alone and listed at the
   end. A wrong food is worse than a missing one.
@@ -117,7 +135,7 @@ energy value that is holding the dish back. A dish returns no nutrition at all
 until every non-optional ingredient has one, rather than an undercount from the
 ingredients that happened to load.
 
-Ingredients 0051 added for the new recipes, expected to match USDA by name:
+Ingredients 0054 added for the new recipes, expected to match USDA by name:
 wheat flour, semolina, phyllo dough, puff pastry, bread crumbs, cornstarch,
 rice flour, couscous, white and whole-wheat toast, heavy cream, dry whole milk,
 sweetened condensed milk, mozzarella, cheddar, cream cheese, ground beef,
@@ -131,7 +149,7 @@ water, table salt, cumin, coriander seed, anise, fenugreek, ground cinnamon,
 ginger root, distilled vinegar, mayonnaise, pistachios, desiccated coconut, jam,
 vanilla ice cream.
 
-Migration 0052 already carries the hand-mapped ids for every 0051 ingredient
+Migration 0055 already carries the hand-mapped ids for every 0054 ingredient
 and for the 0017 ingredients the first ingest left empty (the three breads,
 laban rayeb, corn oil, almonds, mango and the other Foundation-Foods rows that
 have no energy value). Items still to map if the search misses them, because
@@ -139,6 +157,33 @@ USDA has no Egyptian row: areesh / white / roumy / istanbouli cheese, eshta,
 samna, Egyptian sausage, basterma, feseekh, molokhia leaves, taro, halawa,
 erksous, sugarcane juice, and the generic soft drink. Map each to the closest
 USDA relative and say so in the row.
+
+## Clinical rules, and the gate in front of them
+
+`qamar_rule_selection` (0022) returned nothing for every request, for two
+reasons rather than one: `clinical_rules` was empty, **and** every guidance body
+in `source_registry` was seeded `deprecated` with `ai_advice_rights` null, which
+`qamar_source_usable_for_advice` reads as "no". Filling the table without
+opening that gate would have changed nothing.
+
+Migration 0056 opens the gate for the sources whose licence is not in question
+— works of the US federal government, public domain by 17 U.S.C. § 105 — and
+seeds 17 rules from them: the Dietary Guidelines quantitative limits (sodium,
+added sugars, saturated fat, fibre), the Physical Activity Guidelines, and the
+NIH ODS reference intakes. WHO, EFSA and NASEM stay `deprecated` on purpose:
+their numbers are quotable, their licences are recorded as `unknown`, and that
+is a determination for someone with the authority to make it.
+
+```sql
+select * from clinical_rule_review where needs_review;
+```
+
+Every row 0056 seeded is `needs_review`, because `reviewer_id` is null on all of
+them. The selection function has no review gate — an uncurated rule still
+reaches the reasoner, which is the right default when the alternative is
+silence — so this view is how an operator sees what nobody has checked. The DGA
+rows cite the 2020–2025 edition, which the 2025–2030 edition supersedes; each
+needs re-verifying against the current one.
 
 ## Costs and limits, before this goes live
 

@@ -3238,7 +3238,7 @@ comment on function public.qamar_nutrients_per_100g is
   'from its ingredients and yield factor, following sub-recipes, and marked '
   'derived with a confidence no higher than its weakest ingredient. Returns '
   'nothing when any non-optional ingredient lacks an energy value, which the '
-  'caller must treat as a miss and fall back on — never as zero. See 0051.';
+  'caller must treat as a miss and fall back on — never as zero. See 0054.';
 
 -- Which dishes can be priced today, and which ingredient stops the rest.
 -- This is the worklist for ingest_usda.ts after this migration: every slug in
@@ -3380,7 +3380,7 @@ update public.eval_cases set
     when 'res_boiled_rice_is_not_eggs' then '{"slug":"white_rice"}'::jsonb
   end,
   tolerance = '{"min_score":0.5}'::jsonb,
-  description = description || ' Since 0051 the phrase has a right answer, so the guard expects it.'
+  description = description || ' Since 0054 the phrase has a right answer, so the guard expects it.'
 where slug in ('res_burger_is_not_beef', 'res_broasted_is_not_a_breast',
                'res_fried_chicken_is_not_a_thigh', 'res_boiled_rice_is_not_eggs')
   and expected ? 'resolves';

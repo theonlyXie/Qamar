@@ -185,7 +185,7 @@ function pickNutrients(
     if (id !== undefined && PREFERRED_IDS.has(id)) fromPreferred.add(code);
   }
   // Absent, not zero. Water, salt and brewed tea legitimately report 0 kcal,
-  // and 0051 made them recipe ingredients; a falsy check here used to throw
+  // and 0054 made them recipe ingredients; a falsy check here used to throw
   // them away as "no energy value".
   if (nutrients.energy_kcal === undefined) return null;
   return nutrients;

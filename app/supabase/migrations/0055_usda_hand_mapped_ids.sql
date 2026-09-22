@@ -2,7 +2,7 @@
 -- to find on its own.
 --
 -- ingest_usda.ts matches a food by token overlap on name_en + food_state and
--- leaves anything under the floor alone. For the ingredients 0051 added, and
+-- leaves anything under the floor alone. For the ingredients 0054 added, and
 -- for the 0017 ingredients that never received a value, the right USDA row was
 -- decided by reading the candidates rather than trusting the score:
 --
@@ -22,7 +22,7 @@
 -- say where the values come from.
 
 with m(slug, fdc_id, usda_description) as (values
-  -- 0051 ingredients
+  -- 0054 ingredients
   ('wheat_flour',    '169761', 'Wheat flour, white, all-purpose, unenriched'),
   ('semolina',       '168933', 'Semolina, unenriched'),
   ('phyllo_dough',   '172791', 'Phyllo dough'),
@@ -116,7 +116,7 @@ select f.qamar_food_id, 'usda_fdc', m.fdc_id, 'fdc_id',
        'https://fdc.nal.usda.gov/food-details/' || m.fdc_id || '/nutrients',
        jsonb_build_object(
          'usda_description', m.usda_description,
-         'mapped_in', '0052',
+         'mapped_in', '0055',
          'decided_by', 'hand: closest SR Legacy row with an energy value')
 from m
 join public.foods f on f.slug = m.slug
