@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/photos.dart';
@@ -156,6 +158,9 @@ Offset treeSubCenter(int i, {int of = 3}) => _onRing(subAnglesFor(of)[i]);
 /// ring, and light beaming out to each of them.
 class TreeOverlay extends StatefulWidget {
   const TreeOverlay({super.key});
+
+  /// The centre moon's label, for tests.
+  static const centreLabelKey = ValueKey('tree-centre-label');
   @override
   State<TreeOverlay> createState() => _TreeOverlayState();
 }
@@ -265,12 +270,28 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                             ),
                           ),
                           // The moon in the middle is the same one as the
-                          // floating orb; tapping it here is the tap-friendly
-                          // route to the conversation for anyone who cannot hold.
+                          // floating orb, and answers the same way: hold it
+                          // and the conversation opens listening — which is
+                          // what the hint below says — or tap it, the route
+                          // for anyone who cannot hold, to type. Its label
+                          // says so, like every other circle on the ring.
                           Positioned(
                             left: _orbLeft,
                             top: _orbLeft,
-                            child: LivingOrb(size: _orbSize, onTap: state.openChat, state: state.orbState()),
+                            child: _CentreMoon(state: state),
+                          ),
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            top: _canvas / 2 + _orbSize / 2 + 4,
+                            child: IgnorePointer(
+                              child: Text(
+                                t.ask,
+                                key: TreeOverlay.centreLabelKey,
+                                textAlign: TextAlign.center,
+                                style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMid),
+                              ),
+                            ),
                           ),
                           if (!state.treeExpanded)
                             for (var i = 0; i < nodes.length; i++)
@@ -421,6 +442,41 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
       if (!context.mounted) return;
       state.cameraFailedInTree(e);
     }
+  }
+}
+
+/// The moon at the centre of the tree: hold to talk (at the orb's own 350
+/// ms), tap to type. The same two gestures as the floating orb, so the
+/// tree's hint is true of the moon in view.
+class _CentreMoon extends StatelessWidget {
+  final AppState state;
+  const _CentreMoon({required this.state});
+
+  static const _holdAfter = Duration(milliseconds: 350);
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: state.t.ask,
+      child: RawGestureDetector(
+        behavior: HitTestBehavior.opaque,
+        gestures: <Type, GestureRecognizerFactory>{
+          TapGestureRecognizer: GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+            () => TapGestureRecognizer(),
+            (r) => r.onTap = state.openChat,
+          ),
+          LongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+            () => LongPressGestureRecognizer(duration: _holdAfter),
+            (r) => r.onLongPressStart = (_) {
+              HapticFeedback.mediumImpact();
+              state.holdOrb();
+            },
+          ),
+        },
+        child: LivingOrb(size: _orbSize, state: state.orbState()),
+      ),
+    );
   }
 }
 
