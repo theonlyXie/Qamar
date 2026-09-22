@@ -142,6 +142,43 @@ void main() {
     });
   });
 
+  group('the paid month’s reminder', () {
+    final end = DateTime(2026, 10, 21, 12);
+
+    test('fires 48 hours before the month ends, with its own id and payload', () {
+      final n = NudgeSchedule.membershipReminder(periodEnd: end, now: DateTime(2026, 10, 1, 9));
+      expect(n, isNotNull);
+      expect(n!.at, DateTime(2026, 10, 19, 12));
+      expect(n.kind, NudgeKind.membershipEnding);
+      expect(n.id, 91, reason: 'never collides with the week’s reminder or a meal question');
+      expect(n.payload, 'plus:ending');
+      expect(n.text(ar: false), 'Two days left of your month with Qamar+. Nothing renews on its own — shall we do another month?');
+      expect(n.text(ar: true), contains('قمر+'));
+    });
+
+    test('nothing to schedule without a month, or once the 48-hour mark has passed', () {
+      expect(NudgeSchedule.membershipReminder(periodEnd: null, now: DateTime(2026, 10, 1)), isNull);
+      expect(NudgeSchedule.membershipReminder(periodEnd: end, now: DateTime(2026, 10, 20)), isNull);
+      expect(NudgeSchedule.membershipReminder(periodEnd: end, now: DateTime(2026, 10, 19, 12)), isNull, reason: 'exactly at the mark is too late to schedule');
+    });
+
+    test('it says plainly that nothing renews, asks rather than warns, and never says cancel', () {
+      expect(NudgeCopy.membershipEnding(ar: false), contains('Nothing renews on its own'));
+      expect(NudgeCopy.membershipEnding(ar: true), contains('مفيش حاجة بتتجدد لوحدها'));
+      for (final ar in [true, false]) {
+        final t = NudgeCopy.membershipEnding(ar: ar);
+        final lower = t.toLowerCase();
+        expect(t.endsWith('?') || t.endsWith('؟'), isTrue, reason: 'a question in Qamar’s voice: $t');
+        for (final word in ['expir', 'don’t forget', 'remind', 'cancel', 'lose', 'log']) {
+          expect(lower.contains(word), isFalse, reason: '"$word" in: $t');
+        }
+        for (final word in ['متنساش', 'تذكير', 'إلغاء', 'الغي', 'هتخسر', 'سجّل']) {
+          expect(t.contains(word), isFalse, reason: '"$word" in: $t');
+        }
+      }
+    });
+  });
+
   group('voice', () {
     test('every line is a question in Qamar\'s voice; none says log, forget or reminder', () {
       for (final line in NudgeCopy.all) {

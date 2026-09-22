@@ -38,6 +38,10 @@ import 'chat_replies.dart';
 /// Qamar+ billing period. One plan; annual and family wait on retention.
 enum PlusPlan { monthly }
 
+/// A billing moment Today can carry: the free week or the paid month in its
+/// last 48 hours. See [AppState.billingMoment].
+enum BillingMoment { none, trialEnding, membershipEnding }
+
 /// How a meal gets logged straight from the orb, with no page in between.
 enum QuickLog { voice, text, photo, repeat, activity }
 
@@ -881,6 +885,10 @@ class AppState extends ChangeNotifier {
       // OS permission does.
       final trial = NudgeSchedule.trialReminder(trialEnd: plusIsTrial ? plusUntil : null, now: _clock());
       if (trial != null) list.add(trial);
+      // The paid month's, the same way and for the same reason: nothing
+      // renews on its own, so this is the only word a member gets.
+      final renewal = NudgeSchedule.membershipReminder(periodEnd: plusActive && !plusIsTrial ? plusUntil : null, now: _clock());
+      if (renewal != null) list.add(renewal);
       await n.replaceAll(list, ar: isAr);
     } catch (_) {
       // A schedule that could not be written is a missing nudge, not an error
@@ -904,6 +912,11 @@ class AppState extends ChangeNotifier {
   void _onNudgeTap(String payload) {
     if (payload == Nudge.trialPayload) {
       _track('trial_reminder_tapped');
+      go(AppScreen.subscription);
+      return;
+    }
+    if (payload == Nudge.membershipPayload) {
+      _track('membership_reminder_tapped');
       go(AppScreen.subscription);
       return;
     }
@@ -2527,7 +2540,8 @@ class AppState extends ChangeNotifier {
     return left > Duration.zero && left <= NudgeSchedule.trialLead;
   }
 
-  /// "tomorrow" or "in N hours", for the Today card.
+  /// "tomorrow" or "in N hours" until Qamar+ ends — the free week or the
+  /// month — for the Today card.
   String trialEndsIn() {
     final end = plusUntil;
     if (end == null) return '';
@@ -2539,6 +2553,34 @@ class AppState extends ChangeNotifier {
 
   void openTrialEnd() {
     _track('wall_tapped', {'wall': 'trial_end'});
+    go(AppScreen.subscription);
+  }
+
+  /// True in the last 48 hours of a paid or earned month. Nothing renews on
+  /// its own, so this and its push are the only word a member gets.
+  bool get membershipEndingSoon {
+    final end = plusUntil;
+    if (!plusActive || plusIsTrial || end == null) return false;
+    final left = end.difference(_clock());
+    return left > Duration.zero && left <= NudgeSchedule.trialLead;
+  }
+
+  /// Which billing moment Today should carry now, if any: the free week or
+  /// the month, in its last 48 hours. They cannot both be true — a trial is
+  /// never running alongside a paid month. The Today slot (`todayFocus`)
+  /// decides where it sits; this only says whether it is due.
+  BillingMoment get billingMoment => trialEndingSoon
+      ? BillingMoment.trialEnding
+      : membershipEndingSoon
+          ? BillingMoment.membershipEnding
+          : BillingMoment.none;
+
+  bool get billingMomentDue => billingMoment != BillingMoment.none;
+
+  /// Tapping the billing card: the same place the push goes, counted.
+  void openBillingMoment() {
+    final m = billingMoment;
+    _track('wall_tapped', {'wall': m == BillingMoment.membershipEnding ? 'membership_end' : 'trial_end'});
     go(AppScreen.subscription);
   }
 

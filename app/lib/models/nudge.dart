@@ -78,8 +78,10 @@ class MealTimes {
 }
 
 /// What a scheduled notification is about. Almost always a meal; once per
-/// free week, the week ending.
-enum NudgeKind { meal, trialEnding }
+/// free week, the week ending; once per paid month, the month ending —
+/// because nothing renews on its own, so without it a member's Qamar+
+/// simply stops one evening with no word.
+enum NudgeKind { meal, trialEnding, membershipEnding }
 
 /// One scheduled question.
 class Nudge {
@@ -103,15 +105,35 @@ class Nudge {
         dayIndex = 0,
         kind = NudgeKind.trialEnding;
 
-  static const trialPayload = 'trial:ending';
+  /// The paid month's one reminder, 48 hours before it ends. Like the free
+  /// week's, it is scheduled the moment the entitlement is read, and it is
+  /// the only way a member hears that the month is ending.
+  const Nudge.membershipEnding({required this.at})
+      : slot = MealSlot.lunch,
+        dayIndex = 0,
+        kind = NudgeKind.membershipEnding;
 
-  int get id => kind == NudgeKind.trialEnding ? 90 : 100 + dayIndex * MealSlot.values.length + slot.index;
+  static const trialPayload = 'trial:ending';
+  static const membershipPayload = 'plus:ending';
+
+  int get id => switch (kind) {
+        NudgeKind.trialEnding => 90,
+        NudgeKind.membershipEnding => 91,
+        NudgeKind.meal => 100 + dayIndex * MealSlot.values.length + slot.index,
+      };
 
   /// Travels with the notification; tapping it routes back into the app.
-  String get payload => kind == NudgeKind.trialEnding ? trialPayload : 'nudge:${slot.name}';
+  String get payload => switch (kind) {
+        NudgeKind.trialEnding => trialPayload,
+        NudgeKind.membershipEnding => membershipPayload,
+        NudgeKind.meal => 'nudge:${slot.name}',
+      };
 
-  String text({required bool ar}) =>
-      kind == NudgeKind.trialEnding ? NudgeCopy.trialEnding(ar: ar) : NudgeCopy.text(slot, at, ar: ar);
+  String text({required bool ar}) => switch (kind) {
+        NudgeKind.trialEnding => NudgeCopy.trialEnding(ar: ar),
+        NudgeKind.membershipEnding => NudgeCopy.membershipEnding(ar: ar),
+        NudgeKind.meal => NudgeCopy.text(slot, at, ar: ar),
+      };
 }
 
 /// Qamar's voice, and nothing else. Two phrasings per meal, alternating by
@@ -148,6 +170,13 @@ class NudgeCopy {
   /// not "your trial is expiring".
   static String trialEnding({required bool ar}) =>
       ar ? 'باقي يومين في أسبوعك مع قمر+. نكمّل الخطة؟' : 'Two days left of your week with Qamar+. Keep the plan going?';
+
+  /// Two days before a paid month ends. It says plainly that nothing renews
+  /// on its own — that is the reason the message exists — and asks, in the
+  /// same voice. No "expiring", no "don't lose", no "cancel".
+  static String membershipEnding({required bool ar}) => ar
+      ? 'باقي يومين في شهرك مع قمر+. مفيش حاجة بتتجدد لوحدها — نكمّل شهر كمان؟'
+      : 'Two days left of your month with Qamar+. Nothing renews on its own — shall we do another month?';
 }
 
 /// What to put on the phone's notification schedule, from the day as it is.
@@ -172,7 +201,8 @@ class NudgeSchedule {
   /// How long a meal's question stays "waiting" on the orb after its time.
   static const window = Duration(hours: 3);
 
-  /// How long before the free week ends its one reminder fires.
+  /// How long before the free week ends its one reminder fires. The paid
+  /// month's reminder uses the same lead.
   static const trialLead = Duration(hours: 48);
 
   /// The free week's reminder, or null when there is no trial running or
@@ -182,6 +212,17 @@ class NudgeSchedule {
     final at = trialEnd.subtract(trialLead);
     if (!at.isAfter(now)) return null;
     return Nudge.trialEnding(at: at);
+  }
+
+  /// The paid month's reminder, or null when there is no paid (or earned)
+  /// month running or its 48-hour mark has passed (then the billing-moment
+  /// card carries it). Not a meal question, so it sits outside the
+  /// fourteen-day window, like the free week's.
+  static Nudge? membershipReminder({required DateTime? periodEnd, required DateTime now}) {
+    if (periodEnd == null) return null;
+    final at = periodEnd.subtract(trialLead);
+    if (!at.isAfter(now)) return null;
+    return Nudge.membershipEnding(at: at);
   }
 
   /// Which meals get asked about for a given daily allowance: lunch first,

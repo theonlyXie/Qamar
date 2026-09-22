@@ -2230,6 +2230,76 @@ void main() {
       expect(state.screen, AppScreen.subscription);
     });
 
+    test('a paid month schedules its one reminder 48 hours before it ends, and a tap opens the paywall', () async {
+      final end = DateTime.now().toUtc().add(const Duration(days: 20));
+      final fb = FakeBilling()..current = PlusEntitlement(status: 'active', plan: 'monthly', provider: 'paymob', periodEnd: end);
+      final nudger = MemoryNudger();
+      final a = MemoryAnalytics();
+      final state = backed(billing: fb, nudger: nudger, analytics: a);
+      await settle();
+      await state.setImprove(true);
+      await state.allowNudges();
+      await settle();
+
+      final reminder = nudger.scheduled.where((n) => n.kind == NudgeKind.membershipEnding).single;
+      expect(reminder.at, end.subtract(NudgeSchedule.trialLead));
+      expect(reminder.payload, Nudge.membershipPayload);
+      expect(nudger.scheduled.where((n) => n.kind == NudgeKind.trialEnding), isEmpty, reason: 'a paid month is not a trial');
+
+      await state.setNudgesPerDay(0);
+      expect(nudger.scheduled.map((n) => n.kind).toList(), [NudgeKind.membershipEnding],
+          reason: 'zero meal questions a day does not silence the month’s one reminder');
+
+      nudger.tap(Nudge.membershipPayload);
+      await settle();
+      expect(state.screen, AppScreen.subscription);
+      expect(a.named('membership_reminder_tapped'), hasLength(1));
+    });
+
+    test('a free week never schedules the month’s reminder', () async {
+      final end = DateTime.now().toUtc().add(const Duration(days: 5));
+      final fb = FakeBilling()
+        ..current = PlusEntitlement(status: 'active', plan: 'monthly', provider: 'trial', periodEnd: end, trialEndsAt: end);
+      final nudger = MemoryNudger();
+      final state = backed(billing: fb, nudger: nudger);
+      await settle();
+      await state.allowNudges();
+      expect(nudger.scheduled.where((n) => n.kind == NudgeKind.membershipEnding), isEmpty);
+      expect(nudger.scheduled.where((n) => n.kind == NudgeKind.trialEnding), hasLength(1));
+    });
+
+    test('the billing moment is the week or the month in its last 48 hours, never both', () async {
+      final end = DateTime.now().toUtc().add(const Duration(days: 10));
+      PlusEntitlement paid() => PlusEntitlement(status: 'active', plan: 'monthly', provider: 'paymob', periodEnd: end);
+      final early = backed(billing: FakeBilling()..current = paid(), clock: () => end.subtract(const Duration(days: 3)));
+      await settle();
+      expect(early.billingMoment, BillingMoment.none);
+
+      final late = backed(billing: FakeBilling()..current = paid(), clock: () => end.subtract(const Duration(hours: 30)));
+      await settle();
+      expect(late.billingMoment, BillingMoment.membershipEnding);
+      expect(late.billingMomentDue, isTrue);
+      expect(late.trialEndingSoon, isFalse);
+      final a = MemoryAnalytics();
+      final counted = backed(billing: FakeBilling()..current = paid(), analytics: a, clock: () => end.subtract(const Duration(hours: 30)));
+      await settle();
+      await counted.setImprove(true);
+      counted.openBillingMoment();
+      expect(counted.screen, AppScreen.subscription);
+      expect(a.named('wall_tapped').single['wall'], 'membership_end');
+
+      final trial = backed(
+        billing: FakeBilling()
+          ..current = PlusEntitlement(status: 'active', plan: 'monthly', provider: 'trial', periodEnd: end, trialEndsAt: end),
+        clock: () => end.subtract(const Duration(hours: 30)),
+      );
+      await settle();
+      expect(trial.billingMoment, BillingMoment.trialEnding);
+      expect(trial.membershipEndingSoon, isFalse);
+
+      expect(AppState().billingMoment, BillingMoment.none, reason: 'Lite has no billing moment');
+    });
+
     test('the Today card takes over inside the last 48 hours', () async {
       final end = DateTime.utc(2026, 9, 23, 12);
       final fb = FakeBilling()
