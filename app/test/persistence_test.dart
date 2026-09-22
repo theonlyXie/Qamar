@@ -82,6 +82,12 @@ class FakeProfileRepo implements ProfileRepository {
   /// Each Start the app reported, in order.
   final List<String> starts = [];
 
+  /// When the account began, as the server has it.
+  DateTime? day0;
+
+  @override
+  Future<DateTime?> accountDay0(String userId) async => day0;
+
   @override
   Future<void> recordIntakeStart(String userId, {required String via}) async {
     if (failWith != null) throw failWith!;
@@ -1734,7 +1740,8 @@ void main() {
 
     test('a logged meal is an event with its source and never the food', () async {
       final a = MemoryAnalytics();
-      final state = backed(ai: FakeGateway(), analytics: a);
+      // Eleven in the morning: no meal question is waiting on the orb.
+      final state = backed(ai: FakeGateway(), analytics: a, clock: () => DateTime(2026, 9, 21, 11, 0));
       await state.setImprove(true);
       await settle();
 
@@ -1755,6 +1762,8 @@ void main() {
         'first': true,
         'items': 1,
         'nudged': false,
+        'prompt': 'none',
+        'orb_waiting': false,
         'lang': 'ar',
         'plus': false,
         'backed': true,
@@ -1787,6 +1796,21 @@ void main() {
       final logged = a.named('meal_logged').single;
       expect(logged['nudged'], isTrue);
       expect(logged['source'], 'voice', reason: 'a nudge opens the conversation listening');
+    });
+
+    test('the event carries what started the log: prompt and orb_waiting', () async {
+      final a = MemoryAnalytics();
+      final state = AppState(analytics: a, ai: FakeGateway(), clock: () => DateTime(2026, 9, 21, 14, 30));
+      await state.setImprove(true);
+      state.quickLog(QuickLog.text); // from the tree, while lunch's question waits on the orb
+      await state.sendChatMsg('koshary');
+      await settle();
+      state.confirmProposal();
+      await settle();
+      final logged = a.named('meal_logged').single;
+      expect(logged['prompt'], 'none', reason: 'the tree during the pulse is the habit itself');
+      expect(logged['orb_waiting'], isTrue);
+      expect(logged['nudged'], isFalse);
     });
 
     test('the first use of each gesture is one event', () async {
@@ -1846,6 +1870,129 @@ void main() {
       state.openWallet();
       await settle();
       expect(a.screens, ['progress', 'wallet']);
+    });
+  });
+
+  group('what started a log — the day-30 habit metric’s input (O6)', () {
+    test('a log that began from a tapped push is a push, even when confirmed after the half hour', () async {
+      var now = DateTime(2026, 9, 21, 14, 30);
+      final meals = FakeMealRepo();
+      final nudger = MemoryNudger();
+      final state = backed(meals: meals, nudger: nudger, ai: FakeGateway(), clock: () => now);
+      await settle();
+      nudger.tap('nudge:lunch');
+      await settle();
+      await state.sendChatMsg('koshary');
+      await settle();
+      now = now.add(const Duration(minutes: 40)); // confirmed late: captured at the start, not here
+      state.confirmProposal();
+      await settle();
+      expect(meals.saved.single.prompt, 'push');
+      expect(meals.saved.single.orbWaiting, isTrue, reason: 'lunch’s question was waiting when it started');
+    });
+
+    test('holding the orb while its question waits starts an in-app log, and hears the answer as the meal', () async {
+      final meals = FakeMealRepo();
+      final state = backed(meals: meals, ai: FakeGateway(), clock: () => DateTime(2026, 9, 21, 14, 30));
+      await settle();
+      expect(state.waitingNudge, isNotNull);
+      await state.holdOrb();
+      await state.sendChatMsg('koshary');
+      await settle();
+      expect(state.proposal, isNotNull, reason: 'the answer to the meal question is read as the meal');
+      state.confirmProposal();
+      await settle();
+      expect(meals.saved.single.prompt, 'in_app');
+      expect(meals.saved.single.orbWaiting, isTrue);
+    });
+
+    test('a hold with no question waiting is a conversation, not a log', () async {
+      final state = backed(ai: FakeGateway(), clock: () => DateTime(2026, 9, 21, 11, 0));
+      await settle();
+      expect(state.waitingNudge, isNull);
+      await state.holdOrb();
+      await state.sendChatMsg('is koshary healthy?');
+      await settle();
+      expect(state.proposal, isNull);
+    });
+
+    test('a cold log from the tree outside any meal window is none, with nothing waiting', () async {
+      final meals = FakeMealRepo();
+      final state = backed(meals: meals, ai: FakeGateway(), clock: () => DateTime(2026, 9, 21, 11, 0));
+      await settle();
+      state.quickLog(QuickLog.text);
+      await state.sendChatMsg('koshary');
+      await settle();
+      state.confirmProposal();
+      await settle();
+      expect(meals.saved.single.prompt, 'none');
+      expect(meals.saved.single.orbWaiting, isFalse);
+    });
+
+    test('an abandoned log leaves nothing behind: a later one-tap repeat records its own start', () async {
+      var now = DateTime(2026, 9, 21, 11, 0);
+      final meals = FakeMealRepo();
+      final state = backed(meals: meals, ai: FakeGateway(), clock: () => now);
+      await settle();
+      state.quickLog(QuickLog.voice); // started at 11:00, nothing waiting …
+      state.closeChat(); // … and abandoned
+      now = DateTime(2026, 9, 21, 14, 30);
+      state.repeatMeal(const LoggedMeal(name: 'Koshary', sub: '', kcal: 520, p: 16, c: 96, f: 9));
+      await settle();
+      expect(meals.saved.single.prompt, 'none');
+      expect(meals.saved.single.orbWaiting, isTrue, reason: 'lunch’s question was waiting at 14:30, when this log started');
+    });
+
+    test('the offline queue keeps it: a replayed log still says what started it', () async {
+      final meals = FakeMealRepo()..offline = StateError('no signal');
+      final nudger = MemoryNudger();
+      final prefs = MemoryDevicePrefs();
+      final state = backed(meals: meals, nudger: nudger, prefs: prefs, ai: FakeGateway(), clock: () => DateTime(2026, 9, 21, 14, 30));
+      await settle();
+      nudger.tap('nudge:lunch');
+      await settle();
+      await state.sendChatMsg('koshary');
+      await settle();
+      state.confirmProposal();
+      await settle();
+      expect(meals.saved, isEmpty);
+      expect(state.pendingWrites.single.payload['meal']['prompt'], 'push');
+
+      meals.offline = null;
+      await state.drainPending();
+      expect(meals.saved.single.prompt, 'push');
+      expect(meals.saved.single.orbWaiting, isTrue);
+    });
+
+    test('LoggedMeal carries the start through JSON, and ignores anything it does not know', () {
+      const m = LoggedMeal(name: 'x', sub: '', kcal: 1, p: 0, c: 0, f: 0, prompt: 'in_app', orbWaiting: true);
+      final back = LoggedMeal.fromJson(m.toJson());
+      expect(back.prompt, 'in_app');
+      expect(back.orbWaiting, isTrue);
+      expect(LoggedMeal.fromJson({...m.toJson(), 'prompt': 'maybe'}).prompt, isNull, reason: 'unknown is null, never guessed');
+      expect(LoggedMeal.fromJson(const {'name': 'x'}).prompt, isNull);
+    });
+
+    test('a reinstall that signs back in does not restart the fortnight: the account’s day 0 wins', () async {
+      final profiles = FakeProfileRepo()..day0 = DateTime(2026, 9, 1, 10); // the account began 20 days ago
+      final prefs = MemoryDevicePrefs(); // a fresh install: the phone remembers nothing
+      final nudger = MemoryNudger();
+      final state = backed(profiles: profiles, prefs: prefs, nudger: nudger, clock: () => DateTime(2026, 9, 21, 9, 0));
+      await settle();
+      expect(state.firstDay, DateTime(2026, 9, 1));
+      expect(await prefs.getString('first_day'), DateTime(2026, 9, 1).toIso8601String(), reason: 'remembered on the phone too');
+
+      await state.allowNudges();
+      expect(nudger.scheduled.where((n) => n.kind == NudgeKind.meal), isEmpty, reason: 'day 20: the window closed on day 14');
+    });
+
+    test('a later server day 0 never pushes the phone’s own earlier day back', () async {
+      final profiles = FakeProfileRepo()..day0 = DateTime(2026, 9, 20);
+      final prefs = MemoryDevicePrefs();
+      await prefs.setString('first_day', DateTime(2026, 9, 15).toIso8601String());
+      final state = backed(profiles: profiles, prefs: prefs, clock: () => DateTime(2026, 9, 21, 9, 0));
+      await settle();
+      expect(state.firstDay, DateTime(2026, 9, 15));
     });
   });
 

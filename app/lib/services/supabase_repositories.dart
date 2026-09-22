@@ -142,6 +142,12 @@ class SupabaseProfileRepository implements ProfileRepository {
   }
 
   @override
+  Future<DateTime?> accountDay0(String userId) async {
+    final raw = await _client.rpc('qamar_account_day0');
+    return raw is String ? DateTime.tryParse(raw)?.toLocal() : null;
+  }
+
+  @override
   Future<void> saveProfile(String userId, Profile profile) async {
     await _client.from('profiles').upsert({
       'user_id': userId,
@@ -256,7 +262,7 @@ class SupabaseMealRepository implements MealRepository {
     required LoggedMeal meal,
     List<({ConfirmItemDef def, int qty})> items = const [],
   }) async {
-    await _client.from('meal_logs').insert({
+    final row = <String, dynamic>{
       'user_id': userId,
       'draft_id': draftId,
       'name': meal.name,
@@ -291,7 +297,23 @@ class SupabaseMealRepository implements MealRepository {
       'protein_g': meal.p,
       'carbs_g': meal.c,
       'fat_g': meal.f,
-    });
+      // What started the log (0059): the day-30 habit metric reads it.
+      if (meal.prompt != null) 'prompt': meal.prompt,
+      if (meal.orbWaiting != null) 'orb_waiting': meal.orbWaiting,
+    };
+    try {
+      await _client.from('meal_logs').insert(row);
+    } on PostgrestException catch (e) {
+      // A database that has not had 0059 yet does not know those two
+      // columns. The meal matters more than how it started: write it
+      // without them rather than refusing it.
+      final sentPrompt = row.containsKey('prompt') || row.containsKey('orb_waiting');
+      if (e.code != 'PGRST204' || !sentPrompt) rethrow;
+      row
+        ..remove('prompt')
+        ..remove('orb_waiting');
+      await _client.from('meal_logs').insert(row);
+    }
   }
 
   @override

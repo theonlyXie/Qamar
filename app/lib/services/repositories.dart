@@ -34,6 +34,11 @@ abstract class ProfileRepository {
   /// Start was pressed — [via] is 'chat' or 'scan'. The denominator of
   /// intake completion; the first one on the account is the one kept.
   Future<void> recordIntakeStart(String userId, {required String via});
+
+  /// When this account began (auth.users.created_at, through
+  /// qamar_account_day0): day 0 for the kill metrics and for the phone's
+  /// fourteen-day push window alike. Null when the server cannot say.
+  Future<DateTime?> accountDay0(String userId);
 }
 
 /// The two consents the schema knows (consents.type).

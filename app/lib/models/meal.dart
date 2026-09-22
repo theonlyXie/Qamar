@@ -26,9 +26,28 @@ class LoggedMeal {
 
   /// When it was logged. Null only for rows written before this existed.
   final DateTime? at;
-  const LoggedMeal({required this.name, required this.sub, required this.kcal, required this.p, required this.c, required this.f, this.at});
 
-  Map<String, dynamic> toJson() => {'name': name, 'sub': sub, 'kcal': kcal, 'p': p, 'c': c, 'f': f, if (at != null) 'at': at!.toIso8601String()};
+  /// What started this log, captured when it started (see [LogPrompt]):
+  /// the day-30 habit metric reads it. Null: not known.
+  final String? prompt;
+
+  /// A meal question was waiting on the orb when this log started, whatever
+  /// the path. Null: not known.
+  final bool? orbWaiting;
+
+  const LoggedMeal({required this.name, required this.sub, required this.kcal, required this.p, required this.c, required this.f, this.at, this.prompt, this.orbWaiting});
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'sub': sub,
+        'kcal': kcal,
+        'p': p,
+        'c': c,
+        'f': f,
+        if (at != null) 'at': at!.toIso8601String(),
+        if (prompt != null) 'prompt': prompt,
+        if (orbWaiting != null) 'orb_waiting': orbWaiting,
+      };
 
   factory LoggedMeal.fromJson(Map<String, dynamic> j) => LoggedMeal(
         name: (j['name'] ?? '') as String,
@@ -38,7 +57,26 @@ class LoggedMeal {
         c: (j['c'] as num?)?.round() ?? 0,
         f: (j['f'] as num?)?.round() ?? 0,
         at: j['at'] is String ? DateTime.tryParse(j['at'] as String) : null,
+        prompt: LogPrompt.values.contains(j['prompt']) ? j['prompt'] as String : null,
+        orbWaiting: j['orb_waiting'] is bool ? j['orb_waiting'] as bool : null,
       );
+}
+
+/// What started a meal log — the distinction the day-30 habit metric rests
+/// on (meal_logs.prompt, 0059). Captured when the log starts, because by the
+/// time it is confirmed the orb's waiting question has gone.
+abstract final class LogPrompt {
+  /// A notification was tapped within 30 minutes before the log began.
+  static const push = 'push';
+
+  /// The log began from holding the orb while Qamar's meal question waited.
+  static const inApp = 'in_app';
+
+  /// Everything else — including a log from the tree while the orb pulsed,
+  /// which is the habit itself.
+  static const none = 'none';
+
+  static const values = [push, inApp, none];
 }
 
 enum Confidence { high, med, low }

@@ -109,9 +109,14 @@ class AppState extends ChangeNotifier {
         _clock = clock ?? DateTime.now {
     _watchAccount();
     _watchNudger();
-    _loadDevicePrefs();
+    _devicePrefsLoaded = _loadDevicePrefs();
     if (isBacked) hydrate();
   }
+
+  /// Completes once this phone's own choices have been read. Anything that
+  /// merges a server value with a remembered one waits for it, so the phone's
+  /// answer is read before it can be overwritten.
+  late final Future<void> _devicePrefsLoaded;
 
   /// The phone's notification schedule. Null in tests and where there is
   /// none; then nudges exist only as the orb's pulse.
@@ -181,16 +186,12 @@ class AppState extends ChangeNotifier {
       if (perDay != null) nudgesPerDay = perDay.clamp(0, NudgeSchedule.maxPerDay);
       if (allowed != null) nudgesAllowed = allowed;
       if (promptDone == true) nudgePromptDone = true;
-      // The fourteen-day window of push nudges starts on the phone's first
-      // day with the app, and is remembered so a reinstall does not restart it
-      // on the same phone... which it would; that is acceptable.
-      if (first != null) {
-        firstDay = first;
-      } else {
-        final now = _clock();
-        firstDay = DateTime(now.year, now.month, now.day);
-        await p.setString(_kFirstDay, firstDay!.toIso8601String());
-      }
+      // The fourteen-day window of push nudges starts on the first day this
+      // phone or this account knew the app, whichever is earlier: the phone
+      // remembers its own, and hydrate brings the account's from the server,
+      // so a reinstall that signs back in does not restart the window.
+      final now = _clock();
+      _takeFirstDay(first ?? DateTime(now.year, now.month, now.day));
       _notify();
       _rescheduleNudges();
     } catch (_) {
@@ -431,6 +432,16 @@ class AppState extends ChangeNotifier {
 
       final saved = await _profileRepo?.loadProfile(uid);
       if (saved != null) profile = saved;
+
+      // Day 0 as the server has it — the metrics' day 0 as well. Merged only
+      // after the phone's own first day has been read, so the earlier wins.
+      try {
+        final day0 = await _profileRepo?.accountDay0(uid);
+        await _devicePrefsLoaded;
+        if (day0 != null && _takeFirstDay(day0)) _rescheduleNudges();
+      } catch (_) {
+        // The phone's own first day stands until the server answers.
+      }
 
       try {
         final consent = await _profileRepo?.loadConsent(uid, ConsentType.improve);
@@ -707,6 +718,31 @@ class AppState extends ChangeNotifier {
     final t = _nudgeTappedAt;
     return t != null && _clock().difference(t) < const Duration(minutes: 30);
   }
+
+  /// What started the log in progress, captured when it starts: by the
+  /// time it is confirmed, the orb's waiting question has gone (O6). Every
+  /// way into a log sets it; confirming uses it and clears it.
+  ({String prompt, bool orbWaiting})? _logStart;
+
+  /// A push tapped in the last half hour wins; then a log that began from
+  /// the orb's waiting question; then nothing. Whether a question was
+  /// waiting is recorded whatever the path — a log from the tree while the
+  /// orb pulses is the habit itself, and this is how that is told apart.
+  ({String prompt, bool orbWaiting}) _logStartNow({bool fromWaitingQuestion = false}) => (
+        prompt: _nudgedRecently
+            ? LogPrompt.push
+            : fromWaitingQuestion
+                ? LogPrompt.inApp
+                : LogPrompt.none,
+        orbWaiting: waitingNudge != null,
+      );
+
+  /// Takes the captured start for a log being written now, or captures it.
+  ({String prompt, bool orbWaiting}) _takeLogStart() {
+    final start = _logStart ?? _logStartNow();
+    _logStart = null;
+    return start;
+  }
   WalletTab walletTab = WalletTab.spend;
   bool whyOpen = false;
   final List<String> redeemed = [];
@@ -787,8 +823,20 @@ class AppState extends ChangeNotifier {
   /// The Plan-screen card has been answered, one way or the other.
   bool nudgePromptDone = false;
 
-  /// This phone's first day with the app; the push window counts from here.
+  /// The first day this phone or this account knew the app, whichever is
+  /// earlier (see [_takeFirstDay]); the push window counts from here.
   DateTime? firstDay;
+
+  /// Moves [firstDay] earlier, never later, and remembers it on the phone.
+  /// True when it moved.
+  bool _takeFirstDay(DateTime d) {
+    final day = DateTime(d.year, d.month, d.day);
+    final current = firstDay;
+    if (current != null && !day.isBefore(current)) return false;
+    firstDay = day;
+    _prefs?.setString(_kFirstDay, day.toIso8601String()).catchError((_) {});
+    return true;
+  }
 
   /// When this person eats. Typical hours until their own logs say otherwise.
   MealTimes mealTimes = MealTimes.typical;
@@ -923,6 +971,7 @@ class AppState extends ChangeNotifier {
     if (!payload.startsWith('nudge:')) return;
     final slot = MealSlot.values.asNameMap()[payload.substring(6)] ?? MealSlot.lunch;
     _nudgeTappedAt = _clock();
+    _logStart = _logStartNow();
     _track('nudge_tapped', {'slot': slot.name});
     _openWithNudge(Nudge(slot: slot, at: _clock(), dayIndex: 0));
     _collapseTree();
@@ -1898,6 +1947,8 @@ class AppState extends ChangeNotifier {
     proposal = null;
     proposalQty = [];
     proposalRaw = null;
+    // A log that was abandoned leaves no start behind for the next one.
+    _logStart = null;
     discardPhoto(lastMealPhotoPath);
     lastMealPhotoPath = null;
     _notify();
@@ -2004,7 +2055,18 @@ class AppState extends ChangeNotifier {
     final sub = isAr
         ? 'مسجّل $how${anyLow ? ' · تقدير' : ''}'
         : 'Logged $how${anyLow ? ' · estimate' : ''}';
-    final meal = LoggedMeal(name: name, sub: sub, kcal: totals.kcal, p: totals.p, c: totals.c, f: totals.f, at: _clock());
+    final start = _takeLogStart();
+    final meal = LoggedMeal(
+      name: name,
+      sub: sub,
+      kcal: totals.kcal,
+      p: totals.p,
+      c: totals.c,
+      f: totals.f,
+      at: _clock(),
+      prompt: start.prompt,
+      orbWaiting: start.orbWaiting,
+    );
     final drafted = items.map((it) => (def: it.def, qty: it.q)).toList();
     final raw = proposalRaw;
 
@@ -2012,7 +2074,14 @@ class AppState extends ChangeNotifier {
     meals.add(meal);
     final award = first ? SuEconomy.firstMeal : SuEconomy.mealLogged;
     _credit(award, ar: first ? 'أول وجبة' : 'تأكيد وجبة', en: first ? 'First meal logged' : 'Meal confirmed');
-    _track('meal_logged', {'source': proposalInput, 'first': first, 'items': items.length, 'nudged': _nudgedRecently});
+    _track('meal_logged', {
+      'source': proposalInput,
+      'first': first,
+      'items': items.length,
+      'nudged': start.prompt == LogPrompt.push,
+      'prompt': start.prompt,
+      'orb_waiting': start.orbWaiting,
+    });
     _nudgeTappedAt = null;
     chat.add(ChatTurn(
       who: ChatWho.q,
@@ -3439,6 +3508,9 @@ class AppState extends ChangeNotifier {
 
   void closeChat() {
     chatOpen = false;
+    // Closed with nothing waiting to be confirmed: whatever log began here
+    // was abandoned, and the next one captures its own start.
+    if (proposal == null) _logStart = null;
     _notify();
   }
 
@@ -3722,7 +3794,18 @@ class AppState extends ChangeNotifier {
     if (chatOpen) return;
     _collapseTree();
     final n = waitingNudge;
-    if (n != null) _openWithNudge(n);
+    if (n != null) {
+      // The orb was holding a meal question: the conversation opens on it,
+      // and what they say next is the meal, as when the same question
+      // arrives as a notification. The in-app prompt is recorded here.
+      _logStart = _logStartNow(fromWaitingQuestion: true);
+      _openWithNudge(n);
+      openChat();
+      _loggingMeal = true;
+      proposalInput = 'voice';
+      await tapOrbListen();
+      return;
+    }
     openChat();
     await tapOrbListen();
   }
@@ -3780,6 +3863,10 @@ class AppState extends ChangeNotifier {
   /// Logs [source] again, now, with the same numbers. No model, no
   /// confirmation step: repeating is the two-tap path the blueprint asks for.
   void repeatMeal(LoggedMeal source) {
+    // One tap from the tree: the log starts and ends here, so its start is
+    // now, never one left over from an earlier, abandoned log.
+    _logStart = null;
+    final start = _logStartNow();
     _collapseTree();
     final first = meals.isEmpty;
     final meal = LoggedMeal(
@@ -3790,11 +3877,20 @@ class AppState extends ChangeNotifier {
       c: source.c,
       f: source.f,
       at: _clock(),
+      prompt: start.prompt,
+      orbWaiting: start.orbWaiting,
     );
     meals.add(meal);
     final award = first ? SuEconomy.firstMeal : SuEconomy.mealLogged;
     _credit(award, ar: first ? 'أول وجبة' : 'تأكيد وجبة', en: first ? 'First meal logged' : 'Meal confirmed');
-    _track('meal_logged', {'source': 'recent', 'first': first, 'items': 1, 'nudged': _nudgedRecently});
+    _track('meal_logged', {
+      'source': 'recent',
+      'first': first,
+      'items': 1,
+      'nudged': start.prompt == LogPrompt.push,
+      'prompt': start.prompt,
+      'orb_waiting': start.orbWaiting,
+    });
     _nudgeTappedAt = null;
     chat.add(ChatTurn(
       who: ChatWho.q,
@@ -3890,6 +3986,7 @@ class AppState extends ChangeNotifier {
   ///  * photo — the caller opens the camera first and hands the shot back
   ///    through [logPhotoTaken].
   void quickLog(QuickLog kind) {
+    _logStart = _logStartNow();
     _collapseTree();
     openChat();
 
@@ -3916,6 +4013,7 @@ class AppState extends ChangeNotifier {
   /// analysing page and no confirm page. Three a day are free; the server says
   /// so when they are gone, and the wallet sells a fourth for Su.
   void logPhotoTaken(String path) {
+    _logStart ??= _logStartNow();
     lastMealPhotoPath = path;
     _loggingMeal = false;
     proposalInput = 'photo';

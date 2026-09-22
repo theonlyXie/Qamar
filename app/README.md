@@ -231,17 +231,29 @@ Without the key the SDK is never initialised. With it, three rules hold:
   recorded whichever way it goes.
 - **No person in the events.** Events carry a name, the language, the tier
   and a few small enums or counts (`meal_logged {source, first, items,
-  nudged}`, `meal_read {source, items, ms}`, `intake_started {via}`,
+  nudged, prompt, orb_waiting}`, `meal_read {source, items, ms}`, `intake_started {via}`,
   `intake_step {step}`,
   `orb_gesture_first {gesture}`, `trial_started`, `checkout_opened {plan,
   promo}`, `review_shared`, …). Never a name, a weight, a food, a photo or an
   email. The account id is the identity — the same opaque id the database
   uses.
 - **The kill metrics do not depend on consent.** `qamar_kill_metrics(from, to)`
-  (migration 0047) computes intake completion, day-7 logging, day-30
-  unprompted logging and trial-to-paid from the rows people already write,
-  and pg_cron records them nightly into `kill_metrics_daily` for the last
-  sixty days of sign-ups. Service role only.
+  (migration 0047, replaced as a whole by 0059) computes them from the rows
+  people already write. Day 0 is the install (`auth.users`, created by the
+  anonymous sign-in at launch). The rows are:
+  - intake completion, from the tap on Start (`intake_starts`), and
+    install→Start beside it;
+  - day-7 logging (on day 7, as the blueprint pre-committed), and a week-1
+    window beside it;
+  - day-30 unprompted logging, read from each log's recorded `prompt`
+    (`push`, `in_app` or `none`), and a stricter day-30 cold beside it;
+  - trial-to-paid, overall and by source, read at the trial's end plus 7
+    days;
+  - month-2 retention, counted on the second paid order.
+
+  pg_cron records them nightly into `kill_metrics_daily` for the last sixty
+  days of sign-ups. Service role only. The phone's fourteen-day push window
+  counts from the same server day 0 (`qamar_account_day0`).
 
 Native auto-init is off in `AndroidManifest.xml` and `Info.plist`
 (`com.posthog.posthog.AUTO_INIT = false`), so the plugin cannot start itself
