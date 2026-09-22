@@ -117,7 +117,8 @@ void main() {
     Rect mark(WidgetTester t) => t.getRect(find.byType(HoldCoachMark));
     Rect moon(WidgetTester t) => t.getRect(find.byType(LivingOrb));
     Rect caret(WidgetTester t) => t.getRect(find.byKey(HoldCoachMark.caretKey));
-    Rect pill(WidgetTester t) => t.getRect(find.textContaining('Su'));
+    // The orb's whole box: the moon (its balance pill is gone, O9).
+    Rect pill(WidgetTester t) => t.getRect(find.byKey(OrbNav.orbKey));
 
     Future<void> moveOrb(WidgetTester t, AppState s, double x, double y) async {
       s.setOrbPosition(x, y, maxX: area.width - 96, maxY: area.height - 118);
@@ -135,7 +136,7 @@ void main() {
         expect(c.bottom, lessThanOrEqualTo(o.top), reason: '$where: above the moon, never on it');
         expect(m.bottom, lessThanOrEqualTo(c.bottom), reason: where);
       } else {
-        expect(c.top, greaterThanOrEqualTo(pill(t).bottom), reason: '$where: below the whole orb, Su pill included');
+        expect(c.top, greaterThanOrEqualTo(pill(t).bottom), reason: '$where: below the whole orb');
         expect(m.top, greaterThanOrEqualTo(c.top), reason: where);
       }
     }

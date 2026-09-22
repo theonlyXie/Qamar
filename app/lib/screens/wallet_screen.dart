@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
+import '../widgets/explain.dart';
 
 class WalletScreen extends StatelessWidget {
   const WalletScreen({super.key});
@@ -56,7 +57,11 @@ class WalletScreen extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(isAr ? 'المستوى ${state.level()}' : 'Level ${state.level()}', style: QText.body(size: 11, color: QColors.textFaint)),
+                // Level lives here only (O9): Today keeps one Su chip.
+                Explainable(
+                  id: 'level',
+                  child: Text(isAr ? 'المستوى ${state.iso('${state.level()}')}' : 'Level ${state.level()}', style: QText.body(size: 11, color: QColors.textFaint)),
+                ),
                 Text(t.levelNote, style: QText.body(size: 11, color: QColors.textFaint)),
               ]),
             ],

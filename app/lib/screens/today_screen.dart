@@ -61,42 +61,9 @@ class _TodayScreenState extends State<TodayScreen> {
                 ],
               ),
             ),
-            Row(
-              children: [
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: state.openWallet,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                      decoration: BoxDecoration(border: Border.all(color: QColors.gold.withOpacity(0.4)), borderRadius: BorderRadius.circular(999), color: const Color(0xFF0F1730)),
-                      child: Explainable(
-                        id: 'su_points',
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          const SuCoinIcon(size: 16),
-                          const SizedBox(width: 6),
-                          Text('${state.formatSu(state.suAvailable)}', style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.gold)),
-                        ]),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(border: Border.all(color: QColors.borderSoft), borderRadius: BorderRadius.circular(999), color: QColors.cardDeep),
-                  child: Explainable(
-                    id: 'level',
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.green)),
-                      const SizedBox(width: 8),
-                      Text(state.isAr ? 'المستوى ${state.iso('${state.level()}')}' : 'Level ${state.level()}', style: QText.number(size: 11, weight: FontWeight.w500, color: QColors.textMid)),
-                    ]),
-                  ),
-                ),
-              ],
-            ),
+            // One Su display on Today, and it opens the wallet (O9). Level
+            // lives in the wallet only.
+            if (state.showScore) SuChip(state: state),
           ],
         ),
         const SizedBox(height: 14),
@@ -855,6 +822,47 @@ class _OrbLogHint extends StatelessWidget {
             style: QText.body(size: 11, height: 16, color: QColors.textFaint),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Today's one Su display: a coin and the balance, which opens the wallet
+/// (O9). The chip draws small; its touch area is the full 48 points.
+class SuChip extends StatelessWidget {
+  final AppState state;
+  const SuChip({super.key, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '${state.t.suName}: ${state.formatSu(state.suAvailable)}',
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: state.openWallet,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            child: Center(
+              widthFactor: 1,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                decoration: BoxDecoration(border: Border.all(color: QColors.gold.withOpacity(0.4)), borderRadius: BorderRadius.circular(999), color: const Color(0xFF0F1730)),
+                child: Explainable(
+                  id: 'su_points',
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const SuCoinIcon(size: 16),
+                    const SizedBox(width: 6),
+                    Text(state.formatSu(state.suAvailable), style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.gold)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

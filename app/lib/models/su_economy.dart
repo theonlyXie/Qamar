@@ -71,6 +71,21 @@ class SuEconomy {
       ((lifetime % levelXp) / levelXp * 100).toDouble();
 }
 
+/// One credit, as the orb shows it in passing (O9): a coin and the signed
+/// amount, for [SuReceipt.showFor] after [at], then gone. Never a balance,
+/// and never zero — only something earned makes one.
+class SuReceipt {
+  final int amount;
+  final DateTime at;
+
+  /// Counts credits in this session, so two equal credits in a row still
+  /// each show.
+  final int seq;
+  const SuReceipt({required this.amount, required this.at, required this.seq});
+
+  static const showFor = Duration(seconds: 2);
+}
+
 /// Server-authoritative counters for one bucket: 'photo', 'chat' or 'plan'.
 class AiQuota {
   final String bucket;

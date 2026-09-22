@@ -1,0 +1,174 @@
+// Su on screen (O9): one persistent display, Today's header chip, which
+// opens the wallet; Level in the wallet only; and on the orb, never a
+// balance — a wordless receipt for about two seconds when something is
+// earned.
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+
+import 'package:qamar/l10n/strings.dart';
+import 'package:qamar/main.dart';
+import 'package:qamar/models/activity.dart';
+import 'package:qamar/models/su_economy.dart';
+import 'package:qamar/screens/today_screen.dart';
+import 'package:qamar/state/app_state.dart';
+import 'package:qamar/widgets/common.dart';
+import 'package:qamar/widgets/orb_nav.dart';
+
+import 'support/app_fonts.dart';
+
+const _area = Size(390, 844);
+
+Future<void> _pumpOrb(WidgetTester tester, AppState s) async {
+  await tester.binding.setSurfaceSize(_area);
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(ChangeNotifierProvider.value(
+    value: s,
+    child: MaterialApp(
+      builder: (context, child) => Directionality(
+        textDirection: context.watch<AppState>().isAr ? TextDirection.rtl : TextDirection.ltr,
+        child: child!,
+      ),
+      home: const Scaffold(body: Stack(children: [OrbNav()])),
+    ),
+  ));
+  await tester.pump();
+}
+
+Future<void> _pumpApp(WidgetTester tester, AppState s) async {
+  await tester.binding.setSurfaceSize(_area);
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+  await tester.pump();
+}
+
+Future<void> _earn(AppState s) async {
+  s.chooseActivity(ActivityKind.walk);
+  await s.logActivity(20);
+}
+
+/// Every string drawn inside [of].
+List<String> _texts(WidgetTester t, Finder of) => t
+    .widgetList<RichText>(find.descendant(of: of, matching: find.byType(RichText)))
+    .map((r) => r.text.toPlainText())
+    .toList();
+
+void main() {
+  setUpAll(loadAppFonts);
+
+  group('the orb', () {
+    testWidgets('carries no balance at rest: no number, no name', (tester) async {
+      final s = AppState()..setLang(AppLang.ar);
+      s.go(AppScreen.today);
+      await _pumpOrb(tester, s);
+      expect(find.byType(SuReceiptChip), findsNothing);
+      for (final text in _texts(tester, find.byType(OrbNav))) {
+        expect(text, isNot(matches(RegExp(r'[0-9٠-٩]|Su|نقط'))), reason: 'the orb drew "$text"');
+      }
+    });
+
+    for (final lang in AppLang.values) {
+      testWidgets('a credit shows as a coin and the signed amount, for about two seconds (${lang.name})', (tester) async {
+        final s = AppState()..setLang(lang);
+        s.go(AppScreen.today);
+        await _pumpOrb(tester, s);
+
+        await _earn(s);
+        await tester.pump();
+        final receipt = find.byType(SuReceiptChip);
+        expect(receipt, findsOneWidget);
+        expect(find.descendant(of: receipt, matching: find.byType(SuCoinIcon)), findsOneWidget);
+
+        final texts = _texts(tester, receipt);
+        final amount = lang == AppLang.ar ? '+٥٠' : '+${SuEconomy.activityLogged}';
+        expect(texts.single, contains(amount));
+        expect(texts.single, isNot(matches(RegExp('Su|نقط'))), reason: 'wordless: the coin says what it is');
+        final size = tester.widget<Text>(find.descendant(of: receipt, matching: find.byType(Text))).style!.fontSize!;
+        expect(size, greaterThanOrEqualTo(12));
+
+        await tester.pump(const Duration(milliseconds: 1000));
+        expect(_texts(tester, receipt), isNotEmpty, reason: 'still there at one second');
+        await tester.pump(const Duration(milliseconds: 1100));
+        expect(_texts(tester, receipt), isEmpty, reason: 'gone after two');
+      });
+    }
+
+    testWidgets('the balance arriving from the server is not a receipt', (tester) async {
+      final s = AppState()..setLang(AppLang.en);
+      s.go(AppScreen.today);
+      await _pumpOrb(tester, s);
+      s.suAvailable = 12000; // what a hydrate does
+      s.setLang(AppLang.en); // any rebuild
+      await tester.pump();
+      expect(s.suReceipt, isNull);
+      expect(find.byType(SuReceiptChip), findsNothing);
+    });
+
+    testWidgets('a receipt already shown is not shown again when the orb is rebuilt', (tester) async {
+      var now = DateTime(2026, 9, 22, 12);
+      final s = AppState(clock: () => now)..setLang(AppLang.en);
+      s.go(AppScreen.today);
+      await _pumpOrb(tester, s);
+      await _earn(s);
+      await tester.pump();
+      await tester.pump(SuReceipt.showFor);
+      now = now.add(const Duration(seconds: 3));
+      // Leaving for a screen without the orb and coming back rebuilds it.
+      await tester.pumpWidget(const SizedBox());
+      await _pumpOrb(tester, s);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(_texts(tester, find.byType(SuReceiptChip)), isEmpty);
+    });
+  });
+
+  group('Today and the wallet', () {
+    for (final lang in AppLang.values) {
+      testWidgets('Today carries one Su chip, which opens the wallet, and no Level (${lang.name})', (tester) async {
+        final s = AppState()..setLang(lang);
+        s.go(AppScreen.today);
+        await _pumpApp(tester, s);
+
+        expect(find.byType(SuChip), findsOneWidget);
+        expect(find.textContaining(lang == AppLang.ar ? 'المستوى' : 'Level'), findsNothing);
+        final chip = tester.getSize(find.byType(SuChip));
+        expect(chip.height, greaterThanOrEqualTo(48));
+        expect(chip.width, greaterThanOrEqualTo(48));
+
+        await tester.tap(find.byType(SuChip));
+        await tester.pump();
+        expect(s.screen, AppScreen.wallet);
+      });
+    }
+
+    testWidgets('Level lives in the wallet, in Eastern digits in Arabic', (tester) async {
+      final s = AppState()..setLang(AppLang.ar);
+      s.go(AppScreen.wallet);
+      await _pumpApp(tester, s);
+      // Numbers are wrapped in bidi isolates (state.iso), so read the text
+      // without them.
+      final shown = _texts(tester, find.byType(MaterialApp)).map((t) => t.replaceAll(RegExp('[\u2066-\u2069]'), ''));
+      expect(shown, contains('المستوى ١'));
+    });
+  });
+
+  group('the naming rule', () {
+    test('English: the number and "Su"', () {
+      final s = AppState()..setLang(AppLang.en);
+      expect(s.suAmount(100), '100 Su');
+      expect(s.suAmount(100, signed: true), '+100 Su');
+      expect(s.suAmount(1000), '1,000 Su');
+    });
+
+    test('Arabic: the name, with the number agreement Arabic needs', () {
+      final s = AppState()..setLang(AppLang.ar);
+      String plain(String x) => x.replaceAll(RegExp('[\u2066-\u2069]'), '');
+      expect(plain(s.suAmount(5)), '٥ نقاط Su');
+      expect(plain(s.suAmount(10)), '١٠ نقاط Su');
+      expect(plain(s.suAmount(100)), '١٠٠ نقطة Su');
+      expect(plain(s.suAmount(1000)), '١٬٠٠٠ نقطة Su');
+      expect(plain(s.suAmount(250, signed: true)), '+٢٥٠ نقطة Su');
+      expect(s.suAmount(100), isNot(contains(RegExp('[0-9]'))));
+    });
+  });
+}

@@ -126,7 +126,7 @@ class RamadanScreen extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                isAr ? 'وجبة واحدة كل يوم من الشهر — ${state.iso('500')} نقطة Su لما يكمّل.' : 'One meal logged every day of the month — 500 Su when it is complete.',
+                isAr ? 'وجبة واحدة كل يوم من الشهر — ${state.suAmount(500)} لما يكمّل.' : 'One meal logged every day of the month — ${state.suAmount(500)} when it is complete.',
                 style: QText.body(size: 12, height: 18, color: const Color(0xFFB9A57C)),
               ),
               const SizedBox(height: 10),

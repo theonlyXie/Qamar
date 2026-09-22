@@ -107,7 +107,7 @@ const kExplanations = <String, Explanation>{
   'level': Explanation(
     titleAr: 'المستوى',
     titleEn: 'Level',
-    bodyAr: 'بيتحرك مع إجمالي نقاط Su اللي كسبتها من أول ما بدأت — كل ١٠٠٠ نقطة مستوى. مقياس للاستمرارية مش للوزن، وهي الرقم اللي هيتقارن في لوحة المتصدرين.',
+    bodyAr: 'بيتحرك مع إجمالي نقاط Su اللي كسبتها من أول ما بدأت — كل ١٬٠٠٠ نقطة Su مستوى. مقياس للاستمرارية مش للوزن، وهي الرقم اللي هيتقارن في لوحة المتصدرين.',
     bodyEn: 'Moves with the total Su Points you have earned since you started — 1,000 lifetime Su per level. A measure of consistency, not of weight, and the number a leaderboard will rank.',
     soWhatAr: 'الاستمرار أهم من الكمال. يوم واحد مضبوط أحسن من أسبوع مثالي وبعده انقطاع.',
     soWhatEn: 'Consistency beats perfection. One honest day beats a perfect week followed by quitting.',

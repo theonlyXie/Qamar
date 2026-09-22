@@ -2397,7 +2397,7 @@ class AppState extends ChangeNotifier {
     chat.add(ChatTurn(
       who: ChatWho.q,
       text: isAr ? 'اتسجّلت: ${totals.kcal} سعرة.' : 'Logged: ${totals.kcal} kcal.',
-      sub: isAr ? '+${formatSu(award)} نقطة' : '+${formatSu(award)} Su',
+      sub: suAmount(award, signed: true),
     ));
     proposal = null;
     proposalQty = [];
@@ -3256,6 +3256,35 @@ class AppState extends ChangeNotifier {
     suAvailable += amount;
     suLifetime += amount;
     ledgerExtra.insert(0, LedgerEntry(label: isAr ? ar : en, amount: amount, when: isAr ? 'دلوقتي' : 'Just now'));
+    if (amount > 0) suReceipt = SuReceipt(amount: amount, at: _clock(), seq: (suReceipt?.seq ?? 0) + 1);
+  }
+
+  // ---- Su on screen (O9) ----------------------------------------------------
+  //
+  // One persistent display: Today's header chip, which opens the wallet.
+  // Level lives in the wallet only. The orb never shows a balance; when
+  // points are credited it shows a passing receipt, a coin and "+١٠٠".
+
+  /// Whether anything on screen keeps score: Su, the streak, the quest.
+  /// Always on for now. Seats 3 and 4 own what it means (O4): the "Points and
+  /// streaks" switch in Me turns it off, and everything that keeps score
+  /// reads it through this getter and nothing else.
+  bool get showScore => true;
+
+  /// The last credit in this session, for the orb's receipt. Set only by
+  /// [_credit]: a balance read from the server is not something earned just
+  /// now, so it never makes one.
+  SuReceipt? suReceipt;
+
+  /// Su with a number, in words (the naming rule, O9): "100 Su", and in
+  /// Arabic the name with the number agreement Arabic needs — "٥ نقاط Su",
+  /// "١٠٠ نقطة Su". Where space is tight a coin and the number stand in for
+  /// all of it; where only the name is needed it is `t.suName`.
+  String suAmount(int n, {bool signed = false}) {
+    final sign = signed && n > 0 ? '+' : '';
+    if (!isAr) return '$sign${formatSu(n)} Su';
+    final noun = n.abs() >= 3 && n.abs() <= 10 ? 'نقاط' : 'نقطة';
+    return '${iso('$sign${formatSu(n)}')} $noun Su';
   }
 
   // ---- account -------------------------------------------------
@@ -4251,7 +4280,7 @@ class AppState extends ChangeNotifier {
     chat.add(ChatTurn(
       who: ChatWho.q,
       text: isAr ? 'اتسجّلت تاني: ${meal.kcal} سعرة.' : 'Logged again: ${meal.kcal} kcal.',
-      sub: isAr ? '+${formatSu(award)} نقطة' : '+${formatSu(award)} Su',
+      sub: suAmount(award, signed: true),
     ));
     _notify();
     _rescheduleNudges();

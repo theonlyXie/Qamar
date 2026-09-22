@@ -53,6 +53,16 @@ void main() {
     expect(ar.center.dx, lessThan(_area.width / 2), reason: 'towards the left, the end edge in Arabic');
   });
 
+  testWidgets('with no balance pill under it, the moon itself is the exact mirror', (tester) async {
+    final s = AppState()..setLang(AppLang.en);
+    s.go(AppScreen.today);
+    await _pump(tester, s);
+    final en = _moon(tester).center.dx;
+    s.setLang(AppLang.ar);
+    await tester.pump();
+    expect(_moon(tester).center.dx, moreOrLessEquals(_area.width - en, epsilon: 0.01));
+  });
+
   for (final lang in AppLang.values) {
     testWidgets('a drag moves the orb under the finger (${lang.name})', (tester) async {
       final s = AppState()..setLang(lang);
