@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
+import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/state/today_focus.dart';
@@ -63,6 +64,32 @@ void main() {
     s.openWeekCard();
     expect(s.screen, AppScreen.progress);
     expect(todayCardDue(s, TodayCard.weekCard), isFalse, reason: 'seen: it leaves the slot');
+  });
+
+  test('opened, it stays away the rest of that Friday, across a restart; the next Friday it is back', () async {
+    final prefs = MemoryDevicePrefs();
+    AppState launch(DateTime now) {
+      final s = AppState(prefs: prefs, clock: () => now)..setLang(AppLang.en);
+      final today = DateTime(now.year, now.month, now.day);
+      for (var back = 1; back <= 3; back++) {
+        s.dayHistory.add(DayTotals(day: today.subtract(Duration(days: back)), kcal: 1800, meals: 2));
+      }
+      return s;
+    }
+
+    final first = launch(_friday);
+    await Future<void>.delayed(Duration.zero);
+    expect(first.weekCardDue, isTrue);
+    first.openWeekCard();
+    await Future<void>.delayed(Duration.zero);
+
+    final restarted = launch(_friday.add(const Duration(hours: 3)));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(restarted.weekCardDue, isFalse, reason: 'the same Friday, after a restart');
+
+    final nextWeek = launch(_friday.add(const Duration(days: 7)));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(nextWeek.weekCardDue, isTrue, reason: 'a new review day');
   });
 
   for (final lang in AppLang.values) {

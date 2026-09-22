@@ -171,6 +171,7 @@ class AppState extends ChangeNotifier {
   static const _kAdherence = 'adherence_consent';
   static const _kRamadanAsked = 'ramadan_asked';
   static const _kHoldCoachSeen = 'hold_coach_seen';
+  static const _kWeekCardSeen = 'week_card_seen';
 
   Future<void> _loadDevicePrefs() async {
     final p = _prefs;
@@ -187,11 +188,13 @@ class AppState extends ChangeNotifier {
       final adherence = await p.getBool(_kAdherence);
       if (adherence != null) adherenceShare = adherence;
       final asked = await p.getString(_kRamadanAsked);
+      final weekSeen = await p.getString(_kWeekCardSeen);
       final invite = await p.getString(_kPendingInvite);
       if (_disposed) return;
       // A code from an earlier launch is still waiting to be redeemed.
       if (invite != null && invite.trim().isNotEmpty) pendingInvitationCode ??= invite.trim();
       if (asked != null) ramadanAskedFor = asked;
+      if (weekSeen != null) _weekCardSeenDay = weekSeen;
       if (reviewNumbers != null) reviewShowNumbers = reviewNumbers;
       if (consent != null) {
         // Answered before on this phone: a yes sends what waited, a no drops it.
@@ -3943,7 +3946,7 @@ class AppState extends ChangeNotifier {
   // Friday, the Egyptian weekend, is review day: once three days of the week
   // are logged, Today's slot carries the week's one line the person did not
   // expect, with the way to the whole card on Progress. Opened, it leaves
-  // the slot for the day.
+  // the slot for the day, and that is remembered across a restart.
 
   String? _weekCardSeenDay;
 
@@ -3953,6 +3956,8 @@ class AppState extends ChangeNotifier {
   /// "See the week": the whole card, on Progress.
   void openWeekCard() {
     _weekCardSeenDay = _dayKey();
+    // Kept on the phone: a restart the same Friday does not bring it back.
+    _prefs?.setString(_kWeekCardSeen, _weekCardSeenDay!).catchError((_) {});
     _track('week_card_opened');
     go(AppScreen.progress);
   }
