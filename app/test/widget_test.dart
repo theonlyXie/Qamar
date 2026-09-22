@@ -72,8 +72,8 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(_app(state));
 
-    // A meal on the day, repeated once so the conversation carries the
-    // confirm line ("اتسجّلت تاني: … سعرة").
+    // A meal on the day, repeated once so the conversation carries Qamar's
+    // reply to it, with its numbers ("٥٢٠ سعرة، وفاضل …").
     final meal = LoggedMeal(name: 'فول بالعيش', sub: 'بالصوت · تقدير', kcal: 520, p: 22, c: 64, f: 18, at: DateTime.now());
     state.meals.add(meal);
     state.repeatMeal(meal);

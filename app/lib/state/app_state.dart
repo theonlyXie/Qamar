@@ -35,6 +35,7 @@ import '../models/invitation.dart';
 import '../widgets/explain.dart';
 import '../models/profile.dart';
 import '../models/ramadan.dart';
+import '../models/reply.dart';
 import '../models/review.dart';
 import '../models/water.dart';
 import 'chat_replies.dart';
@@ -2562,7 +2563,9 @@ class AppState extends ChangeNotifier {
     _nudgeTappedAt = null;
     chat.add(ChatTurn(
       who: ChatWho.q,
-      text: isAr ? 'اتسجّلت: ${iso('${totals.kcal}')} سعرة.' : 'Logged: ${totals.kcal} kcal.',
+      // What this meal does to the day, in words that change with the day
+      // (O3). The points are the wallet's to show, not Qamar's to say.
+      text: replyFor(meal, dayNumbers(), ar: isAr, iso: iso),
       sub: suAmount(award, signed: true),
     ));
     proposal = null;
@@ -4047,6 +4050,45 @@ class AppState extends ChangeNotifier {
   ///
   /// Chosen by the clock rather than by a fixed index: the Today screen used
   /// to show lunch at every hour of the day, including at ten at night.
+  /// The day as it stands, for Qamar's words about it (O3): what is eaten
+  /// against the target, the hour, and the next planned meal still ahead.
+  DayNumbers dayNumbers() {
+    final con = consumed();
+    final tg = target();
+    return DayNumbers(
+      kcal: con.kcal,
+      targetKcal: tg.kcal,
+      protein: con.p,
+      targetProtein: tg.protein,
+      hour: _clock().hour,
+      next: _plannedAhead(),
+      ahead: _slotsAhead(),
+    );
+  }
+
+  /// The meal slots still ahead today by the clock, not yet eaten.
+  List<MealSlot> _slotsAhead() {
+    final order = fasting ? const [MealSlot.iftar, MealSlot.suhoor] : const [MealSlot.breakfast, MealSlot.lunch, MealSlot.dinner];
+    final at = order.indexOf(slotForHour(_clock().hour, fasting: fasting));
+    final eaten = slotsLoggedToday;
+    return [for (final slot in order.skip(at + 1)) if (!eaten.contains(slot)) slot];
+  }
+
+  /// The first planned meal in a later slot today that has not been eaten.
+  ({String nameAr, String nameEn, int kcal})? _plannedAhead() {
+    final order = fasting ? const [MealSlot.iftar, MealSlot.suhoor] : const [MealSlot.breakfast, MealSlot.lunch, MealSlot.dinner];
+    final at = order.indexOf(slotForHour(_clock().hour, fasting: fasting));
+    final eaten = slotsLoggedToday;
+    final planned = planMeals();
+    for (final slot in order.skip(at + 1)) {
+      if (eaten.contains(slot)) continue;
+      for (final m in planned) {
+        if (m.id == slot.name) return (nameAr: m.nameAr, nameEn: m.nameEn, kcal: mealKcal(m));
+      }
+    }
+    return null;
+  }
+
   PlanMeal? nextMeal() {
     final meals = planMeals();
     if (meals.isEmpty) return null;
@@ -4717,7 +4759,7 @@ class AppState extends ChangeNotifier {
     _nudgeTappedAt = null;
     chat.add(ChatTurn(
       who: ChatWho.q,
-      text: isAr ? 'اتسجّلت تاني: ${iso('${meal.kcal}')} سعرة.' : 'Logged again: ${meal.kcal} kcal.',
+      text: replyFor(meal, dayNumbers(), ar: isAr, iso: iso),
       sub: suAmount(award, signed: true),
     ));
     _notify();

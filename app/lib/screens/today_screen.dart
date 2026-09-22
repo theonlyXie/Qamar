@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/plan.dart';
+import '../models/reply.dart';
 import '../models/streak.dart';
 import '../models/su_economy.dart';
 import '../models/water.dart';
@@ -172,8 +173,10 @@ class TodayStreakLine extends StatelessWidget {
   final night = state.nightSentence;
   if (!logged && night != null && night.isNotEmpty) return (text: night, fromNight: true);
   return (
+    // Once something is logged, the day read in words (O3): the same reading
+    // Qamar gives after each meal, so it changes when the day does.
     text: logged
-        ? (isAr ? 'سجّلت وجبة النهاردة. باقي عشا خفيف فيه بروتين ونكون قفلنا اليوم صح.' : 'You logged a meal today. A light protein dinner closes the day well.')
+        ? dayLineFor(state.dayNumbers(), ar: isAr, iso: state.iso)
         : (isAr ? 'أهم حاجة النهاردة: تسجّل أول وجبة. الباقي أنا هظبطه معاك.' : 'The one thing today: log your first meal. I’ll handle the rest with you.'),
     fromNight: false,
   );

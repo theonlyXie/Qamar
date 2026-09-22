@@ -45,6 +45,7 @@ import {
   toPacketFacts,
   type Resolution,
 } from "./graph.ts";
+import { graphMealNote, modelMealNote } from "./notes.ts";
 import { classify, refusalText } from "./scope.ts";
 import {
   loadHardConstraints,
@@ -707,17 +708,6 @@ function mealClaims(items: MealItem[]): unknown[] {
   }));
 }
 
-function graphMealNote(lang: "ar" | "en", items: MealItem[]): string {
-  if (items.length === 0) {
-    return lang === "ar"
-      ? "مقدرتش ألاقي الأكل ده في قاعدة البيانات. جرّب اسم أوضح. تصوير الطبق لـ Qamar+."
-      : "I could not match that to a food we know. Try a clearer name. Photographing a plate is Qamar+.";
-  }
-  return lang === "ar"
-    ? "الأرقام من قاعدة الأكل، مش من الموديل. ظبّط الكميات قبل ما تأكد."
-    : "These numbers come from the food database, not the model. Adjust the amounts before you confirm.";
-}
-
 /**
  * Prices a typed or spoken meal from the food graph only.
  *
@@ -1023,7 +1013,8 @@ async function analyzeMeal(
     // How much of this meal the log will actually be able to speak for. The
     // confirmation screen should say so when it is not all of it.
     identified: identities.filter((x) => x.qamarFoodId && x.grams).length,
-    note: (lang === "ar" ? parsed.note_ar : parsed.note_en) ?? null,
+    // Never about the score: a note that talks points is dropped (notes.ts).
+    note: modelMealNote(lang === "ar" ? parsed.note_ar : parsed.note_en),
     quota: quotaPayload(shown),
     sources,
     // What the graph made of each phrase: the canonical food, the portion it
