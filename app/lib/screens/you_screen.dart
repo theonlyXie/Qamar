@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
+import '../widgets/orb_gesture_guide.dart';
 import '../widgets/moon.dart';
 
 class YouScreen extends StatelessWidget {
@@ -155,6 +156,10 @@ class YouScreen extends StatelessWidget {
         ],
         const SizedBox(height: 14),
         _InvitationsCard(state: state),
+        const SizedBox(height: 14),
+        // The moon's gestures, for good: the tutorial on Today can be put
+        // away, and this is where to look them up again.
+        OrbGestureGuide(state: state, dismissible: false),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
