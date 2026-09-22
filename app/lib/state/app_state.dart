@@ -3870,7 +3870,9 @@ class AppState extends ChangeNotifier {
     final left = aiQuota.remaining;
     if (left >= 2) return '';
     if (left == 1) return isAr ? 'آخر سؤال النهارده' : 'Last question today';
-    return isAr ? 'خلصت أسئلة النهارده · لسه تقدر تسجّل أكلك' : 'No questions left today · you can still log your meals';
+    // Short enough to stay whole in the one-line header on a 390pt phone,
+    // at the 12pt it is set in: cut short it would lose what still works.
+    return isAr ? 'خلصت أسئلة النهارده · لسه تقدر تسجّل أكلك' : 'No questions left today · you can still log meals';
   }
 
   /// Today's allowance in full, for Me: questions and photos left of the

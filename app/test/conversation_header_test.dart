@@ -3,6 +3,7 @@
 // count is in Me. Every Arabic number is drawn in Eastern digits.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -15,6 +16,7 @@ import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/ask_qamar_overlay.dart';
 import 'package:qamar/widgets/explain.dart';
 
+import 'support/app_fonts.dart';
 import 'support/arabic_digits.dart';
 
 /// Enough of a gateway for the assistant to exist; nothing here calls it.
@@ -45,6 +47,8 @@ Future<void> _pumpChat(WidgetTester tester, AppState s) async {
 }
 
 void main() {
+  setUpAll(loadAppFonts);
+
   group('the quota line', () {
     test('is empty while two or more questions are left, in both languages', () {
       for (final lang in AppLang.values) {
@@ -60,7 +64,7 @@ void main() {
     });
 
     test('at none, says what still works, with no number', () {
-      expect(_state(AppLang.en, left: 0).quotaLine, 'No questions left today · you can still log your meals');
+      expect(_state(AppLang.en, left: 0).quotaLine, 'No questions left today · you can still log meals');
       expect(_state(AppLang.ar, left: 0).quotaLine, 'خلصت أسئلة النهارده · لسه تقدر تسجّل أكلك');
       for (final lang in AppLang.values) {
         for (final left in [0, 1]) {
@@ -90,6 +94,26 @@ void main() {
         s.setLang(lang); // rebuild
         await tester.pump(const Duration(milliseconds: 400));
         expect(find.text(ar ? 'آخر سؤال النهارده' : 'Last question today'), findsOneWidget);
+      });
+    }
+
+    for (final lang in AppLang.values) {
+      testWidgets('the line at none fits the header whole on a 390pt phone (${lang.name})', (tester) async {
+        await tester.binding.setSurfaceSize(const Size(390, 844));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final s = _state(lang, left: 0);
+        await _pumpChat(tester, s);
+        final line = find.text(s.quotaLine);
+        expect(line, findsOneWidget);
+        final paragraph = tester.renderObject<RenderParagraph>(line);
+        expect(paragraph.didExceedMaxLines, isFalse, reason: 'cut short, the line loses what still works: "${s.quotaLine}"');
+        // Seat 6 sets the line at 12pt: it has to fit there too.
+        final at12 = TextPainter(
+          text: TextSpan(text: s.quotaLine, style: paragraph.text.style!.copyWith(fontSize: 12)),
+          textDirection: s.isAr ? TextDirection.rtl : TextDirection.ltr,
+          maxLines: 1,
+        )..layout(maxWidth: paragraph.constraints.maxWidth);
+        expect(at12.didExceedMaxLines, isFalse, reason: 'at 12pt');
       });
     }
 
