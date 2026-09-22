@@ -2849,7 +2849,8 @@ void main() {
       await settle();
       hours.setLang(AppLang.en);
       expect(hours.trialEndsIn(), 'in 5 hours');
-      hours.openTrialEnd();
+      // Today's billing card (BillingMomentCard) is the free week's end now.
+      hours.openBillingMoment();
       expect(hours.screen, AppScreen.subscription);
     });
   });

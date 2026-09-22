@@ -3123,10 +3123,6 @@ class AppState extends ChangeNotifier {
     return isAr ? 'خلال ${iso('$h')} ساعة' : 'in $h hour${h == 1 ? '' : 's'}';
   }
 
-  void openTrialEnd() {
-    _track('wall_tapped', {'wall': 'trial_end'});
-    go(AppScreen.subscription);
-  }
 
   /// True in the last 48 hours of a paid or earned month. Nothing renews on
   /// its own, so this and its push are the only word a member gets.
