@@ -1772,6 +1772,24 @@ void main() {
       expect(a.events[1].name, 'intake_started');
     });
 
+    test('welcome taps before Start are tracked once each, so 60 of them never push intake_started out', () async {
+      final a = MemoryAnalytics();
+      final state = AppState(analytics: a);
+      for (var i = 0; i < 60; i++) {
+        state.openWelcomeDishes();
+        state.welcomeDishShown(kEgyptianDishes.firstWhere((d) => d.id == kWelcomeDishIds[i % kWelcomeDishIds.length]));
+      }
+      state.startOnboarding();
+      await settle();
+      expect(state.heldEvents, lessThan(AppState.heldEventCap), reason: 'room is left for the consultation');
+
+      await state.setImprove(true);
+      await settle();
+      expect(a.named('intake_started'), hasLength(1), reason: 'the funnel’s first event still goes out');
+      expect(a.named('welcome_dishes_opened'), hasLength(1), reason: 'once a session');
+      expect(a.named('dish_shown'), hasLength(kWelcomeDishIds.length), reason: 'once for each dish');
+    });
+
     test('an answer given earlier on this phone decides at once: a no never holds anything', () async {
       final prefs = MemoryDevicePrefs();
       await prefs.setBool('improve_consent', false);

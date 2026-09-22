@@ -2142,13 +2142,20 @@ class AppState extends ChangeNotifier {
   /// The welcome's dishes are open: ask the graph for their numbers, once.
   /// Only the dishes' slugs are sent, nothing about the person.
   void openWelcomeDishes() {
-    _track('welcome_dishes_opened');
+    // Once a session, and a dish once each: these come before Start, and the
+    // pre-consent buffer keeps only the earliest 50, so a burst of taps must
+    // never push intake_started out of it.
+    if (_welcomeTracked.add('opened')) _track('welcome_dishes_opened');
     ensureDishFacts().then((_) => _notify());
   }
+
+  /// Welcome events already tracked this session: 'opened' and dish ids.
+  final Set<String> _welcomeTracked = {};
 
   /// A dish chosen on the welcome, before any question (O5). The event names
   /// no food, as at the reveal.
   void welcomeDishShown(EgyptianDish dish) {
+    if (!_welcomeTracked.add('dish:${dish.id}')) return;
     _track('dish_shown', {'placement': 'welcome', 'live': dishFactsFor(dish).live});
   }
 

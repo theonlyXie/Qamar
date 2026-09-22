@@ -81,6 +81,8 @@ void main() {
         final sub = find.text(s.t.chatDirectSub);
         expect(sub, findsOneWidget);
         expect(s.t.chatDirectSub, contains(lang == AppLang.ar ? 'أكلة' : 'dish'), reason: 'it names what opens');
+        expect(s.t.chatDirectSub, isNot(contains(lang == AppLang.ar ? 'دقيق' : 'minute')),
+            reason: 'both languages promise the same; the button says how long');
         final paragraph = tester.renderObject<RenderParagraph>(find.descendant(of: sub, matching: find.byType(RichText)));
         expect(paragraph.didExceedMaxLines, isFalse, reason: 'a promise cut short is not a promise');
       });

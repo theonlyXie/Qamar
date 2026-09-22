@@ -261,7 +261,7 @@ class QStrings {
     boundary: 'إرشاد عام بالذكاء الاصطناعي للصحة اليومية. مش بديل عن استشارة طبية.',
     startNow: 'ابدأ دلوقتي', haveAccount: 'عندي حساب بالفعل',
     guestNote: 'من غير تسجيل. نقدر نحفظ تقدمك بعدين.',
-    chatDirect: 'اتكلم مع قمر', chatDirectSub: 'أكلة مصرية الأول، وبعدين هدفك في دقيقتين',
+    chatDirect: 'اتكلم مع قمر', chatDirectSub: 'أكلة مصرية الأول، وبعدين هدفك',
     scanInbody: 'امسح تقرير InBody', scanInbodySub: 'صوّر التقرير وهنقرأ أرقامك',
     scanTitle: 'مسح تقرير InBody', scanHint: 'حط الصفحة الأولى جوه الإطار',
     scanPriv: 'الصورة بتتحلل وقتها وما بتتخزنش.', reading: 'بنقرأ التقرير…', continueWith: 'أو سجّل بحساب',
