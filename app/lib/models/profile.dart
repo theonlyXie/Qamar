@@ -10,6 +10,46 @@ enum Gender { male, female }
 /// night job on the server writes the right kind of day.
 enum FastingMode { none, ramadan }
 
+/// The consultation's safety answer. Anything but [none] means Qamar does not
+/// set a calorie target or write a plan — those are for a qualified
+/// professional — and the person continues into the app on general guidance:
+/// what is in a meal, and general questions.
+///
+/// Pregnancy and breastfeeding reach the server as `profiles.life_stage`
+/// ('pregnant' / 'lactating', 0007), where the gateway refuses plans and
+/// answers chat in the condition-aware scope. A chronic condition has no
+/// column on the server; without a target row the gateway refuses plans for
+/// it too (`no target yet`).
+enum SafetyAnswer {
+  none,
+  pregnant,
+  breastfeeding,
+  chronic;
+
+  /// The consultation chip's value.
+  static SafetyAnswer fromValue(Object? v) => switch (v) {
+        'pregnant' => pregnant,
+        'breastfeeding' => breastfeeding,
+        'chronic' => chronic,
+        _ => none,
+      };
+
+  /// profiles.life_stage for this answer.
+  String get lifeStage => switch (this) {
+        pregnant => 'pregnant',
+        breastfeeding => 'lactating',
+        _ => 'none',
+      };
+
+  /// Read back from the server. A chronic condition is not stored there, so
+  /// it cannot come back this way.
+  static SafetyAnswer fromLifeStage(Object? v) => switch (v) {
+        'pregnant' => pregnant,
+        'lactating' => breastfeeding,
+        _ => none,
+      };
+}
+
 class Profile {
   final String name;
 
@@ -28,6 +68,7 @@ class Profile {
   final double activity;
   final List<String> prefs;
   final FastingMode fasting;
+  final SafetyAnswer safety;
 
   const Profile({
     this.name = '',
@@ -42,6 +83,7 @@ class Profile {
     this.activity = 1.5,
     this.prefs = const [],
     this.fasting = FastingMode.none,
+    this.safety = SafetyAnswer.none,
   });
 
   /// Whole years elapsed, counting the birthday as it actually falls rather
@@ -83,6 +125,7 @@ class Profile {
     double? activity,
     List<String>? prefs,
     FastingMode? fasting,
+    SafetyAnswer? safety,
   }) {
     var year = birthYear ?? this.birthYear;
     if (age != null && birthYear == null) {
@@ -106,6 +149,7 @@ class Profile {
       activity: activity ?? this.activity,
       prefs: prefs ?? this.prefs,
       fasting: fasting ?? this.fasting,
+      safety: safety ?? this.safety,
     );
   }
 }

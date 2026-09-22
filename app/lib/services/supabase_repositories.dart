@@ -119,6 +119,7 @@ class SupabaseProfileRepository implements ProfileRepository {
       activity: (row['activity_factor'] as num?)?.toDouble() ?? 1.5,
       prefs: (row['food_exclusions'] as List?)?.cast<String>() ?? const [],
       fasting: (row['fasting_mode'] as String?) == 'ramadan' ? FastingMode.ramadan : FastingMode.none,
+      safety: SafetyAnswer.fromLifeStage(row['life_stage']),
     );
   }
 
@@ -163,6 +164,9 @@ class SupabaseProfileRepository implements ProfileRepository {
       'activity_factor': profile.activity,
       'food_exclusions': profile.prefs,
       'fasting_mode': profile.fasting.name,
+      // Where the gateway reads pregnancy and breastfeeding (0007): it then
+      // refuses plans and answers in the condition-aware scope.
+      'life_stage': profile.safety.lifeStage,
     });
   }
 

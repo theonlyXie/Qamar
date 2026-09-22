@@ -123,8 +123,8 @@ class ProgressScreen extends StatelessWidget {
                         ? 'لسه مفيش وجبات مسجلة الأسبوع ده. أول ما تسجّل، الأرقام تظهر هنا.'
                         : 'Nothing logged this week yet. The numbers appear here as soon as you log.')
                     : (isAr
-                        ? '${state.iso('$active')} ${active == 1 ? 'يوم' : 'أيام'} نشاط · ${state.iso('$logged')} وجبة مسجلة · ${state.iso('$inRange')} من ${state.iso('$active')} داخل النطاق'
-                        : '$active active ${active == 1 ? 'day' : 'days'} · $logged ${logged == 1 ? 'meal' : 'meals'} logged · $inRange of $active in target range'),
+                        ? '${state.iso('$active')} ${active == 1 ? 'يوم' : 'أيام'} نشاط · ${state.iso('$logged')} وجبة مسجلة${state.generalGuidance ? '' : ' · ${state.iso('$inRange')} من ${state.iso('$active')} داخل النطاق'}'
+                        : '$active active ${active == 1 ? 'day' : 'days'} · $logged ${logged == 1 ? 'meal' : 'meals'} logged${state.generalGuidance ? '' : ' · $inRange of $active in target range'}'),
                 style: QText.body(size: 14, height: 22, color: QColors.textHigh),
               ),
             ],
@@ -141,8 +141,10 @@ class ProgressScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(t.activeDays, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
-                  Text(isAr ? 'الهدف ${state.iso('$target')}' : 'target $target',
-                      style: QText.number(size: 10, color: QColors.textFaint)),
+                  // No target is set on the general-guidance route, so none is named.
+                  if (!state.generalGuidance)
+                    Text(isAr ? 'الهدف ${state.iso('$target')}' : 'target $target',
+                        style: QText.number(size: 10, color: QColors.textFaint)),
                 ],
               ),
               const SizedBox(height: 12),

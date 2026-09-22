@@ -1394,13 +1394,15 @@ void main() {
     final state = backed(profiles: profiles);
     await settle();
 
+    final dob = kOnboardingSteps.indexWhere((s) => s.id == 'dob');
+    state.step = dob;
     state.profile = state.profile.copyWith(age: 30);
     state.primarySubmit();
     await Future<void>.delayed(const Duration(milliseconds: 400));
 
     expect(state.syncError, isNotNull, reason: 'the failure must be visible, not swallowed');
     expect(state.profile.age, 30, reason: 'the local answer must survive');
-    expect(state.step, greaterThan(0), reason: 'onboarding must not stall on a failed write');
+    expect(state.step, greaterThan(dob), reason: 'onboarding must not stall on a failed write');
   });
 
   test('a backend that throws on load still yields a usable app', () async {
@@ -1683,6 +1685,19 @@ void main() {
       expect(state.improveAnswered, isTrue);
       expect(state.heldEvents, 0);
       expect(a.events, isEmpty);
+    });
+
+    test('a pregnancy answer is saved with the profile, where it becomes the life stage the gateway enforces', () async {
+      final profiles = FakeProfileRepo();
+      final state = backed(profiles: profiles);
+      await settle();
+      state.startOnboarding();
+      await answerConsent(state, 'yes');
+      state.pickOption(kOnboardingSteps[1].options.firstWhere((o) => o.value == 'pregnant'));
+      await Future<void>.delayed(const Duration(milliseconds: 1000));
+      expect(profiles.stored?.safety, SafetyAnswer.pregnant);
+      expect(profiles.stored!.safety.lifeStage, 'pregnant', reason: 'what saveProfile writes to profiles.life_stage');
+      expect(profiles.targetSaves, 0, reason: 'no target is ever written on this route');
     });
 
     test('pressing Start is written to the account at the tap, once, before any answer', () async {

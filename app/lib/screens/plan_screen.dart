@@ -125,7 +125,9 @@ class _PlanEmpty extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            busy
+            state.generalGuidance
+                ? state.generalGuidancePlanNote
+                : busy
                 ? (isAr ? 'بكتب خطة اليوم…' : 'Writing today’s plan…')
                 : state.planError ??
                     (isAr
@@ -133,14 +135,17 @@ class _PlanEmpty extends StatelessWidget {
                         : 'No plan for today yet. I’ll build it around your target and what you avoid.'),
             style: QText.body(size: 14, height: 22, color: QColors.textHigh),
           ),
-          const SizedBox(height: 14),
-          QPrimaryButton(
-            label: busy
-                ? (isAr ? 'ثانية…' : 'One moment…')
-                : (isAr ? 'اعملي خطة النهاردة' : 'Build today’s plan'),
-            onTap: busy ? null : () => state.ensurePlan(force: true),
-            height: 48,
-          ),
+          // No button on the general-guidance route: it could only be refused.
+          if (!state.generalGuidance) ...[
+            const SizedBox(height: 14),
+            QPrimaryButton(
+              label: busy
+                  ? (isAr ? 'ثانية…' : 'One moment…')
+                  : (isAr ? 'اعملي خطة النهاردة' : 'Build today’s plan'),
+              onTap: busy ? null : () => state.ensurePlan(force: true),
+              height: 48,
+            ),
+          ],
         ],
       ),
     );

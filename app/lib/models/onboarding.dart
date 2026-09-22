@@ -15,33 +15,42 @@ class OnboardingStep {
   final String askAr;
   final String askEn;
   final List<StepOption> options;
+
+  /// The same question asked on the general-guidance route, where its usual
+  /// reason (the calorie maths) does not apply. Null: asked the same way.
+  final String? generalAr;
+  final String? generalEn;
+
   const OnboardingStep({
     required this.id,
     required this.kind,
     required this.askAr,
     required this.askEn,
     this.options = const [],
+    this.generalAr,
+    this.generalEn,
   });
+
+  String ask(bool isAr, {bool general = false}) =>
+      general && generalAr != null ? (isAr ? generalAr! : generalEn!) : (isAr ? askAr : askEn);
 }
 
-/// Date of birth → consent → name → gender → body numbers → goal → activity
-/// → food exclusions → safety gate. The prototype's S06 "are you 18+" chip pair
-/// is now a real birth date, and sex is asked outright because the resting-
-/// metabolism equation needs it.
+/// Consent → safety → name → goal → date of birth → sex → body numbers →
+/// activity → food exclusions.
+///
+/// Consent comes before any personal data. The safety question comes next, so
+/// an answer that rules out a calorie target changes the rest of the
+/// conversation instead of ending it (see [kGeneralGuidanceSkips]). The goal
+/// comes before the numbers, so the questions after it have a reason. The 18+
+/// gate is the date step, and it comes before any target on either route.
 final List<OnboardingStep> kOnboardingSteps = [
-  OnboardingStep(
-    id: 'dob',
-    kind: StepKind.date,
-    askAr: 'أهلاً 👋 أنا قمر. هساعدك تاكل أحسن من غير رجيم قاسي. أول حاجة: تاريخ ميلادك إيه؟ (بيحدد أهليتك وبيدخل في حساب السعرات)',
-    askEn: 'Hi, I’m Qamar. I’ll help you eat better without a punishing diet. First: what’s your date of birth? (it sets your eligibility and feeds the calorie maths)',
-  ),
   OnboardingStep(
     id: 'consent',
     kind: StepKind.chips,
     askAr:
-        'تمام. الخدمة دي إرشاد عام بالذكاء الاصطناعي ومش استشارة طبية. لازم أعالج بياناتك اللي بتدخلها عشان أحسب الهدف — ودي حاجة أساسية. وفي اختيار تاني منفصل: تسمح نشوف إزاي بتستخدم التطبيق — من غير أكلك ولا وزنك ولا اسمك — عشان نحسّن قمر؟',
+        'أهلاً 👋 أنا قمر. هساعدك تاكل أحسن من غير رجيم قاسي. قبل أي سؤال: الخدمة دي إرشاد عام بالذكاء الاصطناعي ومش استشارة طبية، ولازم أعالج بياناتك اللي بتدخلها عشان أحسب الهدف — ودي حاجة أساسية. وفي اختيار تاني منفصل: تسمح نشوف إزاي بتستخدم التطبيق — من غير أكلك ولا وزنك ولا اسمك — عشان نحسّن قمر؟',
     askEn:
-        'Good. This is AI-powered general guidance, not medical advice. Processing the data you enter is required to calculate your target. Separately and optionally: may we see how you use the app — never your food, your weight or your name — to improve Qamar?',
+        'Hi, I’m Qamar. I’ll help you eat better without a punishing diet. Before any question: this is AI-powered general guidance, not medical advice, and processing the data you enter is required to calculate your target. Separately and optionally: may we see how you use the app — never your food, your weight or your name — to improve Qamar?',
     options: const [
       StepOption(ar: 'موافق على الأساسي بس', en: 'Agree to the required only', value: 'yes'),
       StepOption(ar: 'موافق + ساعد في التحسين', en: 'Agree + help improve', value: 'yes_improve'),
@@ -49,10 +58,41 @@ final List<OnboardingStep> kOnboardingSteps = [
     ],
   ),
   OnboardingStep(
+    id: 'safety',
+    kind: StepKind.chips,
+    askAr: 'سؤال أمان قبل ما نبدأ: في أي حالة من دول؟',
+    askEn: 'One safety question before we start: does any of these apply?',
+    options: const [
+      StepOption(ar: 'ولا واحدة', en: 'None of these', value: 'none'),
+      StepOption(ar: 'حامل', en: 'Pregnant', value: 'pregnant'),
+      StepOption(ar: 'برضّع', en: 'Breastfeeding', value: 'breastfeeding'),
+      StepOption(ar: 'حالة مزمنة تحت علاج', en: 'Chronic condition under care', value: 'chronic'),
+    ],
+  ),
+  OnboardingStep(
     id: 'name',
     kind: StepKind.text,
     askAr: 'تمام. أناديك بإيه؟ (تقدر تتخطى)',
     askEn: 'Great. What should I call you? (you can skip)',
+  ),
+  OnboardingStep(
+    id: 'goal',
+    kind: StepKind.chips,
+    askAr: 'هدفك إيه دلوقتي؟',
+    askEn: 'What’s your goal right now?',
+    options: const [
+      StepOption(ar: 'أخس بهدوء', en: 'Lose slowly', value: 'lose'),
+      StepOption(ar: 'أثبّت وزني', en: 'Maintain', value: 'maintain'),
+      StepOption(ar: 'أزيد عضل', en: 'Build muscle', value: 'gain'),
+    ],
+  ),
+  OnboardingStep(
+    id: 'dob',
+    kind: StepKind.date,
+    askAr: 'عشان الحساب يطلع مظبوط: تاريخ ميلادك إيه؟ (بيحدد أهليتك وبيدخل في حساب السعرات)',
+    askEn: 'So the numbers come out right: what’s your date of birth? (it sets your eligibility and feeds the calorie maths)',
+    generalAr: 'قمر للبالغين، فمحتاج أعرف: تاريخ ميلادك إيه؟',
+    generalEn: 'Qamar is for adults, so I need to know: what’s your date of birth?',
   ),
   OnboardingStep(
     id: 'gender',
@@ -69,17 +109,6 @@ final List<OnboardingStep> kOnboardingSteps = [
     kind: StepKind.number,
     askAr: 'محتاج رقمين بس عشان أحسب هدف واقعي: الطول والوزن الحالي.',
     askEn: 'I need just two numbers for a realistic target: your height and current weight.',
-  ),
-  OnboardingStep(
-    id: 'goal',
-    kind: StepKind.chips,
-    askAr: 'هدفك إيه دلوقتي؟',
-    askEn: 'What’s your goal right now?',
-    options: const [
-      StepOption(ar: 'أخس بهدوء', en: 'Lose slowly', value: 'lose'),
-      StepOption(ar: 'أثبّت وزني', en: 'Maintain', value: 'maintain'),
-      StepOption(ar: 'أزيد عضل', en: 'Build muscle', value: 'gain'),
-    ],
   ),
   OnboardingStep(
     id: 'activity',
@@ -105,15 +134,9 @@ final List<OnboardingStep> kOnboardingSteps = [
       StepOption(ar: 'ميزانية محدودة', en: 'Tight budget', value: 'budget'),
     ],
   ),
-  OnboardingStep(
-    id: 'safety',
-    kind: StepKind.chips,
-    askAr: 'آخر سؤال للأمان: في أي حالة من دول؟',
-    askEn: 'One last safety check: does any of these apply?',
-    options: const [
-      StepOption(ar: 'ولا واحدة', en: 'None of these', value: 'none'),
-      StepOption(ar: 'حمل أو رضاعة', en: 'Pregnant or breastfeeding', value: 'preg'),
-      StepOption(ar: 'حالة مزمنة تحت علاج', en: 'Chronic condition under care', value: 'chronic'),
-    ],
-  ),
 ];
+
+/// The questions that exist only to calculate a calorie target. On the
+/// general-guidance route (a safety answer that rules a target out) they are
+/// not asked: the answers would feed a number Qamar will not give.
+const Set<String> kGeneralGuidanceSkips = {'goal', 'gender', 'body', 'activity'};

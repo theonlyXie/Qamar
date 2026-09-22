@@ -258,31 +258,42 @@ void main() {
   });
 
   group('eligibility gate', () {
+    final dob = kOnboardingSteps.indexWhere((s) => s.id == 'dob');
+    final targetInputs = ['gender', 'body', 'activity'].map((id) => kOnboardingSteps.indexWhere((s) => s.id == id));
+
+    test('the date of birth comes after the goal and before every question that feeds the target', () {
+      expect(dob, greaterThan(kOnboardingSteps.indexWhere((s) => s.id == 'goal')));
+      for (final i in targetInputs) {
+        expect(dob, lessThan(i), reason: 'the 18+ gate runs before any target input');
+      }
+    });
+
     test('an under-18 birth date blocks before any target is calculated', () async {
       final state = AppState();
-      expect(kOnboardingSteps.first.id, 'dob');
-
+      state.step = dob;
       state.profile = state.profile.copyWith(age: 15);
       state.primarySubmit();
       await settle();
 
       expect(state.blocked, isTrue);
       expect(state.minor, isTrue);
-      expect(state.step, 0, reason: 'must not advance past the gate');
+      expect(state.step, dob, reason: 'must not advance past the gate');
     });
 
     test('an adult birth date advances', () async {
       final state = AppState();
+      state.step = dob;
       state.profile = state.profile.copyWith(age: 30);
       state.primarySubmit();
       await settle();
 
       expect(state.blocked, isFalse);
-      expect(state.step, 1);
+      expect(state.step, dob + 1);
     });
 
     test('exactly 18 is allowed', () async {
       final state = AppState();
+      state.step = dob;
       state.profile = state.profile.copyWith(age: 18);
       state.primarySubmit();
       await settle();
@@ -820,6 +831,7 @@ void languageTests() {
 
     test('switching mid-onboarding keeps answers and position', () async {
       final state = AppState();
+      state.step = kOnboardingSteps.indexWhere((s) => s.id == 'dob');
       state.profile = state.profile.copyWith(age: 30);
       state.primarySubmit();
       await settle();

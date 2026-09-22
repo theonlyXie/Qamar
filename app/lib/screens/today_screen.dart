@@ -12,6 +12,7 @@ import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/explain.dart';
+import '../widgets/general_guidance_card.dart';
 import '../widgets/moon.dart';
 
 class TodayScreen extends StatefulWidget {
@@ -133,6 +134,11 @@ class _TodayScreenState extends State<TodayScreen> {
           _EarnedMonthCard(state: state),
           const SizedBox(height: 14),
         ],
+        // On the general-guidance route no target is set, so none is shown:
+        // the card that would carry it says what is still here instead.
+        if (state.generalGuidance)
+          GeneralGuidanceCard(state: state)
+        else
         Container(
           padding: const EdgeInsets.all(20),
           decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardSlate]), border: QColors.borderStrong, radius: QRadii.xxxl,

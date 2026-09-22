@@ -41,14 +41,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _draftCtrl.value = TextEditingValue(text: state.draft, selection: TextSelection.collapsed(offset: state.draft.length));
     }
 
-    final stepChips = step != null && (step.kind == StepKind.chips || step.kind == StepKind.multi) && !state.blocked;
-    final stepNumber = step != null && step.kind == StepKind.number;
-    final stepDate = step != null && step.kind == StepKind.date && !state.blocked;
-    final canSkip = step != null && step.kind == StepKind.text;
-    final hasSubmit = (step == null ||
-            step.kind == StepKind.number ||
-            step.kind == StepKind.multi ||
-            step.kind == StepKind.date) &&
+    // An input never appears before its question: each step's chips, wheels
+    // and buttons wait until that step's question is on screen and Qamar has
+    // stopped typing. At the end, "Let's start" waits for the last line too.
+    final asked = state.questionShown;
+    final stepChips = asked && step != null && (step.kind == StepKind.chips || step.kind == StepKind.multi) && !state.blocked;
+    final stepNumber = asked && step != null && step.kind == StepKind.number;
+    final stepDate = asked && step != null && step.kind == StepKind.date && !state.blocked;
+    final canSkip = asked && step != null && step.kind == StepKind.text;
+    final hasSubmit = (step == null
+            ? !state.typing
+            : asked && (step.kind == StepKind.number || step.kind == StepKind.multi || step.kind == StepKind.date)) &&
         !state.blocked;
 
     return Column(

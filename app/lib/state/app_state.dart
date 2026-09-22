@@ -1130,7 +1130,9 @@ class AppState extends ChangeNotifier {
     _notify();
     _screen(AppScreen.onboard);
     _recordStart('chat');
-    Future.delayed(const Duration(milliseconds: 120), () => askStep(0));
+    // No beat before the first question: it is on screen with its chips from
+    // the first frame, so the conversation never opens empty.
+    askStep(0);
   }
 
   /// Absolute path of the photo the user just took of their InBody report,
@@ -1213,7 +1215,7 @@ class AppState extends ChangeNotifier {
       msgs.add(ObMessage.q(ar: read.note!, en: read.note!));
     }
     _notify();
-    Future.delayed(const Duration(milliseconds: 140), () => askStep(0));
+    askStep(0);
   }
 
   // ---- onboarding chat -------------------------------------------------
@@ -1254,12 +1256,33 @@ class AppState extends ChangeNotifier {
     askStep(step);
   }
 
+  /// The step whose question is on screen. An input renders only once its
+  /// own question has been asked (see [questionShown]).
+  int? _askedStep;
+
+  /// The current step's question has been asked and Qamar is not mid-reply:
+  /// the chips, wheels and buttons for it may show. Never before.
+  bool get questionShown => _askedStep == step && !typing;
+
   void askStep(int i) {
     if (i >= kOnboardingSteps.length) {
-      calcTarget();
+      _askedStep = null;
+      generalGuidance ? _finishGeneralGuidance() : calcTarget();
       return;
     }
     final st = kOnboardingSteps[i];
+    // On the general-guidance route the target's own questions are not asked.
+    if (generalGuidance && kGeneralGuidanceSkips.contains(st.id)) {
+      step = i + 1;
+      askStep(step);
+      return;
+    }
+    if (i == 0) {
+      _pushQ(st.ask(true, general: generalGuidance), st.ask(false, general: generalGuidance));
+      _askedStep = 0;
+      _notify();
+      return;
+    }
     if (st.id == 'body' && scanned) {
       typing = true;
       _notify();
@@ -1294,7 +1317,70 @@ class AppState extends ChangeNotifier {
     Future.delayed(const Duration(milliseconds: 600), () {
       if (_disposed) return;
       typing = false;
-      _pushQ(st.askAr, st.askEn);
+      _askedStep = i;
+      _pushQ(st.ask(true, general: generalGuidance), st.ask(false, general: generalGuidance));
+    });
+  }
+
+  /// A safety answer rules out a calorie target and a plan: those are for a
+  /// qualified professional. It does not rule out Qamar — the person still
+  /// logs what they eat, sees what is in it, and asks general questions.
+  bool get generalGuidance => profile.safety != SafetyAnswer.none;
+
+  /// What the Plan screen says on the general-guidance route, in place of a
+  /// plan and a button that could only be refused.
+  String get generalGuidancePlanNote => isAr
+      ? 'الخطة بتتبني على هدف سعرات، وقمر مش بيحط هدف في حالتك — ده للأخصائي. تقدر تسجل أكلك وتعرف فيه إيه، وتسأل أي سؤال عام.'
+      : 'A plan is built around a calorie target, and Qamar doesn’t set one in your case — that’s for a professional. You can still log what you eat, see what’s in it, and ask anything general.';
+
+  /// The safety answer, from a chip or from free text. Anything but "none"
+  /// says why there will be no target, and the conversation goes on without
+  /// the target's questions — the date of birth (the 18+ gate) is still asked.
+  void _answerSafety(SafetyAnswer answer, {String? ar, String? en}) {
+    profile = profile.copyWith(safety: answer);
+    _notify();
+    void next() {
+      if (answer != SafetyAnswer.none) {
+        _pushQ(
+          'شكراً إنك قلتلي. في الحالة دي مش هحسبلك هدف سعرات ولا خطة — الأنسب متابعة مع أخصائي. بس قمر معاك: تعرف إيه اللي في أكلك وتسأل أي سؤال عام. كام سؤال كمان وندخل.',
+          'Thank you for telling me. In this case I won’t calculate a calorie target or a plan — a qualified professional is the right route. Qamar is still with you: see what’s in your meals and ask anything general. A few more questions and we’re in.',
+        );
+      }
+      advance();
+    }
+    if (ar != null && en != null) {
+      answerStep(ar, en, next);
+    } else {
+      next();
+    }
+  }
+
+  /// The end of the conversation on the general-guidance route: no target
+  /// card, and a plain way in.
+  void _finishGeneralGuidance() {
+    typing = true;
+    _notify();
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (_disposed) return;
+      typing = false;
+      msgs.addAll([
+        const ObMessage.q(
+          ar: 'كده خلصنا. مفيش هدف سعرات في حالتك — ده للأخصائي. جوه التطبيق: سجّل أكلك وأنا أقولك فيه إيه، واسألني أي سؤال عام.',
+          en: 'That’s everything. There’s no calorie target in your case — that’s for a professional. Inside: log what you eat and I’ll tell you what’s in it, and ask me anything general.',
+        ),
+        const ObMessage.save(),
+      ]);
+      _track('intake_completed', {'route': 'general_guidance'});
+      _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
+      _notify();
+      if (isBacked && _walletRepo != null) {
+        _push('onboarding bonus', (uid) async {
+          await _walletRepo.grantOnboarding(uid);
+          await _refreshWallet(uid);
+          _notify();
+        });
+      }
+      if (isBacked) _saveProfile();
     });
   }
 
@@ -1347,15 +1433,8 @@ class AppState extends ChangeNotifier {
       }
       return;
     }
-    if (st.id == 'safety' && o.value != 'none') {
-      answerStep(o.ar, o.en, () {
-        _pushQ(
-          'شكراً إنك قلتلي. في الحالة دي مش هحسبلك هدف سعرات — الأنسب متابعة مع أخصائي. تقدر تستخدم قمر للأسئلة العامة بس.',
-          'Thank you for telling me. In this case I won’t calculate a calorie target — a qualified professional is the right route. You can still use Qamar for general questions.',
-        );
-        blocked = true;
-        _notify();
-      });
+    if (st.id == 'safety') {
+      _answerSafety(SafetyAnswer.fromValue(o.value), ar: o.ar, en: o.en);
       return;
     }
     answerStep(o.ar, o.en, advance);
@@ -1741,16 +1820,20 @@ class AppState extends ChangeNotifier {
         return;
 
       case 'safety':
-        if (has(['حامل', 'حمل', 'رضاعة', 'مرضعة', 'pregnan', 'breastfeed', 'nursing']) ||
-            has(['مزمن', 'سكر', 'ضغط', 'قلب', 'كلى', 'chronic', 'diabet', 'blood pressure', 'kidney', 'heart'])) {
-          blocked = true;
-          _notify();
-          qamarSay('شكراً إنك قلتلي. في الحالة دي مش هحسبلك هدف سعرات — الأنسب متابعة مع أخصائي. تقدر تستخدم قمر للأسئلة العامة بس.',
-              'Thank you for telling me. In this case I won’t calculate a calorie target — a qualified professional is the right route. You can still use Qamar for general questions.');
+        if (has(['حامل', 'حمل', 'pregnan'])) {
+          _answerSafety(SafetyAnswer.pregnant);
+          return;
+        }
+        if (has(['رضاعة', 'برضع', 'برضّع', 'مرضعة', 'breastfeed', 'nursing'])) {
+          _answerSafety(SafetyAnswer.breastfeeding);
+          return;
+        }
+        if (has(['مزمن', 'سكر', 'ضغط', 'قلب', 'كلى', 'chronic', 'diabet', 'blood pressure', 'kidney', 'heart'])) {
+          _answerSafety(SafetyAnswer.chronic);
           return;
         }
         if (has(['ولا واحدة', 'مفيش', 'لا', 'none', 'no', 'nope'])) {
-          advance();
+          _answerSafety(SafetyAnswer.none);
           return;
         }
         unclear();
@@ -1772,7 +1855,7 @@ class AppState extends ChangeNotifier {
         const ObMessage.target(),
         const ObMessage.save(),
       ]);
-      _track('intake_completed');
+      _track('intake_completed', {'route': 'target'});
       // Shown at once; paid by the server (qamar_grant_onboarding, once per
       // account), and the wallet is re-read so the two numbers agree.
       _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
@@ -3423,6 +3506,9 @@ class AppState extends ChangeNotifier {
   /// written menu, not a comment on it. The Plan and Today screens then show
   /// whatever comes back.
   Future<void> ensurePlan({bool force = false, String? instruction}) async {
+    // No target, no plan: the gateway would refuse (life_stage, or no target
+    // row), so it is not asked. The Plan screen says why instead.
+    if (generalGuidance) return;
     final today = _today();
     final note = instruction?.trim();
     if (!force && (note == null || note.isEmpty) && planDate == today && hasPlan) return;
