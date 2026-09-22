@@ -247,8 +247,10 @@ Without the key the SDK is never initialised. With it, three rules hold:
     window beside it;
   - day-30 unprompted logging, read from each log's recorded `prompt`
     (`push`, `in_app` or `none`), and a stricter day-30 cold beside it;
-  - trial-to-paid, overall and by source, read at the trial's end plus 7
-    days;
+  - trial-to-paid by source, read at the trial's end plus 7 days. The
+    target and kill line sit on the organic row. The combined row beside it
+    is diagnostic: Pro-code trials, expected to convert at about twice the
+    organic rate, would lift it over a line that organic fails;
   - month-2 retention, counted on the second paid order.
 
   pg_cron records them nightly into `kill_metrics_daily` for the last sixty

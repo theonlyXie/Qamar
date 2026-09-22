@@ -58,15 +58,24 @@
 --                        "paying at day 14"; for the organic 7-day trial
 --                        that is the same moment. It used to be start + 14,
 --                        which gave a 14-day trial (Pro code, invitation) no
---                        days at all after it ended. The 25% target and 15%
---                        kill line stand.
+--                        days at all after it ended. This combined row is
+--                        now diagnostic, with no target and no kill line:
+--                        the 25% target and 15% kill line apply to the
+--                        organic row below. The blueprint expects Pro-code
+--                        trials to convert at about twice the organic rate
+--                        and targets a Pro share above 30% of installs. At
+--                        an organic 13%, those numbers put the combined row
+--                        near 17%: over the 15% kill line while organic is
+--                        under it. That masking is what the split exists to
+--                        prevent.
 --   trial_to_paid_organic / _pro / _invitation
 --                        the same, split by plus_trials.source. The organic
 --                        row carries the 25% / 15% line: below 15%, the
 --                        blueprint's framing test runs before any price
 --                        change. Pro and invitation have no line; the
---                        blueprint only asks that they convert at about
---                        twice the organic rate. A trial with no source
+--                        blueprint asks only that the Pro path convert at
+--                        about twice the organic rate, and sets nothing for
+--                        invitations. A trial with no source
 --                        recorded is attributed from the tables that
 --                        existed when it started:
 --                          - an invitation redeemed within the hour before
@@ -94,7 +103,8 @@
 -- Captured on the phone when the log starts, not when it is confirmed, because
 -- by then the waiting question has gone:
 --   push     a notification was tapped within 30 minutes before the log
---   in_app   the log began from holding the orb while Qamar's question waited
+--   in_app   the log began from a hold that opened Qamar's waiting question,
+--            asked on screen
 --   none     everything else — including a log from the tree while the orb
 --            pulsed, which is the habit itself
 -- orb_waiting: a question was waiting when the log started, whatever the path.
@@ -276,7 +286,7 @@ as $$
     union all
     select 'day30_cold', num_cold, den, null, null from day30
     union all
-    select 'trial_to_paid', count(*) filter (where paid), count(*), 0.25, 0.15 from trials
+    select 'trial_to_paid', count(*) filter (where paid), count(*), null, null from trials
     union all
     select 'trial_to_paid_organic', count(*) filter (where paid), count(*), 0.25, 0.15 from trials where source = 'organic'
     union all
@@ -298,7 +308,7 @@ revoke all on function public.qamar_kill_metrics(date, date) from public, anon, 
 grant execute on function public.qamar_kill_metrics(date, date) to service_role;
 
 comment on column public.meal_logs.prompt is
-  'What started this log: push (a notification tapped within 30 minutes), in_app (the orb''s waiting question, held), none. Captured when the log starts. Null: written before 0059, unknown.';
+  'What started this log: push (a notification tapped within 30 minutes), in_app (a hold that opened the orb''s waiting question), none. Captured when the log starts. Null: written before 0059, unknown.';
 comment on column public.meal_logs.orb_waiting is
   'A meal question was waiting on the orb when this log started, whatever the path. Null: unknown.';
 comment on column public.plus_trials.source is
