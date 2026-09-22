@@ -2661,10 +2661,11 @@ class AppState extends ChangeNotifier {
   String _dayKey() => _clock().toIso8601String().substring(0, 10);
 
   /// Whether the quest wants Today's slot: a real one, not put away, not
-  /// past its time, and only while the score is shown.
+  /// past its time, not on a fasting day, and only while the score is shown.
   bool get questDue {
     final q = quest;
-    if (q == null || !showScore || _questSkippedDay == _dayKey()) return false;
+    // No quest on a fasting day (0063): it would pay for eating in daylight.
+    if (q == null || !showScore || fasting || _questSkippedDay == _dayKey()) return false;
     return q.done || q.expiresAt.isAfter(_clock());
   }
 

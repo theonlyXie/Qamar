@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../models/su_economy.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
@@ -11,8 +10,9 @@ import 'explain.dart';
 /// The day's quest in Today's slot (O2, O15): what the day lacks, in one
 /// line, and why. There is no Accept and no Replace: the meal or glass that
 /// does what it asks pays it, on the server. The person can put it away for
-/// the day ("not today"), and once it is met it shows done. Its "+250" is
-/// part of the score, so it is drawn only while the score is shown.
+/// the day ("not today"), and once it is met it shows done. Its coin shows
+/// what it would pay, or did pay, within the day's cap, and no coin at 0.
+/// It is part of the score, so it is drawn only while the score is shown.
 class QuestCard extends StatelessWidget {
   final AppState state;
   const QuestCard({super.key, required this.state});
@@ -39,11 +39,11 @@ class QuestCard extends StatelessWidget {
               child: Row(
                 children: [
                   Text(state.t.nextQuest, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
-                  if (state.showScore) ...[
+                  if (state.showScore && q.amount > 0) ...[
                     const SizedBox(width: 8),
                     const SuCoinIcon(size: 14),
                     const SizedBox(width: 4),
-                    ExplainMark(child: Text('+${state.formatSu(SuEconomy.dailyQuest)}', style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.gold))),
+                    ExplainMark(child: Text('+${state.formatSu(q.amount)}', style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.gold))),
                   ],
                   const Spacer(),
                   if (q.done)

@@ -1,9 +1,12 @@
+import 'su_economy.dart';
+
 /// The day's quest (O2): real, or absent.
 ///
 /// The server chooses it from what the day actually lacks
 /// (`qamar_quest_for`, migration 0061) and pays it, 250 Su, from the row that
-/// satisfies it: the meal or the glass that does what it asks. The phone only
-/// shows it, and can put it away for the day ("not today"). No tap pays.
+/// satisfies it: the meal or the glass that does what it asks, within the
+/// day's cap. The phone only shows it, and can put it away for the day ("not
+/// today"). No tap pays. There is none on a fasting day (0063).
 ///
 /// Every kind only ever adds something to the day. A kind that restricts
 /// (stay under, skip a meal, a deficit) must never be added:
@@ -56,7 +59,18 @@ class DayQuest {
   /// When it stops being today's, unpaid.
   final DateTime expiresAt;
 
-  const DayQuest({required this.kind, required this.done, required this.expiresAt});
+  /// Su it would pay if met now: 250, within the room the day's cap has
+  /// left (0063). What the card promises.
+  final int pays;
+
+  /// Once done, what it did credit: 0 on a day already at the cap.
+  final int credited;
+
+  const DayQuest({required this.kind, required this.done, required this.expiresAt, this.pays = SuEconomy.dailyQuest, this.credited = 0});
+
+  /// The number the card shows beside the coin: what it would pay, or once
+  /// done what it paid. 0 means no coin at all.
+  int get amount => done ? credited : pays;
 
   /// The RPC's answer (`qamar_today_quest`), or null for no quest today, or
   /// a kind this build does not know.
@@ -65,6 +79,14 @@ class DayQuest {
     final kind = QuestKind.fromWire(json['kind']);
     final expires = json['expires_at'] is String ? DateTime.tryParse(json['expires_at'] as String) : null;
     if (kind == null || expires == null) return null;
-    return DayQuest(kind: kind, done: json['done'] == true, expiresAt: expires.toLocal());
+    int n(Object? v, int fallback) => v is num ? v.round() : fallback;
+    final done = json['done'] == true;
+    return DayQuest(
+      kind: kind,
+      done: done,
+      expiresAt: expires.toLocal(),
+      pays: n(json['pays'], SuEconomy.dailyQuest),
+      credited: n(json['credited'], done ? SuEconomy.dailyQuest : 0),
+    );
   }
 }

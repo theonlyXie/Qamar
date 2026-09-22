@@ -90,9 +90,9 @@ const kExplanations = <String, Explanation>{
     titleAr: 'نقاط Su',
     titleEn: 'Su Points',
     bodyAr:
-        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة (+١٠٠، وأول وجبة +٥٠٠)، كوباية مياه (+٥، ومع Qamar+ +١٠)، مهمة اليوم لما اللي بتطلبه يتسجّل (+٢٥٠)، أسبوع كامل في السلسلة (+١٠٠). بتتصرف على صورة زيادة أو تجميد السلسلة. الأسئلة مش بتتشترى بالنقط — الرابع في Qamar+.',
+        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة (+١٠٠، وأول وجبة +٥٠٠)، كوباية مياه (+٥، ومع Qamar+ +١٠)، مهمة اليوم لما اللي بتطلبه يتسجّل (+٢٥٠، في حدود سقف اليوم)، أسبوع كامل في السلسلة (+١٠٠). بتتصرف على صورة زيادة أو تجميد السلسلة. الأسئلة مش بتتشترى بالنقط — الرابع في Qamar+.',
     bodyEn:
-        'Earned when you do something useful for yourself — logging a meal (+100, first meal +500), a glass of water (+5, +10 with Qamar+), the day’s quest, when what it asks is logged (+250), a full week of streak (+100). Spent on another photo or a streak freeze. Questions are never bought with points — the fourth is Qamar+.',
+        'Earned when you do something useful for yourself — logging a meal (+100, first meal +500), a glass of water (+5, +10 with Qamar+), the day’s quest, when what it asks is logged (+250, within the day’s cap), a full week of streak (+100). Spent on another photo or a streak freeze. Questions are never bought with points — the fourth is Qamar+.',
     soWhatAr: 'النقط دي بتتكسب بس. مش بتتشترى بفلوس ومالهاش قيمة نقدية.',
     soWhatEn: 'They are only ever earned. They cannot be bought with money and have no cash value.',
   ),
@@ -116,9 +116,9 @@ const kExplanations = <String, Explanation>{
     titleAr: 'مهمة اليوم',
     titleEn: "Today's quest",
     bodyAr:
-        'حاجة واحدة ناقصة النهارده، متختارة من اللي سجّلته: الغدا قبل ٤ العصر، أو بروتين في العشا، أو ٦ كوبايات مية. بتدي ٢٥٠ نقطة Su لما الوجبة أو الكوباية اللي بتعملها تتسجّل — مفيش حاجة تدوس عليها عشان تاخدها. وفي أيام مفيهاش مهمة، لأن مفيش حاجة ناقصة.',
+        'حاجة واحدة ناقصة النهارده، متختارة من اللي سجّلته: الغدا قبل ٤ العصر، أو بروتين في العشا، أو ٦ كوبايات مية. بتدي ٢٥٠ نقطة Su، في حدود سقف اليوم (١٬٥٠٠)، لما الوجبة أو الكوباية اللي بتعملها تتسجّل — مفيش حاجة تدوس عليها عشان تاخدها. وفي أيام مفيهاش مهمة: لما مفيش حاجة ناقصة، وأيام الصيام.',
     bodyEn:
-        'One thing today is missing, chosen from what you have logged: lunch before 4pm, protein at dinner, or six glasses of water. It pays 250 Su when the meal or the glass that does it is logged — there is nothing to tap for it. Some days have none, because nothing is missing.',
+        'One thing today is missing, chosen from what you have logged: lunch before 4pm, protein at dinner, or six glasses of water. It pays 250 Su, within the day’s 1,500 cap, when the meal or the glass that does it is logged — there is nothing to tap for it. Some days have none: when nothing is missing, and on fasting days.',
     soWhatAr: 'لو مش مناسبة لظروف يومك، اضغط «مش النهارده» وهتستنى لبكرة — ده مش فشل.',
     soWhatEn: 'If it does not fit your day, tap Not today and it waits until tomorrow — that is not a failure.',
   ),
