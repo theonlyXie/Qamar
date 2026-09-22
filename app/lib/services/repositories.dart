@@ -30,6 +30,10 @@ abstract class ProfileRepository {
   /// The fasting switch, on the profile so the night job writes the right
   /// kind of day.
   Future<void> saveFastingMode(String userId, FastingMode mode);
+
+  /// Start was pressed — [via] is 'chat' or 'scan'. The denominator of
+  /// intake completion; the first one on the account is the one kept.
+  Future<void> recordIntakeStart(String userId, {required String via});
 }
 
 /// The two consents the schema knows (consents.type).

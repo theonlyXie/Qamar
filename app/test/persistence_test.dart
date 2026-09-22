@@ -79,6 +79,15 @@ class FakeProfileRepo implements ProfileRepository {
   Season? season;
   final List<FastingMode> fastingSaves = [];
 
+  /// Each Start the app reported, in order.
+  final List<String> starts = [];
+
+  @override
+  Future<void> recordIntakeStart(String userId, {required String via}) async {
+    if (failWith != null) throw failWith!;
+    starts.add(via);
+  }
+
   @override
   Future<Season?> currentSeason() async => season;
 
@@ -1561,7 +1570,125 @@ void main() {
       await settle();
       expect(state.improve, isTrue);
       expect(a.named('consent_granted'), hasLength(1));
-      expect(a.named('intake_step').single['step'], 'consent', reason: 'the step answered after consent is the first one counted');
+      expect(a.named('intake_step').single['step'], 'consent', reason: 'jumped straight to consent, so it is the only step answered');
+      expect(a.named('intake_started').single['pre_consent'], isTrue, reason: 'Start waited on the phone for the yes');
+    });
+
+    // The three consent chips are three different answers.
+    Future<void> answerConsent(AppState state, String value) async {
+      final at = kOnboardingSteps.indexWhere((s) => s.id == 'consent');
+      state.step = at;
+      state.pickOption(kOnboardingSteps[at].options.firstWhere((o) => o.value == value));
+      await Future<void>.delayed(const Duration(milliseconds: 1000));
+    }
+
+    test('“Agree + help improve” is a yes: saved, analytics on, and what waited goes out after it, in order', () async {
+      final a = MemoryAnalytics();
+      final profiles = FakeProfileRepo();
+      final state = backed(profiles: profiles, analytics: a);
+      await settle();
+      state.startOnboarding();
+      state.logWater(WaterUnit.glass);
+      await settle();
+      expect(a.events, isEmpty, reason: 'waiting on the phone is not sending');
+      expect(a.enabledFor, isEmpty, reason: 'the SDK is not even started before the answer');
+      expect(state.heldEvents, 2);
+
+      await answerConsent(state, 'yes_improve');
+
+      expect(state.improve, isTrue);
+      expect(state.step, kOnboardingSteps.indexWhere((s) => s.id == 'consent') + 1, reason: 'it advances');
+      expect(profiles.consents, [(type: 'improve_optional', granted: true, version: '1.1')]);
+      expect(a.events.map((e) => e.name).toList(), ['consent_granted', 'intake_started', 'water_logged', 'intake_step'],
+          reason: 'the yes first, then what waited for it, oldest first');
+      expect(a.named('intake_started').single['pre_consent'], isTrue);
+      expect(a.named('intake_started').single['via'], 'chat');
+      expect(a.named('intake_step').single.containsKey('pre_consent'), isFalse, reason: 'answered after the yes');
+      expect(state.heldEvents, 0);
+    });
+
+    test('“Agree to the required only” is a recorded no: what waited is dropped, and nothing waits after it', () async {
+      final a = MemoryAnalytics();
+      final profiles = FakeProfileRepo();
+      final state = backed(profiles: profiles, analytics: a);
+      await settle();
+      state.startOnboarding();
+      await settle();
+      expect(state.heldEvents, 1);
+
+      await answerConsent(state, 'yes');
+
+      expect(state.improve, isFalse);
+      expect(state.improveAnswered, isTrue);
+      expect(state.step, kOnboardingSteps.indexWhere((s) => s.id == 'consent') + 1, reason: 'the required part is agreed, so it advances');
+      expect(profiles.consents, [(type: 'improve_optional', granted: false, version: '1.1')], reason: 'a no on the account, not silence');
+      expect(state.heldEvents, 0, reason: 'a no drops what waited');
+
+      state.logWater(WaterUnit.glass);
+      await settle();
+      expect(state.heldEvents, 0, reason: 'after a no nothing waits');
+
+      await state.setImprove(true); // a later yes, on the You screen
+      await settle();
+      expect(a.events.map((e) => e.name).toList(), ['consent_granted'], reason: 'nothing from before the no is ever sent');
+    });
+
+    test('“Tell me more” explains what each choice covers and waits for the answer', () async {
+      final state = AppState(analytics: MemoryAnalytics());
+      state.startOnboarding();
+      await Future<void>.delayed(const Duration(milliseconds: 1000)); // the first question has arrived
+      final before = state.msgs.length;
+
+      await answerConsent(state, 'more');
+
+      expect(state.step, kOnboardingSteps.indexWhere((s) => s.id == 'consent'), reason: 'a question is not an answer');
+      expect(state.improve, isFalse);
+      expect(state.improveAnswered, isFalse, reason: 'still unanswered, so events still wait');
+      expect(state.msgs.length, before + 2, reason: 'their question, then Qamar’s answer');
+      expect(state.msgs.last.text(false), contains('never your food, your weight or your name'));
+      expect(state.msgs.last.text(true), contains('من غير أكلك ولا وزنك ولا اسمك'));
+    });
+
+    test('what waits is capped, and the funnel’s first event is never the one pushed out', () async {
+      final a = MemoryAnalytics();
+      final state = AppState(analytics: a);
+      state.startOnboarding();
+      for (var i = 0; i < 80; i++) {
+        state.logWater(WaterUnit.glass);
+      }
+      await settle();
+      expect(state.heldEvents, AppState.heldEventCap);
+
+      await state.setImprove(true);
+      await settle();
+      expect(a.events.length, AppState.heldEventCap + 1, reason: 'the yes, then everything that waited');
+      expect(a.events[1].name, 'intake_started');
+    });
+
+    test('an answer given earlier on this phone decides at once: a no never holds anything', () async {
+      final prefs = MemoryDevicePrefs();
+      await prefs.setBool('improve_consent', false);
+      final a = MemoryAnalytics();
+      final state = AppState(prefs: prefs, analytics: a);
+      await settle();
+      state.startOnboarding();
+      state.logWater(WaterUnit.glass);
+      await settle();
+      expect(state.improveAnswered, isTrue);
+      expect(state.heldEvents, 0);
+      expect(a.events, isEmpty);
+    });
+
+    test('pressing Start is written to the account at the tap, once, before any answer', () async {
+      final profiles = FakeProfileRepo();
+      final state = backed(profiles: profiles);
+      await settle();
+      state.openScan();
+      state.backToWelcome();
+      state.startOnboarding();
+      await settle();
+      expect(profiles.starts, ['scan'], reason: 'the report is a Start too, and the first one is kept');
+      expect(profiles.saves, 0, reason: 'nothing answered yet');
     });
 
     test('saying no stops everything, and is recorded', () async {

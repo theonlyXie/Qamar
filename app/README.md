@@ -222,11 +222,17 @@ Without the key the SDK is never initialised. With it, three rules hold:
 
 - **Nothing is sent before consent.** The SDK starts only when the person
   says yes to service improvement in the consultation (or on the You screen),
-  and stops when they say no. The answer is remembered on the phone and, on a
-  linked account, in the `consents` table (append-only, latest row wins).
+  and stops when they say no. Until the question has been answered, events
+  wait on the phone, in memory: at most 50, with the earliest kept, so
+  `intake_started` is never the one pushed out. After a yes they go out,
+  marked `pre_consent`. A no throws them away, and from then on nothing
+  waits. The answer is remembered on the phone and, on a linked account, in
+  the `consents` table (append-only, latest row wins). The first answer is
+  recorded whichever way it goes.
 - **No person in the events.** Events carry a name, the language, the tier
   and a few small enums or counts (`meal_logged {source, first, items,
-  nudged}`, `meal_read {source, items, ms}`, `intake_step {step}`,
+  nudged}`, `meal_read {source, items, ms}`, `intake_started {via}`,
+  `intake_step {step}`,
   `orb_gesture_first {gesture}`, `trial_started`, `checkout_opened {plan,
   promo}`, `review_shared`, …). Never a name, a weight, a food, a photo or an
   email. The account id is the identity — the same opaque id the database

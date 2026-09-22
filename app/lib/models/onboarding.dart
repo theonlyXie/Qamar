@@ -39,9 +39,9 @@ final List<OnboardingStep> kOnboardingSteps = [
     id: 'consent',
     kind: StepKind.chips,
     askAr:
-        'تمام. الخدمة دي إرشاد عام بالذكاء الاصطناعي ومش استشارة طبية. لازم أعالج بياناتك اللي بتدخلها عشان أحسب الهدف — ودي حاجة أساسية. وفي اختيار تاني منفصل: تسمح نستخدم محادثاتك لتحسين قمر؟',
+        'تمام. الخدمة دي إرشاد عام بالذكاء الاصطناعي ومش استشارة طبية. لازم أعالج بياناتك اللي بتدخلها عشان أحسب الهدف — ودي حاجة أساسية. وفي اختيار تاني منفصل: تسمح نشوف إزاي بتستخدم التطبيق — من غير أكلك ولا وزنك ولا اسمك — عشان نحسّن قمر؟',
     askEn:
-        'Good. This is AI-powered general guidance, not medical advice. Processing the data you enter is required to calculate your target. Separately and optionally: may we use your conversations to improve Qamar?',
+        'Good. This is AI-powered general guidance, not medical advice. Processing the data you enter is required to calculate your target. Separately and optionally: may we see how you use the app — never your food, your weight or your name — to improve Qamar?',
     options: const [
       StepOption(ar: 'موافق على الأساسي بس', en: 'Agree to the required only', value: 'yes'),
       StepOption(ar: 'موافق + ساعد في التحسين', en: 'Agree + help improve', value: 'yes_improve'),

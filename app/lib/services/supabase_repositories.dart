@@ -134,6 +134,13 @@ class SupabaseProfileRepository implements ProfileRepository {
     await _client.from('profiles').upsert({'user_id': userId, 'fasting_mode': mode.name});
   }
 
+  /// One row per account (0057): a second Start is ignored rather than
+  /// moving the first, so the metric counts the day someone began.
+  @override
+  Future<void> recordIntakeStart(String userId, {required String via}) async {
+    await _client.from('intake_starts').upsert({'user_id': userId, 'via': via}, onConflict: 'user_id', ignoreDuplicates: true);
+  }
+
   @override
   Future<void> saveProfile(String userId, Profile profile) async {
     await _client.from('profiles').upsert({

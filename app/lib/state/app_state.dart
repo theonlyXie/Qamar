@@ -167,7 +167,9 @@ class AppState extends ChangeNotifier {
       if (asked != null) ramadanAskedFor = asked;
       if (reviewNumbers != null) reviewShowNumbers = reviewNumbers;
       if (consent != null) {
+        // Answered before on this phone: a yes sends what waited, a no drops it.
         improve = consent;
+        improveAnswered = true;
         _syncAnalytics().ignore();
       }
       if (done == true) orbTutorialDismissed = true;
@@ -428,8 +430,9 @@ class AppState extends ChangeNotifier {
 
       try {
         final consent = await _profileRepo?.loadConsent(uid, ConsentType.improve);
-        if (consent != null && consent != improve) {
+        if (consent != null && (consent != improve || !improveAnswered)) {
           improve = consent;
+          improveAnswered = true;
           _prefs?.setBool(_kImprove, consent).catchError((_) {});
           _syncAnalytics().ignore();
         }
@@ -572,15 +575,24 @@ class AppState extends ChangeNotifier {
   bool minor = false;
   bool improve = false;
 
+  /// The service-improvement question has been answered — yes or no, in the
+  /// consultation, on the You screen, earlier on this phone or on the
+  /// account. Until it has, events wait on the phone (see [_track]).
+  bool improveAnswered = false;
+
   /// The service-improvement consent: asked in the consultation, changeable
   /// on the You screen, recorded on the account, and the one switch that
-  /// turns analytics on or off. Nothing leaves the phone without it.
+  /// turns analytics on or off. Nothing leaves the phone without it. The
+  /// first answer is recorded whichever way it goes, so a "no" is on the
+  /// account as a no rather than as silence.
   Future<void> setImprove(bool on) async {
     final changed = improve != on;
+    final firstAnswer = !improveAnswered;
     improve = on;
+    improveAnswered = true;
     _notify();
     _prefs?.setBool(_kImprove, on).catchError((_) {});
-    if (changed && isBacked && _profileRepo != null) {
+    if ((changed || firstAnswer) && isBacked && _profileRepo != null) {
       _push('save consent', (uid) => _profileRepo.saveConsent(uid, ConsentType.improve, granted: on, version: QamarConfig.consentVersion));
     }
     await _syncAnalytics(consentEvent: changed && on);
@@ -615,8 +627,23 @@ class AppState extends ChangeNotifier {
     if (a == null) return;
     if (improve) {
       await a.enable(_userId);
+      if (_disposed) return;
+      if (!improve) {
+        // A "no" arrived while the sink was starting: it stops again.
+        await a.disable();
+        return;
+      }
+      _analyticsOn = true;
+      // The yes is the first event; what waited for it follows, in order.
       if (consentEvent) _track('consent_granted', {'version': QamarConfig.consentVersion});
+      final waiting = List.of(_held);
+      _held.clear();
+      for (final e in waiting) {
+        a.track(e.name, e.props).ignore();
+      }
     } else {
+      _analyticsOn = false;
+      if (improveAnswered) _held.clear();
       await a.disable();
     }
   }
@@ -626,12 +653,40 @@ class AppState extends ChangeNotifier {
   // The blueprint's kill metrics and the events that explain them. Every
   // event carries the language, the tier and whether the account is backed,
   // and nothing else about the person: no name, no body, no food, no photo.
-  // Dropped silently without consent or without a sink.
+  //
+  // Nothing is sent before a yes. But the funnel starts before the question
+  // is asked — the app opens, Start is pressed, the first answers are given —
+  // so until the question has been answered, events wait on the phone, in
+  // memory: sent in order on a yes (marked pre_consent), thrown away on a
+  // no, and never held again once the answer is no.
+
+  /// The sink has been switched on and not off since.
+  bool _analyticsOn = false;
+
+  /// Events waiting for the answer, oldest first.
+  final List<({String name, Map<String, Object> props})> _held = [];
+
+  /// Room for the walk from app open to the consent question with plenty to
+  /// spare. Past it the newest are dropped, so the funnel's first events are
+  /// never the ones pushed out.
+  static const heldEventCap = 50;
+
+  /// How many events are waiting on the phone for the answer.
+  int get heldEvents => _held.length;
 
   void _track(String event, [Map<String, Object> props = const {}]) {
     final a = _analytics;
-    if (a == null || !improve) return;
-    a.track(event, {...props, 'lang': lang.code, 'plus': plusActive, 'backed': isBacked}).ignore();
+    if (a == null) return;
+    final all = <String, Object>{...props, 'lang': lang.code, 'plus': plusActive, 'backed': isBacked};
+    if (improve && _analyticsOn) {
+      a.track(event, all).ignore();
+      return;
+    }
+    // Not answered yet, or a yes still switching the sink on: wait. A no
+    // that has been given drops the event where it stands.
+    if ((improve || !improveAnswered) && _held.length < heldEventCap) {
+      _held.add((name: event, props: improveAnswered ? all : {...all, 'pre_consent': true}));
+    }
   }
 
   void _screen(AppScreen s) {
@@ -936,6 +991,9 @@ class AppState extends ChangeNotifier {
     affiliateWallet = AffiliateWallet.empty;
     affiliateNotice = null;
     if (improve) setImprove(false).ignore();
+    // Whatever was waiting for an answer belonged to the session that ended.
+    _held.clear();
+    _startRecorded = false;
     questDone = false;
     _questPaidDay = null;
     proposal = null;
@@ -975,6 +1033,25 @@ class AppState extends ChangeNotifier {
     screen = AppScreen.scan;
     scanReading = false;
     _notify();
+    // The report is the other way into the consultation, so it is a Start too.
+    _recordStart('scan');
+  }
+
+  bool _startRecorded = false;
+
+  /// Pressing Start — the chat or the report — is the denominator of intake
+  /// completion ("users who reach the plan reveal / users who press Start").
+  /// It is written to the account at the tap, before any answer, because the
+  /// first question is where people leave: a denominator that began at the
+  /// first saved answer began after that. Once per session here; the server
+  /// keeps the first one ever.
+  void _recordStart(String via) {
+    _track('intake_started', {'via': via});
+    if (_startRecorded) return;
+    _startRecorded = true;
+    if (isBacked && _profileRepo != null) {
+      _push('record start', (uid) => _profileRepo.recordIntakeStart(uid, via: via));
+    }
   }
 
   void backToWelcome() {
@@ -990,7 +1067,7 @@ class AppState extends ChangeNotifier {
     scanned = false;
     _notify();
     _screen(AppScreen.onboard);
-    _track('intake_started');
+    _recordStart('chat');
     Future.delayed(const Duration(milliseconds: 120), () => askStep(0));
   }
 
@@ -1188,6 +1265,26 @@ class AppState extends ChangeNotifier {
     if (st.id == 'gender') {
       profile = profile.copyWith(gender: o.value == 'female' ? Gender.female : Gender.male);
     }
+    if (st.id == 'consent') {
+      // Three different answers, not one "next": the optional yes turns
+      // analytics on, the required-only answer is a recorded no, and "tell
+      // me more" is a question — it gets an answer and the chips stay.
+      switch (o.value) {
+        case 'more':
+          answerStep(o.ar, o.en, _explainConsent);
+        case 'yes_improve':
+          answerStep(o.ar, o.en, () {
+            setImprove(true).ignore();
+            advance();
+          });
+        default:
+          answerStep(o.ar, o.en, () {
+            setImprove(false).ignore();
+            advance();
+          });
+      }
+      return;
+    }
     if (st.id == 'safety' && o.value != 'none') {
       answerStep(o.ar, o.en, () {
         _pushQ(
@@ -1227,6 +1324,13 @@ class AppState extends ChangeNotifier {
   void skipStep() {
     answerStep('تخطي', 'Skip', advance);
   }
+
+  /// "Tell me more" at the consent question: what each choice covers, in
+  /// plain words, and then the same two choices again. It never advances.
+  void _explainConsent() => qamarSay(
+        'باختصار: بحسبلك هدف سعرات تقريبي وأقترح أكل مصري في حدوده، ومش بشخّص ولا بوصف علاج — وده اللي لازم أعالج بياناتك عشانه. التحسين اختيار منفصل: لو وافقت، بنشوف إزاي التطبيق بيتستخدم (أنهي خطوات وأنهي زراير)، من غير أكلك ولا وزنك ولا اسمك، وتقدر تقفله من «حسابي» في أي وقت. اختار من تحت.',
+        'In short: I estimate a calorie target and suggest Egyptian meals inside it; I don’t diagnose or prescribe — that is what your data is processed for. Helping improve Qamar is separate: if you agree, we see how the app is used (which steps, which buttons), never your food, your weight or your name, and you can turn it off in Me at any time. Pick one below.',
+      );
 
   void bumpAge(int d) => _bumpProfile(age: (profile.age + d).clamp(18, 90).toInt());
 
@@ -1458,13 +1562,15 @@ class AppState extends ChangeNotifier {
           advance();
           return;
         }
+        // A plain "yes" agrees to what is required; the optional part needs
+        // its own clear yes, so this is recorded as a no to it.
         if (has(['موافق', 'اوافق', 'أوافق', 'تمام', 'ماشي', 'اكيد', 'أكيد', 'يلا', 'agree', 'yes', 'ok', 'sure', 'fine'])) {
+          setImprove(false).ignore();
           advance();
           return;
         }
         if (has(['اعرف', 'أعرف', 'ليه', 'معلومات', 'more', 'why', 'tell'])) {
-          qamarSay('باختصار: بحسبلك هدف سعرات تقريبي وأقترح أكل مصري في حدوده. مش بشخّص ولا بوصف علاج. لو تمام قولي "موافق".',
-              'In short: I estimate a calorie target and suggest Egyptian meals inside it. I don’t diagnose or prescribe. Say “I agree” when you’re ready.');
+          _explainConsent();
           return;
         }
         unclear();
