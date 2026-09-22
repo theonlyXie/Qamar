@@ -71,7 +71,18 @@ class HomeShell extends StatelessWidget {
               ),
               if (state.orbVisible) const OrbNav(),
               if (state.treeOpen) const TreeOverlay(),
-              if (state.chatOpen) const AskQamarOverlay(),
+              // The conversation arrives under its own fade and leaves under
+              // this one, so closing it is as soft as opening it was.
+              Positioned.fill(
+                child: IgnorePointer(
+                  ignoring: !state.chatOpen,
+                  child: AnimatedSwitcher(
+                    duration: Duration.zero,
+                    reverseDuration: const Duration(milliseconds: 180),
+                    child: state.chatOpen ? const AskQamarOverlay() : const SizedBox.shrink(),
+                  ),
+                ),
+              ),
               if (state.whyOpen) const WhySheet(),
               if (state.authOpen) const AccountSheet(),
               if (state.pendingActivity != null) const ActivitySheet(),
