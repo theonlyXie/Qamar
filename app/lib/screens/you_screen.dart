@@ -119,7 +119,12 @@ class YouScreen extends StatelessWidget {
                     Text(
                       state.plusActive
                           ? (isAr ? 'شكراً إنك معانا' : 'Thanks for supporting Qamar')
-                          : (isAr ? 'خطة بكرة، وصور وأسئلة أكتر' : 'Tomorrow’s plan, more photos and questions'),
+                          : state.trialWaiting
+                              // "Not now" at the reveal leaves the free week here.
+                              ? (isAr
+                                  ? 'أسبوعك المجاني مستنيك: ${state.iso('${AppState.trialOfferDays}')} أيام، من غير بطاقة، ومفيش تجديد.'
+                                  : 'Your free week is waiting: ${AppState.trialOfferDays} days, no card, nothing renews.')
+                              : (isAr ? 'خطة بكرة، وصور وأسئلة أكتر' : 'Tomorrow’s plan, more photos and questions'),
                       style: QText.body(size: 12, height: 18, color: QColors.textMuted),
                     ),
                   ]),

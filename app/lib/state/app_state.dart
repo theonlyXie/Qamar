@@ -1929,6 +1929,7 @@ class AppState extends ChangeNotifier {
       const ObMessage.save(),
     ]);
     _track('intake_completed', {'route': 'target'});
+    _offerTrialAfterReveal();
     // Shown at once; paid by the server (qamar_grant_onboarding, once per
     // account), and the wallet is re-read so the two numbers agree.
     _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
@@ -1964,6 +1965,49 @@ class AppState extends ChangeNotifier {
   void dismissSave() {
     msgs.removeWhere((m) => m.kind == ObKind.save);
     _notify();
+  }
+
+  // ---- the free week, offered after the reveal (O12) ------------------------
+  //
+  // The blueprint's 7:30: after the plan reveal, never before it, the trial
+  // as a gift with its rules stated — "7 days of the full Qamar. No card,
+  // nothing renews." — Start or Not now. Not now leaves it waiting in Me.
+  // Offered only where it can actually start: a backed account, billing
+  // configured, and a trial the server says is still unused.
+
+  /// The trial the reveal can offer: never used, not already on Qamar+.
+  bool get trialWaiting => plusTrialEligible && !plusActive;
+
+  /// The offer's length, as the organic trial the server starts (0043).
+  static const trialOfferDays = 7;
+
+  bool get _canOfferTrial => trialWaiting && isBacked && hasBilling;
+
+  void _offerTrialAfterReveal() {
+    if (!_canOfferTrial) return;
+    msgs.add(const ObMessage.trialOffer());
+    _track('trial_offer_shown', {'placement': 'onboarding'});
+  }
+
+  Future<void> acceptTrialOffer() async {
+    msgs.removeWhere((m) => m.kind == ObKind.trialOffer);
+    _notify();
+    await startPlusTrial();
+    if (_disposed) return;
+    _pushQ(
+      plusIsTrial
+          ? 'أسبوعك مع قمر كامل بدأ. من غير بطاقة، ومفيش حاجة بتتجدد لوحدها — هقولك قبل ما يخلص بيومين.'
+          : 'مقدرتش أبدأ الأسبوع المجاني دلوقتي. مستنيك في «حسابي» وقت ما تحب.',
+      plusIsTrial
+          ? 'Your week of the full Qamar has started. No card, and nothing renews on its own — I’ll tell you two days before it ends.'
+          : 'I couldn’t start the free week just now. It waits for you in Me whenever you want it.',
+    );
+  }
+
+  void declineTrialOffer() {
+    msgs.removeWhere((m) => m.kind == ObKind.trialOffer);
+    _track('trial_offer_declined', {'placement': 'onboarding'});
+    _pushQ('موجود في «حسابي» وقت ما تحب.', 'It’s waiting in Me whenever you want it.');
   }
 
   Target target() {

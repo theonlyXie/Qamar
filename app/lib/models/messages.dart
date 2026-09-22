@@ -1,4 +1,4 @@
-enum ObKind { q, u, target, save, dish }
+enum ObKind { q, u, target, save, dish, trialOffer }
 
 class ObMessage {
   final ObKind kind;
@@ -19,6 +19,12 @@ class ObMessage {
   /// target (AppState.revealDish).
   const ObMessage.dish()
       : kind = ObKind.dish,
+        ar = '',
+        en = '';
+
+  /// The free week, offered once after the plan reveal — never before it.
+  const ObMessage.trialOffer()
+      : kind = ObKind.trialOffer,
         ar = '',
         en = '';
 

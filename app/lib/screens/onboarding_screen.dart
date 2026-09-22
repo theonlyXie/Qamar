@@ -364,6 +364,8 @@ class _MessageBubble extends StatelessWidget {
         );
       case ObKind.save:
         return _SaveCard(state: state);
+      case ObKind.trialOffer:
+        return _TrialOfferCard(state: state);
     }
   }
 }
@@ -449,6 +451,68 @@ class _MacroBox extends StatelessWidget {
           children: [
             Text(label, style: QText.body(size: 11, color: QColors.textMuted)),
             Text(grams, style: QText.number(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The free week, offered after the reveal: a gift with its rules stated.
+class _TrialOfferCard extends StatelessWidget {
+  final AppState state;
+  const _TrialOfferCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    const days = AppState.trialOfferDays;
+    return FractionallySizedBox(
+      widthFactor: 0.88,
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: QColors.gold.withValues(alpha: 0.08),
+          border: Border.all(color: QColors.gold.withValues(alpha: 0.4)),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isAr ? '${state.iso('$days')} أيام من قمر كامل.' : '$days days of the full Qamar.',
+              style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFE9ECFF)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              isAr
+                  ? 'من غير بطاقة، ومفيش حاجة بتتجدد لوحدها. خطة بكرة، وصور وأسئلة أكتر.'
+                  : 'No card, nothing renews. Tomorrow’s plan, and more photos and questions.',
+              style: QText.body(size: 13, height: 20, color: QColors.textMid),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: () => state.acceptTrialOffer(),
+                    child: Ink(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(999))),
+                      child: Text(isAr ? 'ابدأ' : 'Start', style: QText.body(size: 13, weight: FontWeight.w600, color: Colors.white)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: state.declineTrialOffer,
+                  child: Text(isAr ? 'مش دلوقتي' : 'Not now', style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
+                ),
+              ],
+            ),
           ],
         ),
       ),

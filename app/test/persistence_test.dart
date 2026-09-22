@@ -2022,6 +2022,76 @@ void main() {
     });
   });
 
+  group('the free week, offered after the reveal (O12)', () {
+    // Runs the consultation from its last question to the reveal.
+    Future<void> toReveal(AppState state) async {
+      state.startOnboarding();
+      state.step = kOnboardingSteps.indexWhere((s) => s.id == 'food');
+      state.primarySubmit();
+      await Future<void>.delayed(const Duration(milliseconds: 2600));
+    }
+
+    test('after the plan reveal, never before it — and it is counted where it was shown', () async {
+      final a = MemoryAnalytics();
+      final billing = FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: true);
+      final state = backed(billing: billing, analytics: a);
+      await settle();
+      await state.setImprove(true);
+      state.startOnboarding();
+      expect(state.msgs.any((m) => m.kind == ObKind.trialOffer), isFalse, reason: 'never at the start');
+
+      await toReveal(state);
+      final kinds = state.msgs.map((m) => m.kind).toList();
+      expect(kinds.indexOf(ObKind.trialOffer), greaterThan(kinds.indexOf(ObKind.target)), reason: 'after the reveal');
+      expect(a.named('trial_offer_shown').single['placement'], 'onboarding');
+      expect(billing.trialStarts, 0, reason: 'shown, not started: the person chooses');
+    });
+
+    test('Start begins the week, with no card, and schedules its one reminder', () async {
+      final billing = FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: true);
+      final nudger = MemoryNudger();
+      final state = backed(billing: billing, nudger: nudger);
+      await settle();
+      await state.allowNudges();
+      await toReveal(state);
+
+      await state.acceptTrialOffer();
+      await settle();
+      expect(billing.trialStarts, 1);
+      expect(state.plusIsTrial, isTrue);
+      expect(state.msgs.any((m) => m.kind == ObKind.trialOffer), isFalse);
+      expect(state.msgs.last.text(false), contains('nothing renews on its own'));
+      expect(nudger.scheduled.where((n) => n.kind == NudgeKind.trialEnding), hasLength(1));
+    });
+
+    test('Not now leaves the week waiting in Me', () async {
+      final a = MemoryAnalytics();
+      final billing = FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: true);
+      final state = backed(billing: billing, analytics: a);
+      await settle();
+      await state.setImprove(true);
+      await toReveal(state);
+
+      state.declineTrialOffer();
+      expect(state.msgs.any((m) => m.kind == ObKind.trialOffer), isFalse);
+      expect(state.msgs.last.text(false), 'It’s waiting in Me whenever you want it.');
+      expect(billing.trialStarts, 0);
+      expect(state.trialWaiting, isTrue, reason: 'the You tile says so while it waits');
+      expect(a.named('trial_offer_declined').single['placement'], 'onboarding');
+    });
+
+    test('never offered where it cannot start: a used trial, a member, or no billing', () async {
+      final used = backed(billing: FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: false));
+      await settle();
+      await toReveal(used);
+      expect(used.msgs.any((m) => m.kind == ObKind.trialOffer), isFalse);
+
+      final offline = AppState();
+      await toReveal(offline);
+      expect(offline.msgs.any((m) => m.kind == ObKind.trialOffer), isFalse);
+    });
+  });
+
   group('the first moment of value — the food graph, when backed (O5)', () {
     Map<String, Per100> shipped() => {for (final d in kEgyptianDishes) for (final p in d.parts) p.slug: p.per100};
 

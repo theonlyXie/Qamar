@@ -231,6 +231,18 @@ void main() {
       expect(RegExp('[0-9]').hasMatch(transcript), isFalse, reason: transcript);
     });
 
+    testWidgets('a free week left at "Not now" is waiting on the Me tile, in both languages', (tester) async {
+      final s = AppState()..plusTrialEligible = true;
+      s.setLang(AppLang.en);
+      await pump(tester, s);
+      s.go(AppScreen.you);
+      await tester.pump();
+      expect(find.text('Your free week is waiting: 7 days, no card, nothing renews.'), findsOneWidget);
+      s.setLang(AppLang.ar);
+      await tester.pump();
+      expect(find.text('أسبوعك المجاني مستنيك: \u2066٧\u2069 أيام، من غير بطاقة، ومفيش تجديد.'), findsOneWidget);
+    });
+
     testWidgets('Today names no target on general guidance, and says what is still here', (tester) async {
       final s = AppState()
         ..profile = const Profile(safety: SafetyAnswer.pregnant)
