@@ -14,6 +14,9 @@ import '../widgets/moon.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
+
+  /// The composer's send button, for tests.
+  static const sendKey = ValueKey('onboarding-send');
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
@@ -200,7 +203,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         onSubmitted: (_) => state.sendDraft(),
                         style: QText.body(size: 15, color: QColors.textPrimary),
                         decoration: InputDecoration(
-                          hintText: step != null ? (state.isAr ? 'اكتب ردك بكلامك…' : 'Or just type your answer…') : (state.isAr ? 'اسأل قمر أي حاجة…' : 'Ask Qamar anything…'),
+                          // Until the question is on screen the box asks
+                          // for nothing: what is typed waits for it (O7).
+                          hintText: step != null && !asked
+                              ? (state.isAr ? 'قمر بيكتب…' : 'Qamar is typing…')
+                              : step != null
+                                  ? (state.isAr ? 'اكتب ردك بكلامك…' : 'Or just type your answer…')
+                                  : (state.isAr ? 'اسأل قمر أي حاجة…' : 'Ask Qamar anything…'),
                           hintStyle: QText.body(size: 15, color: QColors.textFaint),
                           filled: true,
                           fillColor: QColors.cardDeep,
@@ -215,17 +224,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   if (canSkip)
                     TextButton(onPressed: state.skipStep, child: Text(t.skip, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textMuted))),
                   const SizedBox(width: 8),
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: Ink(
-                        decoration: const BoxDecoration(shape: BoxShape.circle, gradient: QColors.brandGradient),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: state.sendDraft,
-                          child: const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
+                  // Send waits for the question too.
+                  Opacity(
+                    opacity: step != null && !asked ? 0.4 : 1,
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: Ink(
+                          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: QColors.brandGradient),
+                          child: InkWell(
+                            key: OnboardingScreen.sendKey,
+                            customBorder: const CircleBorder(),
+                            onTap: step != null && !asked ? null : state.sendDraft,
+                            child: const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
+                          ),
                         ),
                       ),
                     ),

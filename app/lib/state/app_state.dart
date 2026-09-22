@@ -1693,6 +1693,9 @@ class AppState extends ChangeNotifier {
   void sendDraft() {
     final raw = draft.trim();
     if (raw.isEmpty) return;
+    // An answer never comes before its question (O7): while Qamar is still
+    // typing the next question, what was typed waits in the box.
+    if (currentStep != null && !questionShown) return;
     draft = '';
     msgs.add(ObMessage.u(ar: raw, en: raw));
     _notify();
