@@ -1,3 +1,5 @@
+import 'problem.dart';
+
 enum ObKind { q, u, target, save, dish, trialOffer }
 
 class ObMessage {
@@ -47,5 +49,10 @@ class ChatTurn {
   /// The photo the person sent with these words — a menu, a label, a plate.
   /// Shown in their bubble; never kept anywhere but this device.
   final String? photoPath;
-  const ChatTurn({required this.who, required this.text, this.sub, this.action, this.openWallet = false, this.openPlus = false, this.photoPath});
+
+  /// Something that did not work, with its next step and, when there is
+  /// one, another way on (O10). The turn's [text] is the problem's "what";
+  /// its actions are drawn under it as buttons.
+  final Problem? problem;
+  const ChatTurn({required this.who, required this.text, this.sub, this.action, this.openWallet = false, this.openPlus = false, this.photoPath, this.problem});
 }

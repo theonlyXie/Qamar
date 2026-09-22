@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:intl/intl.dart';
 
 import '../l10n/strings.dart';
@@ -11,6 +12,7 @@ import '../models/messages.dart';
 import '../models/nudge.dart';
 import '../models/onboarding.dart';
 import '../models/plan.dart';
+import '../models/problem.dart';
 import '../models/streak.dart';
 import '../models/su_economy.dart';
 import '../services/ai_gateway.dart';
@@ -20,6 +22,7 @@ import '../services/device_prefs.dart';
 import '../services/dictation.dart';
 import '../services/nudger.dart';
 import '../services/photos.dart';
+import '../services/settings_link.dart' as settings_link;
 import '../services/sharer.dart';
 import '../services/config.dart';
 import '../services/payments.dart';
@@ -89,6 +92,7 @@ class AppState extends ChangeNotifier {
     Sharer? sharer,
     Analytics? analytics,
     DateTime Function()? clock,
+    Future<bool> Function()? openSettings,
   })  : _profileRepo = profileRepo,
         _mealRepo = mealRepo,
         _waterRepo = waterRepo,
@@ -107,6 +111,7 @@ class AppState extends ChangeNotifier {
         _nudger = nudger,
         _sharer = sharer,
         _analytics = analytics,
+        _openSettings = openSettings ?? settings_link.openAppSettings,
         _clock = clock ?? DateTime.now {
     _watchAccount();
     _watchNudger();
@@ -140,6 +145,9 @@ class AppState extends ChangeNotifier {
 
   /// Injectable so the meal-time logic can be tested at a chosen hour.
   final DateTime Function() _clock;
+
+  /// Opens Qamar's page in the phone's Settings (services/settings_link.dart).
+  final Future<bool> Function() _openSettings;
 
   /// The app's idea of now — the injected clock, so screens and state agree.
   DateTime clockNow() => _clock();
@@ -1165,7 +1173,7 @@ class AppState extends ChangeNotifier {
 
   void openScan() {
     scanPhotoPath = null;
-    scanCameraError = null;
+    scanProblem = null;
     screen = AppScreen.scan;
     scanReading = false;
     _notify();
@@ -1216,18 +1224,65 @@ class AppState extends ChangeNotifier {
   String? scanPhotoPath;
 
   /// Set when the camera could not be opened at all (no camera, permission
-  /// refused, unsupported platform) so the screen can say so instead of
-  /// looking broken.
-  String? scanCameraError;
+  /// refused, unsupported platform) so the screen can say so, with the way
+  /// on, instead of looking broken (O10).
+  Problem? scanProblem;
 
   void setScanPhoto(String? path) {
     scanPhotoPath = path;
-    scanCameraError = null;
+    scanProblem = null;
     _notify();
   }
 
-  void setScanCameraError(String message) {
-    scanCameraError = message;
+  void setScanProblem(Problem? problem) {
+    scanProblem = problem;
+    _notify();
+  }
+
+  // ---- the camera, when it will not open (O10) ------------------------------
+
+  /// Whether this phone can be taken straight to Qamar's page in Settings.
+  bool get canOpenAppSettings => settings_link.canOpenAppSettings;
+
+  void openAppSettings() {
+    _track('app_settings_opened', const {});
+    _openSettings().catchError((_) => false);
+  }
+
+  /// The camera would not open for [e]. Said plainly, never as the
+  /// exception, with [instead] — the way on that keeps what the person was
+  /// doing. A refused camera is a permission, not an error: on an iPhone it
+  /// also offers Settings, and elsewhere it says where to allow it.
+  Problem cameraProblem(Object e, {required ProblemAction instead}) {
+    final refused = e is PlatformException && (e.code == 'camera_access_denied' || e.code == 'camera_access_restricted');
+    if (!refused) {
+      return Problem(
+        what: isAr ? 'الكاميرا مفتحتش.' : 'The camera didn’t open.',
+        why: isAr ? 'قمر مقدرش يستخدم كاميرا الموبايل ده.' : 'Qamar couldn’t use this phone’s camera.',
+        action: instead,
+      );
+    }
+    final settings = canOpenAppSettings ? ProblemAction(isAr ? 'افتح الإعدادات' : 'Open Settings', openAppSettings) : null;
+    return Problem(
+      what: isAr ? 'الكاميرا مقفولة لقمر.' : 'The camera is off for Qamar.',
+      why: settings != null
+          ? (isAr ? 'افتحها من الإعدادات، أو كمّل من غيرها.' : 'Allow it in Settings, or carry on without it.')
+          : (isAr ? 'اسمح لقمر بالكاميرا من إعدادات الموبايل، أو كمّل من غيرها.' : 'Allow the camera for Qamar in your phone’s Settings, or carry on without it.'),
+      action: settings ?? instead,
+      secondary: settings == null ? null : instead,
+      kind: ProblemKind.permission,
+    );
+  }
+
+  /// A problem in the tree, shown in place of the ring: Photo was chosen and
+  /// the camera would not open. Closing the tree clears it.
+  Problem? treeProblem;
+
+  /// Photo was chosen in the tree and the camera would not open: the tree
+  /// says so, and "Type it instead" keeps the meal being logged.
+  void cameraFailedInTree(Object e) {
+    treeProblem = cameraProblem(e, instead: ProblemAction(isAr ? 'اكتبها بدل كده' : 'Type it instead', () => quickLog(QuickLog.text)));
+    _track('camera_failed', {'where': 'tree', 'refused': treeProblem!.kind == ProblemKind.permission});
     _notify();
   }
 
@@ -1246,7 +1301,7 @@ class AppState extends ChangeNotifier {
     final path = scanPhotoPath;
     final gateway = _ai;
     scanReading = true;
-    scanCameraError = null;
+    scanProblem = null;
     scanRead = null;
     _notify();
 
@@ -2327,7 +2382,7 @@ class AppState extends ChangeNotifier {
     } on AiQuotaException catch (e) {
       if (_disposed) return;
       _track('meal_read_failed', {'source': inputType, 'reason': 'quota'});
-      _onQuotaHit(e);
+      _onQuotaHit(e, mealLog: true);
     } catch (e) {
       if (_disposed) return;
       _track('meal_read_failed', {'source': inputType, 'reason': 'error'});
@@ -2337,7 +2392,7 @@ class AppState extends ChangeNotifier {
         text: isAr
             ? 'مقدرتش أوصل للمساعد عشان أقرأ الوجبة. جرّب تاني بعد شوية.'
             : 'I could not reach the assistant to read the meal. Try again in a moment.',
-        sub: '$e'.length > 120 ? null : '$e',
+        sub: _failedWhy(e),
       ));
     } finally {
       _mealReads--;
@@ -3164,7 +3219,7 @@ class AppState extends ChangeNotifier {
       case 'photo':
         photoQuota = q;
       case 'plan':
-        break; // the plan wall speaks through planError
+        break; // the plan wall speaks through planProblem
       default:
         aiQuota = q;
     }
@@ -3201,20 +3256,76 @@ class AppState extends ChangeNotifier {
   /// The wall, in the conversation. Each bucket has its own way out and the
   /// button goes there: another photo is bought with Su in the wallet; the
   /// fourth question is Qamar+.
-  void _onQuotaHit(AiQuotaException e) {
+  ///
+  /// Each wall also offers the way that keeps what the person was doing
+  /// (O10): a meal photo past the limit can be typed instead, and words
+  /// that hit the question limit can be logged as a meal, which never
+  /// spends a question. [asked] is what was sent; [mealLog] says the wall
+  /// came up while logging a meal.
+  void _onQuotaHit(AiQuotaException e, {String? asked, bool mealLog = false}) {
     _track('quota_hit', {'bucket': e.quota.bucket});
     _absorb(e.quota);
     chatState = ChatState.idle;
     final photo = e.quota.bucket == 'photo';
+    // In Arabic the Latin brand is isolated, or its trailing "+" is drawn on
+    // the wrong side of the word ("+Qamar").
+    final label = photo ? (isAr ? 'افتح المحفظة' : 'Open the wallet') : (isAr ? 'شوف \u2066Qamar+\u2069' : 'See Qamar+');
+    final words = asked?.trim() ?? '';
+    final ProblemAction? instead = photo
+        ? (mealLog ? ProblemAction(isAr ? 'اكتبها بدل كده' : 'Type it instead', () => quickLog(QuickLog.text)) : null)
+        : (words.isEmpty ? null : ProblemAction(isAr ? 'سجّلها كوجبة' : 'Log it as a meal', () => logTextAsMeal(words)));
     chat.add(ChatTurn(
       who: ChatWho.q,
       text: e.message,
-      action: photo ? (isAr ? 'افتح المحفظة' : 'Open the wallet') : (isAr ? 'شوف Qamar+' : 'See Qamar+'),
+      action: label,
       openWallet: photo,
       openPlus: !photo,
+      problem: Problem(what: e.message, action: ProblemAction(label, () => _leaveChatForWall(photo: photo)), secondary: instead),
     ));
     _notify();
   }
+
+  /// A wall's way out from the conversation: the wallet sells another photo;
+  /// the fourth question is Qamar+.
+  void _leaveChatForWall({required bool photo}) {
+    chatOpen = false;
+    if (!photo) {
+      openSubscription();
+      return;
+    }
+    screen = AppScreen.wallet;
+    _notify();
+  }
+
+  /// Words that hit the question limit, read as a meal instead (O10). A meal
+  /// is read by the meal reader, never the question bucket, so this works
+  /// with no questions left.
+  Future<void> logTextAsMeal(String text) async {
+    final words = text.trim();
+    if (words.isEmpty || _logUnderWay) return;
+    _logStart = _logStartNow();
+    _mealAskAt = null;
+    _track('question_logged_as_meal', const {});
+    await _analyseMeal(inputType: 'text', text: words);
+  }
+
+  /// The camera would not open for a photo in the conversation: Qamar says
+  /// so, with [instead] as the way on (choosing a photo that is already on
+  /// the phone), and Settings where the phone allows it.
+  void cameraFailedInChat(Object e, {required ProblemAction instead}) {
+    final p = cameraProblem(e, instead: instead);
+    chat.add(ChatTurn(who: ChatWho.q, text: p.what, sub: p.why, problem: p));
+    _track('camera_failed', {'where': 'chat', 'refused': p.kind == ProblemKind.permission});
+    _notify();
+  }
+
+  /// A call that failed, said from the person's side: no connection, too
+  /// slow, or us — never the exception itself.
+  String _failedWhy(Object e) => switch (failureOf(e)) {
+        Failure.offline => isAr ? 'مفيش نت دلوقتي.' : 'You’re offline right now.',
+        Failure.slow => isAr ? 'النت بطيء دلوقتي.' : 'The connection is too slow right now.',
+        Failure.ours => isAr ? 'المشكلة عندنا، مش منك.' : 'The problem is on our side, not yours.',
+      };
 
   void redeem(SpendItemDef item) {
     final done = item.once && isRedeemed(item.id);
@@ -3492,9 +3603,10 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Turns a Supabase error into something a person can act on. The raw
-  /// message is kept when it is not one we recognise — hiding it would make a
-  /// misconfigured project look like a broken app.
+  /// Turns a Supabase error into something a person can act on. One we do
+  /// not recognise is said from the person's side — offline, or a problem on
+  /// our side — never as the raw message (O10); the raw text goes to the
+  /// debug log, where a misconfigured project is still easy to spot.
   String _authMessage(Object e) {
     final raw = '$e';
     if (raw.contains('already been registered') || raw.contains('already registered')) {
@@ -3511,7 +3623,10 @@ class AppState extends ChangeNotifier {
     if (raw.contains('rate limit') || raw.contains('Too many')) {
       return isAr ? 'طلبات كتير على بعض. استنى شوية.' : 'Too many attempts. Wait a minute and try again.';
     }
-    return raw;
+    debugPrint('auth: $raw');
+    return failureOf(e) == Failure.ours
+        ? (isAr ? 'حصلت مشكلة عندنا. جرّب تاني بعد شوية.' : 'Something went wrong on our side. Try again in a moment.')
+        : (isAr ? 'مفيش نت دلوقتي. جرّب تاني لما يرجع.' : 'You’re offline right now. Try again when you’re back.');
   }
 
   // ---- progress -------------------------------------------------
@@ -3726,7 +3841,13 @@ class AppState extends ChangeNotifier {
   String? planDate;
 
   bool planLoading = false;
-  String? planError;
+
+  /// Why today's plan is not here, with the next step (O10). Null while
+  /// there is a plan, or nothing has been asked yet.
+  Problem? planProblem;
+
+  /// The problem's first line, for anything that only needs the words.
+  String? get planError => planProblem?.what;
 
   bool get hasPlan => plan != null && plan!.slots.isNotEmpty;
 
@@ -3775,7 +3896,7 @@ class AppState extends ChangeNotifier {
     final first = planDate == null;
     plan = built;
     planDate = built.date;
-    planError = null;
+    planProblem = null;
     _track('plan_shown', {'via': via, 'first': first});
     // A rewritten menu is not the old one; carrying swaps would apply
     // yesterday's (or the previous dish's) choice to meals that are not there.
@@ -3799,63 +3920,97 @@ class AppState extends ChangeNotifier {
 
     final gateway = _ai;
     if (gateway == null) {
-      planError = isAr
-          ? 'الخطة بتتكتب لك إنت بالذات، وده محتاج اتصال بالمساعد.'
-          : 'The plan is written for you specifically, which needs a connection to the assistant.';
+      planProblem = Problem(
+        what: isAr ? 'الخطة بتتكتب لك إنت بالذات، وده محتاج اتصال بالمساعد.' : 'The plan is written for you specifically, which needs a connection to the assistant.',
+        action: ProblemAction(isAr ? 'ارجع للنهارده' : 'Back to Today', () => go(AppScreen.today)),
+        kind: ProblemKind.offline,
+      );
       _notify();
       return;
     }
 
     planLoading = true;
-    planError = null;
+    planProblem = null;
     _notify();
     try {
-      final built = await gateway.generatePlan(
-        date: today,
-        lang: lang.code,
-        force: force,
-        instruction: (note == null || note.isEmpty) ? null : note,
-      );
+      final built = await gateway
+          .generatePlan(
+            date: today,
+            lang: lang.code,
+            force: force,
+            instruction: (note == null || note.isEmpty) ? null : note,
+          )
+          .timeout(planTimeout);
       if (_disposed) return;
       await _pullQuota(gateway);
       _installPlan(built);
     } on AiQuotaException catch (e) {
       if (_disposed) return;
       _absorb(e.quota);
-      planError = e.message;
+      planProblem = _planWall(e.message);
     } catch (e) {
       if (_disposed) return;
-      planError = _planMessage(e);
+      planProblem = _planProblem(e);
     }
     planLoading = false;
     _notify();
   }
 
+  /// How long writing the plan may take before the person is told the
+  /// connection is too slow, instead of watching "Writing…" for ever.
+  static const planTimeout = Duration(seconds: 60);
+
+  /// The plan's daily cap, in the server's words. Su buys no plan uses, so
+  /// the way out is the one the server names: tell Qamar what changed.
+  Problem _planWall(String message) => Problem(
+        what: message,
+        action: ProblemAction(isAr ? 'قول لقمر إيه اللي اتغيّر' : 'Tell Qamar what changed', openChat),
+      );
+
   /// The gateway refuses to guess, and its refusals are actionable — say what
-  /// they mean rather than showing a raw HTTP status.
-  String _planMessage(Object e) {
+  /// they mean and offer the next step, never a raw status or exception.
+  Problem _planProblem(Object e) {
+    final retry = ProblemAction(isAr ? 'جرّب تاني' : 'Try again', () => ensurePlan(force: true));
+    final away = isAr ? 'الخطة بتتكتب لك على السيرفر، فمحتاجة نت.' : 'The plan is written for you on our server, so it needs a connection.';
+    switch (failureOf(e)) {
+      case Failure.offline:
+        return Problem(what: isAr ? 'مفيش نت دلوقتي.' : 'You’re offline right now.', why: away, action: retry, kind: ProblemKind.offline);
+      case Failure.slow:
+        return Problem(what: isAr ? 'النت بطيء دلوقتي.' : 'The connection is too slow right now.', why: away, action: retry, kind: ProblemKind.offline);
+      case Failure.ours:
+        break;
+    }
     final raw = '$e';
     if (raw.contains('409') || raw.contains('no target')) {
-      return isAr
-          ? 'محتاج أعرف هدفك الأول. كمّل الأسئلة وهعملك الخطة.'
-          : 'I need your target first. Finish the questions and I will build the plan.';
+      return Problem(
+        what: isAr ? 'محتاج أعرف هدفك الأول.' : 'I need your target first.',
+        why: isAr ? 'كمّل الأسئلة وهعملك الخطة.' : 'Finish the questions and I will build the plan.',
+        action: ProblemAction(isAr ? 'كمّل الأسئلة' : 'Finish the questions', startOnboarding),
+      );
     }
     if (raw.contains('503') || raw.contains('no grounded guidance')) {
-      return isAr
-          ? 'مفيش مصادر موثوقة متسجلة لسه، ومش هألّف خطة من دماغي.'
-          : 'There is no trusted guidance loaded yet, and I will not invent a plan.';
+      return Problem(
+        what: isAr ? 'مفيش مصادر موثوقة متسجلة لسه.' : 'There is no trusted guidance loaded yet.',
+        why: isAr ? 'ومش هألّف خطة من دماغي.' : 'I will not invent a plan without it.',
+        action: retry,
+      );
     }
     if (raw.contains('403') || raw.contains('not eligible')) {
-      return isAr ? 'الحساب ده مش مؤهل للخطط.' : 'This account is not eligible for plans.';
+      return Problem(
+        what: isAr ? 'الحساب ده مش مؤهل للخطط.' : 'This account is not eligible for plans.',
+        action: ProblemAction(isAr ? 'ارجع للنهارده' : 'Back to Today', () => go(AppScreen.today)),
+      );
     }
     if (raw.contains('429') || raw.toLowerCase().contains('quota')) {
-      return isAr
-          ? 'خلصت استخدامات قمر النهارده. افتح المحفظة وصرف نقاط Su على استخدام زيادة.'
-          : 'That’s today’s Qamar uses. Open the wallet and spend Su Points on another use.';
+      return _planWall(isAr
+          ? 'الخطة اتكتبت كفاية النهارده. عدّل الوجبات من الخطة نفسها، أو قوللي إيه اللي اتغيّر وأنا أظبط الباقي.'
+          : 'Today’s plan has been rewritten enough. Swap meals on the plan itself, or tell me what changed and I will adjust the rest.');
     }
-    return isAr
-        ? 'مقدرتش أعمل الخطة دلوقتي. جرّب تاني بعد شوية.'
-        : 'I could not build the plan just now. Try again in a moment.';
+    return Problem(
+      what: isAr ? 'حصلت مشكلة عندنا.' : 'Something went wrong on our side.',
+      why: isAr ? 'مش منك. جرّب تاني بعد شوية.' : 'It isn’t you. Try again in a moment.',
+      action: retry,
+    );
   }
 
   // ---- ask qamar (companion overlay) -------------------------------------------------
@@ -4021,7 +4176,7 @@ class AppState extends ChangeNotifier {
       chat.add(ChatTurn(who: ChatWho.q, text: result.reply, action: action));
     } on AiQuotaException catch (e) {
       if (_disposed) return;
-      _onQuotaHit(e);
+      _onQuotaHit(e, asked: photo == null ? text : null);
     } catch (e) {
       if (_disposed) return;
       chatState = ChatState.idle;
@@ -4030,7 +4185,17 @@ class AppState extends ChangeNotifier {
         text: isAr
             ? 'مقدرتش أوصل للمساعد دلوقتي. جرّب تاني بعد شوية.'
             : 'I could not reach the assistant just now. Try again in a moment.',
-        sub: '$e'.length > 120 ? null : '$e',
+        sub: _failedWhy(e),
+        // What was asked goes back in the box, so trying again is one tap.
+        problem: Problem(
+          what: isAr ? 'مقدرتش أوصل للمساعد دلوقتي. جرّب تاني بعد شوية.' : 'I could not reach the assistant just now. Try again in a moment.',
+          why: _failedWhy(e),
+          action: ProblemAction(isAr ? 'جرّب تاني' : 'Try again', () {
+            chatDraft = text;
+            _notify();
+          }),
+          kind: failureOf(e) == Failure.ours ? ProblemKind.error : ProblemKind.offline,
+        ),
       ));
     }
     _notify();
@@ -4071,9 +4236,8 @@ class AppState extends ChangeNotifier {
 
     final ok = await dictation.prepare(
       onError: (e) {
-        dictationError = isAr
-            ? 'مقدرتش أسمع: $e. جرّب تكتب.'
-            : 'I could not listen: $e. Try typing.';
+        dictationError = isAr ? 'مقدرتش أسمعك — جرّب تاني، أو اكتبها.' : 'I couldn’t hear that — try again, or type it.';
+        debugPrint('dictation: $e');
         chatState = ChatState.idle;
         // Closed while listening, and nothing came: the log is abandoned.
         if (!chatOpen) _abandonLog();
@@ -4455,6 +4619,7 @@ class AppState extends ChangeNotifier {
     treeLogIndex = null;
     treeLogSub = null;
     treeWaterIndex = null;
+    treeProblem = null;
     treeOpen = false;
   }
 }

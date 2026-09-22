@@ -11,6 +11,7 @@ import '../models/activity.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
+import 'common.dart';
 import 'living_orb.dart';
 
 /// The tree lives in a fixed 340x340 square; everything below is expressed in
@@ -200,6 +201,28 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
     final nodes = treeNodesFor(ramadan: state.seasonVisible);
     final beamAngles = state.treeExpanded ? subAnglesFor(fanCount) : [for (final n in nodes) n.angle];
 
+    // Photo was chosen and the camera would not open: the problem takes the
+    // ring's place. A tap outside still closes.
+    final problem = state.treeProblem;
+    if (problem != null) {
+      return Positioned.fill(
+        child: GestureDetector(
+          onTap: state.closeTree,
+          child: ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: Container(
+                color: const Color(0xDC070C19),
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: GestureDetector(onTap: () {}, child: QStateCard(problem: problem)),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Positioned.fill(
       child: GestureDetector(
         onTap: state.closeTree,
@@ -378,11 +401,12 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
       }
       state.quickLog(kind);
       state.logPhotoTaken(shot.path);
-    } on Exception {
-      // No camera or a refused permission: fall back to the conversation
-      // rather than leaving the tap doing nothing at all.
+    } on Exception catch (e) {
+      // No camera, or a refused permission: the tree says so, with the way
+      // on — Settings where the phone allows it, and typing the meal
+      // instead — rather than quietly turning into a text box (O10).
       if (!context.mounted) return;
-      state.quickLog(QuickLog.text);
+      state.cameraFailedInTree(e);
     }
   }
 }

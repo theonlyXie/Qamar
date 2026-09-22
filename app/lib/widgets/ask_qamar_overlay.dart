@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../models/meal.dart';
 import '../models/messages.dart';
 import '../services/photos.dart';
+import '../models/problem.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -278,7 +279,12 @@ class _ChatBubble extends StatelessWidget {
               const SizedBox(height: 6),
               Text(turn.sub!, style: QText.body(size: 13, height: 21, color: QColors.textMuted)),
             ],
-            if (turn.action != null) ...[
+            // A problem's next step, and another way on when there is one
+            // (O10); otherwise the turn's one action, as before.
+            if (turn.problem != null) ...[
+              const SizedBox(height: 6),
+              _ProblemActions(problem: turn.problem!),
+            ] else if (turn.action != null) ...[
               const SizedBox(height: 10),
               Align(
                 alignment: AlignmentDirectional.centerStart,
@@ -555,13 +561,87 @@ class _Attachment extends StatelessWidget {
 
 /// Opens the camera for a menu, a label or a plate and attaches the shot to
 /// the next message. Sized for reading print, not for keeping (see photos.dart).
+///
+/// When the camera will not open, Qamar says so (O10), with choosing a photo
+/// already on the phone as the way on, and Settings where the phone allows.
 Future<void> _photographMenu(BuildContext context, AppState state) async {
   try {
     final shot = await pickCompressedPhoto(ImageSource.camera);
     if (!context.mounted || shot == null) return;
     state.attachChatPhoto(shot.path);
+  } on Exception catch (e) {
+    if (!context.mounted) return;
+    state.cameraFailedInChat(
+      e,
+      instead: ProblemAction(state.isAr ? 'اختار صورة من الاستوديو' : 'Choose a photo instead', () => _chooseMenuPhoto(state)),
+    );
+  }
+}
+
+/// The library instead of the camera: the same photo, taken earlier. It
+/// needs no camera permission.
+Future<void> _chooseMenuPhoto(AppState state) async {
+  try {
+    final shot = await pickCompressedPhoto(ImageSource.gallery);
+    if (shot != null) state.attachChatPhoto(shot.path);
   } on Exception {
-    // No camera or a refused permission: the conversation stays as it was.
+    // Nothing chosen and nothing broken: the conversation stays as it was.
+  }
+}
+
+/// A problem's buttons under Qamar's line: the next step, and another way
+/// on when there is one. The chat's chip look, with a touch area of the full
+/// 48 points.
+class _ProblemActions extends StatelessWidget {
+  final Problem problem;
+  const _ProblemActions({required this.problem});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      children: [
+        _TallChip(action: problem.action, emphasis: true),
+        if (problem.secondary != null) _TallChip(action: problem.secondary!),
+      ],
+    );
+  }
+}
+
+class _TallChip extends StatelessWidget {
+  final ProblemAction action;
+  final bool emphasis;
+  const _TallChip({required this.action, this.emphasis = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: action.onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+            child: Align(
+              widthFactor: 1,
+              heightFactor: 1,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: emphasis ? const Color(0x1AA78BFA) : _raised,
+                  border: Border.all(color: emphasis ? QColors.violetSoft.withOpacity(0.4) : QColors.borderSoft),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(action.label,
+                    style: QText.body(size: 12.5, weight: emphasis ? FontWeight.w500 : FontWeight.w400, color: emphasis ? QColors.textHigh : QColors.textMid)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

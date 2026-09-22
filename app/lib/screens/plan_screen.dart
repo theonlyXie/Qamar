@@ -114,6 +114,12 @@ class _PlanEmpty extends StatelessWidget {
     final isAr = state.isAr;
     final busy = state.planLoading;
 
+    // A failed plan says what happened and offers the next step as its
+    // button ("Try again", "Finish the questions"…), in place of the build
+    // button (O10).
+    final problem = state.planProblem;
+    if (problem != null && !busy && !state.generalGuidance) return QStateCard(problem: problem);
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -129,10 +135,9 @@ class _PlanEmpty extends StatelessWidget {
                 ? state.generalGuidancePlanNote
                 : busy
                 ? (isAr ? 'بكتب خطة اليوم…' : 'Writing today’s plan…')
-                : state.planError ??
-                    (isAr
-                        ? 'لسه مفيش خطة لليوم. هبنيها على هدفك واللي بتتجنبه.'
-                        : 'No plan for today yet. I’ll build it around your target and what you avoid.'),
+                : (isAr
+                    ? 'لسه مفيش خطة لليوم. هبنيها على هدفك واللي بتتجنبه.'
+                    : 'No plan for today yet. I’ll build it around your target and what you avoid.'),
             style: QText.body(size: 14, height: 22, color: QColors.textHigh),
           ),
           // No button on the general-guidance route: it could only be refused.

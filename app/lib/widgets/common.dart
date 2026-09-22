@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../l10n/strings.dart';
+import '../models/problem.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -36,6 +37,47 @@ class QPrimaryButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A [Problem] on a screen (O10): what happened, why when it is known, and
+/// the next step as a real button, with another way on beside it when there
+/// is one. The "what" line is always shown whole.
+///
+/// Basic on purpose: seat 6 gives it its design — a glyph per [ProblemKind],
+/// its place in the free space — without changing this API.
+class QStateCard extends StatelessWidget {
+  final Problem problem;
+  const QStateCard({super.key, required this.problem});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = problem;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
+        border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(QRadii.xl),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(p.what, style: QText.body(size: 15, height: 22, weight: FontWeight.w600, color: QColors.textHigh)),
+          if (p.why != null && p.why!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(p.why!, style: QText.body(size: 13, height: 20, color: QColors.textMuted)),
+          ],
+          const SizedBox(height: 14),
+          QPrimaryButton(label: p.action.label, onTap: p.action.onTap, height: 48),
+          if (p.secondary != null) ...[
+            const SizedBox(height: 8),
+            QOutlineButton(label: p.secondary!.label, onTap: p.secondary!.onTap, height: 48, color: QColors.textMid),
+          ],
+        ],
       ),
     );
   }

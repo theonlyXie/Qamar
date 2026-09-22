@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../services/photos.dart';
+import '../models/problem.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -40,12 +41,12 @@ class _ScanScreenState extends State<ScanScreen> {
       state.capture();
     } on Exception catch (e) {
       if (!mounted) return;
-      final isAr = state.isAr;
-      state.setScanCameraError(
-        isAr
-            ? 'مقدرتش أفتح الكاميرا على الجهاز ده. جرّب تختار صورة من الاستوديو، أو اكتب أرقامك بدل الscan. (${e.runtimeType})'
-            : 'I couldn’t open the camera on this device. Try picking a photo from your library, or type your numbers instead. (${e.runtimeType})',
-      );
+      // Said plainly, never as the exception's type, with the way on:
+      // typing the numbers, and Settings where the phone allows it (O10).
+      state.setScanProblem(state.cameraProblem(
+        e,
+        instead: ProblemAction(state.isAr ? 'اكتب أرقامك بدل كده' : 'Type your numbers instead', state.startOnboarding),
+      ));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -127,21 +128,12 @@ class _ScanScreenState extends State<ScanScreen> {
                         ],
                       ),
                     ),
-                  if (state.scanCameraError != null)
+                  if (state.scanProblem != null)
                     Positioned(
                       left: 16,
                       right: 16,
                       bottom: 16,
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: QColors.amber.withValues(alpha: 0.12),
-                          border: Border.all(color: QColors.amber.withValues(alpha: 0.45)),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Text(state.scanCameraError!,
-                            style: QText.body(size: 12, height: 18, color: QColors.amberSoft)),
-                      ),
+                      child: QStateCard(problem: state.scanProblem!),
                     ),
                   if (state.scanReading)
                     ClipRRect(

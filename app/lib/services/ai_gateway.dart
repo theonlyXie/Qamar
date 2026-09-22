@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -331,6 +332,17 @@ class HttpAiGateway implements AiGateway {
 }
 
 /// Today's five uses are gone. The wallet is how they buy another, not a paywall.
+/// What a failed call was, from the person's side (O10): no connection, a
+/// connection too slow to answer, or something on our side. It decides the
+/// words and the next step; the exception itself is never shown.
+enum Failure { offline, slow, ours }
+
+Failure failureOf(Object e) {
+  if (e is TimeoutException) return Failure.slow;
+  if (e is SocketException || e is HandshakeException || e is http.ClientException) return Failure.offline;
+  return Failure.ours;
+}
+
 class AiQuotaException implements Exception {
   final String message;
   final AiQuota quota;
