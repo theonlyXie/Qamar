@@ -24,6 +24,7 @@ import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/models/quest.dart';
 import 'package:qamar/screens/today_screen.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/services/ai_gateway.dart';
@@ -62,6 +63,8 @@ final slotCases = <({TodayCard card, void Function(AppState s) arrange})>[
   ),
   (card: TodayCard.fasting, arrange: (_) {}), // the clock is in the season's lead week
   (card: TodayCard.earnedMonth, arrange: (s) => s.earnedMonthJustGranted = true),
+  // What the server chose from what the day lacks (O2, 0061).
+  (card: TodayCard.quest, arrange: (s) => s.quest = DayQuest(kind: QuestKind.proteinDinner, done: false, expiresAt: _now.add(const Duration(hours: 12)))),
 ];
 
 /// "Points and streaks" on and off. Seat 4 adds `false` with the switch.
@@ -121,7 +124,7 @@ void main() {
     });
 
     test('picks the highest that is due, in the agreed order', () {
-      expect(TodayCard.values, [TodayCard.safety, TodayCard.tutorial, TodayCard.billing, TodayCard.fasting, TodayCard.earnedMonth]);
+      expect(TodayCard.values, [TodayCard.safety, TodayCard.tutorial, TodayCard.billing, TodayCard.fasting, TodayCard.earnedMonth, TodayCard.quest]);
       // Take cards away from the top one by one: the next one takes the slot.
       for (var i = 0; i < TodayCard.values.length; i++) {
         final due = TodayCard.values.sublist(i);

@@ -18,6 +18,7 @@ import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/dishes.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/models/quest.dart';
 import 'package:qamar/models/ramadan.dart';
 import 'package:qamar/models/streak.dart';
 import 'package:qamar/models/su_economy.dart';
@@ -210,12 +211,13 @@ class FakeWalletRepo implements WalletRepository {
   ({int available, int lifetime}) stored = (available: 0, lifetime: 0);
   final List<String> redemptions = [];
   int balanceReads = 0;
-  int quests = 0;
+  int questReads = 0;
+  int skips = 0;
   int onboardingGrants = 0;
 
-  /// What the server pays for the quest — deliberately not the phone's
-  /// number, so a test can tell whose number is on screen.
-  int questPays = 300;
+  /// Today's quest as the server has it. A test sets it, and marks it done
+  /// the way the real earn trigger would when a row meets it.
+  DayQuest? todaysQuest;
 
   @override
   Future<({int available, int lifetime})> balance(String userId) async {
@@ -224,9 +226,14 @@ class FakeWalletRepo implements WalletRepository {
   }
 
   @override
-  Future<void> completeQuest(String userId) async {
-    quests++;
-    stored = (available: stored.available + questPays, lifetime: stored.lifetime + questPays);
+  Future<DayQuest?> todayQuest(String userId) async {
+    questReads++;
+    return todaysQuest;
+  }
+
+  @override
+  Future<void> skipQuest(String userId) async {
+    skips++;
   }
 
   @override
@@ -875,24 +882,57 @@ void main() {
   });
 
   group('Su Points are earned on the server', () {
-    test('the quest is paid by the server, once, and the wallet re-read', () async {
-      final wallet = FakeWalletRepo();
+    test('the quest is paid by the server from the meal that meets it, and the phone credits nothing for it', () async {
+      final later = DateTime.now().add(const Duration(hours: 3));
+      final wallet = FakeWalletRepo()..todaysQuest = DayQuest(kind: QuestKind.lunchBy16, done: false, expiresAt: later);
+      final ai = FakeGateway();
+      final state = backed(wallet: wallet, ai: ai);
+      await settle();
+      expect(state.quest?.kind, QuestKind.lunchBy16, reason: 'read with the wallet');
+      expect(state.questDue, isTrue);
+
+      state.quickLog(QuickLog.text);
+      await state.sendChatMsg('koshary');
+      await settle();
+      // The server's triggers paid the meal and the lunch quest it met.
+      wallet.stored = (available: 850, lifetime: 850);
+      wallet.todaysQuest = DayQuest(kind: QuestKind.lunchBy16, done: true, expiresAt: later);
+      final readsBefore = wallet.questReads;
+      state.confirmProposal();
+      expect(state.suAvailable, SuEconomy.firstMeal, reason: 'the phone shows only the meal it knows it earned');
+      await settle();
+
+      expect(state.suAvailable, 850, reason: 'the ledger’s number, quest included, replaces the phone’s');
+      expect(wallet.questReads, greaterThan(readsBefore), reason: 're-read after the insert that met it');
+      expect(state.quest!.done, isTrue);
+      expect(state.ledger().where((e) => e.amount == SuEconomy.dailyQuest), isEmpty, reason: 'never credited on the phone');
+    });
+
+    test('"not today" puts the quest away at once and tells the server; nothing is paid', () async {
+      final wallet = FakeWalletRepo()
+        ..todaysQuest = DayQuest(kind: QuestKind.water6, done: false, expiresAt: DateTime.now().add(const Duration(hours: 3)));
       final state = backed(wallet: wallet);
       await settle();
-      final readsBefore = wallet.balanceReads;
-
-      state.completeQuest();
-      expect(state.suAvailable, SuEconomy.dailyQuest, reason: 'shown at once, optimistically');
+      expect(state.questDue, isTrue);
+      state.skipQuest();
+      expect(state.questDue, isFalse, reason: 'gone before the server answers');
       await settle();
+      expect(wallet.skips, 1);
+      expect(state.suAvailable, 0);
+    });
 
-      expect(wallet.quests, 1);
-      expect(wallet.balanceReads, greaterThan(readsBefore));
-      expect(state.suAvailable, wallet.questPays, reason: 'the ledger’s number replaces the phone’s');
-
-      state.replaceQuest();
-      state.completeQuest();
+    test('a quest past its time leaves the slot, and Today asks for the next one', () async {
+      var now = DateTime(2027, 2, 5, 12);
+      final wallet = FakeWalletRepo()..todaysQuest = DayQuest(kind: QuestKind.lunchBy16, done: false, expiresAt: DateTime(2027, 2, 5, 16));
+      final state = backed(wallet: wallet, clock: () => now);
       await settle();
-      expect(wallet.quests, 1, reason: 'Accept, Replace, Accept posts once a day');
+      expect(state.questDue, isTrue);
+      now = DateTime(2027, 2, 5, 16, 30);
+      expect(state.questDue, isFalse, reason: 'lunch before four has gone by');
+      wallet.todaysQuest = DayQuest(kind: QuestKind.water6, done: false, expiresAt: DateTime(2027, 2, 6));
+      await state.refreshQuest();
+      expect(state.quest?.kind, QuestKind.water6, reason: 'the next gap the day has');
+      expect(state.questDue, isTrue);
     });
 
     test('a confirmed meal re-reads the wallet after the insert that earned it', () async {
@@ -926,10 +966,13 @@ void main() {
       expect(state.suAvailable, 5);
     });
 
-    test('offline, nothing is posted and the local number stands', () async {
+    test('offline there is no quest: nothing to show, and nothing to tap that pays one', () async {
       final state = AppState();
-      state.completeQuest();
-      expect(state.suAvailable, SuEconomy.dailyQuest);
+      expect(state.quest, isNull);
+      expect(state.questDue, isFalse);
+      state.skipQuest();
+      expect(state.suAvailable, 0);
+      expect(state.ledger(), isEmpty);
     });
   });
 
@@ -1142,9 +1185,9 @@ void main() {
     await settle();
     expect(state.ledger(), isEmpty, reason: 'a new user has earned nothing');
 
-    state.completeQuest();
-    expect(state.ledger().single.amount, SuEconomy.dailyQuest);
-    expect(state.suAvailable, SuEconomy.dailyQuest);
+    state.repeatMeal(LoggedMeal(name: 'Koshary', sub: '', kcal: 520, p: 16, c: 96, f: 9, at: DateTime.now()));
+    expect(state.ledger().single.amount, SuEconomy.firstMeal);
+    expect(state.suAvailable, SuEconomy.firstMeal);
   });
 
   test('the fourth question in a day is refused, and Qamar+ is the way out', () async {

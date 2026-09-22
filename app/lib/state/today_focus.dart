@@ -4,11 +4,10 @@ import 'app_state.dart';
 /// the declaration order is the priority. The slot holds exactly one. The
 /// others that are due move below the fold, in this order. Never a stack.
 ///
-/// Seat 3 adds two in its turn: `weekCard` (review day, three or more days
-/// logged) between [fasting] and [earnedMonth], and `quest` (only when it is
-/// real, O2) last. Each needs a value here, a line in [todayCardDue], a
-/// widget in the Today screen's slot builder, and a case in the layout
-/// contract test (test/today_layout_test.dart).
+/// A new card needs a value here, a line in [todayCardDue], a widget in the
+/// Today screen's slot builder, and a case in the layout contract test
+/// (test/today_layout_test.dart). Seat 3 adds `weekCard` (review day, three
+/// or more days logged) between [fasting] and [earnedMonth].
 enum TodayCard {
   /// A safety answer: the general-guidance card, in place of any target.
   safety,
@@ -27,6 +26,11 @@ enum TodayCard {
 
   /// The earned month: being earned, or just granted.
   earnedMonth,
+
+  /// The day's quest, only when it is real (O2): chosen by the server from
+  /// what the day lacks, and only while the score is shown. Last: it is the
+  /// one card that can always wait.
+  quest,
 }
 
 /// Whether [card] wants the slot now.
@@ -36,6 +40,7 @@ bool todayCardDue(AppState s, TodayCard card) => switch (card) {
       TodayCard.billing => s.billingMomentDue,
       TodayCard.fasting => s.fastingPromptDue || s.fastingNotYet != null,
       TodayCard.earnedMonth => s.earnedMonthJustGranted || (s.plusActive && s.earnedMonth.inProgress),
+      TodayCard.quest => s.questDue,
     };
 
 /// Every card due now, highest first.

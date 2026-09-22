@@ -90,9 +90,9 @@ const kExplanations = <String, Explanation>{
     titleAr: 'نقاط Su',
     titleEn: 'Su Points',
     bodyAr:
-        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة (+١٠٠، وأول وجبة +٥٠٠)، كوباية مياه (+٥، ومع Qamar+ +١٠)، تخلّص مهمة اليوم (+٢٥٠)، أسبوع كامل في السلسلة (+١٠٠). بتتصرف على صورة زيادة أو تجميد السلسلة. الأسئلة مش بتتشترى بالنقط — الرابع في Qamar+.',
+        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة (+١٠٠، وأول وجبة +٥٠٠)، كوباية مياه (+٥، ومع Qamar+ +١٠)، مهمة اليوم لما اللي بتطلبه يتسجّل (+٢٥٠)، أسبوع كامل في السلسلة (+١٠٠). بتتصرف على صورة زيادة أو تجميد السلسلة. الأسئلة مش بتتشترى بالنقط — الرابع في Qamar+.',
     bodyEn:
-        'Earned when you do something useful for yourself — logging a meal (+100, first meal +500), a glass of water (+5, +10 with Qamar+), finishing the day’s quest (+250), a full week of streak (+100). Spent on another photo or a streak freeze. Questions are never bought with points — the fourth is Qamar+.',
+        'Earned when you do something useful for yourself — logging a meal (+100, first meal +500), a glass of water (+5, +10 with Qamar+), the day’s quest, when what it asks is logged (+250), a full week of streak (+100). Spent on another photo or a streak freeze. Questions are never bought with points — the fourth is Qamar+.',
     soWhatAr: 'النقط دي بتتكسب بس. مش بتتشترى بفلوس ومالهاش قيمة نقدية.',
     soWhatEn: 'They are only ever earned. They cannot be bought with money and have no cash value.',
   ),
@@ -116,11 +116,11 @@ const kExplanations = <String, Explanation>{
     titleAr: 'مهمة اليوم',
     titleEn: "Today's quest",
     bodyAr:
-        'حاجة واحدة صغيرة بس ليها أثر — مش قائمة مهام. بتديك نقاط Su لما تخلّصها، وبتتغير كل يوم حسب اللي ناقصك.',
+        'حاجة واحدة ناقصة النهارده، متختارة من اللي سجّلته: الغدا قبل ٤ العصر، أو بروتين في العشا، أو ٦ كوبايات مية. بتدي ٢٥٠ نقطة Su لما الوجبة أو الكوباية اللي بتعملها تتسجّل — مفيش حاجة تدوس عليها عشان تاخدها. وفي أيام مفيهاش مهمة، لأن مفيش حاجة ناقصة.',
     bodyEn:
-        'One small thing with outsized effect — not a to-do list. It pays Su Points when you finish it, and changes daily based on what you are missing.',
-    soWhatAr: 'لو المهمة مش مناسبة لظروف يومك، اضغط «غيّرها» — ده مش فشل.',
-    soWhatEn: 'If it does not fit your day, tap Replace — that is not a failure.',
+        'One thing today is missing, chosen from what you have logged: lunch before 4pm, protein at dinner, or six glasses of water. It pays 250 Su when the meal or the glass that does it is logged — there is nothing to tap for it. Some days have none, because nothing is missing.',
+    soWhatAr: 'لو مش مناسبة لظروف يومك، اضغط «مش النهارده» وهتستنى لبكرة — ده مش فشل.',
+    soWhatEn: 'If it does not fit your day, tap Not today and it waits until tomorrow — that is not a failure.',
   ),
   'water': Explanation(
     titleAr: 'الماء',

@@ -13,6 +13,7 @@ import '../models/nudge.dart';
 import '../models/onboarding.dart';
 import '../models/plan.dart';
 import '../models/problem.dart';
+import '../models/quest.dart';
 import '../models/streak.dart';
 import '../models/su_economy.dart';
 import '../services/ai_gateway.dart';
@@ -439,6 +440,8 @@ class AppState extends ChangeNotifier {
     serverLedger
       ..clear()
       ..addAll(entries);
+    // The write that earned may also have met the day's quest.
+    await _refreshQuest(uid);
   }
 
   /// Pulls the server's copy over the local defaults on start.
@@ -693,7 +696,6 @@ class AppState extends ChangeNotifier {
   /// [photoQuota] is the photo bucket the Log ring shows.
   AiQuota aiQuota = AiQuota.empty;
   AiQuota photoQuota = AiQuota.emptyPhoto;
-  bool questDone = false;
   /// Meal slots the user has swapped to their alternative, keyed by slot id
   /// ('breakfast' | 'lunch' | 'dinner'). Previously a single bool, which meant
   /// every meal's swap button drove the same flag and only lunch ever changed.
@@ -1233,8 +1235,9 @@ class AppState extends ChangeNotifier {
     _startRecorded = false;
     revealDish = null;
     revealDishFacts = null;
-    questDone = false;
-    _questPaidDay = null;
+    quest = null;
+    _questSkippedDay = null;
+    _questReadAt = null;
     proposal = null;
     proposalQty = [];
     proposalRaw = null;
@@ -2612,35 +2615,69 @@ class AppState extends ChangeNotifier {
 
   // ---- quest / wallet -------------------------------------------------
 
-  /// The Cairo day the primary quest last paid out. Accept, Replace, Accept…
-  /// used to credit 250 Su on every tap, because Replace cleared [questDone]
-  /// and nothing remembered that the day had already paid. One primary quest
-  /// payout per day, whatever is tapped.
-  String? _questPaidDay;
+  /// Today's quest, as the server chose it from what the day lacks (O2), or
+  /// null: offline, before the server has answered, or on a day with no real
+  /// gap. The server pays it from the meal or glass that satisfies it; the
+  /// phone never credits it and has nothing to tap that would.
+  DayQuest? quest;
 
-  void completeQuest() {
-    if (questDone) return;
-    questDone = true;
-    final today = _today();
-    if (_questPaidDay != today) {
-      _questPaidDay = today;
-      _credit(SuEconomy.dailyQuest, ar: 'مهمة اليوم', en: 'Primary daily quest');
-      _track('quest_completed');
-      // The server pays it once per Cairo day, whatever this flag says.
-      if (isBacked && _walletRepo != null) {
-        _push('complete quest', (uid) async {
-          await _walletRepo.completeQuest(uid);
-          await _refreshWallet(uid);
-          _notify();
-        });
-      }
+  /// The day the person put the quest away ("not today"), so it is gone at
+  /// once, before the server has been told.
+  String? _questSkippedDay;
+
+  DateTime? _questReadAt;
+
+  /// Today on the app's clock, as a key.
+  String _questDay() => _clock().toIso8601String().substring(0, 10);
+
+  /// Whether the quest wants Today's slot: a real one, not put away, not
+  /// past its time, and only while the score is shown.
+  bool get questDue {
+    final q = quest;
+    if (q == null || !showScore || _questSkippedDay == _questDay()) return false;
+    return q.done || q.expiresAt.isAfter(_clock());
+  }
+
+  Future<void> _refreshQuest(String uid) async {
+    final repo = _walletRepo;
+    if (repo == null) return;
+    try {
+      final q = await repo.todayQuest(uid);
+      if (_disposed) return;
+      quest = q;
+      _questReadAt = _clock();
+    } catch (_) {
+      // The card stays as it last was; the server still pays what is met.
     }
+  }
+
+  /// Reads today's quest again when Today is shown: the one held may have
+  /// expired (the next gap is then chosen), or the day may have turned. At
+  /// most every ten minutes otherwise.
+  Future<void> refreshQuest() async {
+    final uid = _userId;
+    if (!isBacked || uid == null) return;
+    final read = _questReadAt;
+    final q = quest;
+    final stale = read == null ||
+        _clock().difference(read) > const Duration(minutes: 10) ||
+        (q != null && !q.done && !q.expiresAt.isAfter(_clock())) ||
+        DateTime(read.year, read.month, read.day) != DateTime(_clock().year, _clock().month, _clock().day);
+    if (!stale) return;
+    await _refreshQuest(uid);
     _notify();
   }
 
-  void replaceQuest() {
-    questDone = false;
+  /// "Not today": the quest is put away until tomorrow. Nothing is paid.
+  void skipQuest() {
+    if (quest == null) return;
+    _questSkippedDay = _questDay();
+    _track('quest_skipped', {'kind': quest!.kind.wire});
     _notify();
+    final repo = _walletRepo;
+    if (isBacked && repo != null) {
+      _push('skip quest', (uid) => repo.skipQuest(uid));
+    }
   }
 
   void openWallet() {

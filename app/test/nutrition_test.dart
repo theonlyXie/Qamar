@@ -15,6 +15,7 @@ import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/models/quest.dart';
 import 'package:qamar/models/streak.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/models/billing.dart';
@@ -114,20 +115,19 @@ void main() {
   });
 
   group('daily quest', () {
-    test('the primary quest pays once a day, however many times it is accepted or replaced', () {
+    test('the phone has no way to pay the quest: nothing credits it, however often the card is used', () {
+      // The loop that used to mint (accept, replace, accept…) has no
+      // equivalent now: the card's only control puts the quest away, and the
+      // server pays it from the meal or glass that meets it (0061).
       final state = AppState();
+      state.quest = DayQuest(kind: QuestKind.lunchBy16, done: false, expiresAt: DateTime.now().add(const Duration(hours: 2)));
       final start = state.suAvailable;
-      state.completeQuest();
-      expect(state.suAvailable, start + SuEconomy.dailyQuest);
-      // The loop that used to mint: accept, replace, accept, replace…
-      state.completeQuest();
-      state.replaceQuest();
-      state.completeQuest();
-      state.replaceQuest();
-      state.completeQuest();
-      expect(state.suAvailable, start + SuEconomy.dailyQuest);
-      expect(state.ledger().where((e) => e.amount == SuEconomy.dailyQuest).length, 1);
-      expect(state.questDone, isTrue);
+      for (var i = 0; i < 5; i++) {
+        state.skipQuest();
+      }
+      expect(state.suAvailable, start);
+      expect(state.ledger(), isEmpty);
+      expect(state.questDue, isFalse, reason: 'put away for the day');
       state.dispose();
     });
   });

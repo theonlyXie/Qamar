@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../models/plan.dart';
 import '../models/reply.dart';
 import '../models/streak.dart';
-import '../models/su_economy.dart';
 import '../models/water.dart';
 import '../models/ramadan.dart';
 import '../state/app_state.dart';
@@ -19,6 +18,7 @@ import '../widgets/explain.dart';
 import '../widgets/general_guidance_card.dart';
 import '../widgets/moon.dart';
 import '../widgets/orb_gesture_guide.dart';
+import '../widgets/quest_card.dart';
 
 class TodayScreen extends StatefulWidget {
   const TodayScreen({super.key});
@@ -37,7 +37,11 @@ class _TodayScreenState extends State<TodayScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<AppState>().ensurePlan();
+      if (!mounted) return;
+      final state = context.read<AppState>();
+      state.ensurePlan();
+      // The quest held may have expired, and the next gap is then chosen.
+      state.refreshQuest();
     });
   }
 
@@ -74,9 +78,6 @@ class _TodayScreenState extends State<TodayScreen> {
             ]),
       TodayZone.nextMeal: nextMeal == null ? null : _NextMealCard(state: state, meal: nextMeal),
       TodayZone.activity: state.activitiesToday.isEmpty ? null : _ActivityCard(state: state),
-      // Until seat 3 makes the quest real (O2) and it joins the slot, it
-      // stays where it was.
-      TodayZone.quest: _QuestCard(state: state),
       TodayZone.meals: state.meals.isEmpty ? null : _LoggedMeals(state: state),
     };
 
@@ -101,6 +102,7 @@ class _TodayScreenState extends State<TodayScreen> {
           TodayCard.billing => BillingMomentCard(state: state),
           TodayCard.fasting => _FastingPrompt(state: state),
           TodayCard.earnedMonth => _EarnedMonthCard(state: state),
+          TodayCard.quest => QuestCard(state: state),
         },
       );
 }
@@ -109,10 +111,10 @@ class _TodayScreenState extends State<TodayScreen> {
 ///
 /// Above the fold on a 390x844 phone: the header, Qamar's card with "Log a
 /// meal", the numbers, and the one contextual slot ([todayFocus]). Below:
-/// water, the cards that lost the slot, the next meal, movement, the quest
-/// and the meals logged today. Every seat builds inside this order; the
+/// water, the cards that lost the slot (the quest among them), the next
+/// meal, movement and the meals logged today. Every seat builds inside this order; the
 /// contract test (test/today_layout_test.dart) holds it.
-enum TodayZone { header, qamar, numbers, slot, water, runnersUp, nextMeal, activity, quest, meals }
+enum TodayZone { header, qamar, numbers, slot, water, runnersUp, nextMeal, activity, meals }
 
 /// The greeting, the name, and the two game elements, each a named piece
 /// that can be removed: the streak line (seat 3, O4) and the one Su chip
@@ -341,63 +343,6 @@ class _NextMealCard extends StatelessWidget {
               ),
             ),
           );
-  }
-}
-
-/// The day's quest, as it was. Seat 3 makes it real (O2), and then it joins
-/// the slot as its last contender.
-class _QuestCard extends StatelessWidget {
-  final AppState state;
-  const _QuestCard({required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    final t = state.t;
-    return Explainable(
-          id: 'quest',
-          child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.xl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(t.nextQuest, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
-                  Row(mainAxisSize: MainAxisSize.min, children: [
-                    const SuCoinIcon(size: 15),
-                    const SizedBox(width: 5),
-                    ExplainMark(child: Text('+${state.formatSu(SuEconomy.dailyQuest)}', style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.gold))),
-                  ]),
-                ],
-              ),
-              Text(state.isAr ? 'سجّل الغدا قبل ٤ العصر' : 'Log lunch before 4pm', style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),
-              Text(
-                state.isAr ? 'لما تسجّل بدري بقدر أعدّل العشا قبل ما اليوم يخلص.' : 'Logging early lets me adjust dinner before the day ends.',
-                style: QText.body(size: 13, color: QColors.textMuted),
-              ),
-              const SizedBox(height: 8),
-              Row(children: [
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: state.completeQuest,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(color: QColors.violet.withOpacity(0.16), border: Border.all(color: QColors.violet.withOpacity(0.55)), borderRadius: BorderRadius.circular(999)),
-                      child: Text(state.questDone ? t.done2 : t.accept, style: QText.body(size: 13, weight: FontWeight.w500, color: const Color(0xFFE9ECFF))),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                QOutlineButton(label: t.replace, onTap: state.replaceQuest, height: 34, color: QColors.textMuted),
-              ]),
-            ],
-          ),
-        ),
-        );
   }
 }
 

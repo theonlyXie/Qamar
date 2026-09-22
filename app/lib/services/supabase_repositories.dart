@@ -4,6 +4,7 @@ import '../models/activity.dart';
 import '../models/dishes.dart';
 import '../models/invitation.dart';
 import '../models/meal.dart';
+import '../models/quest.dart';
 import '../models/nudge.dart';
 import '../models/profile.dart';
 import '../models/ramadan.dart';
@@ -539,8 +540,9 @@ class SupabaseWalletRepository implements WalletRepository {
   /// `qamar_wallet_credit` is EXECUTE-revoked from anon and authenticated
   /// (migration 0003): if the app could call it, any user could award
   /// themselves an unlimited balance. Points are credited by the server from
-  /// the rows the person writes — a meal, a glass of water (triggers in
-  /// 0046) — and by the two RPCs above. Calling this from the client would
+  /// the rows the person writes — a meal, a glass of water, and the day's
+  /// quest they satisfy (triggers in 0046 and 0061) — and by the onboarding
+  /// RPC. Calling this from the client would
   /// fail with a permission error at the database, so it fails here instead,
   /// where the reason is legible.
   @override
@@ -552,8 +554,11 @@ class SupabaseWalletRepository implements WalletRepository {
   }
 
   @override
-  Future<void> completeQuest(String userId) async {
-    await _client.rpc('qamar_complete_quest', params: {'p_user_id': userId});
+  Future<DayQuest?> todayQuest(String userId) async => DayQuest.fromJson(await _client.rpc('qamar_today_quest'));
+
+  @override
+  Future<void> skipQuest(String userId) async {
+    await _client.rpc('qamar_skip_quest');
   }
 
   @override

@@ -3,6 +3,7 @@ import '../models/dishes.dart';
 import '../models/invitation.dart';
 import '../models/meal.dart';
 import '../models/nudge.dart';
+import '../models/quest.dart';
 import '../models/profile.dart';
 import '../models/ramadan.dart';
 import '../models/streak.dart';
@@ -139,9 +140,13 @@ abstract class WalletRepository {
   Future<({int available, int lifetime})> balance(String userId);
   Future<void> credit(String userId, {required int amount, required String reason, required String idempotencyKey});
 
-  /// Today's quest, done. The server pays it once per Cairo day whatever
-  /// the phone says (qamar_complete_quest).
-  Future<void> completeQuest(String userId);
+  /// Today's quest, chosen by the server from what the day lacks, or null
+  /// (qamar_today_quest, 0061). The server pays it from the meal or glass
+  /// that satisfies it; nothing the phone sends pays it.
+  Future<DayQuest?> todayQuest(String userId);
+
+  /// "Not today": the quest is put away until tomorrow (qamar_skip_quest).
+  Future<void> skipQuest(String userId);
 
   /// The onboarding bonus, once per account (qamar_grant_onboarding).
   Future<void> grantOnboarding(String userId);
