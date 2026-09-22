@@ -43,6 +43,9 @@ class RamadanScreen extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 56, 20, 160),
       children: [
         Row(children: [
+          // The way back (the exit rule), where every screen keeps it.
+          QBackButton(onTap: state.back, isAr: isAr),
+          const SizedBox(width: 4),
           const QamarMoon(size: 44),
           const SizedBox(width: 12),
           Expanded(

@@ -163,6 +163,50 @@ class ConfidenceBadge extends StatelessWidget {
   }
 }
 
+/// The one back control (the exit rule): every screen but the welcome
+/// screen and Today has it, in the same place — the top start corner — with
+/// the same arrow, which mirrors in Arabic. It returns to the screen the
+/// person came from. Drawn at 36 points, it takes touches across the full
+/// 48.
+class QBackButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool isAr;
+  const QBackButton({super.key, required this.onTap, required this.isAr});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: isAr ? 'رجوع' : 'Back',
+      excludeSemantics: true,
+      child: Tooltip(
+        message: isAr ? 'رجوع' : 'Back',
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Center(
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: QColors.borderSoft)),
+                  // arrow_back follows the text direction: it points right in Arabic.
+                  child: const Icon(Icons.arrow_back, size: 18, color: QColors.textMid),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class QRoundIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;

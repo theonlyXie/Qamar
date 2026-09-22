@@ -68,7 +68,7 @@ class _ScanScreenState extends State<ScanScreen> {
             padding: const EdgeInsets.fromLTRB(20, 22, 20, 14),
             child: Row(
               children: [
-                QRoundIconButton(icon: Icons.close, onTap: state.backToWelcome),
+                QBackButton(onTap: state.back, isAr: isAr),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(t.scanTitle,

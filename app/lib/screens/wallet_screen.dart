@@ -22,8 +22,8 @@ class WalletScreen extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 56, 20, 160),
       children: [
         Row(children: [
-          QRoundIconButton(icon: Icons.arrow_back, onTap: () => state.go(AppScreen.today)),
-          const SizedBox(width: 12),
+          QBackButton(onTap: state.back, isAr: isAr),
+          const SizedBox(width: 6),
           Text(t.walletTitle, style: QText.display(size: 28, height: 34, color: const Color(0xFFF5F7FF))),
         ]),
         const SizedBox(height: 14),

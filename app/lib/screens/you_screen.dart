@@ -42,7 +42,11 @@ class YouScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 56, 20, 160),
       children: [
-        Text(t.you, style: QText.display(size: 30, height: 38, color: const Color(0xFFF5F7FF))),
+        Row(children: [
+          QBackButton(onTap: state.back, isAr: isAr),
+          const SizedBox(width: 6),
+          Expanded(child: Text(t.you, style: QText.display(size: 30, height: 38, color: const Color(0xFFF5F7FF)))),
+        ]),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),

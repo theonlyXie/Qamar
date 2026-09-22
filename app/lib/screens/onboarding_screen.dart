@@ -63,8 +63,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: QColors.borderFaint))),
           child: Row(
             children: [
+              // The way back to the welcome screen. The answers are kept:
+              // starting again carries on from here.
+              QBackButton(onTap: state.back, isAr: state.isAr),
+              const SizedBox(width: 2),
               const QamarMoon(size: 36),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

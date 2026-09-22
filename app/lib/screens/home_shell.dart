@@ -56,6 +56,21 @@ class HomeShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    // The phone's back follows the same rule as the back control: the
+    // topmost sheet first, then the screen the person came from. Only at a
+    // root with nothing open is it the system's (leaving the app). Without
+    // this, one route and no stack meant Android's back left the app from
+    // any screen.
+    return PopScope(
+      canPop: !state.handlesSystemBack,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) state.systemBack();
+      },
+      child: _shell(state),
+    );
+  }
+
+  Widget _shell(AppState state) {
     return Scaffold(
       backgroundColor: QColors.bgBottom,
       body: DecoratedBox(

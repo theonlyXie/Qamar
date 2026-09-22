@@ -540,7 +540,93 @@ class AppState extends ChangeNotifier {
   }
 
   AppLang lang = AppLang.ar;
-  AppScreen screen = AppScreen.welcome;
+  /// The screen on show. Every change of screen goes through the setter, so
+  /// the way back is always known (see [back]).
+  AppScreen get screen => _screenNow;
+  set screen(AppScreen s) {
+    if (s == _screenNow) return;
+    _recordTrail(to: s);
+    _screenNow = s;
+  }
+
+  AppScreen _screenNow = AppScreen.welcome;
+
+  // ---- the way back: one rule (seat 2) ---------------------------------------
+  //
+  // Every screen but the two roots — the welcome screen and Today — has one
+  // back control, in the same place (the top start corner) with the same
+  // arrow, and it returns to the screen the person came from. The phone's own
+  // back does the same, after closing whatever sheet is open. The orb, where it
+  // shows, is the way home to Today.
+
+  /// The roots: nothing to go back to from here.
+  static const rootScreens = {AppScreen.welcome, AppScreen.today};
+
+  /// The screens the person came through to reach this one, most recent last.
+  /// Reaching a root clears it; going back to a screen already on it cuts it
+  /// there, so it never loops.
+  final List<AppScreen> _trail = [];
+
+  void _recordTrail({required AppScreen to}) {
+    if (rootScreens.contains(to)) {
+      _trail.clear();
+      return;
+    }
+    final at = _trail.indexOf(to);
+    if (at >= 0) {
+      _trail.removeRange(at, _trail.length);
+      return;
+    }
+    _trail.add(_screenNow);
+  }
+
+  /// Every screen but the roots has a way back.
+  bool get canGoBack => !rootScreens.contains(screen);
+
+  /// Where [back] would go from here.
+  AppScreen get backTarget => _trail.isNotEmpty ? _trail.last : _parentOf(screen);
+
+  static AppScreen _parentOf(AppScreen s) => switch (s) {
+        AppScreen.onboard || AppScreen.scan => AppScreen.welcome,
+        _ => AppScreen.today,
+      };
+
+  /// The screen's back control: to the screen the person came from.
+  void back() {
+    if (!canGoBack) return;
+    final from = screen;
+    final to = _trail.isNotEmpty ? _trail.removeLast() : _parentOf(from);
+    if (from == AppScreen.scan) scanReading = false;
+    // Leaving the consultation part-way keeps its answers: coming back to it
+    // carries on where it was, so a slip of the thumb costs nothing.
+    if (from == AppScreen.onboard && msgs.any((m) => m.kind == ObKind.u)) consultationPaused = true;
+    _screenNow = to;
+    _collapseTree();
+    _track('back', {'from': from.name, 'to': to.name});
+    _notify();
+    _screen(to);
+  }
+
+  /// The consultation was left part-way with the back control; starting it
+  /// again resumes it rather than beginning at the first question.
+  bool consultationPaused = false;
+
+  /// Whether the phone's back has something to do in the app: a sheet or an
+  /// overlay to close, or a screen to go back from. At a root with nothing
+  /// open it is the system's (leaving the app).
+  bool get handlesSystemBack =>
+      explainOpen != null || whyOpen || authOpen || pendingActivity != null || chatOpen || treeOpen || canGoBack;
+
+  /// The phone's back: the topmost sheet or overlay first, then [back].
+  void systemBack() {
+    if (explainOpen != null) return closeExplain();
+    if (pendingActivity != null) return cancelActivity();
+    if (authOpen) return closeAuth();
+    if (whyOpen) return closeWhy();
+    if (chatOpen) return closeChat();
+    if (treeOpen) return closeTree();
+    back();
+  }
   int step = 0;
   final List<ObMessage> msgs = [];
   bool typing = false;
@@ -1102,6 +1188,7 @@ class AppState extends ChangeNotifier {
 
   void restart() {
     screen = AppScreen.welcome;
+    consultationPaused = false;
     step = 0;
     msgs.clear();
     meals.clear();
@@ -1206,6 +1293,15 @@ class AppState extends ChangeNotifier {
   }
 
   void startOnboarding() {
+    if (consultationPaused) {
+      // Left part-way with the back control: carry on where it was.
+      consultationPaused = false;
+      screen = AppScreen.onboard;
+      _notify();
+      _screen(AppScreen.onboard);
+      return;
+    }
+    consultationPaused = false;
     screen = AppScreen.onboard;
     step = 0;
     msgs.clear();
@@ -1337,6 +1433,7 @@ class AppState extends ChangeNotifier {
     // 'scanned' means the body questions can be skipped — only true when the
     // figures that drive the target actually came off the page.
     scanned = read.heightCm != null && read.weightKg != null;
+    consultationPaused = false;
     screen = AppScreen.onboard;
     step = 0;
     msgs.clear();
@@ -4301,6 +4398,9 @@ class AppState extends ChangeNotifier {
         AppScreen.you,
         AppScreen.wallet,
         AppScreen.subscription,
+        // Reached from the tree in season: without the orb, and with no back
+        // control, it was the one screen with no way out.
+        AppScreen.ramadan,
       }.contains(screen);
 
   /// [start] is measured from the start edge (see [orbStart]); a drag in

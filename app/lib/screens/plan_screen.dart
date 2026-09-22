@@ -44,7 +44,11 @@ class _PlanScreenState extends State<PlanScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 56, 20, 160),
       children: [
-        Text(t.plan, style: QText.display(size: 30, height: 38, color: const Color(0xFFF5F7FF))),
+        Row(children: [
+          QBackButton(onTap: state.back, isAr: state.isAr),
+          const SizedBox(width: 6),
+          Expanded(child: Text(t.plan, style: QText.display(size: 30, height: 38, color: const Color(0xFFF5F7FF)))),
+        ]),
         const SizedBox(height: 4),
         Text(t.planSub, style: QText.body(size: 14, height: 22, color: QColors.textMuted)),
         const SizedBox(height: 10),

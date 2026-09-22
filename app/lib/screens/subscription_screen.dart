@@ -28,7 +28,7 @@ class SubscriptionScreen extends StatelessWidget {
       children: [
         Row(
           children: [
-            QRoundIconButton(icon: Icons.close, onTap: () => state.go(AppScreen.you)),
+            QBackButton(onTap: state.back, isAr: isAr),
             const Spacer(),
             if (state.plusActive)
               Container(
