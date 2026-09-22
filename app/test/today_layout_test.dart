@@ -3,17 +3,20 @@
 // screenshot.
 //
 //  * Zones, top to bottom: header, Qamar's card, numbers, the one slot,
-//    water, the slot's runners-up, next meal, movement, quest, meals.
+//    water, the slot's runners-up, next meal, movement, meals. The quest
+//    has no zone: it is the slot's last contender.
 //  * The slot holds exactly one card, chosen by todayFocus in priority
 //    order; every other card that is due moves below the fold, in order.
 //    Never a stack.
 //  * Above the fold on a 390x844 phone, whatever is due: "Log a meal"
-//    (seat 2's non-negotiable) and Qamar's sentence (seat 3's).
+//    (seat 2's non-negotiable) and Qamar's sentence (seat 3's). The phone is
+//    a real one: drawn at 3x, with its status bar and home indicator, and
+//    the fold is wherever the orb really is ([expectAboveFold]).
 //
 // To extend it: a new slot card is a TodayCard value plus a case in
-// [slotCases] saying how to make it due (seat 3: the week card, the quest).
-// The switch-off variant of "Points and streaks" is a value in [scoreModes]
-// (seat 4). The height budgets are seat 6's, in [fold] below.
+// [slotCases] saying how to make it due. The switch-off variant of "Points
+// and streaks" is a value in [scoreModes] (seat 4). The height budgets are
+// seat 6's, against [expectAboveFold] below.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -35,6 +38,7 @@ import 'package:qamar/state/app_state.dart';
 import 'package:qamar/state/today_focus.dart';
 import 'package:qamar/theme/layout.dart';
 import 'package:qamar/widgets/common.dart';
+import 'package:qamar/widgets/orb_nav.dart';
 
 import 'support/app_fonts.dart';
 
@@ -81,10 +85,28 @@ final slotCases = <({TodayCard card, void Function(AppState s) arrange})>[
 /// "Points and streaks" on and off. Seat 4 adds `false` with the switch.
 final scoreModes = <bool>[true];
 
-/// The phone, and the line nothing that must be seen may cross: the orb's
-/// band sits under it.
+/// The phone: 390x844pt (the iPhone 12 to 14), drawn at 3x, with its
+/// status bar and home indicator. The shell lays out inside that safe area,
+/// so the screen starts under the status bar and the orb's band sits above
+/// the home indicator.
 const _phone = Size(390, 844);
-final fold = _phone.height - QLayout.orbBand;
+const _statusBar = 47.0;
+const _homeIndicator = 34.0;
+
+/// The top of the orb's band inside the safe area.
+const insetFold = 844 - _homeIndicator - QLayout.orbBand;
+
+/// Nothing that must be seen may reach under the orb: not the top of its
+/// band inside the safe area, and not the orb's own top wherever it really
+/// rests. Keyed to the orb's rect, so it keeps holding when the orb moves.
+void expectAboveFold(WidgetTester tester, Finder what, String name) {
+  final orb = find.byKey(OrbNav.orbKey);
+  expect(orb, findsOneWidget, reason: 'the orb is on Today');
+  final bottom = tester.getRect(what).bottom;
+  expect(bottom, lessThanOrEqualTo(insetFold), reason: '$name stays above the orb’s band ($insetFold), whatever is due');
+  final orbTop = tester.getRect(orb).top;
+  expect(bottom, lessThanOrEqualTo(orbTop), reason: '$name stays above the orb itself ($orbTop), whatever is due');
+}
 
 AppState _state(AppLang lang, {Iterable<TodayCard> due = const []}) {
   final s = AppState(clock: () => _now)..setLang(lang);
@@ -99,12 +121,18 @@ AppState _state(AppLang lang, {Iterable<TodayCard> due = const []}) {
   return s;
 }
 
+/// Draws the app on the phone, [size] in points. The view itself is set, not
+/// only the surface, so MediaQuery (the safe area, and anything laid out
+/// from the screen's size) sees the same phone the layout does.
 Future<void> _pump(WidgetTester tester, AppState s, Size size) async {
-  await tester.binding.setSurfaceSize(size);
-  addTearDown(() => tester.binding.setSurfaceSize(null));
+  tester.view.devicePixelRatio = 3;
+  tester.view.physicalSize = size * 3;
+  tester.view.padding = const FakeViewPadding(top: _statusBar * 3, bottom: _homeIndicator * 3);
+  addTearDown(tester.view.reset);
   await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
+  expect(MediaQuery.sizeOf(tester.element(find.byType(Scaffold).first)), size, reason: 'MediaQuery sees the phone the test claims');
 }
 
 Rect? _rectOf(WidgetTester t, Key key) {
@@ -187,11 +215,10 @@ void main() {
               expect(find.byType(TodayStreakLine), findsOneWidget, reason: 'the streak line is in the header');
             }
 
-            final log = tester.getRect(find.byKey(QamarCard.logKey));
-            expect(log.bottom, lessThanOrEqualTo(fold), reason: '"Log a meal" stays above the fold, whatever is due');
-            expect(log.height, greaterThanOrEqualTo(48));
-            final sentence = tester.getRect(find.byKey(const ValueKey('today-sentence')));
-            expect(sentence.bottom, lessThanOrEqualTo(fold), reason: 'Qamar’s sentence stays above the fold');
+            expect(tester.getTopLeft(find.byType(TodayScreen)).dy, _statusBar, reason: 'the screen starts under the status bar');
+            expectAboveFold(tester, find.byKey(QamarCard.logKey), '"Log a meal"');
+            expect(tester.getSize(find.byKey(QamarCard.logKey)).height, greaterThanOrEqualTo(48));
+            expectAboveFold(tester, find.byKey(const ValueKey('today-sentence')), 'Qamar’s sentence');
           });
         }
 
@@ -260,8 +287,8 @@ void main() {
       expect(slot.contains(tester.getRect(card).center), isTrue, reason: 'in the slot, where the question was');
       expect(find.descendant(of: card, matching: find.byType(QStateLine)), findsOneWidget);
       expect(find.byType(QStateCard), findsNothing, reason: 'not a second card fighting the slot');
-      expect(tester.getRect(find.byKey(QamarCard.logKey)).bottom, lessThanOrEqualTo(fold));
-      expect(tester.getRect(find.byKey(const ValueKey('today-sentence'))).bottom, lessThanOrEqualTo(fold));
+      expectAboveFold(tester, find.byKey(QamarCard.logKey), '"Log a meal"');
+      expectAboveFold(tester, find.byKey(const ValueKey('today-sentence')), 'Qamar’s sentence');
     });
   }
 
