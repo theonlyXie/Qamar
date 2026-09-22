@@ -44,7 +44,9 @@ class SupabaseInvitationRepository implements InvitationRepository {
       final raw = await _client.rpc('qamar_redeem_invitation', params: {'p_code': code});
       return InvitationRedemption.fromJson(Map<String, dynamic>.from(raw as Map));
     } on PostgrestException catch (e) {
-      throw InvitationException(e.message);
+      // The function's own refusals (raise exception, P0001) are answers about
+      // the code. "not signed in" is about the session, and may pass.
+      throw InvitationException(e.message, refused: e.code == 'P0001' && e.message != 'not signed in');
     }
   }
 }

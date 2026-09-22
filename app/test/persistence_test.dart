@@ -2311,6 +2311,20 @@ void main() {
       expect(a.named('trial_offer_declined').single['placement'], 'onboarding');
     });
 
+    test('while an invitation code waits, no free week is offered: Start would spend the one trial its fortnight needs', () async {
+      final prefs = MemoryDevicePrefs();
+      await prefs.setString('pending_invitation', 'QMR-LATER');
+      final billing = FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: true);
+      final inv = FakeInvitationRepo()..failWith = StateError('no signal');
+      final state = backed(billing: billing, invitations: inv, prefs: prefs);
+      await settle();
+      expect(state.invitationWaiting, isTrue);
+      expect(state.trialWaiting, isFalse, reason: 'so Me does not say "7 days" either');
+      await toReveal(state);
+      expect(state.msgs.any((m) => m.kind == ObKind.trialOffer), isFalse);
+      expect(billing.trialStarts, 0);
+    });
+
     test('never offered where it cannot start: a used trial, a member, or no billing', () async {
       final used = backed(billing: FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: false));
       await settle();
@@ -3068,6 +3082,48 @@ void main() {
       expect(later.redeemCodes, ['QMR-LATER']);
       expect(signedIn.pendingInvitationCode, isNull);
       expect(await prefs.getString('pending_invitation'), '');
+    });
+
+    test('a redeem that cannot reach the server keeps the code; the next connected start redeems it and clears it', () async {
+      final prefs = MemoryDevicePrefs();
+      await AppState(prefs: prefs).acceptInvitationLink('QMR-LATER'); // opened before there was an account
+      final flaky = FakeInvitationRepo()..failWith = StateError('no signal');
+      final first = backed(invitations: flaky, prefs: prefs);
+      await settle();
+      expect(first.pendingInvitationCode, 'QMR-LATER', reason: 'kept');
+      expect(await prefs.getString('pending_invitation'), 'QMR-LATER');
+
+      final ok = FakeInvitationRepo();
+      final next = backed(invitations: ok, prefs: prefs);
+      await settle();
+      expect(ok.redeemCodes, ['QMR-LATER']);
+      expect(next.invitedBy, 'Basel');
+      expect(next.pendingInvitationCode, isNull);
+      expect(await prefs.getString('pending_invitation'), '');
+    });
+
+    test('a link opened with an account but no signal waits too, and says so in both languages', () async {
+      for (final lang in AppLang.values) {
+        final prefs = MemoryDevicePrefs();
+        final flaky = FakeInvitationRepo()..failWith = StateError('no signal');
+        final state = backed(invitations: flaky, prefs: prefs)..setLang(lang);
+        await settle();
+        await state.acceptInvitationLink('QMR-LIVE');
+        expect(state.pendingInvitationCode, 'QMR-LIVE');
+        expect(await prefs.getString('pending_invitation'), 'QMR-LIVE');
+        expect(state.invitationNotice, lang == AppLang.ar ? contains('محفوظة على الموبايل') : contains('kept on this phone'));
+      }
+    });
+
+    test('a code the server refuses is an answer: cleared, not tried again at every start', () async {
+      final prefs = MemoryDevicePrefs();
+      await prefs.setString('pending_invitation', 'QMR-USED');
+      final inv = FakeInvitationRepo()..failWith = const InvitationException('this invitation was already used', refused: true);
+      final state = backed(invitations: inv, prefs: prefs);
+      await settle();
+      expect(state.pendingInvitationCode, isNull);
+      expect(await prefs.getString('pending_invitation'), '');
+      expect(state.invitationNotice, 'this invitation was already used');
     });
   });
 }

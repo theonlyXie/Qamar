@@ -243,6 +243,22 @@ void main() {
       expect(find.text('أسبوعك المجاني مستنيك: \u2066٧\u2069 أيام، من غير بطاقة، ومفيش تجديد.'), findsOneWidget);
     });
 
+    testWidgets('while an invitation code waits, the Me tile does not offer the free week, in either language', (tester) async {
+      final s = AppState()
+        ..plusTrialEligible = true
+        ..pendingInvitationCode = 'QMR-LATER';
+      s.setLang(AppLang.en);
+      await pump(tester, s);
+      s.go(AppScreen.you);
+      await tester.pump();
+      expect(find.textContaining('Your free week is waiting'), findsNothing);
+      expect(find.text('Tomorrow’s plan, more photos and questions'), findsOneWidget);
+      s.setLang(AppLang.ar);
+      await tester.pump();
+      expect(find.textContaining('أسبوعك المجاني مستنيك'), findsNothing);
+      expect(find.text('خطة بكرة، وصور وأسئلة أكتر'), findsOneWidget);
+    });
+
     testWidgets('Today names no target on general guidance, and says what is still here', (tester) async {
       final s = AppState()
         ..profile = const Profile(safety: SafetyAnswer.pregnant)

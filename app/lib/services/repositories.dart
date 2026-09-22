@@ -120,7 +120,11 @@ abstract class InvitationRepository {
 
 class InvitationException implements Exception {
   final String message;
-  const InvitationException(this.message);
+
+  /// The server looked at the code and said no: not there, already used, or
+  /// the person's own. The same code can never succeed.
+  final bool refused;
+  const InvitationException(this.message, {this.refused = false});
   @override
   String toString() => message;
 }

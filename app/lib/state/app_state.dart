@@ -174,7 +174,10 @@ class AppState extends ChangeNotifier {
       final adherence = await p.getBool(_kAdherence);
       if (adherence != null) adherenceShare = adherence;
       final asked = await p.getString(_kRamadanAsked);
+      final invite = await p.getString(_kPendingInvite);
       if (_disposed) return;
+      // A code from an earlier launch is still waiting to be redeemed.
+      if (invite != null && invite.trim().isNotEmpty) pendingInvitationCode ??= invite.trim();
       if (asked != null) ramadanAskedFor = asked;
       if (reviewNumbers != null) reviewShowNumbers = reviewNumbers;
       if (consent != null) {
@@ -2038,10 +2041,13 @@ class AppState extends ChangeNotifier {
   // as a gift with its rules stated — "7 days of the full Qamar. No card,
   // nothing renews." — Start or Not now. Not now leaves it waiting in Me.
   // Offered only where it can actually start: a backed account, billing
-  // configured, and a trial the server says is still unused.
+  // configured, and a trial the server says is still unused. Never while an
+  // invitation code waits to be redeemed: the account's one trial is the
+  // invitation's fortnight, and Start would spend it on seven days.
 
-  /// The trial the reveal can offer: never used, not already on Qamar+.
-  bool get trialWaiting => plusTrialEligible && !plusActive;
+  /// The trial the reveal can offer: never used, not already on Qamar+, and
+  /// no invitation code waiting to bring its own fortnight.
+  bool get trialWaiting => plusTrialEligible && !plusActive && !invitationWaiting;
 
   /// The offer's length, as the organic trial the server starts (0043).
   static const trialOfferDays = 7;
@@ -2710,22 +2716,31 @@ class AppState extends ChangeNotifier {
   /// A code that arrived by link before the account existed.
   String? pendingInvitationCode;
 
+  /// An invitation code is waiting on this phone to be redeemed. While it
+  /// waits, the free week is not offered: starting it would spend the one
+  /// trial an account gets, and with it the invitation's fortnight and the
+  /// inviter's credit.
+  bool get invitationWaiting => pendingInvitationCode?.trim().isNotEmpty ?? false;
+
   Future<void> acceptInvitationLink(String code) async {
     final c = code.trim();
     if (c.isEmpty) return;
     _track('invitation_link_opened');
-    if (isBacked && _invitationRepo != null) {
-      pendingInvitationCode = null;
-      _prefs?.setString(_kPendingInvite, '').catchError((_) {});
-      await redeemInvitation(c);
-      return;
-    }
+    // The code waits on the phone until the server has answered it.
     pendingInvitationCode = c;
     _prefs?.setString(_kPendingInvite, c).catchError((_) {});
+    if (isBacked && _invitationRepo != null) {
+      await _redeemPendingInvitation();
+      return;
+    }
     invitationNotice = isAr ? 'وصلتك دعوة. هتتفعّل أول ما تدخل.' : 'You have an invitation. It is redeemed the moment you are in.';
     _notify();
   }
 
+  /// Redeems the waiting code. It is cleared only once the server has
+  /// answered it — redeemed, or refused (a code that is not there, already
+  /// used, or the person's own can never succeed). A redeem that could not
+  /// reach the server keeps it, and the next connected start tries again.
   Future<void> _redeemPendingInvitation() async {
     var code = pendingInvitationCode;
     if (code == null || code.trim().isEmpty) {
@@ -2736,27 +2751,42 @@ class AppState extends ChangeNotifier {
       }
     }
     if (code == null || code.trim().isEmpty || _invitationRepo == null) return;
+    pendingInvitationCode = code.trim();
+    final answered = await redeemInvitation(code);
+    if (_disposed) return;
+    if (!answered) {
+      invitationNotice = isAr
+          ? 'مقدرتش أفعّل الدعوة دلوقتي. هي محفوظة على الموبايل، وهجرّب تاني أول ما تفتح التطبيق وانت متوصل.'
+          : 'I could not redeem your invitation just now. It is kept on this phone, and I will try again the next time you open the app with a connection.';
+      _notify();
+      return;
+    }
     pendingInvitationCode = null;
     _prefs?.setString(_kPendingInvite, '').catchError((_) {});
-    await redeemInvitation(code);
+    _notify();
   }
 
-  Future<void> redeemInvitation(String code) async {
+  /// Redeems [code]. True once the server has answered it — redeemed, or
+  /// refused — and false when it could not be asked, so a waiting code can
+  /// be kept for another try.
+  Future<bool> redeemInvitation(String code) async {
     invitationNotice = null;
     final repo = _invitationRepo;
     final uid = _userId;
-    if (code.trim().isEmpty) return;
+    if (code.trim().isEmpty) return false;
     if (repo == null || uid == null) {
       invitationNotice = isAr
           ? 'الدعوة بتتفعّل لما التطبيق يبقى متوصل بحسابك.'
           : 'An invitation is redeemed once the app is connected to your account.';
       _notify();
-      return;
+      return false;
     }
     invitationBusy = true;
     _notify();
+    var answered = false;
     try {
       final r = await repo.redeem(uid, code: code.trim());
+      answered = true;
       invitedBy = r.inviterName.trim().isEmpty ? null : r.inviterName.trim();
       final who = invitedBy ?? (isAr ? 'صاحبك' : 'A friend');
       invitationNotice = r.trialDays > 0
@@ -2767,12 +2797,14 @@ class AppState extends ChangeNotifier {
       _track('invitation_redeemed', {'trial_days': r.trialDays});
       await _refreshPlus();
     } catch (e) {
+      answered = answered || (e is InvitationException && e.refused);
       invitationNotice = e is InvitationException
           ? e.message
           : (isAr ? 'مقدرتش أفعّل الدعوة دلوقتي. جرّب تاني بعد شوية.' : 'Could not redeem the invitation just now. Try again in a moment.');
     }
     invitationBusy = false;
     _notify();
+    return answered;
   }
   String? affiliateNotice;
 
