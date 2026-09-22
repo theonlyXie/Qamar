@@ -724,7 +724,8 @@ class AppState extends ChangeNotifier {
 
   /// What started the log in progress, captured when it starts: by the
   /// time it is confirmed, the orb's waiting question has gone (O6). Every
-  /// way into a log sets it; confirming uses it and clears it.
+  /// way into a log sets it; the log's reading takes it along
+  /// ([_proposalStart]); an abandoned log drops it.
   ({String prompt, bool orbWaiting})? _logStart;
 
   /// A push tapped in the last half hour wins; then a log that began from
@@ -740,7 +741,7 @@ class AppState extends ChangeNotifier {
         orbWaiting: waitingNudge != null,
       );
 
-  /// Takes the captured start for a log being written now, or captures it.
+  /// Takes the captured start for a log being read now, or captures it.
   ({String prompt, bool orbWaiting}) _takeLogStart() {
     final start = _logStart ?? _logStartNow();
     _logStart = null;
@@ -974,19 +975,40 @@ class AppState extends ChangeNotifier {
     if (!payload.startsWith('nudge:')) return;
     final slot = MealSlot.values.asNameMap()[payload.substring(6)] ?? MealSlot.lunch;
     _nudgeTappedAt = _clock();
-    _logStart = _logStartNow();
     _track('nudge_tapped', {'slot': slot.name});
-    _openWithNudge(Nudge(slot: slot, at: _clock(), dayIndex: 0));
     _collapseTree();
+    if (_logUnderWay) {
+      // A log already under way is picked up where it was, with its start.
+      openChat();
+      return;
+    }
+    _logStart = _logStartNow();
+    _askNudgeQuestion(Nudge(slot: slot, at: _clock(), dayIndex: 0));
     openChat();
-    _loggingMeal = true;
+    _armMealLog();
     proposalInput = 'voice';
     tapOrbListen();
   }
 
-  /// The question as Qamar's opening line, when the conversation is fresh.
-  void _openWithNudge(Nudge n) {
-    if (chat.isNotEmpty) return;
+  /// The meal question already asked in this conversation, by day and meal.
+  /// Each is asked once: held again after the talk has moved past it, the
+  /// orb opens the conversation, not a log.
+  ({DateTime day, MealSlot slot})? _askedQuestion;
+
+  ({DateTime day, MealSlot slot}) _questionKey(Nudge n) {
+    final now = _clock();
+    return (day: DateTime(now.year, now.month, now.day), slot: n.slot);
+  }
+
+  /// Whether Qamar's last line is this meal question.
+  bool _asking(Nudge n) => chat.isNotEmpty && chat.last.who == ChatWho.q && chat.last.text == n.text(ar: isAr);
+
+  /// Qamar asks the meal question as its newest line — on a fresh thread or
+  /// after whatever was said before — unless it already is the last one. A
+  /// meal log is only ever armed on a question the person can see.
+  void _askNudgeQuestion(Nudge n) {
+    _askedQuestion = _questionKey(n);
+    if (_asking(n)) return;
     chat.add(ChatTurn(
       who: ChatWho.q,
       text: n.text(ar: isAr),
@@ -1103,6 +1125,10 @@ class AppState extends ChangeNotifier {
     proposal = null;
     proposalQty = [];
     proposalRaw = null;
+    // The conversation is gone, and every log begun in it with it.
+    _proposalStart = null;
+    _abandonLog();
+    _askedQuestion = null;
     lastMealPhotoPath = null;
     chatPhotoPath = null;
     scanned = false;
@@ -2147,9 +2173,36 @@ class AppState extends ChangeNotifier {
   /// What the user said or the caption on the photo, kept for the draft row.
   String? proposalRaw;
 
-  /// Set while the next chat message should be read as a meal rather than a
-  /// question. Quick-logging arms it; producing a proposal disarms it.
-  bool _loggingMeal = false;
+  /// Where in [chat] the meal question the next message answers sits. What
+  /// is said or typed next is read as a meal only while that question is
+  /// still Qamar's last line, so nothing is read as a meal unless a meal
+  /// question is on screen. Every way into a log asks its question and arms
+  /// this; the next message, or an abandoned log, disarms it.
+  int? _mealAskAt;
+
+  bool get _loggingMeal => _mealAskAt != null && _mealAskAt == chat.length - 1;
+
+  /// Arms the log on the question just put on screen.
+  void _armMealLog() => _mealAskAt = chat.length - 1;
+
+  /// The start of the log whose reading is up for confirmation. A reading
+  /// takes its log's start with it when it begins ([_analyseMeal]), so
+  /// closing the conversation mid-read, or starting another log before this
+  /// one is confirmed, cannot change what started this one.
+  ({String prompt, bool orbWaiting})? _proposalStart;
+
+  /// Meal readings still on their way.
+  int _mealReads = 0;
+
+  /// A log already under way: a reading to confirm, or one still being read.
+  bool get _logUnderWay => proposal != null || _mealReads > 0;
+
+  /// A log the conversation closed on, with nothing still coming: it is
+  /// disarmed, and the next one captures its own start.
+  void _abandonLog() {
+    _logStart = null;
+    _mealAskAt = null;
+  }
 
   bool get hasProposal => proposal != null && proposal!.items.isNotEmpty;
 
@@ -2186,6 +2239,7 @@ class AppState extends ChangeNotifier {
     proposalQty = [];
     proposalRaw = null;
     // A log that was abandoned leaves no start behind for the next one.
+    _proposalStart = null;
     _logStart = null;
     discardPhoto(lastMealPhotoPath);
     lastMealPhotoPath = null;
@@ -2198,6 +2252,10 @@ class AppState extends ChangeNotifier {
     final gateway = _ai;
     proposalInput = inputType;
     proposalRaw = text;
+    // The reading belongs to the log that began it and takes that log's
+    // start with it: a conversation closed while it runs, or another log
+    // begun before it is confirmed, leaves this one's start as it was.
+    final start = _takeLogStart();
 
     if (gateway == null) {
       chatState = ChatState.idle;
@@ -2217,6 +2275,7 @@ class AppState extends ChangeNotifier {
     _notify();
     // The verdict's latency, as the person feels it: from asking to seeing.
     final verdict = Stopwatch()..start();
+    _mealReads++;
     try {
       final result = await gateway.analyzeMeal(
         inputType: inputType,
@@ -2248,6 +2307,7 @@ class AppState extends ChangeNotifier {
         proposalQty = [];
       } else {
         proposal = result;
+        _proposalStart = start;
         proposalQty = List.filled(result.items.length, 1);
         chat.add(ChatTurn(
           who: ChatWho.q,
@@ -2270,6 +2330,8 @@ class AppState extends ChangeNotifier {
             : 'I could not reach the assistant to read the meal. Try again in a moment.',
         sub: '$e'.length > 120 ? null : '$e',
       ));
+    } finally {
+      _mealReads--;
     }
     _notify();
   }
@@ -2293,7 +2355,9 @@ class AppState extends ChangeNotifier {
     final sub = isAr
         ? 'مسجّل $how${anyLow ? ' · تقدير' : ''}'
         : 'Logged $how${anyLow ? ' · estimate' : ''}';
-    final start = _takeLogStart();
+    // What started this log, as its reading took it when it began.
+    final start = _proposalStart ?? _logStartNow();
+    _proposalStart = null;
     final meal = LoggedMeal(
       name: name,
       sub: sub,
@@ -3735,7 +3799,8 @@ class AppState extends ChangeNotifier {
   void openChat() {
     chatOpen = true;
     _collapseTree();
-    chatState = ChatState.idle;
+    // Reopened while a meal is still being read: Qamar is still reading it.
+    chatState = _mealReads > 0 ? ChatState.thinking : ChatState.idle;
     if (chat.isEmpty) {
       chat.add(ChatTurn(
         who: ChatWho.q,
@@ -3749,9 +3814,11 @@ class AppState extends ChangeNotifier {
 
   void closeChat() {
     chatOpen = false;
-    // Closed with nothing waiting to be confirmed: whatever log began here
-    // was abandoned, and the next one captures its own start.
-    if (proposal == null) _logStart = null;
+    // Closed mid-sentence, the words still arrive and are the meal. Closed
+    // otherwise, a log armed here and not yet answered was abandoned. A
+    // reading on its way, or one waiting to be confirmed, is not touched: it
+    // took its start with it when it began.
+    if (chatState != ChatState.listening) _abandonLog();
     _notify();
   }
 
@@ -3797,18 +3864,21 @@ class AppState extends ChangeNotifier {
     final photo = chatPhotoPath;
     chatPhotoPath = null;
     if (text.trim().isEmpty && photo != null) text = menuPhotoQuestion;
+    // A meal only in answer to a meal question still on screen. Whatever is
+    // said, that question has now been answered or passed over.
+    final asMeal = _loggingMeal;
+    _mealAskAt = null;
     chat.add(ChatTurn(who: ChatWho.u, text: text, photoPath: photo));
     lastUser = text;
     chatDraft = '';
     chatState = ChatState.thinking;
     _notify();
 
-    // Armed by quick-logging: this message describes a meal, so it goes to the
-    // analyser rather than the chat model, and comes back as something to
-    // confirm instead of something to read. A photo taken meanwhile is the
+    // An answer to a meal question: this message describes a meal, so it goes
+    // to the analyser rather than the chat model, and comes back as something
+    // to confirm instead of something to read. A photo taken meanwhile is the
     // meal's photo.
-    if (_loggingMeal) {
-      _loggingMeal = false;
+    if (asMeal) {
       await _analyseMeal(inputType: photo != null ? 'photo' : proposalInput, text: text, imagePath: photo);
       return;
     }
@@ -3915,6 +3985,8 @@ class AppState extends ChangeNotifier {
             ? 'مقدرتش أسمع: $e. جرّب تكتب.'
             : 'I could not listen: $e. Try typing.';
         chatState = ChatState.idle;
+        // Closed while listening, and nothing came: the log is abandoned.
+        if (!chatOpen) _abandonLog();
         _notify();
       },
     );
@@ -3942,6 +4014,8 @@ class AppState extends ChangeNotifier {
           chatState = ChatState.idle;
           final said = heard.trim();
           heard = '';
+          // Closed while listening, and nothing was said: abandoned.
+          if (said.isEmpty && !chatOpen) _abandonLog();
           _notify();
           if (said.isNotEmpty) sendChatMsg(said);
         }
@@ -4035,14 +4109,18 @@ class AppState extends ChangeNotifier {
     if (chatOpen) return;
     _collapseTree();
     final n = waitingNudge;
-    if (n != null) {
-      // The orb was holding a meal question: the conversation opens on it,
-      // and what they say next is the meal, as when the same question
-      // arrives as a notification. The in-app prompt is recorded here.
+    // The orb holds a meal question. Qamar asks it, as its newest line, the
+    // first time the orb is held while it waits in this conversation, and
+    // what is said next is the meal, as when the same question arrives as a
+    // notification: the in-app prompt is recorded here. Held again while it
+    // is still Qamar's last line, it is the same ask. Once the talk has moved
+    // past it, or while a log is already under way (a reading to confirm, or
+    // one still being read), the hold opens the conversation where it is.
+    if (n != null && !_logUnderWay && (_askedQuestion != _questionKey(n) || _asking(n))) {
       _logStart = _logStartNow(fromWaitingQuestion: true);
-      _openWithNudge(n);
+      _askNudgeQuestion(n);
       openChat();
-      _loggingMeal = true;
+      _armMealLog();
       proposalInput = 'voice';
       await tapOrbListen();
       return;
@@ -4233,8 +4311,6 @@ class AppState extends ChangeNotifier {
 
     if (kind == QuickLog.photo) return; // the caller hands the shot back
 
-    // Whatever they say or type next is a meal, not a question.
-    _loggingMeal = true;
     proposalInput = kind == QuickLog.voice ? 'voice' : 'text';
     chat.add(ChatTurn(
       who: ChatWho.q,
@@ -4243,6 +4319,8 @@ class AppState extends ChangeNotifier {
           : (isAr ? 'اكتبلي أكلت إيه.' : 'Tell me what you ate.'),
       sub: isAr ? 'مفيش حاجة بتتسجل قبل ما تأكد.' : 'Nothing is saved until you confirm.',
     ));
+    // Whatever they say or type next, in answer, is a meal, not a question.
+    _armMealLog();
     if (kind == QuickLog.voice) tapOrbListen();
   }
 
@@ -4256,7 +4334,7 @@ class AppState extends ChangeNotifier {
   void logPhotoTaken(String path) {
     _logStart ??= _logStartNow();
     lastMealPhotoPath = path;
-    _loggingMeal = false;
+    _mealAskAt = null;
     proposalInput = 'photo';
     chat.add(ChatTurn(who: ChatWho.u, text: isAr ? 'صوّرت الوجبة دي' : 'I photographed this meal'));
     _notify();

@@ -69,7 +69,8 @@ abstract final class LogPrompt {
   /// A notification was tapped within 30 minutes before the log began.
   static const push = 'push';
 
-  /// The log began from holding the orb while Qamar's meal question waited.
+  /// The log began from a hold that opened Qamar's waiting meal question,
+  /// asked on screen.
   static const inApp = 'in_app';
 
   /// Everything else — including a log from the tree while the orb pulsed,

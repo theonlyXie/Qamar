@@ -31,6 +31,7 @@ import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/analytics.dart';
 import 'package:qamar/services/auth_service.dart';
 import 'package:qamar/services/device_prefs.dart';
+import 'package:qamar/services/dictation.dart';
 import 'package:qamar/services/nudger.dart';
 import 'package:qamar/services/sharer.dart';
 import 'package:qamar/services/payments.dart';
@@ -284,9 +285,18 @@ class FakeGateway implements AiGateway {
       );
   void _usePlan() => _use(quotas.plan, 'That’s enough plans for today.');
 
+  /// What each meal reading was asked to read.
+  final List<String?> mealTexts = [];
+
+  /// While set, a meal reading waits on it: a reading still on its way.
+  Completer<void>? readGate;
+
   @override
   Future<MealAnalysis> analyzeMeal({required String inputType, String? text, String? imagePath, String lang = 'ar'}) async {
     imagePaths.add(imagePath);
+    mealTexts.add(text);
+    final gate = readGate;
+    if (gate != null) await gate.future;
     // Typed and spoken logs are the food graph. Only a photo spends a use.
     if (inputType == 'photo' || (imagePath != null && imagePath.isNotEmpty)) {
       _usePhoto();
@@ -478,6 +488,7 @@ AppState backed({
   MemorySharer? sharer,
   FakeBilling? billing,
   MemoryNudger? nudger,
+  Dictation? dictation,
   DateTime Function()? clock,
 }) =>
     AppState(
@@ -495,10 +506,44 @@ AppState backed({
       sharer: sharer,
       billing: billing,
       nudger: nudger,
+      dictation: dictation,
       clock: clock,
     );
 
 Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 60));
+
+/// A recogniser that hears what the test says.
+class FakeDictation implements Dictation {
+  void Function(String text, bool isFinal)? _onResult;
+
+  @override
+  bool get available => true;
+
+  @override
+  bool get listening => _onResult != null;
+
+  @override
+  Future<bool> prepare({void Function(String status)? onStatus, void Function(String error)? onError}) async => true;
+
+  @override
+  Future<bool> start({required String lang, required void Function(String text, bool isFinal) onResult}) async {
+    _onResult = onResult;
+    return true;
+  }
+
+  @override
+  Future<void> stop() async {}
+
+  @override
+  Future<void> cancel() async {}
+
+  /// The person stops speaking, having said [words] (nothing, if empty).
+  void say(String words) {
+    final heard = _onResult;
+    _onResult = null;
+    heard?.call(words, true);
+  }
+}
 
 void main() {
   test('with no repositories the app is entirely local', () {
@@ -1940,6 +1985,192 @@ void main() {
       await state.sendChatMsg('is koshary healthy?');
       await settle();
       expect(state.proposal, isNull);
+    });
+
+    test('after an earlier exchange, a hold asks the waiting question as Qamar’s newest line; only its answer is read as the meal', () async {
+      var now = DateTime(2026, 9, 21, 11, 0);
+      final meals = FakeMealRepo();
+      final ai = FakeGateway();
+      final voice = FakeDictation();
+      final state = backed(meals: meals, ai: ai, dictation: voice, clock: () => now);
+      await settle();
+      state.openChat(); // the morning's conversation
+      await state.sendChatMsg('can I have feteer tonight?');
+      await settle();
+      state.closeChat();
+
+      now = DateTime(2026, 9, 21, 14, 30); // lunch's question is waiting
+      final lunch = state.waitingNudge!.text(ar: state.isAr);
+      await state.holdOrb();
+      expect(state.chat.last.text, lunch, reason: 'the question is on screen before anything is heard');
+      voice.say('koshary');
+      await settle();
+      expect(ai.mealTexts, ['koshary']);
+      expect(ai.chatMessages, ['can I have feteer tonight?'], reason: 'the question was never read as a meal');
+      state.confirmProposal();
+      await settle();
+      expect(meals.saved.single.prompt, 'in_app');
+    });
+
+    test('held again while the question is still Qamar’s last line, it is the same ask, not a second one', () async {
+      final meals = FakeMealRepo();
+      final voice = FakeDictation();
+      final state = backed(meals: meals, ai: FakeGateway(), dictation: voice, clock: () => DateTime(2026, 9, 21, 14, 30));
+      await settle();
+      final lunch = state.waitingNudge!.text(ar: state.isAr);
+      await state.holdOrb();
+      voice.say(''); // nothing said …
+      state.closeChat(); // … and closed
+      await state.holdOrb();
+      expect(state.chat.where((t) => t.text == lunch), hasLength(1));
+      voice.say('koshary');
+      await settle();
+      state.confirmProposal();
+      await settle();
+      expect(meals.saved.single.prompt, 'in_app');
+    });
+
+    test('once the talk has moved past the question, a hold is a conversation: nothing asked is read as a meal, nothing is in_app', () async {
+      final ai = FakeGateway();
+      final voice = FakeDictation();
+      final state = backed(ai: ai, dictation: voice, clock: () => DateTime(2026, 9, 21, 14, 30));
+      await settle();
+      await state.holdOrb(); // lunch is asked …
+      voice.say('');
+      state.closeChat(); // … and left unanswered
+      state.openChat(); // back, from the Plan screen's "ask"
+      await state.sendChatMsg('can I have feteer tonight?');
+      await settle();
+      state.closeChat();
+
+      await state.holdOrb(); // lunch still waits, but the conversation has moved on
+      expect(state.chat.last.text, isNot(state.waitingNudge!.text(ar: state.isAr)), reason: 'not asked again');
+      voice.say('and with honey?');
+      await settle();
+      expect(ai.mealTexts, isEmpty);
+      expect(ai.chatMessages, ['can I have feteer tonight?', 'and with honey?']);
+      expect(state.proposal, isNull);
+    });
+
+    test('a log closed on without a word is disarmed: a question asked later goes to the chat, not the analyser', () async {
+      final ai = FakeGateway();
+      final state = backed(ai: ai, clock: () => DateTime(2026, 9, 21, 11, 0));
+      await settle();
+      state.quickLog(QuickLog.text); // "Tell me what you ate." …
+      state.closeChat(); // … closed without an answer
+      state.openChat(); // later, from the Plan screen
+      await state.sendChatMsg('can I have feteer tonight?');
+      await settle();
+      expect(ai.mealTexts, isEmpty);
+      expect(ai.chatMessages, ['can I have feteer tonight?']);
+    });
+
+    test('a reading still on its way when the conversation closes keeps its start: confirmed 40 minutes later, still a push', () async {
+      var now = DateTime(2026, 9, 21, 14, 30);
+      final meals = FakeMealRepo();
+      final nudger = MemoryNudger();
+      final voice = FakeDictation();
+      final ai = FakeGateway()..readGate = Completer<void>();
+      final state = backed(meals: meals, nudger: nudger, ai: ai, dictation: voice, clock: () => now);
+      await settle();
+      nudger.tap('nudge:lunch');
+      await settle();
+      voice.say('koshary'); // spoken …
+      await settle();
+      expect(state.chatState, ChatState.thinking);
+      state.closeChat(); // … and closed while it is read
+      now = now.add(const Duration(minutes: 40));
+      ai.readGate!.complete();
+      await settle();
+      expect(state.proposal, isNotNull);
+      state.confirmProposal();
+      await settle();
+      expect(meals.saved.single.prompt, 'push');
+      expect(meals.saved.single.orbWaiting, isTrue);
+    });
+
+    test('holding the orb to come back to it picks the reading up where it was: no second ask, and the push stands', () async {
+      var now = DateTime(2026, 9, 21, 14, 30);
+      final meals = FakeMealRepo();
+      final nudger = MemoryNudger();
+      final voice = FakeDictation();
+      final ai = FakeGateway()..readGate = Completer<void>();
+      final state = backed(meals: meals, nudger: nudger, ai: ai, dictation: voice, clock: () => now);
+      await settle();
+      nudger.tap('nudge:lunch');
+      await settle();
+      voice.say('koshary');
+      await settle();
+      state.closeChat();
+      now = now.add(const Duration(minutes: 40)); // lunch's question is still waiting
+      final lunch = state.waitingNudge!.text(ar: state.isAr);
+      await state.holdOrb(); // back while it is still being read
+      expect(state.chatState, ChatState.thinking, reason: 'Qamar is still reading it, and does not listen over it');
+      ai.readGate!.complete();
+      await settle();
+      expect(state.chat.where((t) => t.text == lunch), hasLength(1), reason: 'asked once, with the push');
+      state.confirmProposal();
+      await settle();
+      expect(ai.mealTexts, ['koshary']);
+      expect(meals.saved.single.prompt, 'push');
+    });
+
+    test('a reading waiting to be confirmed is what a hold goes back to: the waiting question is not asked over it', () async {
+      var now = DateTime(2026, 9, 21, 13, 50);
+      final meals = FakeMealRepo();
+      final ai = FakeGateway();
+      final state = backed(meals: meals, ai: ai, clock: () => now);
+      await settle();
+      state.quickLog(QuickLog.text); // from the tree, before lunch's question
+      await state.sendChatMsg('koshary');
+      await settle();
+      state.closeChat(); // not confirmed yet
+      now = DateTime(2026, 9, 21, 14, 30); // lunch's question is now waiting
+      final lunch = state.waitingNudge!.text(ar: state.isAr);
+      await state.holdOrb();
+      expect(state.chat.where((t) => t.text == lunch), isEmpty, reason: 'the reading is still there to confirm');
+      state.confirmProposal();
+      await settle();
+      expect(meals.saved.single.prompt, 'none', reason: 'started from the tree at 13:50, with nothing waiting');
+      expect(meals.saved.single.orbWaiting, isFalse);
+    });
+
+    test('closed mid-sentence, the words still arrive as the meal, with the push’s start', () async {
+      var now = DateTime(2026, 9, 21, 14, 30);
+      final meals = FakeMealRepo();
+      final nudger = MemoryNudger();
+      final voice = FakeDictation();
+      final ai = FakeGateway();
+      final state = backed(meals: meals, nudger: nudger, ai: ai, dictation: voice, clock: () => now);
+      await settle();
+      nudger.tap('nudge:lunch');
+      await settle();
+      expect(state.chatState, ChatState.listening);
+      state.closeChat(); // closed while still speaking
+      voice.say('koshary');
+      await settle();
+      expect(ai.mealTexts, ['koshary']);
+      now = now.add(const Duration(minutes: 40));
+      state.confirmProposal();
+      await settle();
+      expect(meals.saved.single.prompt, 'push');
+    });
+
+    test('closed mid-sentence with nothing said, the log is abandoned: what is asked later goes to the chat', () async {
+      final ai = FakeGateway();
+      final nudger = MemoryNudger();
+      final voice = FakeDictation();
+      final state = backed(nudger: nudger, ai: ai, dictation: voice, clock: () => DateTime(2026, 9, 21, 14, 30));
+      await settle();
+      nudger.tap('nudge:lunch');
+      await settle();
+      state.closeChat();
+      voice.say(''); // the recogniser stops: nothing was said
+      state.openChat();
+      await state.sendChatMsg('can I have feteer tonight?');
+      await settle();
+      expect(ai.mealTexts, isEmpty);
+      expect(ai.chatMessages, ['can I have feteer tonight?']);
     });
 
     test('a cold log from the tree outside any meal window is none, with nothing waiting', () async {
