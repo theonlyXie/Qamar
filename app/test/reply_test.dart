@@ -12,6 +12,7 @@ import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/nudge.dart';
 import 'package:qamar/models/reply.dart';
+import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/state/app_state.dart';
 
@@ -164,6 +165,31 @@ void main() {
       expect(said, replyFor(s.meals.single, s.dayNumbers(), ar: false, iso: s.iso));
       expect(said, startsWith('640 kcal'));
       expect(said, isNot(contains('Logged:')), reason: 'the fixed line is gone');
+    });
+
+    test('under the reply sits the meal’s own receipt, never the points; the credit goes to the orb (O3)', () {
+      final score = RegExp(r'\bsu\b|point|earn|reward|coin|نقط|نقاط|كسب|مكافأ', caseSensitive: false);
+      for (final lang in AppLang.values) {
+        final s = state(lang);
+        s.proposal = const MealAnalysis([
+          ConfirmItemDef(ar: 'كشري', en: 'Koshary', portionAr: 'طبق', portionEn: 'a plate', conf: Confidence.low, kcal: 640, p: 20, c: 100, f: 18),
+        ]);
+        s.proposalQty = [1];
+        s.confirmProposal();
+        final confirmed = s.chat.lastWhere((t) => t.who == ChatWho.q);
+        expect(confirmed.sub, s.meals.last.sub, reason: 'the receipt is the meal’s own');
+        expect(confirmed.sub, lang == AppLang.ar ? 'مسجّل بالكتابة · تقدير' : 'Logged by text · estimate');
+
+        s.repeatMeal(s.meals.last);
+        final repeated = s.chat.lastWhere((t) => t.who == ChatWho.q);
+        expect(repeated.sub, lang == AppLang.ar ? 'مكرر' : 'Repeated');
+
+        for (final turn in [confirmed, repeated]) {
+          expect(score.hasMatch('${turn.text} ${turn.sub}'), isFalse, reason: '${turn.text} / ${turn.sub}');
+        }
+        // The points were still credited, and the orb's receipt carries them.
+        expect(s.suReceipt?.amount, SuEconomy.mealLogged);
+      }
     });
 
     test('a repeat is read against the day as it now is, so the second one reads differently', () {

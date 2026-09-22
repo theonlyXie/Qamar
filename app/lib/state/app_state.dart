@@ -2609,9 +2609,11 @@ class AppState extends ChangeNotifier {
     chat.add(ChatTurn(
       who: ChatWho.q,
       // What this meal does to the day, in words that change with the day
-      // (O3). The points are the wallet's to show, not Qamar's to say.
+      // (O3). Under it, the meal's own receipt ("Logged by voice ·
+      // estimate"). The points are the wallet's to show, not Qamar's to say:
+      // the credit shows only as the orb's passing receipt (O9).
       text: replyFor(meal, dayNumbers(), ar: isAr, iso: iso),
-      sub: suAmount(award, signed: true),
+      sub: meal.sub,
     ));
     proposal = null;
     proposalQty = [];
@@ -4861,7 +4863,8 @@ class AppState extends ChangeNotifier {
     chat.add(ChatTurn(
       who: ChatWho.q,
       text: replyFor(meal, dayNumbers(), ar: isAr, iso: iso),
-      sub: suAmount(award, signed: true),
+      // The meal's own receipt, never the points (O3).
+      sub: meal.sub,
     ));
     _notify();
     _rescheduleNudges();
