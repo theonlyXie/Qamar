@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import 'hold_coach_mark.dart';
+import 'tree_overlay.dart';
 
 /// The moon's three gestures, each ticked once the person has done it.
 ///
@@ -22,12 +23,21 @@ class OrbGestureGuide extends StatelessWidget {
   /// The card's rows, in the order they are learned: tap, hold, drag. The
   /// hold row is the hold mark's own words (HoldCopy), so the two never
   /// drift apart.
-  static List<(OrbGesture, IconData, String, String, String, String)> rows() => [
-        (OrbGesture.tap, Icons.touch_app_outlined, 'دوس على القمر', 'Tap the moon', 'تفتح الشجرة: سجّل · الخطة · مياه · المراجعة · حسابي', 'opens the tree: Log · Plan · Water · Review · Me'),
+  ///
+  /// The tap row names the tree's own labels, read from the tree, so the
+  /// words on the card are the words on the ring (they had drifted apart in
+  /// Arabic: "مياه" and "حسابي" for a ring that says "الماء" and "أنا"). And
+  /// it says what a tap does off Today too, since the card also lives in Me.
+  static List<(OrbGesture, IconData, String, String, String, String)> rows() {
+    final ar = kTreeNodes.map((n) => n.labelAr).join(' · ');
+    final en = kTreeNodes.map((n) => n.labelEn).join(' · ');
+    return [
+        (OrbGesture.tap, Icons.touch_app_outlined, 'دوس على القمر', 'Tap the moon', 'تفتح الشجرة: $ar — ومن أي شاشة تانية ترجّعك للنهارده', 'opens the tree: $en — and from any other screen, it brings you back to Today'),
         (OrbGesture.hold, Icons.mic_none, HoldCopy.doAr, HoldCopy.doEn, HoldCopy.whatAr, HoldCopy.whatEn),
         // The explainable numbers carry a dotted line under them (ExplainMark).
         (OrbGesture.explain, Icons.open_with, 'اسحبه على رقم تحته نقط', 'Drag it onto a dotted number', 'يشرحه لك: من فين جه وإيه معناه', 'and it explains itself: where it came from, what it means'),
       ];
+  }
 
   @override
   Widget build(BuildContext context) {

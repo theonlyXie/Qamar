@@ -15,8 +15,9 @@ import 'living_orb.dart';
 /// The persistent floating orb — the whole navigation. Three gestures, none
 /// of them a swipe:
 ///
-///  * **tap** — on Today the action tree blooms; anywhere else it is Back.
-///    The orb is the one fixed point, so "tap the orb" always gets home,
+///  * **tap** — on Today the action tree blooms; anywhere else it goes home
+///    to Today. The orb is the one fixed point, so "tap the orb" always gets
+///    home (a screen's own back arrow goes to where the person came from),
 ///  * **hold** (350 ms) — the conversation opens and the moon is already
 ///    listening. The one gesture people have to learn; everything else is tap,
 ///  * **drag** — moves the orb, and dropping it on a value explains it.

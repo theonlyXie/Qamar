@@ -4455,8 +4455,9 @@ class AppState extends ChangeNotifier {
 
   // ---- the orb's gestures ---------------------------------------------
   //
-  // Blueprint contract. Tap: on Today the tree blooms; anywhere else it is
-  // Back — the orb is the one fixed point, so "tap the orb" always gets home.
+  // Blueprint contract. Tap: on Today the tree blooms; anywhere else it goes
+  // home to Today — the orb is the one fixed point, so "tap the orb" always
+  // gets home (a screen's back arrow, [back], goes where the person came from).
   // Hold: the conversation opens and the moon is already listening. Drag:
   // move the orb, and drop it on a value to have it explained (the explain
   // section above).

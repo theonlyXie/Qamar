@@ -13,6 +13,7 @@ import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/orb_gesture_guide.dart';
+import 'package:qamar/widgets/tree_overlay.dart';
 
 import 'support/arabic_digits.dart';
 
@@ -102,5 +103,15 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 60));
     expect(again.gesturesLearned, containsAll([OrbGesture.tap, OrbGesture.hold]));
     expect(again.gesturesLearned, isNot(contains(OrbGesture.explain)));
+  });
+
+  test('the tap row names the tree’s own labels, and says what a tap does off Today', () {
+    final (_, _, _, _, whatAr, whatEn) = OrbGestureGuide.rows().first;
+    for (final n in kTreeNodes) {
+      expect(whatAr, contains(n.labelAr), reason: 'the card and the ring use the same words');
+      expect(whatEn, contains(n.labelEn));
+    }
+    expect(whatAr, isNot(contains('مياه')));
+    expect(whatEn, contains('back to Today'), reason: 'in Me a tap goes home, not to the tree');
   });
 }
