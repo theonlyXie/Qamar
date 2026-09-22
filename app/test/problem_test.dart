@@ -16,6 +16,7 @@ import 'package:qamar/models/plan.dart';
 import 'package:qamar/main.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/problem.dart';
+import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/auth_service.dart';
@@ -23,6 +24,8 @@ import 'package:qamar/services/dictation.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/common.dart';
 import 'package:qamar/widgets/tree_overlay.dart';
+
+import 'support/arabic_digits.dart';
 
 /// A gateway whose answers each test sets.
 class _Ai implements AiGateway {
@@ -486,6 +489,125 @@ void main() {
       turn.problem!.action.onTap();
       await Future<void>.delayed(Duration.zero);
       expect(ai.planInstructions, ['no cooking', 'no cooking']);
+    });
+  });
+
+  group('a fasting switch whose rewrite does not happen says so above the plan it left', () {
+    // Today's plan is on screen, written today, and a rewrite is refused.
+    PlanMeal lunch(String ar, String en) =>
+        (id: 'lunch', slotAr: 'الغدا', slotEn: 'Lunch', nameAr: ar, nameEn: en, noteAr: '', noteEn: '', portions: const []);
+    AppState written(AppLang lang, {required Object refusal, int questionsLeft = 2, bool alternative = true, _Ai? gateway}) {
+      final chat = AiQuota(bucket: 'chat', used: 3 - questionsLeft, limit: 3, extra: 0, remaining: questionsLeft);
+      final ai = (gateway ?? _Ai())
+        ..planFails = refusal
+        ..quotas = AiQuotas(chat: chat, photo: AiQuota.emptyPhoto, plan: AiQuotas.empty.plan);
+      final s = AppState(ai: ai)..setLang(lang);
+      s.aiQuota = chat;
+      final koshary = lunch('كشري', 'Koshary');
+      s.plan = DayPlan(date: '2026-09-22', slots: [(koshary, alternative ? lunch('فراخ مشوية', 'Grilled chicken') : koshary)]);
+      s.planDate = DateTime.now().toIso8601String().substring(0, 10);
+      return s;
+    }
+
+    AiQuotaException planCap() => AiQuotaException(
+          'Today’s plan has been rewritten enough. Swap meals on the plan itself, or tell me what changed and I will adjust the rest.',
+          const AiQuota(bucket: 'plan', used: 4, limit: 4, extra: 0, remaining: 0),
+        );
+
+    for (final lang in [AppLang.en, AppLang.ar]) {
+      testWidgets('the plan’s cap: a limit card above the meals says the plan is not the fasting plan yet (${lang.code})', (tester) async {
+        final isAr = lang == AppLang.ar;
+        final s = written(lang, refusal: planCap());
+        s.go(AppScreen.plan);
+        await tester.binding.setSurfaceSize(const Size(900, 2400));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+        await tester.pump();
+        expect(find.byType(QStateCard), findsNothing, reason: 'nothing to say before the switch');
+
+        await s.setFasting(true);
+        await tester.pump();
+
+        final notYet = isAr ? 'الخطة اللي تحت لسه مش خطة الصيام.' : 'The plan below isn’t your fasting plan yet.';
+        final card = find.byType(QStateCard);
+        expect(card, findsOneWidget, reason: 'the refusal is drawn, not only kept in state');
+        expect(find.descendant(of: card, matching: find.text(notYet)), findsOneWidget);
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.text(isAr
+                ? 'الخطة اتكتبت كفاية النهارده، فمتكتبتش تاني. قمر لسه يقدر يغيّر وجباتها في المحادثة.'
+                : 'Today’s plan has been rewritten enough, so it wasn’t written again. Qamar can still change its meals in the conversation.'),
+          ),
+          findsOneWidget,
+        );
+        final meal = find.text(isAr ? 'كشري' : 'Koshary');
+        expect(meal, findsOneWidget, reason: 'the plan from before stays on screen');
+        expect(tester.getBottomLeft(card).dy, lessThan(tester.getTopLeft(meal).dy), reason: 'above the meal list');
+        expect(Directionality.of(tester.element(find.text(notYet))), isAr ? TextDirection.rtl : TextDirection.ltr);
+
+        final p = s.planProblem!;
+        expect(p.kind, ProblemKind.limit);
+        expect(p.action.label, isAr ? 'قول لقمر إيه اللي اتغيّر' : 'Tell Qamar what changed',
+            reason: 'a question left: the conversation changes meals without the plan call');
+        expect(p.secondary!.label, isAr ? 'بدّل وجبة من الخطة' : 'Swap a meal on the plan');
+        expect(find.descendant(of: card, matching: find.widgetWithText(QPrimaryButton, p.action.label)), findsOneWidget);
+        if (isAr) expectNoLatinDigits(tester, within: card, where: 'the fasting card');
+
+        await tester.tap(find.descendant(of: card, matching: find.widgetWithText(QPrimaryButton, p.action.label)));
+        await tester.pump();
+        expect(s.chatOpen, isTrue);
+      });
+    }
+
+    test('no questions left: the plan’s own swap, which on the Plan screen makes way for the meals', () async {
+      final s = written(AppLang.en, refusal: planCap(), questionsLeft: 0);
+      s.go(AppScreen.plan);
+      await s.setFasting(true);
+      final p = s.planProblem!;
+      expect(p.what, 'The plan below isn’t your fasting plan yet.');
+      expect(p.kind, ProblemKind.limit);
+      expect(p.action.label, 'Swap a meal on the plan');
+      expect(p.secondary, isNull);
+      expect(p.why, 'Today’s plan has been rewritten enough, so it wasn’t written again. '
+          'A meal with another option can be swapped on the plan itself, and that spends nothing.');
+      p.action.onTap();
+      expect(s.screen, AppScreen.plan);
+      expect(s.planProblem, isNull, reason: 'already on the plan, the button is not a dead one');
+      expect(s.hasPlan, isTrue);
+    });
+
+    test('nothing that works now: back to Today, and when it can be written again', () async {
+      final s = written(AppLang.ar, refusal: planCap(), questionsLeft: 0, alternative: false);
+      s.go(AppScreen.plan);
+      await s.setFasting(true);
+      final p = s.planProblem!;
+      expect(p.what, 'الخطة اللي تحت لسه مش خطة الصيام.');
+      expect(p.why, 'الخطة اتكتبت كفاية النهارده، فمتكتبتش تاني. تقدر تتكتب تاني من بكرة.');
+      expect(p.action.label, 'ارجع للنهارده');
+    });
+
+    test('turning it off says the plan is still the fasting one', () async {
+      final s = written(AppLang.en, refusal: planCap(), questionsLeft: 0);
+      s.profile = s.profile.copyWith(fasting: FastingMode.ramadan);
+      await s.setFasting(false);
+      expect(s.planProblem!.what, 'The plan below is still your fasting plan.');
+    });
+
+    test('offline: said the same way, with the refusal as its reason and "Try again" writing the fasting plan', () async {
+      final ai = _Ai();
+      final s = written(AppLang.en, refusal: const SocketException('Failed host lookup'), gateway: ai);
+      await s.setFasting(true);
+      final p = s.planProblem!;
+      expect(p.what, 'The plan below isn’t your fasting plan yet.');
+      expect(p.why, 'You’re offline right now. The plan is written for you on our server, so it needs a connection.');
+      expect(p.kind, ProblemKind.offline);
+      expect(p.action.label, 'Try again');
+      ai.planFails = null;
+      p.action.onTap();
+      await Future<void>.delayed(Duration.zero);
+      expect(ai.planCalls, 2);
+      expect(s.planProblem, isNull);
     });
   });
 

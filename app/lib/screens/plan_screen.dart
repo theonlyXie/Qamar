@@ -55,6 +55,13 @@ class _PlanScreenState extends State<PlanScreen> {
         if (!state.hasPlan) ...[
           _PlanEmpty(state: state),
         ] else ...[
+          // A rewrite that did not happen (the plan's cap, a failure, a
+          // fasting switch it could not follow) is said above the plan it
+          // left in place, never only where it was asked (O10).
+          if (state.planProblem case final problem? when !state.planLoading) ...[
+            QStateCard(problem: problem),
+            const SizedBox(height: 10),
+          ],
           Explainable(id: 'plan_total', child: _DayTotal(state: state, kcal: dayTotal)),
           if (state.nudgePromptDue) ...[
             const SizedBox(height: 10),

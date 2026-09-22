@@ -2734,7 +2734,9 @@ class AppState extends ChangeNotifier {
 
   /// The person's answer to "fasting this Ramadan?", now or from the
   /// seventh node later. Turning it on rewrites today's plan as iftar and
-  /// suhoor and moves the questions to those hours.
+  /// suhoor and moves the questions to those hours. A rewrite that cannot
+  /// happen now (the plan's daily cap, no connection) leaves the plan from
+  /// before on screen, and the Plan screen says so above it.
   Future<void> setFasting(bool on) async {
     ramadanAskedFor = season.key;
     _prefs?.setString(_kRamadanAsked, season.key).catchError((_) {});
@@ -2748,7 +2750,32 @@ class AppState extends ChangeNotifier {
     }
     _rescheduleNudges();
     // A plan asked for today is a different day now: rewrite it.
-    if (changed && planDate != null) await ensurePlan(force: true);
+    if (changed && planDate != null) {
+      await ensurePlan(force: true);
+      if (_disposed) return;
+      final refused = planProblem;
+      if (refused != null && hasPlan) {
+        planProblem = _notYetFasting(refused, on: on);
+        _notify();
+      }
+    }
+  }
+
+  /// A fasting switch whose rewrite did not happen: the plan shown is the
+  /// one from before it, so that is said first, then why, with the same way
+  /// on the refusal offered.
+  Problem _notYetFasting(Problem refused, {required bool on}) {
+    final notYet = on
+        ? (isAr ? 'الخطة اللي تحت لسه مش خطة الصيام.' : 'The plan below isn’t your fasting plan yet.')
+        : (isAr ? 'الخطة اللي تحت لسه خطة الصيام.' : 'The plan below is still your fasting plan.');
+    if (refused.kind == ProblemKind.limit) return _planWall(refused.what, notYet: notYet);
+    return Problem(
+      what: notYet,
+      why: [refused.what, if (refused.why != null) refused.why!].join(' '),
+      action: refused.action,
+      secondary: refused.secondary,
+      kind: refused.kind,
+    );
   }
 
   void dismissFastingPrompt() {
@@ -3954,8 +3981,10 @@ class AppState extends ChangeNotifier {
 
   bool planLoading = false;
 
-  /// Why today's plan is not here, with the next step (O10). Null while
-  /// there is a plan, or nothing has been asked yet.
+  /// Why the last writing of today's plan did not happen, with the next
+  /// step (O10). With no plan the Plan screen shows it in the plan's place;
+  /// with one, above it, since the plan shown is the one from before. Null
+  /// once a plan is written, or while nothing has been asked yet.
   Problem? planProblem;
 
   /// The problem's first line, for anything that only needs the words.
@@ -4084,17 +4113,29 @@ class AppState extends ChangeNotifier {
   ///    the plan, which spends nothing;
   ///  * otherwise, back to Today: the plan can be written again tomorrow.
   /// The server's own words are kept only when the way they name works.
-  Problem _planWall(String message, {bool rebuildAsked = false}) {
+  /// [notYet] is what a change the rewrite was for left undone (a fasting
+  /// switch): it is said first, and the cap becomes its reason.
+  Problem _planWall(String message, {bool rebuildAsked = false, String? notYet}) {
     final canAsk = !rebuildAsked && hasAssistant && aiQuota.remaining > 0 && hasPlan;
     final canSwap = hasPlan && (plan?.slots.any((s) => slotHasAlternative(s.$1.id)) ?? false);
     final what = isAr ? 'الخطة اتكتبت كفاية النهارده.' : 'Today’s plan has been rewritten enough.';
+    String? because(String? way) => notYet == null
+        ? way
+        : [isAr ? 'الخطة اتكتبت كفاية النهارده، فمتكتبتش تاني.' : 'Today’s plan has been rewritten enough, so it wasn’t written again.', if (way != null) way].join(' ');
     final toPlan = ProblemAction(isAr ? 'بدّل وجبة من الخطة' : 'Swap a meal on the plan', () {
       chatOpen = false;
+      // Already there, the card steps aside for the meals and their swaps.
+      if (screen == AppScreen.plan) {
+        planProblem = null;
+        _notify();
+        return;
+      }
       go(AppScreen.plan);
     });
     if (canAsk) {
       return Problem(
-        what: message,
+        what: notYet ?? message,
+        why: because(notYet == null ? null : (isAr ? 'قمر لسه يقدر يغيّر وجباتها في المحادثة.' : 'Qamar can still change its meals in the conversation.')),
         action: ProblemAction(isAr ? 'قول لقمر إيه اللي اتغيّر' : 'Tell Qamar what changed', openChat),
         secondary: canSwap ? toPlan : null,
         kind: ProblemKind.limit,
@@ -4102,15 +4143,15 @@ class AppState extends ChangeNotifier {
     }
     if (canSwap) {
       return Problem(
-        what: what,
-        why: isAr ? 'الوجبة اللي ليها بديل تقدر تبدّلها من الخطة نفسها، ومن غير ما تصرف حاجة.' : 'A meal with another option can be swapped on the plan itself, and that spends nothing.',
+        what: notYet ?? what,
+        why: because(isAr ? 'الوجبة اللي ليها بديل تقدر تبدّلها من الخطة نفسها، ومن غير ما تصرف حاجة.' : 'A meal with another option can be swapped on the plan itself, and that spends nothing.'),
         action: toPlan,
         kind: ProblemKind.limit,
       );
     }
     return Problem(
-      what: what,
-      why: isAr ? 'تقدر تتكتب تاني من بكرة.' : 'It can be written again from tomorrow.',
+      what: notYet ?? what,
+      why: because(isAr ? 'تقدر تتكتب تاني من بكرة.' : 'It can be written again from tomorrow.'),
       action: ProblemAction(isAr ? 'ارجع للنهارده' : 'Back to Today', () {
         chatOpen = false;
         go(AppScreen.today);
