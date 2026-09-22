@@ -7,6 +7,8 @@ import '../models/su_economy.dart';
 import '../models/water.dart';
 import '../models/ramadan.dart';
 import '../state/app_state.dart';
+import '../widgets/billing_moment_card.dart';
+import '../state/today_focus.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
@@ -18,6 +20,11 @@ import '../widgets/orb_gesture_guide.dart';
 
 class TodayScreen extends StatefulWidget {
   const TodayScreen({super.key});
+
+  /// Keys the layout contract test finds zones and cards by.
+  static Key zoneKey(TodayZone zone) => ValueKey('today-zone-${zone.name}');
+  static Key cardKey(TodayCard card) => ValueKey('today-card-${card.name}');
+  static const guideKey = ValueKey('today-guide-below');
 
   @override
   State<TodayScreen> createState() => _TodayScreenState();
@@ -35,79 +42,219 @@ class _TodayScreenState extends State<TodayScreen> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final t = state.t;
-    final tg = state.target();
-    final con = state.consumed();
-    final remaining = (tg.kcal - con.kcal).clamp(0, 1 << 30);
-    final nameOr = state.profile.name.isNotEmpty ? state.profile.name : (state.isAr ? 'يا صاحبي' : 'friend');
-    // Null until a plan has been generated for this person. The card is then
-    // hidden entirely rather than showing a meal nobody chose for them.
+    final due = todayCardsDue(state);
     final nextMeal = state.nextMeal();
+    // The gestures card leaves the slot at the first hold; until all three
+    // are learned (or it is put away) it waits below the fold.
+    final guideBelow = !state.orbTutorialDone && !state.holdTutorialDue;
 
-    double pct(int a, int b) => b == 0 ? 0 : (a / b).clamp(0, 1).toDouble();
+    // The zones, in the order the layout contract fixes (O15). A zone with
+    // nothing to show takes no space, so the screen closes up.
+    final zones = <TodayZone, Widget?>{
+      TodayZone.header: _Header(state: state),
+      TodayZone.qamar: QamarCard(state: state),
+      // No target on the general-guidance route, so no numbers: its card
+      // takes the slot instead.
+      TodayZone.numbers: state.generalGuidance ? null : _NumbersCard(state: state),
+      TodayZone.slot: due.isEmpty ? null : _slotCard(state, due.first),
+      TodayZone.water: const _WaterCard(),
+      TodayZone.runnersUp: (due.length < 2 && !guideBelow)
+          ? null
+          : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (final (i, card) in due.skip(1).indexed) ...[
+                if (i > 0) const SizedBox(height: 14),
+                _slotCard(state, card),
+              ],
+              if (guideBelow) ...[
+                if (due.length > 1) const SizedBox(height: 14),
+                KeyedSubtree(key: TodayScreen.guideKey, child: OrbGestureGuide(state: state)),
+              ],
+            ]),
+      TodayZone.nextMeal: nextMeal == null ? null : _NextMealCard(state: state, meal: nextMeal),
+      TodayZone.activity: state.activitiesToday.isEmpty ? null : _ActivityCard(state: state),
+      // Until seat 3 makes the quest real (O2) and it joins the slot, it
+      // stays where it was.
+      TodayZone.quest: _QuestCard(state: state),
+      TodayZone.meals: state.meals.isEmpty ? null : _LoggedMeals(state: state),
+    };
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 56, 20, 160),
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(state.isAr ? 'صباح الخير،' : 'Good morning,', style: QText.body(size: 14, color: QColors.textMuted)),
-                  Text(nameOr, style: QText.display(size: 34, height: 42, color: const Color(0xFFF5F7FF))),
-                ],
-              ),
-            ),
-            // One Su display on Today, and it opens the wallet (O9). Level
-            // lives in the wallet only.
-            if (state.showScore) SuChip(state: state),
+        for (final zone in TodayZone.values)
+          if (zones[zone] case final w?) ...[
+            KeyedSubtree(key: TodayScreen.zoneKey(zone), child: w),
+            const SizedBox(height: 14),
           ],
+      ],
+    );
+  }
+
+  /// A contender's card, keyed so the layout contract can find it.
+  static Widget _slotCard(AppState state, TodayCard card) => KeyedSubtree(
+        key: TodayScreen.cardKey(card),
+        child: switch (card) {
+          TodayCard.safety => GeneralGuidanceCard(state: state),
+          TodayCard.tutorial => OrbGestureGuide(state: state),
+          TodayCard.billing => BillingMomentCard(state: state),
+          TodayCard.fasting => _FastingPrompt(state: state),
+          TodayCard.earnedMonth => _EarnedMonthCard(state: state),
+        },
+      );
+}
+
+/// Today's zones, top to bottom: the layout contract (O15).
+///
+/// Above the fold on a 390x844 phone: the header, Qamar's card with "Log a
+/// meal", the numbers, and the one contextual slot ([todayFocus]). Below:
+/// water, the cards that lost the slot, the next meal, movement, the quest
+/// and the meals logged today. Every seat builds inside this order; the
+/// contract test (test/today_layout_test.dart) holds it.
+enum TodayZone { header, qamar, numbers, slot, water, runnersUp, nextMeal, activity, quest, meals }
+
+/// The greeting, the name, and the two game elements, each a named piece
+/// that can be removed: the streak line (seat 3, O4) and the one Su chip
+/// (O9). With "Points and streaks" off (showScore) both go and the header
+/// closes up.
+class _Header extends StatelessWidget {
+  final AppState state;
+  const _Header({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final nameOr = state.profile.name.isNotEmpty ? state.profile.name : (state.isAr ? 'يا صاحبي' : 'friend');
+    final streak = state.showScore ? streakLineFor(state) : null;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(state.isAr ? 'صباح الخير،' : 'Good morning,', style: QText.body(size: 14, color: QColors.textMuted)),
+              Text(nameOr, style: QText.display(size: 34, height: 42, color: const Color(0xFFF5F7FF))),
+              if (streak != null) TodayStreakLine(text: streak),
+            ],
+          ),
         ),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), radius: QRadii.xl),
-          child: Row(
+        // One Su display on Today, and it opens the wallet (O9). Level
+        // lives in the wallet only.
+        if (state.showScore) SuChip(state: state),
+      ],
+    );
+  }
+}
+
+/// The streak line's words: Qamar's one sentence under the name, from the
+/// second day ("Fourth day running." / "رابع يوم ورا بعض."). Seat 3 writes
+/// it (O4). Until then there is none, and the header closes up.
+String? streakLineFor(AppState state) => null;
+
+/// The streak line, a named piece of the header so it can go whole.
+class TodayStreakLine extends StatelessWidget {
+  final String text;
+  const TodayStreakLine({super.key, required this.text});
+
+  @override
+  Widget build(BuildContext context) =>
+      Text(text, style: QText.body(size: 14, height: 20, color: QColors.textMid));
+}
+
+/// The day's sentence in Qamar's card. What it says is seat 3's (O3, O15):
+/// in the morning, before the first log, it is last night's note about the
+/// day; otherwise the day's line. [fromNight] says the night note is what
+/// is shown, so the card carries its link to the plan.
+({String text, bool fromNight}) todaySentenceFor(AppState state) {
+  final isAr = state.isAr;
+  final logged = state.consumed().kcal > 0;
+  final night = state.nightSentence;
+  if (!logged && night != null && night.isNotEmpty) return (text: night, fromNight: true);
+  return (
+    text: logged
+        ? (isAr ? 'سجّلت وجبة النهاردة. باقي عشا خفيف فيه بروتين ونكون قفلنا اليوم صح.' : 'You logged a meal today. A light protein dinner closes the day well.')
+        : (isAr ? 'أهم حاجة النهاردة: تسجّل أول وجبة. الباقي أنا هظبطه معاك.' : 'The one thing today: log your first meal. I’ll handle the rest with you.'),
+    fromNight: false,
+  );
+}
+
+/// Qamar's card (O15): the day's sentence, and under it "Log a meal".
+///
+/// The button is Today's one primary action and it stays above the fold. It
+/// opens the tree already on Log rather than going round it, so using it
+/// shows where logging lives. The night note, which was a card of its own,
+/// is the sentence here in the morning, with its link to today's plan.
+class QamarCard extends StatelessWidget {
+  final AppState state;
+  const QamarCard({super.key, required this.state});
+
+  /// The "Log a meal" button, for tests.
+  static const logKey = ValueKey('today-log-a-meal');
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final line = todaySentenceFor(state);
+    final locked = state.nightPlanLocked;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), radius: QRadii.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
               const QamarMoon(size: 40),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  con.kcal > 0
-                      ? (state.isAr ? 'سجّلت وجبة النهاردة. باقي عشا خفيف فيه بروتين ونكون قفلنا اليوم صح.' : 'You logged a meal today. A light protein dinner closes the day well.')
-                      : (state.isAr ? 'أهم حاجة النهاردة: تسجّل أول وجبة. الباقي أنا هظبطه معاك.' : 'The one thing today: log your first meal. I’ll handle the rest with you.'),
-                  style: QText.body(size: 14, height: 21, color: QColors.textHigh),
-                ),
+                child: Text(line.text, key: const ValueKey('today-sentence'), style: QText.body(size: 14, height: 21, color: QColors.textHigh)),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 14),
-        if (state.fastingPromptDue) ...[
-          _FastingPrompt(state: state),
-          const SizedBox(height: 14),
+          if (line.fromNight)
+            // The night note's way on: today's plan, or where the wall is.
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(QRadii.md),
+                onTap: state.openNightNote,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 52, end: 8),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(locked ? Icons.lock_outline : Icons.arrow_outward, size: 14, color: locked ? QColors.gold : QColors.textMuted),
+                      const SizedBox(width: 6),
+                      Text(
+                        locked ? (isAr ? 'الخطة الكاملة في قمر+' : 'The full plan is Qamar+') : (isAr ? 'افتح خطة النهارده' : 'Open today’s plan'),
+                        style: QText.body(size: 12, color: locked ? QColors.gold : QColors.textMuted),
+                      ),
+                    ]),
+                  ),
+                ),
+              ),
+            )
+          else
+            const SizedBox(height: 12),
+          QPrimaryButton(key: logKey, label: isAr ? 'سجّل وجبة' : 'Log a meal', onTap: state.openTreeOnLog, height: 48),
         ],
-        if (state.nightNote != null) ...[
-          _NightCard(state: state),
-          const SizedBox(height: 14),
-        ],
-        if (state.trialEndingSoon) ...[
-          _TrialEndingCard(state: state),
-          const SizedBox(height: 14),
-        ],
-        if (state.earnedMonthJustGranted || (state.plusActive && state.earnedMonth.inProgress)) ...[
-          _EarnedMonthCard(state: state),
-          const SizedBox(height: 14),
-        ],
-        // On the general-guidance route no target is set, so none is shown:
-        // the card that would carry it says what is still here instead.
-        if (state.generalGuidance)
-          GeneralGuidanceCard(state: state)
-        else
-        Container(
+      ),
+    );
+  }
+}
+
+/// The day's numbers: calories left and the three macros.
+class _NumbersCard extends StatelessWidget {
+  final AppState state;
+  const _NumbersCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = state.t;
+    final tg = state.target();
+    final con = state.consumed();
+    final remaining = (tg.kcal - con.kcal).clamp(0, 1 << 30);
+    double pct(int a, int b) => b == 0 ? 0 : (a / b).clamp(0, 1).toDouble();
+    return Container(
           padding: const EdgeInsets.all(20),
           decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardSlate]), border: QColors.borderStrong, radius: QRadii.xxxl,
               shadow: [BoxShadow(color: QColors.blue.withOpacity(0.12), blurRadius: 40)]),
@@ -140,16 +287,21 @@ class _TodayScreenState extends State<TodayScreen> {
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 14),
-        const _WaterCard(),
-        const SizedBox(height: 14),
-        if (state.activitiesToday.isNotEmpty) ...[
-          _ActivityCard(state: state),
-          const SizedBox(height: 14),
-        ],
-        if (nextMeal != null)
-          Explainable(
+        );
+  }
+}
+
+/// The next planned meal, once a plan exists for this person.
+class _NextMealCard extends StatelessWidget {
+  final AppState state;
+  final PlanMeal meal;
+  const _NextMealCard({required this.state, required this.meal});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = state.t;
+    final nextMeal = meal;
+    return Explainable(
             id: 'next_meal',
             explanation: mealExplanation(nextMeal, iso: state.iso, digits: state.digits),
             child: Container(
@@ -179,9 +331,20 @@ class _TodayScreenState extends State<TodayScreen> {
                 ],
               ),
             ),
-          ),
-        const SizedBox(height: 14),
-        Explainable(
+          );
+  }
+}
+
+/// The day's quest, as it was. Seat 3 makes it real (O2), and then it joins
+/// the slot as its last contender.
+class _QuestCard extends StatelessWidget {
+  final AppState state;
+  const _QuestCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = state.t;
+    return Explainable(
           id: 'quest',
           child: Container(
           padding: const EdgeInsets.all(16),
@@ -225,13 +388,22 @@ class _TodayScreenState extends State<TodayScreen> {
             ],
           ),
         ),
-        ),
-        const SizedBox(height: 14),
-        // The three gestures, until they are learned or put away. They stay
-        // in Me for good.
-        if (!state.orbTutorialDone) OrbGestureGuide(state: state),
-        if (state.meals.isNotEmpty) ...[
-          const SizedBox(height: 18),
+        );
+  }
+}
+
+/// The meals logged today.
+class _LoggedMeals extends StatelessWidget {
+  final AppState state;
+  const _LoggedMeals({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = state.t;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+          const SizedBox(height: 4),
           Text(t.loggedToday, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
           const SizedBox(height: 8),
           for (final m in state.meals) ...[
@@ -251,7 +423,6 @@ class _TodayScreenState extends State<TodayScreen> {
               ),
             ),
           ],
-        ],
       ],
     );
   }
@@ -562,114 +733,7 @@ class _HydrationLine extends StatelessWidget {
   }
 }
 
-/// Last night's sentence about today — the plan's one line, read in the
-/// morning. On Qamar+ it opens the plan; on the free tier the plan behind it
-/// is locked, and this card is where the wall stands.
-class _NightCard extends StatelessWidget {
-  final AppState state;
-  const _NightCard({required this.state});
 
-  @override
-  Widget build(BuildContext context) {
-    final isAr = state.isAr;
-    final locked = state.nightPlanLocked;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(QRadii.xl),
-        onTap: state.openNightNote,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          decoration: BoxDecoration(
-            color: QColors.violet.withValues(alpha: 0.08),
-            border: Border.all(color: QColors.violet.withValues(alpha: 0.3)),
-            borderRadius: BorderRadius.circular(QRadii.xl),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                const Icon(Icons.nightlight_round, size: 14, color: QColors.violetSoft),
-                const SizedBox(width: 6),
-                Text(
-                  isAr ? 'من الليل' : 'From last night',
-                  style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.violetSoft, letterSpacing: 0.3),
-                ),
-              ]),
-              const SizedBox(height: 8),
-              Text(state.nightSentence ?? '', style: QText.body(size: 14, height: 21, color: QColors.textHigh)),
-              const SizedBox(height: 8),
-              Row(children: [
-                Icon(
-                  locked ? Icons.lock_outline : Icons.arrow_outward,
-                  size: 14,
-                  color: locked ? QColors.gold : QColors.textMuted,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  locked
-                      ? (isAr ? 'الخطة الكاملة في قمر+' : 'The full plan is Qamar+')
-                      : (isAr ? 'افتح خطة النهارده' : 'Open today’s plan'),
-                  style: QText.body(size: 12, color: locked ? QColors.gold : QColors.textMuted),
-                ),
-              ]),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The last 48 hours of the free week, in the same words the reminder used.
-class _TrialEndingCard extends StatelessWidget {
-  final AppState state;
-  const _TrialEndingCard({required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    final isAr = state.isAr;
-    final when = state.trialEndsIn();
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(QRadii.xl),
-        onTap: state.openTrialEnd,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          decoration: BoxDecoration(
-            color: QColors.gold.withValues(alpha: 0.08),
-            border: Border.all(color: QColors.gold.withValues(alpha: 0.35)),
-            borderRadius: BorderRadius.circular(QRadii.xl),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.hourglass_bottom_rounded, size: 18, color: QColors.gold),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isAr ? 'أسبوعك المجاني بيخلص $when. نكمّل الخطة؟' : 'Your free week ends $when. Keep the plan going?',
-                      style: QText.body(size: 14, height: 21, color: QColors.textHigh),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      isAr ? '٥٠٠ ج.م/شهر · إلغاء بضغطة' : 'EGP 500/month · cancel in one tap',
-                      style: QText.body(size: 12, color: QColors.textMuted),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_outward, size: 14, color: QColors.textMuted),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 /// The earned month: progress while it is being earned, the grant when it
 /// lands. Only for members — it is their first month being rewarded.

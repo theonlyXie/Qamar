@@ -339,6 +339,19 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                     ),
                   ),
                   const SizedBox(height: 40),
+                  // Opened by Today's "Log a meal" button, the tree names
+                  // where it lives, until the moon has been tapped once.
+                  if (state.treeOpenedFromButton && !state.gesturesLearned.contains(OrbGesture.tap)) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 30),
+                      child: Text(
+                        isAr ? 'المرة الجاية، دوس على القمر وهتلاقي ده.' : 'Next time, tap the moon to find this.',
+                        textAlign: TextAlign.center,
+                        style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMid),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 30),
                     child: Text(hint, textAlign: TextAlign.center, style: QText.body(size: 12, color: QColors.textFaint)),

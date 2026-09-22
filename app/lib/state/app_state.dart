@@ -156,6 +156,9 @@ class AppState extends ChangeNotifier {
   /// then nothing is remembered between launches, and nothing pretends to be.
   final DevicePrefs? _prefs;
   static const _kOrbTutorialDone = 'orb_tutorial_done';
+
+  /// The gestures this phone has seen made on the orb, by name.
+  static const _kOrbGestures = 'orb_gestures_learned';
   static const _kEasternDigits = 'eastern_digits';
   static const _kNudgesPerDay = 'nudges_per_day';
   static const _kNudgesAllowed = 'nudges_allowed';
@@ -195,6 +198,11 @@ class AppState extends ChangeNotifier {
         _syncAnalytics().ignore();
       }
       if (done == true) orbTutorialDismissed = true;
+      for (final name in (await p.getString(_kOrbGestures) ?? '').split(',')) {
+        for (final g in OrbGesture.values) {
+          if (g.name == name) gesturesLearned.add(g);
+        }
+      }
       if (await p.getBool(_kHoldCoachSeen) == true) holdCoachSeen = true;
       if (digits != null) easternDigits = digits;
       if (perDay != null) nudgesPerDay = perDay.clamp(0, NudgeSchedule.maxPerDay);
@@ -1165,8 +1173,11 @@ class AppState extends ChangeNotifier {
       holdCoachSeen = true;
       _prefs?.setBool(_kHoldCoachSeen, true).catchError((_) {});
     }
-    if (orbTutorialDone || gesturesLearned.contains(g)) return;
+    // Recorded whether or not the tutorial card is still showing, and kept
+    // across launches: Me's ticks and the tree's "tap the moon" line read it.
+    if (gesturesLearned.contains(g)) return;
     gesturesLearned.add(g);
+    _prefs?.setString(_kOrbGestures, gesturesLearned.map((x) => x.name).join(',')).catchError((_) {});
     _track('orb_gesture_first', {'gesture': g.name});
     if (gesturesLearned.length == OrbGesture.values.length) {
       _prefs?.setBool(_kOrbTutorialDone, true).catchError((_) {});
@@ -4706,6 +4717,21 @@ class AppState extends ChangeNotifier {
     _notify();
   }
 
+  /// The tree was opened by Today's "Log a meal" button rather than the moon.
+  bool treeOpenedFromButton = false;
+
+  /// Today's "Log a meal" button (O15): the tree, already open on Log, with
+  /// its ways to log fanned out. It opens the moon's own menu rather than
+  /// going round it, so using the button shows where logging lives; until
+  /// the moon has been tapped, the tree says "next time, tap the moon".
+  void openTreeOnLog() {
+    treeOpen = true;
+    treeOpenedFromButton = true;
+    _track('log_button_tapped', const {});
+    // Log is the first node on the ring.
+    expandTreeLog(0);
+  }
+
   void closeTree() {
     _collapseTree();
     _notify();
@@ -4720,6 +4746,7 @@ class AppState extends ChangeNotifier {
     treeLogSub = null;
     treeWaterIndex = null;
     treeProblem = null;
+    treeOpenedFromButton = false;
     treeOpen = false;
   }
 }

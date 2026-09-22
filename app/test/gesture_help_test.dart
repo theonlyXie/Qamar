@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
 import 'package:qamar/models/su_economy.dart';
+import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/orb_gesture_guide.dart';
 
@@ -78,5 +79,28 @@ void main() {
     s.setLang(AppLang.en);
     await tester.pump();
     expect(find.textContaining('Photos, 30 a day'), findsOneWidget, reason: 'it used to say three, whatever the plan');
+  });
+
+  test('a gesture made after the tutorial is put away is still recorded, and ticked in Me', () {
+    final s = AppState()..setLang(AppLang.en);
+    s.go(AppScreen.today);
+    s.dismissOrbTutorial();
+    s.orbTap();
+    expect(s.gesturesLearned, contains(OrbGesture.tap), reason: 'it used to stop recording once the card was put away');
+  });
+
+  test('the gestures are remembered across launches', () async {
+    final prefs = MemoryDevicePrefs();
+    final s = AppState(prefs: prefs);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    s.go(AppScreen.today);
+    s.orbTap();
+    s.closeTree();
+    await s.holdOrb();
+
+    final again = AppState(prefs: prefs);
+    await Future<void>.delayed(const Duration(milliseconds: 60));
+    expect(again.gesturesLearned, containsAll([OrbGesture.tap, OrbGesture.hold]));
+    expect(again.gesturesLearned, isNot(contains(OrbGesture.explain)));
   });
 }
