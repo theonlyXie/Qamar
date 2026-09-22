@@ -2736,7 +2736,8 @@ class AppState extends ChangeNotifier {
   /// seventh node later. Turning it on rewrites today's plan as iftar and
   /// suhoor and moves the questions to those hours. A rewrite that cannot
   /// happen now (the plan's daily cap, no connection) leaves the plan from
-  /// before on screen, and the Plan screen says so above it.
+  /// before on screen, and says so: on the Plan screen above it, and where
+  /// the answer was given ([fastingNotYet]).
   Future<void> setFasting(bool on) async {
     ramadanAskedFor = season.key;
     _prefs?.setString(_kRamadanAsked, season.key).catchError((_) {});
@@ -2751,23 +2752,43 @@ class AppState extends ChangeNotifier {
     _rescheduleNudges();
     // A plan asked for today is a different day now: rewrite it.
     if (changed && planDate != null) {
-      await ensurePlan(force: true);
-      if (_disposed) return;
-      final refused = planProblem;
-      if (refused != null && hasPlan) {
-        planProblem = _notYetFasting(refused, on: on);
+      if (_planMissed != null && hasPlan) {
+        // The last answer could not rewrite the plan, so the plan on screen
+        // was written for this one: nothing to rewrite, nothing to say.
+        _planMissed = null;
+        planProblem = null;
         _notify();
+        return;
       }
+      // Until a plan is written for the answer, a refusal says so (see
+      // [_notYetLine]).
+      _planMissed = mode;
+      await ensurePlan(force: true);
     }
   }
 
-  /// A fasting switch whose rewrite did not happen: the plan shown is the
-  /// one from before it, so that is said first, then why, with the same way
-  /// on the refusal offered.
-  Problem _notYetFasting(Problem refused, {required bool on}) {
-    final notYet = on
-        ? (isAr ? 'الخطة اللي تحت لسه مش خطة الصيام.' : 'The plan below isn’t your fasting plan yet.')
-        : (isAr ? 'الخطة اللي تحت لسه خطة الصيام.' : 'The plan below is still your fasting plan.');
+  /// The answer to "fasting?" that the plan on screen was not rewritten
+  /// for: set while a switch waits on its rewrite, cleared when a plan is
+  /// written.
+  FastingMode? _planMissed;
+
+  /// A refusal's first line while the plan on screen is from before a
+  /// fasting switch; null otherwise. "Today's plan", not "the plan below":
+  /// it is also said on Today, on the Ramadan screen and in the
+  /// conversation, where no plan is below it.
+  String? get _notYetLine {
+    if (_planMissed == null || !hasPlan) return null;
+    return _planMissed == FastingMode.ramadan
+        ? (isAr ? 'خطة النهارده لسه مش خطة الصيام.' : 'Today’s plan isn’t your fasting plan yet.')
+        : (isAr ? 'خطة النهارده لسه خطة الصيام.' : 'Today’s plan is still your fasting plan.');
+  }
+
+  /// A refused rewrite, said first as what it left undone when the plan on
+  /// screen is from before a fasting switch: then why, with the same way on
+  /// the refusal offered. Any other refusal is returned as it is.
+  Problem _behindFasting(Problem refused) {
+    final notYet = _notYetLine;
+    if (notYet == null) return refused;
     if (refused.kind == ProblemKind.limit) return _planWall(refused.what, notYet: notYet);
     return Problem(
       what: notYet,
@@ -2776,6 +2797,20 @@ class AppState extends ChangeNotifier {
       secondary: refused.secondary,
       kind: refused.kind,
     );
+  }
+
+  /// The same refusal where the answer was given (Today's slot, the Ramadan
+  /// screen): one line, and the Plan card's way on. A way on that is only
+  /// the way back to Today does nothing from there, so the line says when
+  /// instead. Null unless the plan on screen is from before a fasting
+  /// switch and its card is up.
+  ({String line, ProblemAction? action})? get fastingNotYet {
+    final p = planProblem;
+    final line = _notYetLine;
+    if (p == null || line == null) return null;
+    if (!p.action.wayBack) return (line: line, action: p.action);
+    final when = p.kind == ProblemKind.limit ? (isAr ? 'تقدر تتكتب تاني من بكرة.' : 'It can be written again from tomorrow.') : null;
+    return (line: when == null ? line : '$line $when', action: null);
   }
 
   void dismissFastingPrompt() {
@@ -4038,6 +4073,8 @@ class AppState extends ChangeNotifier {
     plan = built;
     planDate = built.date;
     planProblem = null;
+    // Written now, for the answer given now.
+    _planMissed = null;
     _track('plan_shown', {'via': via, 'first': first});
     // A rewritten menu is not the old one; carrying swaps would apply
     // yesterday's (or the previous dish's) choice to meals that are not there.
@@ -4061,11 +4098,11 @@ class AppState extends ChangeNotifier {
 
     final gateway = _ai;
     if (gateway == null) {
-      planProblem = Problem(
+      planProblem = _behindFasting(Problem(
         what: isAr ? 'الخطة بتتكتب لك إنت بالذات، وده محتاج اتصال بالمساعد.' : 'The plan is written for you specifically, which needs a connection to the assistant.',
-        action: ProblemAction(isAr ? 'ارجع للنهارده' : 'Back to Today', () => go(AppScreen.today)),
+        action: ProblemAction(isAr ? 'ارجع للنهارده' : 'Back to Today', () => go(AppScreen.today), wayBack: true),
         kind: ProblemKind.offline,
-      );
+      ));
       _notify();
       return;
     }
@@ -4089,10 +4126,10 @@ class AppState extends ChangeNotifier {
       if (_disposed) return;
       _absorb(e.quota);
       // A rewrite asked for in the conversation carries its instruction.
-      planProblem = _planWall(e.message, rebuildAsked: note != null && note.isNotEmpty);
+      planProblem = _planWall(e.message, rebuildAsked: note != null && note.isNotEmpty, notYet: _notYetLine);
     } catch (e) {
       if (_disposed) return;
-      planProblem = _planProblem(e, instruction: note);
+      planProblem = _behindFasting(_planProblem(e, instruction: note));
     }
     planLoading = false;
     _notify();
@@ -4121,7 +4158,7 @@ class AppState extends ChangeNotifier {
     final what = isAr ? 'الخطة اتكتبت كفاية النهارده.' : 'Today’s plan has been rewritten enough.';
     String? because(String? way) => notYet == null
         ? way
-        : [isAr ? 'الخطة اتكتبت كفاية النهارده، فمتكتبتش تاني.' : 'Today’s plan has been rewritten enough, so it wasn’t written again.', if (way != null) way].join(' ');
+        : [isAr ? 'اتكتبت كفاية النهارده، فمتكتبتش تاني.' : 'It has been rewritten enough today, so it wasn’t written again.', if (way != null) way].join(' ');
     final toPlan = ProblemAction(isAr ? 'بدّل وجبة من الخطة' : 'Swap a meal on the plan', () {
       chatOpen = false;
       // Already there, the card steps aside for the meals and their swaps.
@@ -4155,7 +4192,7 @@ class AppState extends ChangeNotifier {
       action: ProblemAction(isAr ? 'ارجع للنهارده' : 'Back to Today', () {
         chatOpen = false;
         go(AppScreen.today);
-      }),
+      }, wayBack: true),
       kind: ProblemKind.limit,
     );
   }
@@ -4193,7 +4230,7 @@ class AppState extends ChangeNotifier {
     if (raw.contains('403') || raw.contains('not eligible')) {
       return Problem(
         what: isAr ? 'الحساب ده مش مؤهل للخطط.' : 'This account is not eligible for plans.',
-        action: ProblemAction(isAr ? 'ارجع للنهارده' : 'Back to Today', () => go(AppScreen.today)),
+        action: ProblemAction(isAr ? 'ارجع للنهارده' : 'Back to Today', () => go(AppScreen.today), wayBack: true),
       );
     }
     if (raw.contains('429') || raw.toLowerCase().contains('quota')) {

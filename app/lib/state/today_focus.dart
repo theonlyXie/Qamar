@@ -20,7 +20,9 @@ enum TodayCard {
   /// its window is 48 hours and, with nothing renewing, it is the only word.
   billing,
 
-  /// Ramadan's one question, in season, until it is answered.
+  /// Ramadan's one question, in season, until it is answered. After it, if
+  /// the answer could not rewrite today's plan, the slot keeps one line
+  /// saying so, with its way on, until the plan catches up (O10).
   fasting,
 
   /// The earned month: being earned, or just granted.
@@ -32,7 +34,7 @@ bool todayCardDue(AppState s, TodayCard card) => switch (card) {
       TodayCard.safety => s.generalGuidance,
       TodayCard.tutorial => s.holdTutorialDue,
       TodayCard.billing => s.billingMomentDue,
-      TodayCard.fasting => s.fastingPromptDue,
+      TodayCard.fasting => s.fastingPromptDue || s.fastingNotYet != null,
       TodayCard.earnedMonth => s.earnedMonthJustGranted || (s.plusActive && s.earnedMonth.inProgress),
     };
 

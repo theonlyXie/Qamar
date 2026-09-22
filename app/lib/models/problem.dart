@@ -27,7 +27,12 @@ class Problem {
 class ProblemAction {
   final String label;
   final void Function() onTap;
-  const ProblemAction(this.label, this.onTap);
+
+  /// Only the way back to Today: a way out, not a way on for what failed. A
+  /// compact state shown somewhere else leaves it out and says when instead.
+  final bool wayBack;
+
+  const ProblemAction(this.label, this.onTap, {this.wayBack = false});
 }
 
 /// What sort of problem it is. Seat 6 gives each its glyph; the words are

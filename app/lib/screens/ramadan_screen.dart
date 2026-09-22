@@ -80,6 +80,12 @@ class RamadanScreen extends StatelessWidget {
             ),
           ]),
         ),
+        // The switch flipped but today's plan could not follow it (O10):
+        // said here, under the switch, with the Plan card's way on.
+        if (state.fastingNotYet case final n?) ...[
+          const SizedBox(height: 8),
+          QStateLine(line: n.line, action: n.action, accent: QColors.gold, icon: Icons.nightlight_round),
+        ],
         const SizedBox(height: 14),
 
         // The sun's two times, and the water between them.

@@ -22,14 +22,29 @@ import 'package:provider/provider.dart';
 
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
+import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/screens/today_screen.dart';
+import 'package:qamar/models/su_economy.dart';
+import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/state/today_focus.dart';
 import 'package:qamar/theme/layout.dart';
+import 'package:qamar/widgets/common.dart';
 
 import 'support/app_fonts.dart';
+
+/// A gateway whose plan is always refused by the daily cap.
+class _PlanCapped implements AiGateway {
+  @override
+  Future<DayPlan> generatePlan({required String date, required String lang, bool force = false, String? instruction}) async =>
+      throw AiQuotaException('Today’s plan has been rewritten enough.', const AiQuota(bucket: 'plan', used: 4, limit: 4, extra: 0, remaining: 0));
+  @override
+  Future<AiQuotas> quotaStatus() async => AiQuotas.empty;
+  @override
+  dynamic noSuchMethod(Invocation i) => throw UnimplementedError('${i.memberName}');
+}
 
 /// Four days before the first fast of 1448, so the season's question is due.
 final _now = DateTime(2027, 2, 4, 9);
@@ -184,6 +199,34 @@ void main() {
         });
       }
     }
+  }
+
+  // The fasting card's second state (O10): the question answered, and the
+  // plan's cap kept today's plan from following. Still one card in the
+  // slot, a line now, and the fold holds.
+  for (final lang in AppLang.values) {
+    testWidgets('the fasting answer the plan could not follow is one line in the slot, and the fold holds (${lang.name})', (tester) async {
+      final s = AppState(clock: () => _now, ai: _PlanCapped())..setLang(lang);
+      s.profile = s.profile.copyWith(name: 'Basel');
+      s.dismissOrbTutorial();
+      s.aiQuota = const AiQuota(bucket: 'chat', used: 1, limit: 3, extra: 0, remaining: 2);
+      const lunch = (id: 'lunch', slotAr: 'الغدا', slotEn: 'Lunch', nameAr: 'كشري', nameEn: 'Koshary', noteAr: '', noteEn: '', portions: <PlanPortion>[]);
+      s.plan = const DayPlan(date: '2027-02-04', slots: [(lunch, lunch)]);
+      s.planDate = DateTime.now().toIso8601String().substring(0, 10);
+      s.go(AppScreen.today);
+      await s.setFasting(true);
+      expect(todayCardsDue(s), [TodayCard.fasting]);
+
+      await _pump(tester, s, _phone);
+      expect(tester.takeException(), isNull, reason: 'nothing overflows on a phone');
+      final slot = tester.getRect(find.byKey(TodayScreen.zoneKey(TodayZone.slot)));
+      final card = find.byKey(TodayScreen.cardKey(TodayCard.fasting));
+      expect(slot.contains(tester.getRect(card).center), isTrue, reason: 'in the slot, where the question was');
+      expect(find.descendant(of: card, matching: find.byType(QStateLine)), findsOneWidget);
+      expect(find.byType(QStateCard), findsNothing, reason: 'not a second card fighting the slot');
+      expect(tester.getRect(find.byKey(QamarCard.logKey)).bottom, lessThanOrEqualTo(fold));
+      expect(tester.getRect(find.byKey(const ValueKey('today-sentence'))).bottom, lessThanOrEqualTo(fold));
+    });
   }
 
   group('Qamar’s card', () {

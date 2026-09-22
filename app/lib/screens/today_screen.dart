@@ -655,6 +655,10 @@ class _ActivityCard extends StatelessWidget {
 /// The one question the season asks, once: fasting this year? Yes turns the
 /// plan into iftar and suhoor and the water card into windows; no leaves the
 /// day as it is. Either way the seventh node stays on the tree in season.
+///
+/// Answered, and the plan could not be rewritten for the answer (the plan's
+/// daily cap, no connection), the slot keeps one line saying so, with the
+/// Plan card's way on (O10): where the answer was given, not only on Plan.
 class _FastingPrompt extends StatelessWidget {
   final AppState state;
   const _FastingPrompt({required this.state});
@@ -662,6 +666,11 @@ class _FastingPrompt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAr = state.isAr;
+    if (!state.fastingPromptDue) {
+      if (state.fastingNotYet case final n?) {
+        return QStateLine(line: n.line, action: n.action, accent: QColors.gold, icon: Icons.nightlight_round);
+      }
+    }
     final until = state.season.daysUntil(state.clockNow());
     final lead = until == null
         ? (isAr ? 'رمضان كريم.' : 'Ramadan Kareem.')

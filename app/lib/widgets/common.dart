@@ -83,6 +83,56 @@ class QStateCard extends StatelessWidget {
   }
 }
 
+/// A [Problem]'s compact form, for where something was asked that another
+/// screen shows in full (O10): one line, and its way on as a text button
+/// with a 48pt target. Never a second card: it sits in the place of the
+/// thing that asked.
+class QStateLine extends StatelessWidget {
+  final String line;
+  final ProblemAction? action;
+  final Color accent;
+  final IconData icon;
+  const QStateLine({super.key, required this.line, this.action, this.accent = QColors.violet, this.icon = Icons.info_outline});
+
+  @override
+  Widget build(BuildContext context) {
+    final a = action;
+    return Container(
+      padding: EdgeInsetsDirectional.fromSTEB(14, 12, 14, a == null ? 12 : 2),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        border: Border.all(color: accent.withValues(alpha: 0.32)),
+        borderRadius: BorderRadius.circular(QRadii.xl),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(padding: const EdgeInsets.only(top: 3), child: Icon(icon, size: 14, color: accent)),
+            const SizedBox(width: 8),
+            Expanded(child: Text(line, style: QText.body(size: 14, height: 21, weight: FontWeight.w600, color: QColors.textHigh))),
+          ]),
+          if (a != null)
+            Padding(
+              // The button's own inset lines its words up under the line's.
+              padding: const EdgeInsetsDirectional.only(start: 10),
+              child: TextButton(
+                onPressed: a.onTap,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  foregroundColor: accent,
+                ),
+                child: Text(a.label, style: QText.body(size: 13, weight: FontWeight.w600, color: accent)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class QOutlineButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
