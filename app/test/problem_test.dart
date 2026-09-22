@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:qamar/l10n/strings.dart';
+import 'package:qamar/models/plan.dart';
 import 'package:qamar/main.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/problem.dart';
@@ -28,13 +29,17 @@ class _Ai implements AiGateway {
   Object? planFails;
   Completer<DayPlan>? planHangs;
   int planCalls = 0;
+  final List<String?> planInstructions = [];
   Object? chatFails;
+  ChatResult chatResult = const ChatResult(reply: 'grounded answer');
+  AiQuotas quotas = AiQuotas.empty;
   int chatCalls = 0;
   final List<String?> mealTexts = [];
 
   @override
   Future<DayPlan> generatePlan({required String date, required String lang, bool force = false, String? instruction}) async {
     planCalls++;
+    planInstructions.add(instruction);
     if (planHangs != null) return planHangs!.future;
     if (planFails != null) throw planFails!;
     return const DayPlan(date: '2026-09-22', slots: []);
@@ -44,7 +49,7 @@ class _Ai implements AiGateway {
   Future<ChatResult> chatReply({required String message, required String lang, String? date, Map<String, dynamic>? currentPlan, List<String>? swappedSlots, String? imagePath}) async {
     chatCalls++;
     if (chatFails != null) throw chatFails!;
-    return const ChatResult(reply: 'grounded answer');
+    return chatResult;
   }
 
   @override
@@ -56,7 +61,7 @@ class _Ai implements AiGateway {
   }
 
   @override
-  Future<AiQuotas> quotaStatus() async => AiQuotas.empty;
+  Future<AiQuotas> quotaStatus() async => quotas;
 
   @override
   dynamic noSuchMethod(Invocation i) => throw UnimplementedError('${i.memberName}');
@@ -163,7 +168,7 @@ void main() {
       expect(s.screen, AppScreen.onboard);
     });
 
-    test('the plan’s daily cap names the way the server names: tell Qamar what changed', () async {
+    test('the plan’s daily cap with no plan yet: nothing to change, so back to Today — never a way that cannot work', () async {
       final cap = AiQuotaException(
         'Today’s plan has been rewritten enough. Swap meals on the plan itself, or tell me what changed and I will adjust the rest.',
         const AiQuota(bucket: 'plan', used: 4, limit: 4, extra: 0, remaining: 0),
@@ -172,10 +177,11 @@ void main() {
       final s = AppState(ai: ai)..setLang(AppLang.en);
       await s.ensurePlan(force: true);
       final p = s.planProblem!;
-      expect(p.what, cap.message);
-      expect(p.action.label, 'Tell Qamar what changed', reason: 'Su buys no plan uses, so the wallet is not the way out');
+      expect(p.kind, ProblemKind.limit);
+      expect(p.action.label, 'Back to Today', reason: 'Su buys no plan uses, and with no plan there is no meal to swap or change');
+      expect(p.what, isNot(contains('tell me what changed')));
       p.action.onTap();
-      expect(s.chatOpen, isTrue);
+      expect(s.screen, AppScreen.today);
     });
 
     test('something on our side: said without blame, with "Try again"', () async {
@@ -372,8 +378,115 @@ void main() {
     expect(s.chat.last.problem!.action.label, 'شوف \u2066Qamar+\u2069');
   });
 
-  test('the Problem kinds are the four the component draws', () {
-    expect(ProblemKind.values.map((k) => k.name), ['empty', 'error', 'offline', 'permission']);
+  test('the Problem kinds are the five the component draws', () {
+    expect(ProblemKind.values.map((k) => k.name), ['empty', 'error', 'offline', 'permission', 'limit']);
+  });
+
+  group('a daily cap is a limit, and its way on is one that works now', () {
+    AiQuotaException planCap() => AiQuotaException(
+          'Today’s plan has been rewritten enough. Swap meals on the plan itself, or tell me what changed and I will adjust the rest.',
+          const AiQuota(bucket: 'plan', used: 4, limit: 4, extra: 0, remaining: 0),
+        );
+    PlanMeal meal(String id, String name) =>
+        (id: id, slotAr: id, slotEn: id, nameAr: name, nameEn: name, noteAr: '', noteEn: '', portions: const []);
+    DayPlan day({required bool alternative}) => DayPlan(date: '2026-09-22', slots: [
+          (meal('lunch', 'Koshary'), alternative ? meal('lunch', 'Grilled chicken') : meal('lunch', 'Koshary')),
+        ]);
+    AppState capped({required int questionsLeft, required bool plan, bool alternative = true}) {
+      final chat = AiQuota(bucket: 'chat', used: 3 - questionsLeft, limit: 3, extra: 0, remaining: questionsLeft);
+      final ai = _Ai()
+        ..planFails = planCap()
+        ..quotas = AiQuotas(chat: chat, photo: AiQuota.emptyPhoto, plan: AiQuotas.empty.plan);
+      final s = AppState(ai: ai)..setLang(AppLang.en);
+      s.aiQuota = chat;
+      if (plan) s.plan = day(alternative: alternative);
+      return s;
+    }
+
+    test('the question and photo limits are limits, not errors', () async {
+      final ai = _Ai()
+        ..chatFails = AiQuotaException('That was today’s third question.', const AiQuota(bucket: 'chat', used: 3, limit: 3, extra: 0, remaining: 0));
+      final s = AppState(ai: ai)..setLang(AppLang.en);
+      await s.sendChatMsg('what should I eat tonight?');
+      expect(s.chat.last.problem!.kind, ProblemKind.limit);
+
+      final photos = AppState(ai: _PhotoWallAi())..setLang(AppLang.en);
+      photos.logPhotoTaken('/tmp/does-not-matter.jpg');
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(photos.chat.last.problem!.kind, ProblemKind.limit);
+    });
+
+    test('a question left and a plan to change: "Tell Qamar what changed" — a swap is saved under the question', () async {
+      final s = capped(questionsLeft: 2, plan: true);
+      await s.ensurePlan(force: true);
+      final p = s.planProblem!;
+      expect(p.kind, ProblemKind.limit);
+      expect(p.action.label, 'Tell Qamar what changed');
+      expect(p.secondary!.label, 'Swap a meal on the plan', reason: 'and the way that spends nothing, beside it');
+    });
+
+    test('no questions left: never "Tell Qamar", which would open on the question wall; the plan’s own swap instead', () async {
+      final s = capped(questionsLeft: 0, plan: true);
+      s.go(AppScreen.today);
+      s.openChat();
+      await s.ensurePlan(force: true);
+      final p = s.planProblem!;
+      expect(p.kind, ProblemKind.limit);
+      expect(p.action.label, 'Swap a meal on the plan');
+      expect(p.secondary, isNull);
+      expect(p.what, 'Today’s plan has been rewritten enough.', reason: 'the server’s "tell me what changed" is not offered when it cannot work');
+      p.action.onTap();
+      expect(s.screen, AppScreen.plan);
+      expect(s.chatOpen, isFalse);
+    });
+
+    test('no questions and nothing to swap: back to Today, and when it comes back', () async {
+      for (final plan in [false, true]) {
+        final s = capped(questionsLeft: 0, plan: plan, alternative: false);
+        s.go(AppScreen.plan);
+        await s.ensurePlan(force: true);
+        final p = s.planProblem!;
+        expect(p.action.label, 'Back to Today', reason: plan ? 'no meal has another option' : 'no plan to change');
+        expect(p.why, 'It can be written again from tomorrow.');
+        p.action.onTap();
+        expect(s.screen, AppScreen.today);
+      }
+    });
+
+    test('a full rewrite asked for in the conversation that meets the cap is said, not claimed — even with questions left', () async {
+      final ai = _Ai()
+        ..planFails = planCap()
+        ..chatResult = const ChatResult(reply: 'Rewriting your whole day around no cooking.', rebuildInstruction: 'no cooking');
+      final s = AppState(ai: ai)..setLang(AppLang.en);
+      s.plan = day(alternative: true);
+      s.aiQuota = const AiQuota(bucket: 'chat', used: 1, limit: 3, extra: 0, remaining: 2);
+      s.openChat();
+      await s.sendChatMsg('I’m too tired to cook, redo my day');
+
+      expect(ai.planInstructions, ['no cooking'], reason: 'the rewrite went to the metered plan call');
+      final turn = s.chat.last;
+      expect(turn.text, 'Today’s plan has been rewritten enough.');
+      expect(s.chat.any((t) => t.text.startsWith('Rewriting your whole day')), isFalse, reason: 'the reply spoke as if it would happen');
+      expect(turn.action, isNull, reason: 'no "See the plan" on a plan that did not change');
+      expect(turn.problem!.kind, ProblemKind.limit);
+      expect(turn.problem!.action.label, 'Swap a meal on the plan',
+          reason: 'telling Qamar again would ask for the same rewrite and meet the same cap');
+    });
+
+    test('trying again after a failed rewrite asks for the same rewrite', () async {
+      final ai = _Ai()
+        ..planFails = const SocketException('Failed host lookup')
+        ..chatResult = const ChatResult(reply: 'Rewriting your day.', rebuildInstruction: 'no cooking');
+      final s = AppState(ai: ai)..setLang(AppLang.en);
+      s.plan = day(alternative: true);
+      await s.sendChatMsg('redo my day');
+      final turn = s.chat.last;
+      expect(turn.problem!.action.label, 'Try again');
+      ai.planFails = null;
+      turn.problem!.action.onTap();
+      await Future<void>.delayed(Duration.zero);
+      expect(ai.planInstructions, ['no cooking', 'no cooking']);
+    });
   });
 
   test('a meal photo past the day’s photos offers typing it instead', () async {

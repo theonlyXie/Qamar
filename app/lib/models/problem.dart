@@ -44,4 +44,8 @@ enum ProblemKind {
 
   /// The phone has not allowed something the step needs, like the camera.
   permission,
+
+  /// A daily allowance used up — the questions, the photos, the plan's
+  /// rewrites. Nothing broke; it comes back tomorrow.
+  limit,
 }

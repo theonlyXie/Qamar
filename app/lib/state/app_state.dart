@@ -3387,7 +3387,12 @@ class AppState extends ChangeNotifier {
       action: label,
       openWallet: photo,
       openPlus: !photo,
-      problem: Problem(what: e.message, action: ProblemAction(label, () => _leaveChatForWall(photo: photo)), secondary: instead),
+      problem: Problem(
+        what: e.message,
+        action: ProblemAction(label, () => _leaveChatForWall(photo: photo)),
+        secondary: instead,
+        kind: ProblemKind.limit,
+      ),
     ));
     _notify();
   }
@@ -4054,10 +4059,11 @@ class AppState extends ChangeNotifier {
     } on AiQuotaException catch (e) {
       if (_disposed) return;
       _absorb(e.quota);
-      planProblem = _planWall(e.message);
+      // A rewrite asked for in the conversation carries its instruction.
+      planProblem = _planWall(e.message, rebuildAsked: note != null && note.isNotEmpty);
     } catch (e) {
       if (_disposed) return;
-      planProblem = _planProblem(e);
+      planProblem = _planProblem(e, instruction: note);
     }
     planLoading = false;
     _notify();
@@ -4067,17 +4073,58 @@ class AppState extends ChangeNotifier {
   /// connection is too slow, instead of watching "Writing…" for ever.
   static const planTimeout = Duration(seconds: 60);
 
-  /// The plan's daily cap, in the server's words. Su buys no plan uses, so
-  /// the way out is the one the server names: tell Qamar what changed.
-  Problem _planWall(String message) => Problem(
+  /// The plan's daily cap (O10): a limit, not a failure. Su buys no plan
+  /// uses, so the way on is whichever works now without the plan call:
+  ///  * a question left and a plan to change: tell Qamar. A new meal or a
+  ///    new day asked for in the conversation is saved under the question,
+  ///    not the plan. Not after [rebuildAsked]: a full rewrite asked for in
+  ///    the conversation is the metered call itself, and would meet this cap
+  ///    again;
+  ///  * otherwise, a meal on today's plan with another option: swap it on
+  ///    the plan, which spends nothing;
+  ///  * otherwise, back to Today: the plan can be written again tomorrow.
+  /// The server's own words are kept only when the way they name works.
+  Problem _planWall(String message, {bool rebuildAsked = false}) {
+    final canAsk = !rebuildAsked && hasAssistant && aiQuota.remaining > 0 && hasPlan;
+    final canSwap = hasPlan && (plan?.slots.any((s) => slotHasAlternative(s.$1.id)) ?? false);
+    final what = isAr ? 'الخطة اتكتبت كفاية النهارده.' : 'Today’s plan has been rewritten enough.';
+    final toPlan = ProblemAction(isAr ? 'بدّل وجبة من الخطة' : 'Swap a meal on the plan', () {
+      chatOpen = false;
+      go(AppScreen.plan);
+    });
+    if (canAsk) {
+      return Problem(
         what: message,
         action: ProblemAction(isAr ? 'قول لقمر إيه اللي اتغيّر' : 'Tell Qamar what changed', openChat),
+        secondary: canSwap ? toPlan : null,
+        kind: ProblemKind.limit,
       );
+    }
+    if (canSwap) {
+      return Problem(
+        what: what,
+        why: isAr ? 'الوجبة اللي ليها بديل تقدر تبدّلها من الخطة نفسها، ومن غير ما تصرف حاجة.' : 'A meal with another option can be swapped on the plan itself, and that spends nothing.',
+        action: toPlan,
+        kind: ProblemKind.limit,
+      );
+    }
+    return Problem(
+      what: what,
+      why: isAr ? 'تقدر تتكتب تاني من بكرة.' : 'It can be written again from tomorrow.',
+      action: ProblemAction(isAr ? 'ارجع للنهارده' : 'Back to Today', () {
+        chatOpen = false;
+        go(AppScreen.today);
+      }),
+      kind: ProblemKind.limit,
+    );
+  }
 
   /// The gateway refuses to guess, and its refusals are actionable — say what
   /// they mean and offer the next step, never a raw status or exception.
-  Problem _planProblem(Object e) {
-    final retry = ProblemAction(isAr ? 'جرّب تاني' : 'Try again', () => ensurePlan(force: true));
+  /// [instruction] is a rewrite asked for in the conversation: trying again
+  /// asks for the same rewrite, not a different plan.
+  Problem _planProblem(Object e, {String? instruction}) {
+    final retry = ProblemAction(isAr ? 'جرّب تاني' : 'Try again', () => ensurePlan(force: true, instruction: instruction));
     final away = isAr ? 'الخطة بتتكتب لك على السيرفر، فمحتاجة نت.' : 'The plan is written for you on our server, so it needs a connection.';
     switch (failureOf(e)) {
       case Failure.offline:
@@ -4271,6 +4318,18 @@ class AppState extends ChangeNotifier {
         }
         if (_disposed) return;
         await ensurePlan(force: true, instruction: result.rebuildInstruction);
+        if (_disposed) return;
+        final refused = planProblem;
+        if (refused != null) {
+          // The rewrite did not happen (the plan's cap, or a failure). The
+          // model's reply spoke as if it would, so it is not shown: Qamar
+          // says what happened instead, with the way on that works now.
+          await _pullQuota(gateway);
+          chatState = ChatState.idle;
+          chat.add(ChatTurn(who: ChatWho.q, text: refused.what, sub: refused.why, problem: refused));
+          _notify();
+          return;
+        }
         menuMoved = hasPlan;
       }
 
