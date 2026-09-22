@@ -155,7 +155,43 @@ function score(query: string, candidate: string): number {
   return hits / a.size;
 }
 
-async function searchUsda(query: string): Promise<{ fdcId: number; description: string; nutrients: Record<string, number> } | null> {
+interface UsdaHit {
+  fdcId: number;
+  description: string;
+  nutrients: Record<string, number>;
+}
+
+/**
+ * Maps one USDA nutrient list onto Qamar codes.
+ *
+ * The search endpoint and the by-id endpoint spell the same list differently
+ * (`nutrientId`/`value` versus `nutrient.id`/`amount`), so the two accessors
+ * are passed in and the PREFERRED_IDS rule lives in one place.
+ */
+function pickNutrients(
+  list: unknown[],
+  idOf: (n: unknown) => number | undefined,
+  valueOf: (n: unknown) => unknown,
+): Record<string, number> | null {
+  const nutrients: Record<string, number> = {};
+  const fromPreferred = new Set<string>();
+  for (const n of list) {
+    const id = idOf(n);
+    const code = id === undefined ? undefined : NUTRIENT_MAP[id];
+    const value = valueOf(n);
+    if (!code || typeof value !== "number") continue;
+    if (fromPreferred.has(code)) continue; // a preferred field already won
+    nutrients[code] = value;
+    if (id !== undefined && PREFERRED_IDS.has(id)) fromPreferred.add(code);
+  }
+  // Absent, not zero. Water, salt and brewed tea legitimately report 0 kcal,
+  // and 0054 made them recipe ingredients; a falsy check here used to throw
+  // them away as "no energy value".
+  if (nutrients.energy_kcal === undefined) return null;
+  return nutrients;
+}
+
+async function searchUsda(query: string): Promise<UsdaHit | null> {
   const url =
     `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${USDA_KEY}` +
     `&query=${encodeURIComponent(query)}&pageSize=5&dataType=SR%20Legacy,Foundation`;
@@ -181,21 +217,57 @@ async function searchUsda(query: string): Promise<{ fdcId: number; description: 
     return null;
   }
 
-  const nutrients: Record<string, number> = {};
-  const fromPreferred = new Set<string>();
-  // deno-lint-ignore no-explicit-any
-  for (const n of ((best.raw as any).foodNutrients ?? [])) {
-    const code = NUTRIENT_MAP[n.nutrientId];
-    if (!code || typeof n.value !== "number") continue;
-    if (fromPreferred.has(code)) continue; // a preferred field already won
-    nutrients[code] = n.value;
-    if (PREFERRED_IDS.has(n.nutrientId)) fromPreferred.add(code);
-  }
-  if (!nutrients.energy_kcal) {
+  const nutrients = pickNutrients(
+    // deno-lint-ignore no-explicit-any
+    (best.raw as any).foodNutrients ?? [],
+    // deno-lint-ignore no-explicit-any
+    (n) => (n as any).nutrientId,
+    // deno-lint-ignore no-explicit-any
+    (n) => (n as any).value,
+  );
+  if (!nutrients) {
     console.log(`  match has no energy value, skipping: "${best.description}"`);
     return null;
   }
   return { fdcId: best.fdcId, description: best.description, nutrients };
+}
+
+/**
+ * Fetches one USDA food by its fdcId, for the foods a person has mapped by
+ * hand.
+ *
+ * The search cannot find عيش بلدي or جبنة قريش under any English name, and the
+ * unmatched report at the end of every run has been asking for a way to act on
+ * "map them to the closest generic food deliberately". The way is a
+ * food_source_links row: source 'usda_fdc', external_type 'fdc_id', written by
+ * the person who made the judgement. This importer then takes that id as
+ * given and skips the search, so a deliberate choice is never second-guessed
+ * by a token-overlap score — and the provenance of the choice is the row.
+ */
+async function fetchUsdaById(fdcId: number): Promise<UsdaHit | null> {
+  const url = `https://api.nal.usda.gov/fdc/v1/food/${fdcId}?api_key=${USDA_KEY}`;
+  const res = await fetch(url);
+  if (res.status === 429) {
+    console.error("rate limited by USDA; stopping so the run can be resumed cleanly");
+    Deno.exit(2);
+  }
+  if (!res.ok) {
+    console.log(`  hand-mapped fdc_id ${fdcId} returned ${res.status}`);
+    return null;
+  }
+  const json = await res.json();
+  const nutrients = pickNutrients(
+    json.foodNutrients ?? [],
+    // deno-lint-ignore no-explicit-any
+    (n) => (n as any).nutrient?.id,
+    // deno-lint-ignore no-explicit-any
+    (n) => (n as any).amount,
+  );
+  if (!nutrients) {
+    console.log(`  hand-mapped fdc_id ${fdcId} has no energy value: "${json.description}"`);
+    return null;
+  }
+  return { fdcId, description: json.description ?? String(fdcId), nutrients };
 }
 
 async function main() {
@@ -217,9 +289,21 @@ async function main() {
   let todo = all.filter((f) => !have.has(f.qamar_food_id));
   if (LIMIT > 0) todo = todo.slice(0, LIMIT);
 
+  // Hand-mapped ids, written by a person into food_source_links. A food that
+  // has one is fetched by id and never searched.
+  const linksRes = await db(
+    "food_source_links?source_id=eq.usda_fdc&external_type=eq.fdc_id&select=qamar_food_id,external_id",
+  );
+  const handMapped = new Map<string, number>(
+    ((await linksRes.json()) as { qamar_food_id: string; external_id: string }[])
+      .map((r) => [r.qamar_food_id, Number(r.external_id)] as [string, number])
+      .filter(([, id]) => Number.isFinite(id)),
+  );
+
   console.log(
     `${todo.length} of ${all.length} foods to resolve ` +
-      `(${have.size} already at nutrient set ${NUTRIENT_SET_VERSION})\n`,
+      `(${have.size} already at nutrient set ${NUTRIENT_SET_VERSION}, ` +
+      `${handMapped.size} hand-mapped)\n`,
   );
 
   let matched = 0;
@@ -231,9 +315,10 @@ async function main() {
     const query = food.food_state === "unspecified"
       ? food.name_en
       : `${food.name_en} ${food.food_state}`;
-    console.log(`${food.slug}: "${query}"`);
+    const mappedId = handMapped.get(food.qamar_food_id);
+    console.log(mappedId ? `${food.slug}: hand-mapped fdc_id ${mappedId}` : `${food.slug}: "${query}"`);
 
-    const hit = await searchUsda(query);
+    const hit = mappedId ? await fetchUsdaById(mappedId) : await searchUsda(query);
     if (!hit) {
       unmatched.push(food.slug);
       continue;
@@ -286,8 +371,11 @@ async function main() {
     for (const s of unmatched) console.log(`  ${s}`);
     console.log(
       "\nThese are mostly Egyptian items USDA does not carry. Map them to the " +
-        "closest generic food deliberately, or take them from the Egypt food " +
-        "composition tables — do not let the model estimate them.",
+        "closest generic food deliberately — insert a food_source_links row " +
+        "(source_id 'usda_fdc', external_type 'fdc_id') and re-run — or take " +
+        "them from the Egypt food composition tables. Do not let the model " +
+        "estimate them. `select * from dish_nutrient_readiness where not " +
+        "computable` lists which dishes each gap is holding back.",
     );
   }
   if (DRY_RUN) console.log("\n(dry run: nothing written)");
