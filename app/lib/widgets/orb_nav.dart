@@ -210,7 +210,7 @@ class _DraggableOrbState extends State<_DraggableOrb> {
         key: _moonKey,
         width: 56,
         height: 56,
-        child: Center(child: LivingOrb(size: 56, wander: true, sparks: true, state: state.orbState(), speaking: state.waitingNudge != null)),
+        child: Center(child: LivingOrb(size: 56, wander: true, sparks: true, state: state.orbState(), speaking: state.orbSpeaking)),
       ),
     );
   }

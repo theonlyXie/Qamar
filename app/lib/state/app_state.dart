@@ -1111,6 +1111,18 @@ class AppState extends ChangeNotifier {
     return (day: DateTime(now.year, now.month, now.day), slot: n.slot);
   }
 
+  /// Whether the orb pulses: a meal's question is waiting and holding the orb
+  /// would ask it. Each question is asked once per conversation; once the
+  /// talk has moved past it, the hold opens the conversation instead, so the
+  /// pulse stops rather than promise a question the hold will not ask. After
+  /// the fortnight of pushes the pulse is the only prompt left, and a pulse
+  /// that leads nowhere teaches people to ignore it.
+  bool get orbSpeaking {
+    final n = waitingNudge;
+    if (n == null) return false;
+    return _askedQuestion != _questionKey(n) || _asking(n);
+  }
+
   /// Whether Qamar's last line is this meal question.
   bool _asking(Nudge n) => chat.isNotEmpty && chat.last.who == ChatWho.q && chat.last.text == n.text(ar: isAr);
 

@@ -7,7 +7,8 @@
 /// only for the first fourteen days: by then the internal trigger — food
 /// doubt — has either formed or it has not, and a notification is not going
 /// to form it. In the app the same nudge is a slow pulse of the orb for the
-/// hours the meal is usually eaten; holding the orb hears it.
+/// hours the meal is usually eaten; holding the orb hears it, and once it has
+/// been asked and passed over the pulse stops.
 library;
 
 enum MealSlot { breakfast, lunch, dinner, iftar, suhoor }
@@ -287,7 +288,9 @@ class NudgeSchedule {
   /// The question the orb is holding right now, if a meal's usual time has
   /// come, its window is still open and it has not been logged. This is the
   /// in-app side of the trigger and it does not stop after fourteen days:
-  /// the orb having something to say is how Qamar talks, not a push.
+  /// the orb having something to say is how Qamar talks, not a push. The orb
+  /// pulses for it only until it has been asked and the talk has moved past
+  /// it (AppState.orbSpeaking), because the hold does not ask it twice.
   static Nudge? waiting({
     required int perDay,
     required MealTimes times,

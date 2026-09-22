@@ -24,7 +24,8 @@ class LivingOrb extends StatefulWidget {
   /// when intake runs over, and the streak ring closes one day at a time.
   final OrbState? state;
 
-  /// Qamar has something to say (a meal's question is waiting): the halo
+  /// Qamar has something to say (a meal's question is waiting and the hold
+  /// would ask it, AppState.orbSpeaking): the halo
   /// breathes wider and brighter on its own slow cycle. A pulse, never a
   /// bounce, and never a sound.
   final bool speaking;

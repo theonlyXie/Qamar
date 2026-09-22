@@ -2095,6 +2095,31 @@ void main() {
       expect(state.proposal, isNull);
     });
 
+    test('the orb pulses only while the hold would ask: once the talk has moved past its question, it stops', () async {
+      final ai = FakeGateway();
+      final voice = FakeDictation();
+      final state = backed(ai: ai, dictation: voice, clock: () => DateTime(2026, 9, 21, 14, 30));
+      await settle();
+      expect(state.waitingNudge, isNotNull);
+      expect(state.orbSpeaking, isTrue, reason: 'lunch’s question waits, and the hold would ask it');
+
+      await state.holdOrb(); // lunch is asked …
+      voice.say('');
+      state.closeChat(); // … and left unanswered
+      expect(state.orbSpeaking, isTrue, reason: 'still Qamar’s last line: the hold is the same ask');
+
+      state.openChat();
+      await state.sendChatMsg('can I have feteer tonight?');
+      await settle();
+      state.closeChat();
+      expect(state.waitingNudge, isNotNull, reason: 'lunch still has not been logged');
+      expect(state.orbSpeaking, isFalse, reason: 'the talk moved past it; the hold would not ask it again');
+
+      final dinner = backed(ai: ai, clock: () => DateTime(2026, 9, 21, 20, 45));
+      await settle();
+      expect(dinner.orbSpeaking, isTrue, reason: 'the next meal’s question is a new ask');
+    });
+
     test('a log closed on without a word is disarmed: a question asked later goes to the chat, not the analyser', () async {
       final ai = FakeGateway();
       final state = backed(ai: ai, clock: () => DateTime(2026, 9, 21, 11, 0));
