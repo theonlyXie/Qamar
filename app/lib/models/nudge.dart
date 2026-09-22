@@ -160,6 +160,15 @@ class NudgeSchedule {
   /// Push nudges stop after this many days of use.
   static const externalDays = 14;
 
+  /// iOS keeps at most this many pending local notifications per app and
+  /// silently drops the rest; Android has no such limit, so this is the one
+  /// that binds.
+  static const maxPending = 64;
+
+  /// Slots kept free under [maxPending] for the notifications that are not
+  /// meal questions: the free week's reminder and the paid month's.
+  static const reservedPending = 2;
+
   /// How long a meal's question stays "waiting" on the orb after its time.
   static const window = Duration(hours: 3);
 
@@ -184,35 +193,54 @@ class NudgeSchedule {
     return order.take(n).toList();
   }
 
-  /// The next [days] days of questions, oldest first. Today's questions for
-  /// meals already eaten, or whose time has passed, are left out; days past
-  /// the fourteen-day external window (counted from [firstDay]) are left out
-  /// entirely. [firstDay] null means the window has not started.
+  /// Every question still to come in the fourteen-day external window, oldest
+  /// first — the whole rest of the window, not the next few days.
+  ///
+  /// These are local notifications: the phone fires only what is already on
+  /// its schedule, and the schedule is only rebuilt while the app is running.
+  /// A shorter horizon meant that a person who stopped opening the app went
+  /// silent a few days later, well inside the window the questions exist for.
+  /// So the rest of the window is scheduled up front, and never more than
+  /// [maxPending] less [reservedPending] of them.
+  ///
+  /// Today's questions for meals already eaten, or whose time has passed, are
+  /// left out; days past the window (counted from [firstDay]) are left out
+  /// entirely. [firstDay] null means the window has not started, so it is
+  /// taken to start today. [days] caps the horizon below the window.
+  ///
+  /// [fastingOn] and [timesOn] decide each day on its own, so a schedule that
+  /// crosses the first or last fast of Ramadan asks about lunch and dinner on
+  /// one side and iftar and suhoor on the other, at that day's sun. Without
+  /// them, [fasting] and [times] hold for every day.
   static List<Nudge> build({
     required int perDay,
     required MealTimes times,
     required DateTime now,
     Set<MealSlot> loggedToday = const {},
     DateTime? firstDay,
-    int days = 3,
+    int days = externalDays,
     bool fasting = false,
+    bool Function(DateTime day)? fastingOn,
+    MealTimes Function(DateTime day)? timesOn,
   }) {
-    final slots = slotsFor(perDay, fasting: fasting);
-    if (slots.isEmpty) return const [];
+    if (perDay.clamp(0, maxPerDay) == 0) return const [];
     final today = DateTime(now.year, now.month, now.day);
-    final first = firstDay == null ? null : DateTime(firstDay.year, firstDay.month, firstDay.day);
+    final first = firstDay == null ? today : DateTime(firstDay.year, firstDay.month, firstDay.day);
     final out = <Nudge>[];
     for (var d = 0; d < days; d++) {
       final day = today.add(Duration(days: d));
-      if (first != null && day.difference(first).inDays >= externalDays) break;
-      for (final slot in slots) {
-        final at = day.add(Duration(minutes: times.of(slot)));
+      if (day.difference(first).inDays >= externalDays) break;
+      final fastingDay = fastingOn?.call(day) ?? fasting;
+      final dayTimes = timesOn?.call(day) ?? times;
+      for (final slot in slotsFor(perDay, fasting: fastingDay)) {
+        final at = day.add(Duration(minutes: dayTimes.of(slot)));
         if (d == 0 && (!at.isAfter(now) || loggedToday.contains(slot))) continue;
         out.add(Nudge(slot: slot, at: at, dayIndex: d));
       }
     }
     out.sort((a, b) => a.at.compareTo(b.at));
-    return out;
+    const cap = maxPending - reservedPending;
+    return out.length > cap ? out.sublist(0, cap) : out;
   }
 
   /// The question the orb is holding right now, if a meal's usual time has

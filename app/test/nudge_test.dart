@@ -16,16 +16,52 @@ void main() {
       expect(NudgeSchedule.slotsFor(9), hasLength(2), reason: 'the ceiling is two');
     });
 
-    test('three days ahead, at the meal times, oldest first', () {
-      final s = NudgeSchedule.build(perDay: 2, times: times, now: morning);
-      expect(s.length, 6);
+    test('the whole fourteen-day window up front, at the meal times, oldest first', () {
+      // The phone fires only what is already scheduled, and the schedule is
+      // rebuilt only while the app runs — so a person who stops opening it
+      // must still have every question the window holds.
+      final s = NudgeSchedule.build(perDay: 2, times: times, now: morning, firstDay: DateTime(2026, 9, 21));
+      expect(s.length, 28, reason: 'fourteen days, two a day');
       expect(s.first.slot, MealSlot.lunch);
       expect(s.first.at, DateTime(2026, 9, 21, 14, 0));
       expect(s[1].at, DateTime(2026, 9, 21, 20, 30));
-      expect(s.last.at, DateTime(2026, 9, 23, 20, 30));
+      expect(s.last.at, DateTime(2026, 10, 4, 20, 30), reason: 'day 13 is the window’s last');
       for (var i = 1; i < s.length; i++) {
         expect(s[i].at.isAfter(s[i - 1].at), isTrue);
       }
+    });
+
+    test('a window that started days ago schedules exactly what is left of it', () {
+      final tenDaysIn = DateTime(2026, 9, 11);
+      final s = NudgeSchedule.build(perDay: 2, times: times, now: morning, firstDay: tenDaysIn);
+      expect(s.length, 8, reason: 'days 10 to 13, two a day');
+      expect(s.map((n) => n.dayIndex).toSet(), {0, 1, 2, 3});
+      expect(s.last.at, DateTime(2026, 9, 24, 20, 30));
+    });
+
+    test('the whole window and both reminders fit under the phone’s pending limit', () {
+      expect(
+        NudgeSchedule.externalDays * NudgeSchedule.maxPerDay + NudgeSchedule.reservedPending,
+        lessThanOrEqualTo(NudgeSchedule.maxPending),
+        reason: 'iOS drops pending notifications past 64 without saying so',
+      );
+      final s = NudgeSchedule.build(perDay: 9, times: times, now: morning, days: 400);
+      expect(s.length, lessThanOrEqualTo(NudgeSchedule.maxPending - NudgeSchedule.reservedPending));
+      expect(s.length, 28, reason: 'a longer horizon still stops at the window');
+    });
+
+    test('each day decides its own fast, so a schedule can cross the first one', () {
+      final firstFast = DateTime(2026, 9, 24);
+      bool fastingOn(DateTime d) => !d.isBefore(firstFast);
+      MealTimes timesOn(DateTime d) => fastingOn(d) ? times.withRamadan(iftar: 17 * 60 + d.day, suhoor: 4 * 60) : times;
+      final s = NudgeSchedule.build(perDay: 2, times: times, now: morning, firstDay: morning, fastingOn: fastingOn, timesOn: timesOn);
+
+      final before = s.where((n) => n.at.isBefore(firstFast)).map((n) => n.slot).toSet();
+      expect(before, {MealSlot.lunch, MealSlot.dinner});
+      final after = s.where((n) => !n.at.isBefore(firstFast)).toList();
+      expect(after.map((n) => n.slot).toSet(), {MealSlot.iftar, MealSlot.suhoor});
+      expect(after.firstWhere((n) => n.slot == MealSlot.iftar).at, DateTime(2026, 9, 24, 17, 24), reason: 'that day’s sunset, not today’s');
+      expect(s.map((n) => n.id).toSet().length, s.length, reason: 'ids stay unique across the switch');
     });
 
     test('today\'s question is dropped once its time has passed or the meal is logged', () {
@@ -46,7 +82,8 @@ void main() {
       final day14 = DateTime(2026, 9, 21).subtract(const Duration(days: 14));
       expect(NudgeSchedule.build(perDay: 2, times: times, now: morning, firstDay: day14), isEmpty);
 
-      expect(NudgeSchedule.build(perDay: 2, times: times, now: morning, firstDay: null).length, 6);
+      expect(NudgeSchedule.build(perDay: 2, times: times, now: morning, firstDay: null).length, 28,
+          reason: 'a window that has not started yet starts today');
     });
 
     test('learned meal times move the questions', () {

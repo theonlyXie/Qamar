@@ -805,6 +805,9 @@ class AppState extends ChangeNotifier {
         await n.replaceAll(const [], ar: isAr);
         return;
       }
+      // The whole rest of the fourteen-day window, each day decided on its
+      // own: the phone fires only what is already scheduled, so this is what
+      // someone who stops opening the app still hears.
       final list = <Nudge>[
         if (nudgesPerDay > 0)
           ...NudgeSchedule.build(
@@ -814,6 +817,8 @@ class AppState extends ChangeNotifier {
             loggedToday: slotsLoggedToday,
             firstDay: firstDay,
             fasting: fasting,
+            fastingOn: _fastingOn,
+            timesOn: _nudgeTimesOn,
           ),
       ];
       // The free week's one reminder, 48 hours before it ends. It is not a
@@ -2096,7 +2101,18 @@ class AppState extends ChangeNotifier {
   /// Meal times for the questions: the sun's on a fasting day, the learned
   /// ones otherwise. Suhoor's question comes an hour before dawn, when the
   /// meal is on the table.
-  MealTimes get nudgeTimes => fasting ? mealTimes.withRamadan(iftar: iftarMinutes, suhoor: (fajrMinutes - 60).clamp(0, 24 * 60 - 1)) : mealTimes;
+  MealTimes get nudgeTimes => _nudgeTimesOn(_clock());
+
+  /// A fasting day is a day of the season's month with the switch on. Asked
+  /// per day because the phone's schedule runs two weeks ahead, and the
+  /// first or last fast can fall inside it.
+  bool _fastingOn(DateTime day) => profile.fasting == FastingMode.ramadan && season.phase(day) == SeasonPhase.during;
+
+  /// That day's question times: that day's sun while fasting, the learned
+  /// meal times otherwise.
+  MealTimes _nudgeTimesOn(DateTime day) => _fastingOn(day)
+      ? mealTimes.withRamadan(iftar: SunTimes.sunset(day), suhoor: (SunTimes.fajr(day) - 60).clamp(0, 24 * 60 - 1))
+      : mealTimes;
 
   /// Days of the month with a meal logged, from the history already loaded.
   int get seasonDaysLogged {

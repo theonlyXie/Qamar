@@ -936,8 +936,23 @@ void main() {
       expect(state.nudgePromptDue, isFalse);
       final today = nudger.scheduled.where((n) => n.dayIndex == 0).map((n) => n.slot).toList();
       expect(today, [MealSlot.lunch, MealSlot.dinner]);
-      expect(nudger.scheduled.length, 6, reason: 'three days ahead, two a day');
+      expect(nudger.scheduled.length, 28, reason: 'the whole fourteen-day window, two a day');
       expect(nudger.lastAr, isTrue);
+    });
+
+    test('someone who stops opening the app still hears the rest of the window, and nothing past it', () async {
+      // Ten days in, the app is opened once more and then never again. What
+      // is on the phone's schedule after this session is all they will hear.
+      final prefs = MemoryDevicePrefs();
+      await prefs.setString('first_day', DateTime(2026, 9, 11).toIso8601String());
+      final nudger = MemoryNudger();
+      final state = AppState(nudger: nudger, prefs: prefs, clock: morning);
+      await settle();
+      await state.allowNudges();
+
+      expect(nudger.scheduled.length, 8, reason: 'days 10 to 13 of the window, two a day');
+      expect(nudger.scheduled.last.at, DateTime(2026, 9, 24, 20, 30), reason: 'day 13 is the last day with a question');
+      expect(nudger.scheduled.where((n) => !n.at.isBefore(DateTime(2026, 9, 25))), isEmpty, reason: 'day 14 onwards is the internal trigger’s');
     });
 
     test('“No, thanks” is zero a day and an empty schedule, not a later nag', () async {
