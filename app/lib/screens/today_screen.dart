@@ -151,7 +151,7 @@ class _TodayScreenState extends State<TodayScreen> {
         if (nextMeal != null)
           Explainable(
             id: 'next_meal',
-            explanation: mealExplanation(nextMeal),
+            explanation: mealExplanation(nextMeal, iso: state.iso, digits: state.digits),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: QDecor.card(color: QColors.cardDeep, border: QColors.green.withOpacity(0.4), radius: QRadii.xl),

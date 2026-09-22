@@ -2396,7 +2396,7 @@ class AppState extends ChangeNotifier {
     _nudgeTappedAt = null;
     chat.add(ChatTurn(
       who: ChatWho.q,
-      text: isAr ? 'اتسجّلت: ${totals.kcal} سعرة.' : 'Logged: ${totals.kcal} kcal.',
+      text: isAr ? 'اتسجّلت: ${iso('${totals.kcal}')} سعرة.' : 'Logged: ${totals.kcal} kcal.',
       sub: suAmount(award, signed: true),
     ));
     proposal = null;
@@ -3860,6 +3860,30 @@ class AppState extends ChangeNotifier {
 
   // ---- ask qamar (companion overlay) -------------------------------------------------
 
+  /// The conversation header's quota line (O8): nothing while two or more
+  /// questions are left, so the conversation never opens on a countdown; a
+  /// sentence at the last one, so the limit is never a surprise; and at none,
+  /// what still works. Never a number. The full count is in Me
+  /// ([quotaSummary]).
+  String get quotaLine {
+    if (!hasAssistant) return '';
+    final left = aiQuota.remaining;
+    if (left >= 2) return '';
+    if (left == 1) return isAr ? 'آخر سؤال النهارده' : 'Last question today';
+    return isAr ? 'خلصت أسئلة النهارده · لسه تقدر تسجّل أكلك' : 'No questions left today · you can still log your meals';
+  }
+
+  /// Today's allowance in full, for Me: questions and photos left of the
+  /// day's total. Empty when there is no assistant to ask.
+  String get quotaSummary {
+    if (!hasAssistant) return '';
+    final q = aiQuota, p = photoQuota;
+    final qTotal = q.limit + q.extra, pTotal = p.limit + p.extra;
+    return isAr
+        ? 'فاضل النهارده — أسئلة: ${iso('${q.remaining}')} من ${iso('$qTotal')} · صور: ${iso('${p.remaining}')} من ${iso('$pTotal')}'
+        : 'Left today — questions: ${q.remaining} of $qTotal · photos: ${p.remaining} of $pTotal';
+  }
+
   void openChat() {
     chatOpen = true;
     _collapseTree();
@@ -4279,7 +4303,7 @@ class AppState extends ChangeNotifier {
     _nudgeTappedAt = null;
     chat.add(ChatTurn(
       who: ChatWho.q,
-      text: isAr ? 'اتسجّلت تاني: ${meal.kcal} سعرة.' : 'Logged again: ${meal.kcal} kcal.',
+      text: isAr ? 'اتسجّلت تاني: ${iso('${meal.kcal}')} سعرة.' : 'Logged again: ${meal.kcal} kcal.',
       sub: suAmount(award, signed: true),
     ));
     _notify();

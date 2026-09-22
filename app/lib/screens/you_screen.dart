@@ -28,7 +28,7 @@ class YouScreen extends StatelessWidget {
     final remembered = state.rememberedCount();
     final rows = <(String, String)>[
       (isAr ? 'الهدف والسعرات' : 'Target and calories', isAr ? '${state.iso('${tg.kcal}')} سعر' : '${tg.kcal} kcal'),
-      (isAr ? 'ما يجب تجنبه' : 'What to avoid', state.profile.prefs.isNotEmpty ? '${state.profile.prefs.length}' : (isAr ? 'مفيش' : 'None')),
+      (isAr ? 'ما يجب تجنبه' : 'What to avoid', state.profile.prefs.isNotEmpty ? state.iso('${state.profile.prefs.length}') : (isAr ? 'مفيش' : 'None')),
       (
         isAr ? 'ذاكرة قمر' : 'Qamar memory',
         remembered == 0
@@ -134,6 +134,15 @@ class YouScreen extends StatelessWidget {
             ),
           ),
         ),
+        // The day's allowance in full. The conversation's header says only
+        // "Last question today" near the limit (O8); the numbers are here.
+        if (state.quotaSummary.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
+            child: Text(state.quotaSummary, style: QText.body(size: 12, height: 18, color: QColors.textMuted)),
+          ),
+        ],
         const SizedBox(height: 14),
         _AffiliateCard(state: state),
         if (state.proClients.isNotEmpty) ...[
@@ -380,7 +389,8 @@ class YouScreen extends StatelessWidget {
         const SizedBox(height: 18),
         Center(
           child: Text(
-            'Qamar ${QamarConfig.buildLabel}',
+            // In the language's own digits, like the consent version above.
+            '${t.brand} ${state.iso(QamarConfig.buildLabel)}',
             style: QText.number(size: 11, color: QColors.textFaint),
           ),
         ),

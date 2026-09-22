@@ -9,8 +9,12 @@ import 'package:provider/provider.dart';
 
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
+import 'package:qamar/models/meal.dart';
 import 'package:qamar/screens/welcome_screen.dart';
 import 'package:qamar/state/app_state.dart';
+import 'package:qamar/widgets/explain.dart';
+
+import 'support/arabic_digits.dart';
 
 Widget _app(AppState state) => ChangeNotifierProvider.value(
       value: state,
@@ -53,6 +57,35 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(tester.takeException(), isNull, reason: 'while building $screen');
+    }
+  });
+
+  // O8: every Arabic number is drawn in Eastern digits. The sweep is the
+  // reusable helper in support/arabic_digits.dart.
+  testWidgets('no Latin digit on any screen in Arabic: a meal logged, the conversation and an explanation open',
+      (tester) async {
+    final state = AppState()..setLang(AppLang.ar);
+    state.profile = state.profile.copyWith(name: 'Basel', prefs: ['no_meat', 'lactose']);
+    // Tall enough that every list builds to its end: lists build lazily, and
+    // the sweep can only read what was built. This checks words, not layout.
+    await tester.binding.setSurfaceSize(const Size(900, 9000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(_app(state));
+
+    // A meal on the day, repeated once so the conversation carries the
+    // confirm line ("اتسجّلت تاني: … سعرة").
+    final meal = LoggedMeal(name: 'فول بالعيش', sub: 'بالصوت · تقدير', kcal: 520, p: 22, c: 64, f: 18, at: DateTime.now());
+    state.meals.add(meal);
+    state.repeatMeal(meal);
+    state.openExplain(kExplanations['kcal_remaining']!);
+
+    for (final screen in AppScreen.values) {
+      state.go(screen);
+      state.openChat();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(tester.takeException(), isNull, reason: 'while building $screen');
+      expectNoLatinDigits(tester, where: '$screen');
     }
   });
 }

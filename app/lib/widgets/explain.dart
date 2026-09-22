@@ -145,20 +145,26 @@ const kExplanations = <String, Explanation>{
 /// Builds the orb's answer for a planned meal from the meal itself, so hovering
 /// a meal gives the portions and the reasoning without opening the Plan page —
 /// which is the whole point of the orb.
-Explanation mealExplanation(PlanMeal m) {
+///
+/// Pass the state's [iso] and [digits] so the Arabic numbers are drawn the
+/// way every other Arabic number is (Eastern digits, in bidi isolates);
+/// without them the numbers are left as they are.
+Explanation mealExplanation(PlanMeal m, {String Function(String) iso = _asIs, String Function(String) digits = _asIs}) {
   final kcal = mealKcal(m);
-  final linesAr = m.portions.map((p) => '• ${p.ar} — ${p.amountAr} — ${p.kcal} سعر').join('\n');
+  final linesAr = m.portions.map((p) => '• ${p.ar} — ${digits(p.amountAr)} — ${iso('${p.kcal}')} سعر').join('\n');
   final linesEn = m.portions.map((p) => '• ${p.en} — ${p.amountEn} — ${p.kcal} kcal').join('\n');
 
   return Explanation(
     titleAr: '${m.slotAr}: ${m.nameAr}',
     titleEn: '${m.slotEn}: ${m.nameEn}',
-    bodyAr: 'إجمالي $kcal سعر، موزّعة كده:\n$linesAr',
+    bodyAr: 'إجمالي ${iso('$kcal')} سعر، موزّعة كده:\n$linesAr',
     bodyEn: 'A total of $kcal kcal, made up of:\n$linesEn',
     soWhatAr: 'الكميات تقريبية — الأقرب أحسن من المضبوط. لو مكوّن مش متاح، اضغط «بديل» وهجيبلك واحد قريب منه في السعرات.',
     soWhatEn: 'Amounts are approximate — close is better than exact. If something is unavailable, tap Swap and I will offer a near-equivalent.',
   );
 }
+
+String _asIs(String x) => x;
 
 /// Where an explainable value currently sits on screen.
 ///

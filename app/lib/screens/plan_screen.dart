@@ -64,7 +64,7 @@ class _PlanScreenState extends State<PlanScreen> {
           for (final m in meals)
             Explainable(
               id: 'plan_meal_${m.id}',
-              explanation: mealExplanation(m),
+              explanation: mealExplanation(m, iso: state.iso, digits: state.digits),
               child: _MealCard(state: state, meal: m),
             ),
           if (state.canShopPlan) ...[

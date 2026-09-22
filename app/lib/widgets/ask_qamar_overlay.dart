@@ -180,11 +180,10 @@ class _Header extends StatelessWidget {
           ChatState.thinking => t.sThinking,
           ChatState.idle => '',
         };
-    final quota = state.hasAssistant
-        ? (state.isAr
-            ? '${state.aiQuota.remaining} من ${state.aiQuota.limit + state.aiQuota.extra} النهارده'
-            : '${state.aiQuota.remaining} of ${state.aiQuota.limit + state.aiQuota.extra} today')
-        : '';
+    // One thing at a time: a dictation error, then what was heard (or
+    // Listening / Thinking), then the quota only near the limit, then
+    // nothing (O8). The full count lives in Me.
+    final quota = state.quotaLine;
     final line = heard.isNotEmpty ? heard : quota;
     final colour = state.dictationError != null
         ? QColors.red

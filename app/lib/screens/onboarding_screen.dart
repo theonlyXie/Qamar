@@ -80,7 +80,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(border: Border.all(color: QColors.borderSoft), borderRadius: BorderRadius.circular(999)),
-                child: Text('${(state.step + 1).clamp(1, kOnboardingSteps.length)}/${kOnboardingSteps.length}',
+                child: Text(state.iso('${(state.step + 1).clamp(1, kOnboardingSteps.length)}/${kOnboardingSteps.length}'),
                     style: QText.number(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
               ),
             ],
