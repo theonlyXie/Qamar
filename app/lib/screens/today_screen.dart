@@ -19,6 +19,7 @@ import '../widgets/general_guidance_card.dart';
 import '../widgets/moon.dart';
 import '../widgets/orb_gesture_guide.dart';
 import '../widgets/quest_card.dart';
+import '../widgets/week_glance_card.dart';
 
 class TodayScreen extends StatefulWidget {
   const TodayScreen({super.key});
@@ -101,6 +102,7 @@ class _TodayScreenState extends State<TodayScreen> {
           TodayCard.tutorial => OrbGestureGuide(state: state),
           TodayCard.billing => BillingMomentCard(state: state),
           TodayCard.fasting => _FastingPrompt(state: state),
+          TodayCard.weekCard => WeekGlanceCard(state: state),
           TodayCard.earnedMonth => _EarnedMonthCard(state: state),
           TodayCard.quest => QuestCard(state: state),
         },

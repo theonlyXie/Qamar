@@ -2628,13 +2628,13 @@ class AppState extends ChangeNotifier {
   DateTime? _questReadAt;
 
   /// Today on the app's clock, as a key.
-  String _questDay() => _clock().toIso8601String().substring(0, 10);
+  String _dayKey() => _clock().toIso8601String().substring(0, 10);
 
   /// Whether the quest wants Today's slot: a real one, not put away, not
   /// past its time, and only while the score is shown.
   bool get questDue {
     final q = quest;
-    if (q == null || !showScore || _questSkippedDay == _questDay()) return false;
+    if (q == null || !showScore || _questSkippedDay == _dayKey()) return false;
     return q.done || q.expiresAt.isAfter(_clock());
   }
 
@@ -2671,7 +2671,7 @@ class AppState extends ChangeNotifier {
   /// "Not today": the quest is put away until tomorrow. Nothing is paid.
   void skipQuest() {
     if (quest == null) return;
-    _questSkippedDay = _questDay();
+    _questSkippedDay = _dayKey();
     _track('quest_skipped', {'kind': quest!.kind.wire});
     _notify();
     final repo = _walletRepo;
@@ -3853,7 +3853,7 @@ class AppState extends ChangeNotifier {
   /// reflects the meals in memory, so a meal just logged shows immediately
   /// rather than waiting for the next hydrate.
   List<DayTotals> week() {
-    final now = DateTime.now();
+    final now = _clock();
     final today = DateTime(now.year, now.month, now.day);
     final byDay = {for (final d in dayHistory) DateTime(d.day.year, d.day.month, d.day.day): d};
 
@@ -3906,6 +3906,25 @@ class AppState extends ChangeNotifier {
         streak: streak(),
         iso: iso,
       );
+
+  // ---- the week card on Today (O15) -------------------------------------
+  //
+  // Friday, the Egyptian weekend, is review day: once three days of the week
+  // are logged, Today's slot carries the week's one line the person did not
+  // expect, with the way to the whole card on Progress. Opened, it leaves
+  // the slot for the day.
+
+  String? _weekCardSeenDay;
+
+  /// Whether the week card wants Today's slot.
+  bool get weekCardDue => _clock().weekday == DateTime.friday && _weekCardSeenDay != _dayKey() && weekReview().enough;
+
+  /// "See the week": the whole card, on Progress.
+  void openWeekCard() {
+    _weekCardSeenDay = _dayKey();
+    _track('week_card_opened');
+    go(AppScreen.progress);
+  }
 
   /// What travels with the picture: the sentence, and the link.
   String reviewShareText() {

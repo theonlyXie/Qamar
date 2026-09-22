@@ -6,8 +6,7 @@ import 'app_state.dart';
 ///
 /// A new card needs a value here, a line in [todayCardDue], a widget in the
 /// Today screen's slot builder, and a case in the layout contract test
-/// (test/today_layout_test.dart). Seat 3 adds `weekCard` (review day, three
-/// or more days logged) between [fasting] and [earnedMonth].
+/// (test/today_layout_test.dart).
 enum TodayCard {
   /// A safety answer: the general-guidance card, in place of any target.
   safety,
@@ -24,6 +23,10 @@ enum TodayCard {
   /// saying so, with its way on, until the plan catches up (O10).
   fasting,
 
+  /// The week's card on review day (Friday), once three days are logged,
+  /// until it is opened.
+  weekCard,
+
   /// The earned month: being earned, or just granted.
   earnedMonth,
 
@@ -39,6 +42,7 @@ bool todayCardDue(AppState s, TodayCard card) => switch (card) {
       TodayCard.tutorial => s.holdTutorialDue,
       TodayCard.billing => s.billingMomentDue,
       TodayCard.fasting => s.fastingPromptDue || s.fastingNotYet != null,
+      TodayCard.weekCard => s.weekCardDue,
       TodayCard.earnedMonth => s.earnedMonthJustGranted || (s.plusActive && s.earnedMonth.inProgress),
       TodayCard.quest => s.questDue,
     };

@@ -25,6 +25,8 @@ import 'package:qamar/main.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/quest.dart';
+import 'package:qamar/models/meal.dart';
+import 'package:qamar/models/streak.dart';
 import 'package:qamar/screens/today_screen.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/services/ai_gateway.dart';
@@ -47,8 +49,9 @@ class _PlanCapped implements AiGateway {
   dynamic noSuchMethod(Invocation i) => throw UnimplementedError('${i.memberName}');
 }
 
-/// Four days before the first fast of 1448, so the season's question is due.
-final _now = DateTime(2027, 2, 4, 9);
+/// A Friday, review day, three days before the first fast of 1448, so the
+/// week card can be due and so is the season's question.
+final _now = DateTime(2027, 2, 5, 9);
 
 /// How to make each slot card due. Every TodayCard needs one.
 final slotCases = <({TodayCard card, void Function(AppState s) arrange})>[
@@ -62,6 +65,14 @@ final slotCases = <({TodayCard card, void Function(AppState s) arrange})>[
       ..plusUntil = _now.add(const Duration(hours: 20)),
   ),
   (card: TodayCard.fasting, arrange: (_) {}), // the clock is in the season's lead week
+  (
+    card: TodayCard.weekCard,
+    // Three days of the week logged, so the card has something to say.
+    arrange: (s) => s.dayHistory.addAll([
+      for (final back in [1, 2, 3])
+        DayTotals(day: DateTime(_now.year, _now.month, _now.day).subtract(Duration(days: back)), kcal: 1800 + back * 150, meals: 2),
+    ]),
+  ),
   (card: TodayCard.earnedMonth, arrange: (s) => s.earnedMonthJustGranted = true),
   // What the server chose from what the day lacks (O2, 0061).
   (card: TodayCard.quest, arrange: (s) => s.quest = DayQuest(kind: QuestKind.proteinDinner, done: false, expiresAt: _now.add(const Duration(hours: 12)))),
@@ -124,7 +135,7 @@ void main() {
     });
 
     test('picks the highest that is due, in the agreed order', () {
-      expect(TodayCard.values, [TodayCard.safety, TodayCard.tutorial, TodayCard.billing, TodayCard.fasting, TodayCard.earnedMonth, TodayCard.quest]);
+      expect(TodayCard.values, [TodayCard.safety, TodayCard.tutorial, TodayCard.billing, TodayCard.fasting, TodayCard.weekCard, TodayCard.earnedMonth, TodayCard.quest]);
       // Take cards away from the top one by one: the next one takes the slot.
       for (var i = 0; i < TodayCard.values.length; i++) {
         final due = TodayCard.values.sublist(i);
@@ -150,17 +161,39 @@ void main() {
         final due = withSafety ? TodayCard.values : TodayCard.values.where((c) => c != TodayCard.safety).toList();
         final label = '${lang.name}, score ${score ? 'on' : 'off'}, ${withSafety ? 'with' : 'without'} a safety answer';
 
-        testWidgets('above the fold, every card due: "Log a meal" and Qamar’s sentence ($label)', (tester) async {
-          final s = _state(lang, due: due);
-          await _pump(tester, s, _phone);
-          expect(tester.takeException(), isNull, reason: 'nothing overflows on a phone');
+        // The top of the screen at its tallest, both ways it can be: in the
+        // morning Qamar's card carries last night's note with its link; after
+        // a log the header carries the streak line and the card the day line.
+        for (final moment in const ['morning', 'after a log']) {
+          testWidgets('above the fold, every card due, $moment: "Log a meal" and Qamar’s sentence ($label)', (tester) async {
+            final s = _state(lang, due: due);
+            if (moment == 'morning') {
+              s.nightNote = NightNote(
+                day: _now,
+                ar: 'بكرة جاهز: ٢١٨٠ سعرة على ٣ وجبات، مبني على هدفك — النهارده مفيش تسجيل.',
+                en: 'Tomorrow is ready: 2180 kcal over 3 meals, built on your target — nothing was logged today.',
+                planKcal: 2180,
+                todayKcal: 0,
+              );
+            } else {
+              s.serverStreak = const Streak(current: 3, best: 3, todayCounted: false);
+              s.meals.add(LoggedMeal(name: 'Koshary', sub: '', kcal: 640, p: 20, c: 100, f: 18, at: _now));
+            }
+            await _pump(tester, s, _phone);
+            expect(tester.takeException(), isNull, reason: 'nothing overflows on a phone');
+            if (moment == 'morning') {
+              expect(find.textContaining(lang == AppLang.ar ? 'بكرة جاهز' : 'Tomorrow is ready'), findsOneWidget, reason: 'the note is the sentence');
+            } else {
+              expect(find.byType(TodayStreakLine), findsOneWidget, reason: 'the streak line is in the header');
+            }
 
-          final log = tester.getRect(find.byKey(QamarCard.logKey));
-          expect(log.bottom, lessThanOrEqualTo(fold), reason: '"Log a meal" stays above the fold, whatever is due');
-          expect(log.height, greaterThanOrEqualTo(48));
-          final sentence = tester.getRect(find.byKey(const ValueKey('today-sentence')));
-          expect(sentence.bottom, lessThanOrEqualTo(fold), reason: 'Qamar’s sentence stays above the fold');
-        });
+            final log = tester.getRect(find.byKey(QamarCard.logKey));
+            expect(log.bottom, lessThanOrEqualTo(fold), reason: '"Log a meal" stays above the fold, whatever is due');
+            expect(log.height, greaterThanOrEqualTo(48));
+            final sentence = tester.getRect(find.byKey(const ValueKey('today-sentence')));
+            expect(sentence.bottom, lessThanOrEqualTo(fold), reason: 'Qamar’s sentence stays above the fold');
+          });
+        }
 
         testWidgets('the zones in order, one card in the slot, the rest below in order ($label)', (tester) async {
           final s = _state(lang, due: due);
