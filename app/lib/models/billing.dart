@@ -225,8 +225,8 @@ class PlusEntitlement {
   /// Qamar+ right now is the free week, not a payment.
   bool get isTrial => provider == 'trial' && active;
 
-  /// Qamar+ right now is the earned month — 28 logged days in the first 30 —
-  /// running on its own after the paid month lapsed.
+  /// Qamar+ right now is the earned month — the logged days the server asks
+  /// for in the first 30 — running on its own after the paid month lapsed.
   bool get isEarned => provider == 'earned' && active;
 
   bool get active {
@@ -308,9 +308,12 @@ String formatEgp(int pounds, {required bool ar, bool eastern = true}) {
   return '$mapped ج.م';
 }
 
-/// The earned-month promo, as the server computes it: 28 logged days in the
-/// first 30 of paid membership, and the next 30 days of Qamar+ are on us.
-/// Once per account. The phone never counts the days itself.
+/// The earned-month promo, as the server computes it: [needed] logged days
+/// in the first [windowDays] of paid membership (20 of 30 at launch, in
+/// billing_config since 0058), and the next 30 days of Qamar+ are on us.
+/// Once per account. The phone never counts the days itself, and never
+/// states the rule with a number of its own: every sentence reads [needed]
+/// and [windowDays] from here.
 class EarnedMonth {
   /// The window is running and nothing has been granted yet.
   final bool open;
@@ -340,7 +343,7 @@ class EarnedMonth {
   });
 
   /// No paid membership yet, so no window.
-  static const none = EarnedMonth(open: false, loggedDays: 0, needed: 28, windowDays: 30, daysLeft: 0, eligible: false, claimed: false);
+  static const none = EarnedMonth(open: false, loggedDays: 0, needed: 20, windowDays: 30, daysLeft: 0, eligible: false, claimed: false);
 
   /// Still being earned: the window is open and the month is not yet reached.
   bool get inProgress => open && !eligible && !claimed;
@@ -351,7 +354,7 @@ class EarnedMonth {
     return EarnedMonth(
       open: json['open'] == true,
       loggedDays: n('logged_days', 0),
-      needed: n('needed', 28),
+      needed: n('needed', 20),
       windowDays: n('window_days', 30),
       daysLeft: n('days_left', 0),
       eligible: json['eligible'] == true,

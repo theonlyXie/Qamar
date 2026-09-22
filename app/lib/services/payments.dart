@@ -26,7 +26,8 @@ abstract class BillingGateway {
   /// Where the earned month stands: logged days in the first 30 of membership.
   Future<EarnedMonth> earnedMonth();
 
-  /// Grants the earned month once 28 days are logged. The server re-checks;
+  /// Grants the earned month once the days the server asks for are logged
+  /// (EarnedMonth.needed). The server re-checks;
   /// the [BillingException] says why when it refuses.
   Future<EarnedMonthClaim> claimEarnedMonth();
   Future<AffiliateWallet> affiliate();

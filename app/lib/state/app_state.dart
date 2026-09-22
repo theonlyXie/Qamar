@@ -2586,10 +2586,12 @@ class AppState extends ChangeNotifier {
 
   // ---- the earned month -----------------------------------------------------
   //
-  // "Earned-month promo (28/30 days), starts day 1." The server counts the
-  // days and grants the month; the phone reads where things stand, asks for
-  // the grant the moment it is due, and shows the progress while it is being
-  // earned.
+  // The blueprint's "earned-month promo (28/30 days), starts day 1", at 20
+  // of 30 since 0058 (a reversal, so the rule rewards more than the people
+  // who would never leave). The server counts the days, holds the threshold
+  // in billing_config and grants the month; the phone reads where things
+  // stand, asks for the grant the moment it is due, and shows the progress
+  // while it is being earned — always in the server's numbers.
 
   EarnedMonth earnedMonth = EarnedMonth.none;
 

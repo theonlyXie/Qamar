@@ -8,7 +8,7 @@
 //   POST /billing/entitlement    {}                                    JWT
 //   POST /billing/trial/start    {}                                    JWT
 //   POST /billing/earned         {}   where the earned month stands       JWT
-//   POST /billing/earned/claim   {}   grant it, once 28/30 is reached     JWT
+//   POST /billing/earned/claim   {}   grant it, once the threshold is met  JWT
 //   POST /billing/affiliate      {}                                    JWT
 //   POST /billing/affiliate/payout { amount_cents? }                   JWT
 //   POST /billing/affiliate/clients {}  the professional's consenting clients, this week   JWT
@@ -21,6 +21,7 @@
 //   PAYMOB_INTEGRATION_IDS   comma-separated integration ids or names (card,wallet)
 //   PAYMOB_BASE_URL          optional, defaults to https://accept.paymob.com
 
+import { notYetEarnedMessage, type EarnedStatus } from "./earned.ts";
 import { verifyPaymobHmac } from "./hmac.ts";
 import { amountMatches, signedOrderId, txnObject, txnOutcome, type OrderRow } from "./webhook.ts";
 import {
@@ -352,9 +353,11 @@ async function startTrial(userId: string): Promise<Response> {
   }
 }
 
-// The earned month (0052): 28 logged days in the first 30 of membership, and
+// The earned month (0052, threshold since 0058): the logged days
+// billing_config asks for (20 at launch) in the first 30 of membership, and
 // the next 30 are on us. The status is a read; the claim re-checks under a
-// lock in the database and refuses with a reason the app can show.
+// lock in the database and refuses with a reason the app can show, stating
+// the database's numbers rather than its own.
 async function earnedStatus(userId: string): Promise<Response> {
   return json(await rpc("qamar_earned_month_status", { p_user_id: userId }));
 }
@@ -365,7 +368,10 @@ async function earnedClaim(userId: string): Promise<Response> {
   } catch (e) {
     const message = e instanceof Error ? e.message : "claim failed";
     if (message.includes("already granted")) return json({ error: "The earned month has already been granted on this account." }, 400);
-    if (message.includes("not yet earned")) return json({ error: "Not earned yet: 28 logged days in the first 30 are needed." }, 400);
+    if (message.includes("not yet earned")) {
+      const status = (await rpc("qamar_earned_month_status", { p_user_id: userId }).catch(() => null)) as EarnedStatus | null;
+      return json({ error: notYetEarnedMessage(status) }, 400);
+    }
     throw e;
   }
 }

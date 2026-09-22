@@ -2163,12 +2163,12 @@ void main() {
   });
 
   group('the earned month and the free week’s reminder', () {
-    test('28 logged days in the first 30 grant a month on us, once, appended to the running month', () async {
+    test('20 logged days in the first 30 grant a month on us, once, appended to the running month', () async {
       final a = MemoryAnalytics();
       final end = DateTime.utc(2026, 10, 15, 12);
       final fb = FakeBilling()
         ..current = PlusEntitlement(status: 'active', plan: 'monthly', provider: 'paymob', periodEnd: end, firstPurchase: false)
-        ..earned = const EarnedMonth(open: true, loggedDays: 12, needed: 28, windowDays: 30, daysLeft: 18, eligible: false, claimed: false);
+        ..earned = const EarnedMonth(open: true, loggedDays: 12, needed: 20, windowDays: 30, daysLeft: 18, eligible: false, claimed: false);
       final state = backed(billing: fb, analytics: a, clock: () => DateTime(2026, 9, 27, 9));
       await settle();
       state.setLang(AppLang.en);
@@ -2177,7 +2177,7 @@ void main() {
       expect(state.earnedMonth.inProgress, isTrue, reason: 'the progress is read on hydrate');
       expect(fb.earnedClaims, 0, reason: 'nothing is claimed before the days are logged');
 
-      fb.earned = const EarnedMonth(open: true, loggedDays: 28, needed: 28, windowDays: 30, daysLeft: 2, eligible: true, claimed: false);
+      fb.earned = const EarnedMonth(open: true, loggedDays: 20, needed: 20, windowDays: 30, daysLeft: 2, eligible: true, claimed: false);
       await state.restorePlusPurchases();
 
       expect(fb.earnedClaims, 1);
@@ -2186,7 +2186,7 @@ void main() {
       expect(state.plusUntil, end.add(const Duration(days: 30)), reason: 'appended to the paid month, not replacing it');
       expect(state.plusIsEarned, isFalse, reason: 'the paid month is still the one running');
       expect(state.plusNotice, contains('A month on us'));
-      expect(a.named('earned_month_granted').single['logged_days'], 28);
+      expect(a.named('earned_month_granted').single['logged_days'], 20);
 
       await state.restorePlusPurchases();
       expect(fb.earnedClaims, 1, reason: 'once per account: a granted month is never claimed again');
@@ -2198,7 +2198,7 @@ void main() {
     test('earned after the paid month lapsed, the month runs on its own', () async {
       final fb = FakeBilling()
         ..current = PlusEntitlement(status: 'expired', plan: 'monthly', provider: 'paymob', periodEnd: DateTime.utc(2026, 9, 1), firstPurchase: false)
-        ..earned = const EarnedMonth(open: true, loggedDays: 28, needed: 28, windowDays: 30, daysLeft: 0, eligible: true, claimed: false);
+        ..earned = const EarnedMonth(open: true, loggedDays: 20, needed: 20, windowDays: 30, daysLeft: 0, eligible: true, claimed: false);
       final state = backed(billing: fb);
       await settle();
       expect(state.plusActive, isTrue);
@@ -2619,7 +2619,7 @@ class FakeBilling implements BillingGateway {
   Future<EarnedMonthClaim> claimEarnedMonth() async {
     earnedClaims++;
     if (earned.claimed) throw BillingException('The earned month has already been granted on this account.');
-    if (!earned.eligible) throw BillingException('Not earned yet: 28 logged days in the first 30 are needed.');
+    if (!earned.eligible) throw BillingException('Not earned yet: ${earned.needed} logged days in the first ${earned.windowDays} are needed.');
     // As 0052 does: appended to a running month, a fresh 30 days otherwise.
     final running = current.active && current.periodEnd != null;
     final until = (running ? current.periodEnd! : DateTime.now().toUtc()).add(const Duration(days: 30));
