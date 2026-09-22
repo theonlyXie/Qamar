@@ -576,7 +576,10 @@ class AppState extends ChangeNotifier {
   int turn = 0;
   bool chatOpen = false;
 
-  double orbX = 290;
+  /// Where the orb rests, measured from the start edge of the screen — the
+  /// left in English, the right in Arabic — so the layout mirrors with the
+  /// language (O1). The default sits towards the end edge in both.
+  double orbStart = 290;
   double orbY = 620;
 
   bool treeOpen = false;
@@ -4081,8 +4084,10 @@ class AppState extends ChangeNotifier {
         AppScreen.subscription,
       }.contains(screen);
 
-  void setOrbPosition(double x, double y, {required double maxX, required double maxY}) {
-    orbX = x.clamp(4, maxX).toDouble();
+  /// [start] is measured from the start edge (see [orbStart]); a drag in
+  /// Arabic turns its physical movement into start-relative movement first.
+  void setOrbPosition(double start, double y, {required double maxX, required double maxY}) {
+    orbStart = start.clamp(4, maxX).toDouble();
     orbY = y.clamp(46, maxY).toDouble();
     _notify();
   }

@@ -21,6 +21,10 @@ import 'living_orb.dart';
 class OrbNav extends StatelessWidget {
   const OrbNav({super.key});
 
+  /// The orb's own box — the moon and whatever rides under it — for tests
+  /// and for anything placed from the orb's rect.
+  static const orbKey = ValueKey('orb');
+
   @override
   Widget build(BuildContext context) {
     return Positioned.fill(
@@ -29,15 +33,18 @@ class OrbNav extends StatelessWidget {
           final state = context.watch<AppState>();
           final maxX = constraints.maxWidth - 96;
           final maxY = constraints.maxHeight - 118;
-          final at = Offset(
-            state.orbX.clamp(4, maxX < 4 ? 4 : maxX).toDouble(),
-            state.orbY.clamp(46, maxY < 46 ? 46 : maxY).toDouble(),
-          );
+          final start = state.orbStart.clamp(4, maxX < 4 ? 4 : maxX).toDouble();
+          final top = state.orbY.clamp(46, maxY < 46 ? 46 : maxY).toDouble();
           // The hold's one-time mark rides with the orb: above it, or below
           // it while the orb rests in the top half of the screen.
-          final markBelow = at.dy < constraints.maxHeight / 2;
+          final markBelow = top < constraints.maxHeight / 2;
           return CustomMultiChildLayout(
-            delegate: _OrbLayout(orbAt: at, markBelow: markBelow),
+            delegate: _OrbLayout(
+              start: start,
+              top: top,
+              rtl: Directionality.of(context) == TextDirection.rtl,
+              markBelow: markBelow,
+            ),
             children: [
               if (state.holdCoachDue) ...[
                 LayoutId(id: _OrbPart.mark, child: HoldCoachMark(state: state)),
@@ -45,7 +52,7 @@ class OrbNav extends StatelessWidget {
               ],
               LayoutId(
                 id: _OrbPart.orb,
-                child: _DraggableOrb(maxX: maxX < 4 ? 4 : maxX, maxY: maxY < 46 ? 46 : maxY),
+                child: _DraggableOrb(key: OrbNav.orbKey, maxX: maxX < 4 ? 4 : maxX, maxY: maxY < 46 ? 46 : maxY),
               ),
             ],
           );
@@ -60,14 +67,21 @@ enum _OrbPart { orb, mark, caret }
 /// The orb at the position state holds (the one place it is placed), and,
 /// while it is due, the hold's mark placed from the orb's own rect: centred
 /// on the moon, kept 8 points inside the screen, its caret on the moon.
+///
+/// The position is start-relative: [start] is the gap from the start edge to
+/// the orb's start side, so in Arabic it is measured from the right and the
+/// whole layout mirrors (O1).
 class _OrbLayout extends MultiChildLayoutDelegate {
-  final Offset orbAt;
+  final double start;
+  final double top;
+  final bool rtl;
   final bool markBelow;
-  _OrbLayout({required this.orbAt, required this.markBelow});
+  _OrbLayout({required this.start, required this.top, required this.rtl, required this.markBelow});
 
   @override
   void performLayout(Size size) {
     final orb = layoutChild(_OrbPart.orb, const BoxConstraints());
+    final orbAt = Offset(rtl ? size.width - orb.width - start : start, top);
     positionChild(_OrbPart.orb, orbAt);
     if (!hasChild(_OrbPart.mark)) return;
     final mark = layoutChild(_OrbPart.mark, BoxConstraints.loose(size));
@@ -84,13 +98,14 @@ class _OrbLayout extends MultiChildLayoutDelegate {
   }
 
   @override
-  bool shouldRelayout(_OrbLayout old) => old.orbAt != orbAt || old.markBelow != markBelow;
+  bool shouldRelayout(_OrbLayout old) =>
+      old.start != start || old.top != top || old.rtl != rtl || old.markBelow != markBelow;
 }
 
 class _DraggableOrb extends StatefulWidget {
   final double maxX;
   final double maxY;
-  const _DraggableOrb({required this.maxX, required this.maxY});
+  const _DraggableOrb({super.key, required this.maxX, required this.maxY});
 
   @override
   State<_DraggableOrb> createState() => _DraggableOrbState();
@@ -114,7 +129,11 @@ class _DraggableOrbState extends State<_DraggableOrb> {
 
   void _dragUpdate(AppState state, DragUpdateDetails d) {
     _dragDistance += d.delta.distance;
-    state.setOrbPosition(state.orbX + d.delta.dx, state.orbY + d.delta.dy, maxX: widget.maxX, maxY: widget.maxY);
+    // The finger moves in screen space; the orb is kept from the start edge,
+    // which in Arabic is the right, so a move to the right brings it closer.
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final along = rtl ? -d.delta.dx : d.delta.dx;
+    state.setOrbPosition(state.orbStart + along, state.orbY + d.delta.dy, maxX: widget.maxX, maxY: widget.maxY);
     final centre = _moonCentre;
     final hit = centre == null ? null : ExplainRegistry.instance.hitTest(centre);
     if (hit != state.explainHoverId && hit != null) HapticFeedback.selectionClick();

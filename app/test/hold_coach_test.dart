@@ -101,7 +101,15 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(ChangeNotifierProvider.value(
         value: s,
-        child: const MaterialApp(home: Scaffold(body: Stack(children: [OrbNav()]))),
+        child: MaterialApp(
+          // As the app does (main.dart): the direction follows the language,
+          // so the orb's start edge is the right in Arabic.
+          builder: (context, child) => Directionality(
+            textDirection: s.isAr ? TextDirection.rtl : TextDirection.ltr,
+            child: child!,
+          ),
+          home: const Scaffold(body: Stack(children: [OrbNav()])),
+        ),
       ));
       await tester.pump();
     }
@@ -147,9 +155,15 @@ void main() {
         expectOnMoon(tester, above: true, where: 'mid-screen');
         expect(mark(tester).center.dx, moreOrLessEquals(moon(tester).center.dx, epsilon: 0.5), reason: 'centred over the moon when there is room');
 
+        // The orb is placed from the start edge (O1): the left in English,
+        // the right in Arabic. At that edge the mark is held 8 points in.
         await moveOrb(tester, s, 4, 500);
-        expectOnMoon(tester, above: true, where: 'at the left edge');
-        expect(mark(tester).left, 8);
+        expectOnMoon(tester, above: true, where: 'at the start edge');
+        if (lang == AppLang.ar) {
+          expect(mark(tester).right, area.width - 8);
+        } else {
+          expect(mark(tester).left, 8);
+        }
 
         await moveOrb(tester, s, 147, 60);
         expectOnMoon(tester, above: false, where: 'with the orb at the top, it goes below');
