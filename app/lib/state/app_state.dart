@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
 import '../l10n/strings.dart';
+import '../models/dishes.dart';
 import '../models/meal.dart';
 import '../models/messages.dart';
 import '../models/nudge.dart';
@@ -1056,6 +1057,8 @@ class AppState extends ChangeNotifier {
     // Whatever was waiting for an answer belonged to the session that ended.
     _held.clear();
     _startRecorded = false;
+    revealDish = null;
+    revealDishFacts = null;
     questDone = false;
     _questPaidDay = null;
     proposal = null;
@@ -1097,6 +1100,7 @@ class AppState extends ChangeNotifier {
     _notify();
     // The report is the other way into the consultation, so it is a Start too.
     _recordStart('scan');
+    ensureDishFacts();
   }
 
   bool _startRecorded = false;
@@ -1130,6 +1134,7 @@ class AppState extends ChangeNotifier {
     _notify();
     _screen(AppScreen.onboard);
     _recordStart('chat');
+    ensureDishFacts();
     // No beat before the first question: it is on screen with its chips from
     // the first frame, so the conversation never opens empty.
     askStep(0);
@@ -1841,52 +1846,119 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  // ---- the first moment of value (O5) --------------------------------------
+  //
+  // Before the calorie card, one real Egyptian dish for the next meal: picked
+  // against the new target, the goal and the exclusions, costed as a share of
+  // the day, and labelled as an estimate. The numbers are the food graph's —
+  // live when the account is backed and the graph answers, shipped with the
+  // app otherwise (models/dishes.dart).
+
+  /// The dish shown at the reveal, its numbers and the meal it is for.
+  EgyptianDish? revealDish;
+  DishFacts? revealDishFacts;
+  MealSlot revealSlot = MealSlot.lunch;
+
+  /// The live graph's per-100 g numbers for the shipped dishes' parts, once
+  /// fetched. Empty offline, and whenever the graph has not answered.
+  final Map<String, Per100> _liveDishFacts = {};
+  bool _dishFactsAsked = false;
+
+  /// Asks the graph for the dishes' numbers, once, so the reveal can prefer
+  /// them. Safe to call often; a failure leaves the shipped numbers in place.
+  Future<void> ensureDishFacts() async {
+    final repo = _mealRepo;
+    final uid = _userId;
+    if (_dishFactsAsked || repo == null || uid == null) return;
+    _dishFactsAsked = true;
+    try {
+      _liveDishFacts.addAll(await repo.graphPer100({for (final d in kEgyptianDishes) ...d.slugs}));
+    } catch (_) {
+      // The shipped numbers stand.
+    }
+  }
+
+  EgyptianDish? _pickRevealDish() {
+    final slot = slotForHour(_clock().hour, fasting: fasting);
+    final dish = pickDish(
+      targetKcal: target().kcal,
+      goal: profile.goal,
+      exclusions: profile.prefs,
+      slot: slot,
+      live: _liveDishFacts,
+    );
+    revealSlot = slot;
+    revealDish = dish;
+    revealDishFacts = dish?.facts(live: _liveDishFacts);
+    return dish;
+  }
+
   void calcTarget() {
     typing = true;
     _notify();
     Future.delayed(const Duration(milliseconds: 900), () {
       if (_disposed) return;
-      typing = false;
-      msgs.addAll([
-        const ObMessage.q(
-          ar: 'حسبتلك الهدف على أساس اللي قلته. دي تقديرات، وتقدر تعدلها في أي وقت.',
-          en: 'I calculated your target from what you told me. These are estimates and you can change them any time.',
+      if (_pickRevealDish() == null) {
+        _revealTarget();
+        return;
+      }
+      // The dish first; Qamar goes on typing towards the numbers.
+      msgs.addAll(const [
+        ObMessage.q(
+          ar: 'قبل الأرقام، حاجة تاكلها — من الأكل المصري، على قد اللي قلته:',
+          en: 'Before the numbers, something to eat — Egyptian food, sized to what you told me:',
         ),
-        const ObMessage.target(),
-        const ObMessage.save(),
+        ObMessage.dish(),
       ]);
-      _track('intake_completed', {'route': 'target'});
-      // Shown at once; paid by the server (qamar_grant_onboarding, once per
-      // account), and the wallet is re-read so the two numbers agree.
-      _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
+      _track('dish_shown', {'placement': 'intake', 'live': revealDishFacts!.live});
       _notify();
-      if (isBacked && _walletRepo != null) {
-        _push('onboarding bonus', (uid) async {
-          await _walletRepo.grantOnboarding(uid);
-          await _refreshWallet(uid);
-          _notify();
-        });
-      }
-
-      if (isBacked) {
-        final p = profile;
-        final t = target();
-        _push('save profile', (uid) => _profileRepo!.saveProfile(uid, p));
-        _push('save target', (uid) => _profileRepo!.saveTarget(uid, t, inputs: p));
-        // The weight they just gave is the first real point on the trend.
-        // Without it the Progress chart has nothing to draw from for weeks.
-        _push('record weight', (uid) async {
-          await _mealRepo?.recordWeight(uid, kg: p.weight.toDouble());
-          final w = await _mealRepo?.weightHistory(uid);
-          if (w != null) {
-            weightHistory
-              ..clear()
-              ..addAll(w);
-            _notify();
-          }
-        });
-      }
+      Future.delayed(const Duration(milliseconds: 900), () {
+        if (!_disposed) _revealTarget();
+      });
     });
+  }
+
+  void _revealTarget() {
+    typing = false;
+    msgs.addAll([
+      const ObMessage.q(
+        ar: 'حسبتلك الهدف على أساس اللي قلته. دي تقديرات، وتقدر تعدلها في أي وقت.',
+        en: 'I calculated your target from what you told me. These are estimates and you can change them any time.',
+      ),
+      const ObMessage.target(),
+      const ObMessage.save(),
+    ]);
+    _track('intake_completed', {'route': 'target'});
+    // Shown at once; paid by the server (qamar_grant_onboarding, once per
+    // account), and the wallet is re-read so the two numbers agree.
+    _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
+    _notify();
+    if (isBacked && _walletRepo != null) {
+      _push('onboarding bonus', (uid) async {
+        await _walletRepo.grantOnboarding(uid);
+        await _refreshWallet(uid);
+        _notify();
+      });
+    }
+
+    if (isBacked) {
+      final p = profile;
+      final t = target();
+      _push('save profile', (uid) => _profileRepo!.saveProfile(uid, p));
+      _push('save target', (uid) => _profileRepo!.saveTarget(uid, t, inputs: p));
+      // The weight they just gave is the first real point on the trend.
+      // Without it the Progress chart has nothing to draw from for weeks.
+      _push('record weight', (uid) async {
+        await _mealRepo?.recordWeight(uid, kg: p.weight.toDouble());
+        final w = await _mealRepo?.weightHistory(uid);
+        if (w != null) {
+          weightHistory
+            ..clear()
+            ..addAll(w);
+          _notify();
+        }
+      });
+    }
   }
 
   void dismissSave() {

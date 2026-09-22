@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/activity.dart';
+import '../models/dishes.dart';
 import '../models/invitation.dart';
 import '../models/meal.dart';
 import '../models/nudge.dart';
@@ -229,6 +230,32 @@ class SupabaseProfileRepository implements ProfileRepository {
 class SupabaseMealRepository implements MealRepository {
   final SupabaseClient _client;
   const SupabaseMealRepository(this._client);
+
+  @override
+  Future<Map<String, Per100>> graphPer100(Iterable<String> slugs) async {
+    final rows = await _client.from('foods').select('qamar_food_id, slug').inFilter('slug', slugs.toList());
+    final out = <String, Per100>{};
+    for (final r in rows as List) {
+      final id = r['qamar_food_id'] as String?;
+      final slug = r['slug'] as String?;
+      if (id == null || slug == null) continue;
+      final raw = await _client.rpc('qamar_nutrients_per_100g', params: {'p_food_id': id});
+      if (raw is! List) continue;
+      double? amount(String code) {
+        for (final n in raw) {
+          if (n is Map && n['nutrient_code'] == code) {
+            final a = n['amount'];
+            return a is num ? a.toDouble() : double.tryParse('$a');
+          }
+        }
+        return null;
+      }
+      final kcal = amount('energy_kcal'), protein = amount('protein_g'), carbs = amount('carbs_g'), fat = amount('fat_g');
+      if (kcal == null || protein == null || carbs == null || fat == null) continue;
+      out[slug] = (kcal: kcal, protein: protein, carbs: carbs, fat: fat);
+    }
+    return out;
+  }
 
   @override
   Future<String> saveDraft(String userId, MealAnalysisDraft draft) async {

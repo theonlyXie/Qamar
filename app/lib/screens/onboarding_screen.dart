@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
+import '../widgets/dish_card.dart';
 import '../widgets/moon.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -345,6 +346,22 @@ class _MessageBubble extends StatelessWidget {
         );
       case ObKind.target:
         return _TargetCard(state: state);
+      case ObKind.dish:
+        final dish = state.revealDish;
+        final facts = state.revealDishFacts;
+        if (dish == null || facts == null) return const SizedBox.shrink();
+        return FractionallySizedBox(
+          widthFactor: 0.88,
+          alignment: Alignment.centerLeft,
+          child: DishCard(
+            dish: dish,
+            facts: facts,
+            targetKcal: state.target().kcal,
+            slot: state.revealSlot,
+            isAr: isAr,
+            iso: state.iso,
+          ),
+        );
       case ObKind.save:
         return _SaveCard(state: state);
     }
@@ -360,6 +377,8 @@ class _TargetCard extends StatelessWidget {
     final t = state.t;
     final tg = state.target();
     final p = state.profile;
+    // Numbers the way the app draws them: Eastern digits in Arabic.
+    String grams(int g) => state.isAr ? '${state.iso('$g')} جم' : '${g}g';
     final sexAr = p.gender == Gender.female ? 'أنثى' : 'ذكر';
     final sexEn = p.gender == Gender.female ? 'female' : 'male';
     final assumptions = state.isAr
@@ -388,7 +407,7 @@ class _TargetCard extends StatelessWidget {
               children: [
                 ShaderMask(
                   shaderCallback: (r) => QColors.blueCyanGradient.createShader(r),
-                  child: Text('${tg.kcal}', style: QText.number(size: 36, weight: FontWeight.w600, color: Colors.white)),
+                  child: Text(state.digits('${tg.kcal}'), style: QText.number(size: 36, weight: FontWeight.w600, color: Colors.white)),
                 ),
                 const SizedBox(width: 8),
                 Text(t.kcalDay, style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
@@ -397,11 +416,11 @@ class _TargetCard extends StatelessWidget {
             const SizedBox(height: 16),
             Row(
               children: [
-                _MacroBox(label: t.protein, g: tg.protein),
+                _MacroBox(label: t.protein, grams: grams(tg.protein)),
                 const SizedBox(width: 8),
-                _MacroBox(label: t.carbs, g: tg.carbs),
+                _MacroBox(label: t.carbs, grams: grams(tg.carbs)),
                 const SizedBox(width: 8),
-                _MacroBox(label: t.fat, g: tg.fat),
+                _MacroBox(label: t.fat, grams: grams(tg.fat)),
               ],
             ),
             const SizedBox(height: 14),
@@ -417,8 +436,8 @@ class _TargetCard extends StatelessWidget {
 
 class _MacroBox extends StatelessWidget {
   final String label;
-  final int g;
-  const _MacroBox({required this.label, required this.g});
+  final String grams;
+  const _MacroBox({required this.label, required this.grams});
   @override
   Widget build(BuildContext context) {
     return Expanded(
@@ -429,7 +448,7 @@ class _MacroBox extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label, style: QText.body(size: 11, color: QColors.textMuted)),
-            Text('${g}g', style: QText.number(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),
+            Text(grams, style: QText.number(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),
           ],
         ),
       ),

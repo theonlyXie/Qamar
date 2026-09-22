@@ -11,7 +11,9 @@ import 'package:provider/provider.dart';
 
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
+import 'package:qamar/models/dishes.dart';
 import 'package:qamar/models/messages.dart';
+import 'package:qamar/models/nudge.dart';
 import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/state/app_state.dart';
@@ -156,6 +158,42 @@ void main() {
     expect(s.generalGuidancePlanNote, contains('قمر مش بيحط هدف في حالتك'));
   });
 
+  test('the reveal opens with one real dish, before the calorie card — filtered by the exclusions, costed against the target', () async {
+    final s = AppState(clock: () => DateTime(2026, 9, 21, 20, 0))..setLang(AppLang.en); // dinner
+    s.profile = s.profile.copyWith(prefs: ['lactose', 'meat']);
+    s.step = kOnboardingSteps.indexWhere((x) => x.id == 'food');
+    s.primarySubmit();
+    await _wait(2600);
+
+    final kinds = s.msgs.map((m) => m.kind).toList();
+    final dishAt = kinds.indexOf(ObKind.dish);
+    final targetAt = kinds.indexOf(ObKind.target);
+    expect(dishAt, greaterThanOrEqualTo(0), reason: 'a dish is shown');
+    expect(dishAt, lessThan(targetAt), reason: 'before the calorie card');
+    expect(s.msgs[dishAt - 1].text(false), startsWith('Before the numbers, something to eat'));
+
+    final dish = s.revealDish!;
+    expect(dish.ruledOutBy.intersection({'lactose', 'meat'}), isEmpty);
+    expect(s.revealSlot, MealSlot.dinner);
+    expect(dish.id, pickDish(targetKcal: s.target().kcal, goal: s.profile.goal, exclusions: const ['lactose', 'meat'], slot: MealSlot.dinner)!.id);
+    expect(s.revealDishFacts!.live, isFalse, reason: 'no backend: the numbers that ship with the app');
+  });
+
+  test('on the general-guidance route there is no dish either: it would be costed against a target that is not set', () async {
+    final s = await _pastConsent();
+    s.pickOption(_option('safety', 'chronic'));
+    await _wait();
+    s.skipStep();
+    await _wait();
+    s.profile = s.profile.copyWith(age: 30);
+    s.primarySubmit();
+    await _wait();
+    s.primarySubmit();
+    await _wait(2000);
+    expect(s.msgs.any((m) => m.kind == ObKind.dish), isFalse);
+    expect(s.revealDish, isNull);
+  });
+
   group('on screen', () {
     Future<void> pump(WidgetTester tester, AppState s) async {
       await tester.binding.setSurfaceSize(const Size(900, 2000)); // words, not layout
@@ -176,6 +214,21 @@ void main() {
       expect(find.byType(QPillChip), findsNothing, reason: 'the safety question is still being typed');
       await tester.pump(const Duration(milliseconds: 700));
       expect(find.widgetWithText(QPillChip, 'None of these'), findsOneWidget);
+    });
+
+    testWidgets('the reveal — the dish, then the calorie card — carries no Latin digits in Arabic', (tester) async {
+      final s = AppState(clock: () => DateTime(2026, 9, 21, 13, 0));
+      s.profile = s.profile.copyWith(prefs: ['budget']);
+      await pump(tester, s);
+      s.go(AppScreen.onboard);
+      s.step = kOnboardingSteps.indexWhere((x) => x.id == 'food');
+      s.primarySubmit();
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 500)); // the answer, the dish, then the numbers
+      }
+      final transcript = tester.widgetList<Text>(find.descendant(of: find.byType(ListView), matching: find.byType(Text))).map((t) => t.data ?? '').join(' | ');
+      expect(transcript, contains('٪ من هدفك'), reason: 'the dish is costed against the target');
+      expect(RegExp('[0-9]').hasMatch(transcript), isFalse, reason: transcript);
     });
 
     testWidgets('Today names no target on general guidance, and says what is still here', (tester) async {

@@ -1,4 +1,4 @@
-enum ObKind { q, u, target, save }
+enum ObKind { q, u, target, save, dish }
 
 class ObMessage {
   final ObKind kind;
@@ -12,6 +12,13 @@ class ObMessage {
         en = '';
   const ObMessage.save()
       : kind = ObKind.save,
+        ar = '',
+        en = '';
+
+  /// The first moment of value: one real dish, costed against the new
+  /// target (AppState.revealDish).
+  const ObMessage.dish()
+      : kind = ObKind.dish,
         ar = '',
         en = '';
 

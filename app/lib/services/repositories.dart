@@ -1,4 +1,5 @@
 import '../models/activity.dart';
+import '../models/dishes.dart';
 import '../models/invitation.dart';
 import '../models/meal.dart';
 import '../models/nudge.dart';
@@ -93,6 +94,12 @@ abstract class MealRepository {
   /// The last [days] days of meals, newest first — what "repeat a meal"
   /// offers. Duplicates by name are the caller's to fold.
   Future<List<LoggedMeal>> recentMeals(String userId, {int days = 7});
+
+  /// The food graph's per-100 g numbers for [slugs] (qamar_nutrients_per_100g:
+  /// USDA values for a food, derived from the ingredients for a dish). A slug
+  /// the graph has no complete numbers for is left out — a miss, never a
+  /// zero — and the caller falls back on what ships with the app.
+  Future<Map<String, Per100>> graphPer100(Iterable<String> slugs);
 }
 
 /// Movement logged by hand (activity_logs, migration 0051).

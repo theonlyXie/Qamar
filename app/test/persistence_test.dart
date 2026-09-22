@@ -16,6 +16,7 @@ import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/nudge.dart';
 import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
+import 'package:qamar/models/dishes.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/ramadan.dart';
 import 'package:qamar/models/streak.dart';
@@ -129,6 +130,16 @@ class FakeMealRepo implements MealRepository {
 
   @override
   Future<List<LoggedMeal>> mealsForDay(String userId, DateTime day) async => today;
+
+  /// What the food graph answers for per-100 g numbers; empty is a miss.
+  Map<String, Per100> graph = const {};
+  final List<Set<String>> graphAsks = [];
+
+  @override
+  Future<Map<String, Per100>> graphPer100(Iterable<String> slugs) async {
+    graphAsks.add(slugs.toSet());
+    return {for (final s in slugs) if (graph.containsKey(s)) s: graph[s]!};
+  }
 
   List<DayTotals> history = [];
   List<WeightReading> weights = [];
@@ -2008,6 +2019,48 @@ void main() {
       final state = backed(profiles: profiles, prefs: prefs, clock: () => DateTime(2026, 9, 21, 9, 0));
       await settle();
       expect(state.firstDay, DateTime(2026, 9, 15));
+    });
+  });
+
+  group('the first moment of value — the food graph, when backed (O5)', () {
+    Map<String, Per100> shipped() => {for (final d in kEgyptianDishes) for (final p in d.parts) p.slug: p.per100};
+
+    test('the dish’s numbers come from the live graph when it answers, and the moment is an event', () async {
+      final graph = shipped()..['koshary'] = (kcal: 150.0, protein: 5.0, carbs: 22.0, fat: 4.0);
+      final meals = FakeMealRepo()..graph = graph;
+      final a = MemoryAnalytics();
+      final state = backed(meals: meals, analytics: a, clock: () => DateTime(2026, 9, 21, 20, 0));
+      await settle();
+      await state.setImprove(true);
+      state.startOnboarding();
+      await settle();
+      expect(meals.graphAsks, hasLength(1), reason: 'asked once, as the consultation begins');
+      expect(meals.graphAsks.single, containsAll(['koshary', 'baladi_bread', 'salata_baladi']));
+
+      state.profile = state.profile.copyWith(prefs: ['lactose', 'meat']);
+      state.step = kOnboardingSteps.indexWhere((s) => s.id == 'food');
+      state.primarySubmit();
+      await Future<void>.delayed(const Duration(milliseconds: 2600));
+
+      final want = pickDish(targetKcal: state.target().kcal, goal: state.profile.goal, exclusions: const ['lactose', 'meat'], slot: MealSlot.dinner, live: graph)!;
+      expect(state.revealDish!.id, want.id);
+      expect(state.revealDishFacts, want.facts(live: graph));
+      expect(state.revealDishFacts!.live, isTrue, reason: 'the graph answered for every part');
+      expect(a.named('dish_shown').single, containsPair('live', true));
+      expect(a.named('dish_shown').single, containsPair('placement', 'intake'));
+    });
+
+    test('a graph that does not answer leaves the shipped numbers in place', () async {
+      final meals = FakeMealRepo(); // answers nothing
+      final state = backed(meals: meals, clock: () => DateTime(2026, 9, 21, 13, 0));
+      await settle();
+      state.startOnboarding();
+      state.step = kOnboardingSteps.indexWhere((s) => s.id == 'food');
+      state.primarySubmit();
+      await Future<void>.delayed(const Duration(milliseconds: 2600));
+      expect(state.revealDish, isNotNull);
+      expect(state.revealDishFacts!.live, isFalse);
+      expect(state.revealDishFacts, state.revealDish!.facts());
     });
   });
 
