@@ -185,8 +185,10 @@ class _DayTotal extends StatelessWidget {
         children: [
           Text(label, style: QText.body(size: 12, color: QColors.textMuted)),
           const Spacer(),
-          Text(isAr ? '${state.iso('$kcal')} سعر' : '$kcal kcal',
-              style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.cyan)),
+          ExplainMark(
+            child: Text(isAr ? '${state.iso('$kcal')} سعر' : '$kcal kcal',
+                style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.cyan)),
+          ),
           const SizedBox(width: 8),
           Text('· $vsTarget', style: QText.body(size: 11, color: QColors.textFaint)),
         ],
@@ -216,8 +218,10 @@ class _MealCard extends StatelessWidget {
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text(isAr ? meal.slotAr : meal.slotEn,
                 style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
-            Text(isAr ? '${state.iso('$kcal')} سعر' : '$kcal kcal',
-                style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.cyan)),
+            ExplainMark(
+              child: Text(isAr ? '${state.iso('$kcal')} سعر' : '$kcal kcal',
+                  style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.cyan)),
+            ),
           ]),
           Text(isAr ? meal.nameAr : meal.nameEn,
               style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),

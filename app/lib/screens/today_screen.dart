@@ -264,9 +264,11 @@ class _NumbersCard extends StatelessWidget {
               Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
                 Explainable(
                   id: 'kcal_remaining',
-                  child: ShaderMask(
-                    shaderCallback: (r) => QColors.cyanVioletGradient.createShader(r),
-                    child: Text(state.digits('$remaining'), style: QText.number(size: 38, weight: FontWeight.w600, color: Colors.white)),
+                  child: ExplainMark(
+                    child: ShaderMask(
+                      shaderCallback: (r) => QColors.cyanVioletGradient.createShader(r),
+                      child: Text(state.digits('$remaining'), style: QText.number(size: 38, weight: FontWeight.w600, color: Colors.white)),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -313,11 +315,13 @@ class _NextMealCard extends StatelessWidget {
                   Text(t.nextMeal, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.green, letterSpacing: 0.4)),
                   Text(state.isAr ? nextMeal.nameAr : nextMeal.nameEn,
                       style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.textPrimary)),
-                  Text(
-                    state.isAr
-                        ? 'حوالي ${state.iso('${mealKcal(nextMeal)}')} سعر'
-                        : 'About ${mealKcal(nextMeal)} kcal',
-                    style: QText.body(size: 13, color: QColors.textMuted),
+                  ExplainMark(
+                    child: Text(
+                      state.isAr
+                          ? 'حوالي ${state.iso('${mealKcal(nextMeal)}')} سعر'
+                          : 'About ${mealKcal(nextMeal)} kcal',
+                      style: QText.body(size: 13, color: QColors.textMuted),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Row(children: [
@@ -359,7 +363,7 @@ class _QuestCard extends StatelessWidget {
                   Row(mainAxisSize: MainAxisSize.min, children: [
                     const SuCoinIcon(size: 15),
                     const SizedBox(width: 5),
-                    Text('+${state.formatSu(SuEconomy.dailyQuest)}', style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.gold)),
+                    ExplainMark(child: Text('+${state.formatSu(SuEconomy.dailyQuest)}', style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.gold))),
                   ]),
                 ],
               ),
@@ -460,11 +464,13 @@ class _WaterCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                ShaderMask(
-                  shaderCallback: (r) => QColors.blueCyanGradient.createShader(r),
-                  child: Text(
-                    isAr ? '${state.iso(litres)} لتر' : '$litres L',
-                    style: QText.number(size: 28, weight: FontWeight.w600, color: Colors.white),
+                ExplainMark(
+                  child: ShaderMask(
+                    shaderCallback: (r) => QColors.blueCyanGradient.createShader(r),
+                    child: Text(
+                      isAr ? '${state.iso(litres)} لتر' : '$litres L',
+                      style: QText.number(size: 28, weight: FontWeight.w600, color: Colors.white),
+                    ),
                   ),
                 ),
                 const Spacer(),
@@ -579,7 +585,7 @@ class _MacroRow extends StatelessWidget {
       children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text(label, style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMuted)),
-          Text(text, style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMuted)),
+          ExplainMark(child: Text(text, style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMuted))),
         ]),
         const SizedBox(height: 6),
         ClipRRect(
@@ -834,7 +840,7 @@ class SuChip extends StatelessWidget {
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     const SuCoinIcon(size: 16),
                     const SizedBox(width: 6),
-                    Text(state.formatSu(state.suAvailable), style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.gold)),
+                    ExplainMark(child: Text(state.formatSu(state.suAvailable), style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.gold))),
                   ]),
                 ),
               ),

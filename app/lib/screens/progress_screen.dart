@@ -71,8 +71,8 @@ class ProgressScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(isAr ? 'السلسلة' : 'Streak',
-                          style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+                      ExplainMark(child: Text(isAr ? 'السلسلة' : 'Streak',
+                          style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4))),
                       const SizedBox(height: 4),
                       Text(
                         streak.current == 0

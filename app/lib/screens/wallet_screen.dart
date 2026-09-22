@@ -60,7 +60,7 @@ class WalletScreen extends StatelessWidget {
                 // Level lives here only (O9): Today keeps one Su chip.
                 Explainable(
                   id: 'level',
-                  child: Text(isAr ? 'المستوى ${state.iso('${state.level()}')}' : 'Level ${state.level()}', style: QText.body(size: 11, color: QColors.textFaint)),
+                  child: ExplainMark(child: Text(isAr ? 'المستوى ${state.iso('${state.level()}')}' : 'Level ${state.level()}', style: QText.body(size: 11, color: QColors.textFaint))),
                 ),
                 Text(t.levelNote, style: QText.body(size: 11, color: QColors.textFaint)),
               ]),

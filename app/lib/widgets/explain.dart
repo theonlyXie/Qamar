@@ -285,6 +285,47 @@ class _ExplainableState extends State<Explainable> {
   }
 }
 
+/// The mark that says "the orb explains this": a quiet dotted violet line
+/// under a value, the way a dotted underline marks a term with a definition.
+/// Drag-to-explain had no signifier at all — nothing on screen told the
+/// explainable numbers from the rest — so the gesture could only be learned
+/// from the tutorial. The tutorial now says "a dotted number".
+///
+/// It belongs inside an [Explainable] and nowhere else: a mark on a value
+/// the orb cannot explain would be a false promise, so that is asserted.
+class ExplainMark extends StatelessWidget {
+  final Widget child;
+  const ExplainMark({super.key, required this.child});
+
+  static const color = Color(0xB3A78BFA); // violetSoft at 70%
+
+  @override
+  Widget build(BuildContext context) {
+    assert(
+      context.findAncestorWidgetOfExactType<Explainable>() != null,
+      'An ExplainMark says the orb explains this value: put it inside an Explainable.',
+    );
+    return CustomPaint(foregroundPainter: const _DottedUnderline(), child: child);
+  }
+}
+
+class _DottedUnderline extends CustomPainter {
+  const _DottedUnderline();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = ExplainMark.color;
+    const r = 1.0, step = 4.0;
+    final y = size.height - r;
+    for (var x = r; x <= size.width - r; x += step) {
+      canvas.drawCircle(Offset(x, y), r, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DottedUnderline oldDelegate) => false;
+}
+
 /// The sheet the orb opens when it is dropped on a value.
 class ExplainSheet extends StatelessWidget {
   const ExplainSheet({super.key});

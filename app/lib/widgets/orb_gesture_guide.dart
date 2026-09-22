@@ -25,7 +25,8 @@ class OrbGestureGuide extends StatelessWidget {
   static List<(OrbGesture, IconData, String, String, String, String)> rows() => [
         (OrbGesture.tap, Icons.touch_app_outlined, 'دوس على القمر', 'Tap the moon', 'تفتح الشجرة: سجّل · الخطة · مياه · المراجعة · حسابي', 'opens the tree: Log · Plan · Water · Review · Me'),
         (OrbGesture.hold, Icons.mic_none, HoldCopy.doAr, HoldCopy.doEn, HoldCopy.whatAr, HoldCopy.whatEn),
-        (OrbGesture.explain, Icons.open_with, 'اسحبه على أي رقم', 'Drag it onto any number', 'يشرحه لك: من فين جه وإيه معناه', 'and it explains itself: where it came from, what it means'),
+        // The explainable numbers carry a dotted line under them (ExplainMark).
+        (OrbGesture.explain, Icons.open_with, 'اسحبه على رقم تحته نقط', 'Drag it onto a dotted number', 'يشرحه لك: من فين جه وإيه معناه', 'and it explains itself: where it came from, what it means'),
       ];
 
   @override
