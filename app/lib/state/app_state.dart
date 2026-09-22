@@ -162,6 +162,7 @@ class AppState extends ChangeNotifier {
   /// The gestures this phone has seen made on the orb, by name.
   static const _kOrbGestures = 'orb_gestures_learned';
   static const _kEasternDigits = 'eastern_digits';
+  static const _kShowScore = 'show_score';
   static const _kNudgesPerDay = 'nudges_per_day';
   static const _kNudgesAllowed = 'nudges_allowed';
   static const _kNudgePromptDone = 'nudge_prompt_done';
@@ -179,6 +180,7 @@ class AppState extends ChangeNotifier {
     try {
       final done = await p.getBool(_kOrbTutorialDone);
       final digits = await p.getBool(_kEasternDigits);
+      final score = await p.getBool(_kShowScore);
       final perDay = int.tryParse(await p.getString(_kNudgesPerDay) ?? '');
       final allowed = await p.getBool(_kNudgesAllowed);
       final promptDone = await p.getBool(_kNudgePromptDone);
@@ -210,6 +212,7 @@ class AppState extends ChangeNotifier {
       }
       if (await p.getBool(_kHoldCoachSeen) == true) holdCoachSeen = true;
       if (digits != null) easternDigits = digits;
+      if (score != null) showScore = score;
       if (perDay != null) nudgesPerDay = perDay.clamp(0, NudgeSchedule.maxPerDay);
       if (allowed != null) nudgesAllowed = allowed;
       if (promptDone == true) nudgePromptDone = true;
@@ -3635,11 +3638,25 @@ class AppState extends ChangeNotifier {
   // Level lives in the wallet only. The orb never shows a balance; when
   // points are credited it shows a passing receipt, a coin and "+١٠٠".
 
-  /// Whether anything on screen keeps score: Su, the streak, the quest.
-  /// Always on for now. Seats 3 and 4 own what it means (O4): the "Points and
-  /// streaks" switch in Me turns it off, and everything that keeps score
-  /// reads it through this getter and nothing else.
-  bool get showScore => true;
+  /// Whether anything on screen keeps score (O4): the "Points and streaks"
+  /// switch in Me, on by default and kept on this phone like the digits.
+  ///
+  /// Off hides everything that counts at the person: Today's Su chip, the
+  /// orb's passing receipt, the orb's streak ring, the streak line under the
+  /// name, the quest and its coin, Progress's streak card and the streak on
+  /// the week card. Off only hides. Points are still earned, freezes still
+  /// apply, the earned month still counts its days, photos can still be
+  /// bought, and the wallet in Me still shows the balance for whoever goes
+  /// to look. Switching back costs nothing. Everything that keeps score reads
+  /// this and nothing else.
+  bool showScore = true;
+
+  void setShowScore(bool on) {
+    if (showScore == on) return;
+    showScore = on;
+    _notify();
+    _prefs?.setBool(_kShowScore, on).catchError((_) {});
+  }
 
   /// The last credit in this session, for the orb's receipt. Set only by
   /// [_credit]: a balance read from the server is not something earned just
@@ -4030,7 +4047,8 @@ class AppState extends ChangeNotifier {
         targetKcal: target().kcal,
         mealsToday: meals.length,
         planSlots: plan?.slots.length ?? 0,
-        streak: streak(),
+        // The ring is the streak, so it goes with "Points and streaks" (O4).
+        streak: showScore ? streak() : Streak.none,
       );
 
   int mealsThisWeek() => week().fold(0, (sum, d) => sum + d.meals);

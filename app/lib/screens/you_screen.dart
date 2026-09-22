@@ -16,6 +16,9 @@ import '../widgets/moon.dart';
 class YouScreen extends StatelessWidget {
   const YouScreen({super.key});
 
+  /// The "Points and streaks" switch (O4), found by tests.
+  static const scoreSwitchKey = ValueKey('points-and-streaks');
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -206,6 +209,35 @@ class YouScreen extends StatelessWidget {
             ),
             QOutlineButton(label: t.spendTab, onTap: state.openWallet, height: 36, color: QColors.gold),
           ]),
+        ),
+        const SizedBox(height: 10),
+        // "Points and streaks" (O4): off hides everything on screen that keeps
+        // score, and only hides it. The wallet above stays, for whoever goes
+        // to look, and earning, freezes and photo purchases carry on.
+        MergeSemantics(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+            child: Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(isAr ? 'النقاط والسلسلة' : 'Points and streaks', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+                  Text(
+                    isAr
+                        ? 'نقاط Su والسلسلة ومهمة اليوم على شاشاتك. لو قفلتها بتستخبى بس: النقاط بتتحسب زي ما هي، ومحفظتك فاضلة هنا.'
+                        : 'Su, the streak and the day’s quest on your screens. Off only hides them: you still earn, and your wallet stays here.',
+                    style: QText.body(size: 12, height: 16, color: QColors.textMuted),
+                  ),
+                ]),
+              ),
+              Switch.adaptive(
+                key: YouScreen.scoreSwitchKey,
+                value: state.showScore,
+                activeThumbColor: QColors.violet,
+                onChanged: state.setShowScore,
+              ),
+            ]),
+          ),
         ),
         const SizedBox(height: 14),
         for (final r in rows) ...[

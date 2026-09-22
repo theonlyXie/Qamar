@@ -38,7 +38,9 @@ import 'package:qamar/state/app_state.dart';
 import 'package:qamar/state/today_focus.dart';
 import 'package:qamar/theme/layout.dart';
 import 'package:qamar/widgets/common.dart';
+import 'package:qamar/widgets/living_orb.dart';
 import 'package:qamar/widgets/orb_nav.dart';
+import 'package:qamar/widgets/quest_card.dart';
 
 import 'support/app_fonts.dart';
 
@@ -82,8 +84,10 @@ final slotCases = <({TodayCard card, void Function(AppState s) arrange})>[
   (card: TodayCard.quest, arrange: (s) => s.quest = DayQuest(kind: QuestKind.proteinDinner, done: false, expiresAt: _now.add(const Duration(hours: 12)))),
 ];
 
-/// "Points and streaks" on and off. Seat 4 adds `false` with the switch.
-final scoreModes = <bool>[true];
+/// "Points and streaks" on and off (O4). Off, nothing on Today keeps score:
+/// no Su chip, no streak line, no quest, no ring on the orb, and the header
+/// closes up behind them.
+final scoreModes = <bool>[true, false];
 
 /// The phone: 390x844pt (the iPhone 12 to 14), drawn at 3x, with its
 /// status bar and home indicator. The shell lays out inside that safe area,
@@ -108,9 +112,10 @@ void expectAboveFold(WidgetTester tester, Finder what, String name) {
   expect(bottom, lessThanOrEqualTo(orbTop), reason: '$name stays above the orb itself ($orbTop), whatever is due');
 }
 
-AppState _state(AppLang lang, {Iterable<TodayCard> due = const []}) {
+AppState _state(AppLang lang, {Iterable<TodayCard> due = const [], bool score = true}) {
   final s = AppState(clock: () => _now)..setLang(lang);
   s.profile = s.profile.copyWith(name: 'Basel');
+  s.setShowScore(score);
   for (final c in slotCases) {
     if (due.contains(c.card)) c.arrange(s);
   }
@@ -138,6 +143,31 @@ Future<void> _pump(WidgetTester tester, AppState s, Size size) async {
 Rect? _rectOf(WidgetTester t, Key key) {
   final f = find.byKey(key);
   return f.evaluate().isEmpty ? null : t.getRect(f);
+}
+
+/// What keeps score on Today (O4): all of it while "Points and streaks" is
+/// on, none of it while it is off, with the header closed up behind it: the
+/// name is its last line, and nothing below it is held open.
+void _expectScore(WidgetTester tester, bool score) {
+  final keeping = {
+    'the Su chip': find.byType(SuChip),
+    'the quest': find.byType(QuestCard),
+    'the orb’s streak ring': find.byWidgetPredicate((w) => w is CustomPaint && w.painter is StreakRingPainter),
+    'the orb’s receipt': find.byType(SuReceiptChip),
+  };
+  if (score) {
+    expect(keeping['the Su chip'], findsOneWidget);
+    return;
+  }
+  for (final e in keeping.entries) {
+    expect(e.value, findsNothing, reason: '${e.key} keeps score, so it goes with the switch');
+  }
+  expect(find.byType(TodayStreakLine), findsNothing);
+  final header = tester.getRect(find.byKey(TodayScreen.zoneKey(TodayZone.header)));
+  final name = tester.getRect(find.text('Basel'));
+  expect(header.bottom, moreOrLessEquals(name.bottom, epsilon: 0.5), reason: 'the header closes up under the name');
+  final qamar = tester.getRect(find.byKey(TodayScreen.zoneKey(TodayZone.qamar)));
+  expect(qamar.top - header.bottom, moreOrLessEquals(14, epsilon: 0.5), reason: 'Qamar’s card follows at the usual gap, nothing held open');
 }
 
 void main() {
@@ -186,7 +216,9 @@ void main() {
   for (final lang in AppLang.values) {
     for (final score in scoreModes) {
       for (final withSafety in [false, true]) {
-        final due = withSafety ? TodayCard.values : TodayCard.values.where((c) => c != TodayCard.safety).toList();
+        final asked = withSafety ? TodayCard.values : TodayCard.values.where((c) => c != TodayCard.safety).toList();
+        // With the score off the quest is never due: it keeps score (O4).
+        final due = score ? asked : asked.where((c) => c != TodayCard.quest).toList();
         final label = '${lang.name}, score ${score ? 'on' : 'off'}, ${withSafety ? 'with' : 'without'} a safety answer';
 
         // The top of the screen at its tallest, both ways it can be: in the
@@ -194,7 +226,7 @@ void main() {
         // a log the header carries the streak line and the card the day line.
         for (final moment in const ['morning', 'after a log']) {
           testWidgets('above the fold, every card due, $moment: "Log a meal" and Qamar’s sentence ($label)', (tester) async {
-            final s = _state(lang, due: due);
+            final s = _state(lang, due: asked, score: score);
             if (moment == 'morning') {
               s.nightNote = NightNote(
                 day: _now,
@@ -212,8 +244,9 @@ void main() {
             if (moment == 'morning') {
               expect(find.textContaining(lang == AppLang.ar ? 'بكرة جاهز' : 'Tomorrow is ready'), findsOneWidget, reason: 'the note is the sentence');
             } else {
-              expect(find.byType(TodayStreakLine), findsOneWidget, reason: 'the streak line is in the header');
+              expect(find.byType(TodayStreakLine), score ? findsOneWidget : findsNothing, reason: 'the streak line is in the header while the score is shown');
             }
+            _expectScore(tester, score);
 
             expect(tester.getTopLeft(find.byType(TodayScreen)).dy, _statusBar, reason: 'the screen starts under the status bar');
             expectAboveFold(tester, find.byKey(QamarCard.logKey), '"Log a meal"');
@@ -223,7 +256,7 @@ void main() {
         }
 
         testWidgets('the zones in order, one card in the slot, the rest below in order ($label)', (tester) async {
-          final s = _state(lang, due: due);
+          final s = _state(lang, due: asked, score: score);
           // As wide as the phone and tall enough that every zone is built.
           await _pump(tester, s, Size(_phone.width, 5000));
           expect(tester.takeException(), isNull);
@@ -237,6 +270,8 @@ void main() {
                 reason: '${present[i].$1} comes after ${present[i - 1].$1}, never beside or over it');
           }
           final zones = {for (final (z, _) in present) z};
+          expect(todayCardsDue(s), due, reason: 'what is due, with the score ${score ? 'on' : 'off'}');
+          _expectScore(tester, score);
           expect(zones.contains(TodayZone.numbers), !withSafety, reason: 'no target on the general-guidance route, so no numbers');
 
           // Exactly one card in the slot: the highest due.

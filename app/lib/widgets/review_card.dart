@@ -16,6 +16,10 @@ class ReviewCard extends StatelessWidget {
   final WeekReview review;
   final bool isAr;
   final bool showNumbers;
+
+  /// The run under the week, when "Points and streaks" is on (O4). Off, the
+  /// card and what it shares carry no streak.
+  final bool showStreak;
   final String footer;
   final String Function(String) iso;
 
@@ -24,6 +28,7 @@ class ReviewCard extends StatelessWidget {
     required this.review,
     required this.isAr,
     required this.showNumbers,
+    required this.showStreak,
     required this.footer,
     required this.iso,
   });
@@ -104,7 +109,7 @@ class ReviewCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (review.streak.current >= 2)
+                if (showStreak && review.streak.current >= 2)
                   Text(
                     isAr ? '${iso('${review.streak.current}')} أيام ورا بعض' : '${review.streak.current} days in a row',
                     style: QText.body(size: 11, color: QColors.cyan),
