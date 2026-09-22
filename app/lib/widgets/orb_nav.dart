@@ -7,6 +7,7 @@ import '../state/app_state.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import 'explain.dart';
+import 'hold_coach_mark.dart';
 import 'living_orb.dart';
 
 /// The persistent floating orb — the whole navigation. Three gestures, none
@@ -28,11 +29,22 @@ class OrbNav extends StatelessWidget {
           final state = context.watch<AppState>();
           final maxX = constraints.maxWidth - 96;
           final maxY = constraints.maxHeight - 118;
-          return Stack(
+          final at = Offset(
+            state.orbX.clamp(4, maxX < 4 ? 4 : maxX).toDouble(),
+            state.orbY.clamp(46, maxY < 46 ? 46 : maxY).toDouble(),
+          );
+          // The hold's one-time mark rides with the orb: above it, or below
+          // it while the orb rests in the top half of the screen.
+          final markBelow = at.dy < constraints.maxHeight / 2;
+          return CustomMultiChildLayout(
+            delegate: _OrbLayout(orbAt: at, markBelow: markBelow),
             children: [
-              Positioned(
-                left: state.orbX.clamp(4, maxX < 4 ? 4 : maxX).toDouble(),
-                top: state.orbY.clamp(46, maxY < 46 ? 46 : maxY).toDouble(),
+              if (state.holdCoachDue) ...[
+                LayoutId(id: _OrbPart.mark, child: HoldCoachMark(state: state)),
+                LayoutId(id: _OrbPart.caret, child: HoldCoachMark.caret(up: markBelow)),
+              ],
+              LayoutId(
+                id: _OrbPart.orb,
                 child: _DraggableOrb(maxX: maxX < 4 ? 4 : maxX, maxY: maxY < 46 ? 46 : maxY),
               ),
             ],
@@ -41,6 +53,38 @@ class OrbNav extends StatelessWidget {
       ),
     );
   }
+}
+
+enum _OrbPart { orb, mark, caret }
+
+/// The orb at the position state holds (the one place it is placed), and,
+/// while it is due, the hold's mark placed from the orb's own rect: centred
+/// on the moon, kept 8 points inside the screen, its caret on the moon.
+class _OrbLayout extends MultiChildLayoutDelegate {
+  final Offset orbAt;
+  final bool markBelow;
+  _OrbLayout({required this.orbAt, required this.markBelow});
+
+  @override
+  void performLayout(Size size) {
+    final orb = layoutChild(_OrbPart.orb, const BoxConstraints());
+    positionChild(_OrbPart.orb, orbAt);
+    if (!hasChild(_OrbPart.mark)) return;
+    final mark = layoutChild(_OrbPart.mark, BoxConstraints.loose(size));
+    final caret = layoutChild(_OrbPart.caret, BoxConstraints.loose(size));
+    // The moon is centred in the orb's column, the Su pill under it.
+    final moonX = orbAt.dx + orb.width / 2;
+    final maxLeft = size.width - mark.width - 8;
+    final left = (moonX - mark.width / 2).clamp(8.0, maxLeft < 8 ? 8.0 : maxLeft);
+    final caretTop = markBelow ? orbAt.dy + orb.height + 4 : orbAt.dy - 4 - caret.height;
+    // The caret reaches a point into the bubble, so the two read as one.
+    final markTop = markBelow ? caretTop + caret.height - 1 : caretTop - mark.height + 1;
+    positionChild(_OrbPart.mark, Offset(left, markTop));
+    positionChild(_OrbPart.caret, Offset(moonX - caret.width / 2, caretTop));
+  }
+
+  @override
+  bool shouldRelayout(_OrbLayout old) => old.orbAt != orbAt || old.markBelow != markBelow;
 }
 
 class _DraggableOrb extends StatefulWidget {

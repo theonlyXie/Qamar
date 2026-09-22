@@ -157,6 +157,7 @@ class AppState extends ChangeNotifier {
   static const _kImprove = 'improve_consent';
   static const _kAdherence = 'adherence_consent';
   static const _kRamadanAsked = 'ramadan_asked';
+  static const _kHoldCoachSeen = 'hold_coach_seen';
 
   Future<void> _loadDevicePrefs() async {
     final p = _prefs;
@@ -183,6 +184,7 @@ class AppState extends ChangeNotifier {
         _syncAnalytics().ignore();
       }
       if (done == true) orbTutorialDismissed = true;
+      if (await p.getBool(_kHoldCoachSeen) == true) holdCoachSeen = true;
       if (digits != null) easternDigits = digits;
       if (perDay != null) nudgesPerDay = perDay.clamp(0, NudgeSchedule.maxPerDay);
       if (allowed != null) nudgesAllowed = allowed;
@@ -1003,7 +1005,44 @@ class AppState extends ChangeNotifier {
 
   bool get orbTutorialDone => orbTutorialDismissed || gesturesLearned.length == OrbGesture.values.length;
 
+  // ---- the hold, named where it is done (O1) --------------------------------
+  //
+  // Hold is the one gesture people have to learn, and it is the logging path.
+  // The tutorial card on Today stays until the first hold; if the tree has
+  // been opened and closed twice with no hold, a one-time mark above the orb
+  // names it, in the card's words (HoldCopy).
+
+  /// Times an open tree closed while the hold was still unlearned.
+  int treeClosesWithoutHold = 0;
+
+  /// The mark has been dismissed, or made unnecessary by a hold. Remembered
+  /// on the phone: it is one-time.
+  bool holdCoachSeen = false;
+
+  /// The three-gesture card keeps Today's slot until the first hold.
+  bool get holdTutorialDue => !orbTutorialDone && !gesturesLearned.contains(OrbGesture.hold);
+
+  bool get holdCoachDue =>
+      !holdCoachSeen &&
+      !gesturesLearned.contains(OrbGesture.hold) &&
+      treeClosesWithoutHold >= 2 &&
+      screen == AppScreen.today &&
+      !treeOpen &&
+      !chatOpen;
+
+  void dismissHoldCoach() {
+    holdCoachSeen = true;
+    _prefs?.setBool(_kHoldCoachSeen, true).catchError((_) {});
+    _track('hold_coach_dismissed');
+    _notify();
+  }
+
   void _learn(OrbGesture g) {
+    if (g == OrbGesture.hold && !holdCoachSeen) {
+      // Learned by doing: the mark is no longer needed, now or ever.
+      holdCoachSeen = true;
+      _prefs?.setBool(_kHoldCoachSeen, true).catchError((_) {});
+    }
     if (orbTutorialDone || gesturesLearned.contains(g)) return;
     gesturesLearned.add(g);
     _track('orb_gesture_first', {'gesture': g.name});
@@ -1085,7 +1124,7 @@ class AppState extends ChangeNotifier {
 
   void go(AppScreen s) {
     screen = s;
-    treeOpen = false;
+    _collapseTree();
     _notify();
     _screen(s);
   }
@@ -2364,7 +2403,7 @@ class AppState extends ChangeNotifier {
 
   void openWallet() {
     screen = AppScreen.wallet;
-    treeOpen = false;
+    _collapseTree();
     _notify();
     _screen(AppScreen.wallet);
   }
@@ -2679,7 +2718,7 @@ class AppState extends ChangeNotifier {
 
   void openSubscription() {
     screen = AppScreen.subscription;
-    treeOpen = false;
+    _collapseTree();
     plusNotice = null;
     _notify();
     refreshPlusQuote();
@@ -3695,7 +3734,7 @@ class AppState extends ChangeNotifier {
 
   void openChat() {
     chatOpen = true;
-    treeOpen = false;
+    _collapseTree();
     chatState = ChatState.idle;
     if (chat.isEmpty) {
       chat.add(ChatTurn(
@@ -4239,8 +4278,10 @@ class AppState extends ChangeNotifier {
   }
 
   /// Closes the ring and folds any fanned-out node back, without notifying —
-  /// every caller goes on to change something else and notifies once.
+  /// every caller goes on to change something else and notifies once. Every
+  /// way the tree closes comes through here, so a close is counted once.
   void _collapseTree() {
+    if (treeOpen && !gesturesLearned.contains(OrbGesture.hold)) treeClosesWithoutHold++;
     treeLogIndex = null;
     treeLogSub = null;
     treeWaterIndex = null;

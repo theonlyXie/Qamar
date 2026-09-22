@@ -13,6 +13,7 @@ import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/explain.dart';
 import '../widgets/general_guidance_card.dart';
+import '../widgets/hold_coach_mark.dart';
 import '../widgets/moon.dart';
 
 class TodayScreen extends StatefulWidget {
@@ -786,12 +787,12 @@ class _OrbLogHint extends StatelessWidget {
     final learned = state.gesturesLearned;
     final rows = <(OrbGesture, IconData, String, String)>[
       (OrbGesture.tap, Icons.touch_app_outlined, 'دوس على القمر', 'Tap the moon'),
-      (OrbGesture.hold, Icons.mic_none, 'استمر ضاغط عليه', 'Hold it'),
+      (OrbGesture.hold, Icons.mic_none, HoldCopy.doAr, HoldCopy.doEn),
       (OrbGesture.explain, Icons.open_with, 'اسحبه على أي رقم', 'Drag it onto any number'),
     ];
     final what = <OrbGesture, (String, String)>{
       OrbGesture.tap: ('تفتح الشجرة: سجّل · الخطة · مياه · المراجعة · حسابي', 'opens the tree: Log · Plan · Water · Review · Me'),
-      OrbGesture.hold: ('تتكلم مع قمر — بصوتك', 'talk to Qamar — with your voice'),
+      OrbGesture.hold: (HoldCopy.whatAr, HoldCopy.whatEn),
       OrbGesture.explain: ('يشرحه لك: من فين جه وإيه معناه', 'and it explains itself: where it came from, what it means'),
     };
     return Container(
