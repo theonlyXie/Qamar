@@ -1790,6 +1790,31 @@ void main() {
       expect(a.named('dish_shown'), hasLength(kWelcomeDishIds.length), reason: 'once for each dish');
     });
 
+    test('after a sign-out the welcome counts again, once a session and once a dish', () async {
+      final a = MemoryAnalytics();
+      final state = AppState(analytics: a);
+      final koshary = kEgyptianDishes.firstWhere((d) => d.id == 'koshary');
+      await state.setImprove(true);
+      await settle();
+      state.openWelcomeDishes();
+      state.welcomeDishShown(koshary);
+      state.welcomeDishShown(koshary);
+      await settle();
+      expect(a.named('welcome_dishes_opened'), hasLength(1));
+      expect(a.named('dish_shown'), hasLength(1));
+
+      state.restart(); // signed out: a new session
+      await settle();
+      await state.setImprove(true);
+      await settle();
+      state.openWelcomeDishes();
+      state.welcomeDishShown(koshary);
+      state.welcomeDishShown(koshary);
+      await settle();
+      expect(a.named('welcome_dishes_opened'), hasLength(2), reason: 'the new session’s opening is counted');
+      expect(a.named('dish_shown'), hasLength(2), reason: 'once for the dish in this session too');
+    });
+
     test('an answer given earlier on this phone decides at once: a no never holds anything', () async {
       final prefs = MemoryDevicePrefs();
       await prefs.setBool('improve_consent', false);

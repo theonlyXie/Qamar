@@ -1245,8 +1245,10 @@ class AppState extends ChangeNotifier {
     affiliateWallet = AffiliateWallet.empty;
     affiliateNotice = null;
     if (improve) setImprove(false).ignore();
-    // Whatever was waiting for an answer belonged to the session that ended.
+    // Whatever was waiting for an answer belonged to the session that ended,
+    // and so did what the welcome has already counted.
     _held.clear();
+    _welcomeTracked.clear();
     _startRecorded = false;
     revealDish = null;
     revealDishFacts = null;
