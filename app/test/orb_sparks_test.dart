@@ -60,7 +60,9 @@ void main() {
         if (p.near && p.at.distance < _moonR) inFront++;
         if (!p.near && p.at.distance < _moonR) behind++;
       }
-      expect(seen / n, greaterThan(0.6), reason: 'spark $i is seen, not hidden by the moon');
+      // How much of the ring is seen is measured from the clip itself, in
+      // the widget test below; this is the ring's geometry.
+      expect(seen, greaterThan(0));
       expect(inFront, greaterThan(0), reason: 'spark $i crosses the moon’s face');
       expect(behind, greaterThan(0), reason: 'spark $i goes behind it');
       expect(LivingOrb.sparkAt(i, 0, size: OrbNav.moon, reach: OrbNav.bandReach).at, isNot(LivingOrb.sparkAt((i + 1) % 3, 0, size: OrbNav.moon, reach: OrbNav.bandReach).at), reason: 'spread round the ring');
@@ -87,30 +89,48 @@ void main() {
       expect(at, greaterThan(moonAt), reason: 'spark $i is painted after the moon, not under it');
     }
 
-    // Sample the cycle: where the spark is drawn is where the ring puts it,
-    // and it is clipped exactly when it is on the far side.
-    var clipped = 0, open = 0;
-    for (var k = 0; k < 44; k++) {
-      await tester.pump(const Duration(milliseconds: 250));
+    // Sample the whole cycle. Where the spark is drawn is where the ring
+    // puts it; on the far side, what the clip actually lets through is the
+    // spark beside the disc and nothing over it; and how much of each spark
+    // is seen is counted from that clip.
+    final seen = List.filled(3, 0), samples = List.filled(3, 0);
+    var besideFar = 0, overFar = 0;
+    for (var k = 0; k < 88; k++) {
+      await tester.pump(const Duration(milliseconds: 125));
       final centre = tester.getCenter(find.descendant(of: orb, matching: find.byType(QamarMoon)).first);
       for (var i = 0; i < LivingOrb.sparkOrbits.length; i++) {
         final spark = find.byKey(LivingOrb.sparkKey(i));
         final dot = tester.getCenter(find.descendant(of: spark, matching: find.byType(Container)).first);
         final offset = dot - centre;
-        final clip = find.descendant(of: spark, matching: find.byType(ClipPath)).evaluate().isNotEmpty;
-        final far = offset.dy < -0.01;
-        if (far) {
-          expect(clip, isTrue, reason: 'spark $i behind the moon is clipped to its disc');
-          clipped++;
-        } else if (offset.dy > 0.01) {
-          expect(clip, isFalse, reason: 'spark $i in front is whole');
-          open++;
-        }
         expect(offset.dx.abs(), lessThanOrEqualTo(LivingOrb.sparkOrbits[i].across * OrbNav.moon + 0.5));
+        final clipFinder = find.descendant(of: spark, matching: find.byType(ClipPath));
+        samples[i]++;
+        if (offset.dy > 0.01) {
+          expect(clipFinder, findsNothing, reason: 'spark $i in front is whole');
+          seen[i]++;
+          continue;
+        }
+        if (offset.dy >= -0.01) continue; // on the ring's edge: either way
+        expect(clipFinder, findsOneWidget, reason: 'spark $i on the far side is clipped');
+        final clip = tester.widget<ClipPath>(clipFinder).clipper! as BehindMoonClipper;
+        final box = tester.renderObject<RenderBox>(clipFinder);
+        final local = box.globalToLocal(dot);
+        final through = clip.getClip(box.size).contains(local);
+        final overDisc = offset.distance < clip.radius;
+        expect(through, !overDisc, reason: 'spark $i at $offset: the clip lets it through beside the disc and not over it');
+        if (overDisc) {
+          overFar++;
+        } else {
+          besideFar++;
+        }
+        if (through) seen[i]++;
       }
     }
-    expect(clipped, greaterThan(0));
-    expect(open, greaterThan(0));
+    expect(besideFar, greaterThan(0), reason: 'the far side, beside the moon, was sampled');
+    expect(overFar, greaterThan(0), reason: 'and behind the disc');
+    for (var i = 0; i < 3; i++) {
+      expect(seen[i] / samples[i], greaterThan(0.6), reason: 'spark $i is seen most of the way round, by the clip: ${seen[i]} of ${samples[i]}');
+    }
   });
 
   for (final lang in AppLang.values) {

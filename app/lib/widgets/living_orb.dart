@@ -341,27 +341,37 @@ class _OrbitingSpark extends StatelessWidget {
           ),
         );
         // On the far side the moon is in front of it.
-        if (!p.near) spark = ClipPath(clipper: _BehindMoon(moonRadius), child: spark);
+        if (!p.near) spark = ClipPath(clipper: BehindMoonClipper(moonRadius), child: spark);
         return spark;
       },
     );
   }
 }
 
-/// Everything but the moon's disc, centred in the box: what is visible of a
-/// spark behind the moon.
-class _BehindMoon extends CustomClipper<Path> {
+/// Everything but the moon's disc, around the box's centre (the moon's):
+/// what is visible of a spark behind the moon.
+///
+/// The outer square is the moon's, three radii out, well past the widest
+/// orbit (0.75 of the moon's size across, 1.5 radii). It used to be built
+/// from the spark's own 3 to 6 point box, ±13 to ±27 points, inside which
+/// the even-odd rule was right and outside which it flipped: beside the
+/// moon on the far side a spark was cut away, and the smallest one was
+/// inverted, drawn over the disc and hidden beside it.
+class BehindMoonClipper extends CustomClipper<Path> {
   final double radius;
-  const _BehindMoon(this.radius);
+  const BehindMoonClipper(this.radius);
 
   @override
-  Path getClip(Size size) => Path()
-    ..fillType = PathFillType.evenOdd
-    ..addRect(Rect.fromLTWH(-size.width * 4, -size.height * 4, size.width * 9, size.height * 9))
-    ..addOval(Rect.fromCircle(center: size.center(Offset.zero), radius: radius));
+  Path getClip(Size size) {
+    final c = size.center(Offset.zero);
+    return Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRect(Rect.fromCircle(center: c, radius: radius * 3))
+      ..addOval(Rect.fromCircle(center: c, radius: radius));
+  }
 
   @override
-  bool shouldReclip(_BehindMoon old) => old.radius != radius;
+  bool shouldReclip(BehindMoonClipper old) => old.radius != radius;
 }
 
 /// The streak as a ring: one arc segment per day of the current week of the
