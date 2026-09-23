@@ -259,13 +259,13 @@ class _AccountSheetState extends State<AccountSheet> {
       const SizedBox(height: 14),
       Row(
         children: [
-          const Expanded(child: Divider(color: QColors.borderFaint, height: 1)),
+          const Expanded(child: Divider(color: QColors.borderSoft, height: 1)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(isAr ? 'أو بالإيميل' : 'or with email',
                 style: QText.body(size: 12, color: QColors.textMuted)),
           ),
-          const Expanded(child: Divider(color: QColors.borderFaint, height: 1)),
+          const Expanded(child: Divider(color: QColors.borderSoft, height: 1)),
         ],
       ),
       const SizedBox(height: 14),
@@ -352,7 +352,7 @@ class _Field extends StatelessWidget {
         hintText: hint,
         hintStyle: QText.body(size: 14, color: QColors.textMuted),
         filled: true,
-        fillColor: QColors.cardNavy,
+        fillColor: QColors.cardDeep,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.borderSoft)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.borderSoft)),

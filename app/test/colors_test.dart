@@ -20,8 +20,6 @@ const _surfaces = {
   'bgScan': QColors.bgScan,
   'cardDeep': QColors.cardDeep,
   'cardMid': QColors.cardMid,
-  'cardSlate': QColors.cardSlate,
-  'cardNavy': QColors.cardNavy,
 };
 
 const _text = {
@@ -59,6 +57,17 @@ void main() {
   test('a disabled label sits below AA on purpose, and stays there to see', () {
     expect(contrastRatio(QColors.textDisabled, QColors.cardDeep), lessThan(4.5));
     expect(contrastRatio(QColors.textDisabled, QColors.cardDeep), greaterThanOrEqualTo(3), reason: 'still there to see');
+  });
+
+  test('two card surfaces and two edges, each pair a step apart', () {
+    final palette = File('lib/theme/colors.dart').readAsStringSync();
+    final names = RegExp(r'static const (\w+) =').allMatches(palette).map((m) => m.group(1)!).toList();
+    expect(names.where((n) => n.startsWith('card')).toList(), ['cardDeep', 'cardMid']);
+    expect(names.where((n) => n.startsWith('border')).toList(), ['borderSoft', 'borderStrong']);
+    expect(contrastRatio(QColors.cardMid, QColors.cardDeep), greaterThan(1.03), reason: 'raised is a step up, as on the phone: a card lifted by a lighter fill, not a shadow');
+    final soft = contrastRatio(QColors.borderSoft, QColors.cardDeep), strong = contrastRatio(QColors.borderStrong, QColors.cardDeep);
+    expect(soft, greaterThan(1.2), reason: 'the hairline is there');
+    expect(strong - soft, greaterThan(0.25), reason: 'the strong edge is a clear step above it');
   });
 
   test('every translucent token is a surface of the palette at an alpha', () {

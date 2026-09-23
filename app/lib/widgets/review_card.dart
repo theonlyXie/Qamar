@@ -51,7 +51,7 @@ class ReviewCard extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [QColors.cardMid, QColors.cardNavy],
+            colors: [QColors.cardMid, QColors.cardDeep],
           ),
           borderRadius: BorderRadius.circular(QRadii.card),
           border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),

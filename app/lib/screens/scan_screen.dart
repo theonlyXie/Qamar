@@ -88,7 +88,7 @@ class _ScanScreenState extends State<ScanScreen> {
                 alignment: Alignment.center,
                 children: [
                   Container(
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(QRadii.card), color: QColors.cardNavy),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(QRadii.card), color: QColors.cardDeep),
                   ),
                   // Once a shot is taken, show it in the frame so the user can
                   // see what Qamar is reading.

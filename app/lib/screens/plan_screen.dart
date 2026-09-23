@@ -223,7 +223,7 @@ class _DayTotal extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: QDecor.card(color: QColors.cardNavy, border: QColors.borderFaint, radius: QRadii.control),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.control),
       child: Row(
         children: [
           Text(label, style: QText.body(size: 12, color: QColors.textMuted)),
@@ -272,7 +272,7 @@ class _MealCard extends StatelessWidget {
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: QDecor.card(color: QColors.cardNavy, border: QColors.borderFaint, radius: QRadii.control),
+            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.control),
             child: Column(
               children: [
                 Row(

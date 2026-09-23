@@ -291,7 +291,7 @@ class _NumbersCard extends StatelessWidget {
     // estimates, in a colour that passes AA.
     return Container(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
-          decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardSlate]), border: QColors.borderStrong, radius: QRadii.card,
+          decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), border: QColors.borderStrong, radius: QRadii.card,
               shadow: [BoxShadow(color: QColors.blue.withValues(alpha: 0.12), blurRadius: 40)]),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,7 +393,7 @@ class _LoggedMeals extends StatelessWidget {
             Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.control),
+              decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.control),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -430,7 +430,7 @@ class _WaterCard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: QDecor.card(
           color: QColors.cardDeep,
-          border: QColors.borderFaint,
+          border: QColors.borderSoft,
           radius: QRadii.card,
         ),
         child: Column(
@@ -476,7 +476,7 @@ class _WaterCard extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: w.progress,
                 minHeight: 6,
-                backgroundColor: QColors.borderFaint,
+                backgroundColor: QColors.borderSoft,
                 valueColor: const AlwaysStoppedAnimation(QColors.cyan),
               ),
             ),
@@ -572,7 +572,7 @@ class _MacroRow extends StatelessWidget {
           child: LinearProgressIndicator(
             value: pct,
             minHeight: 6,
-            backgroundColor: QColors.borderFaint,
+            backgroundColor: QColors.borderSoft,
             valueColor: const AlwaysStoppedAnimation(QColors.green),
           ),
         ),
@@ -593,7 +593,7 @@ class _ActivityCard extends StatelessWidget {
     final isAr = state.isAr;
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.card),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -843,7 +843,7 @@ class SuChip extends StatelessWidget {
               widthFactor: 1,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                decoration: BoxDecoration(border: Border.all(color: QColors.gold.withOpacity(0.4)), borderRadius: BorderRadius.circular(QRadii.pill), color: QColors.cardSlate),
+                decoration: BoxDecoration(border: Border.all(color: QColors.gold.withOpacity(0.4)), borderRadius: BorderRadius.circular(QRadii.pill), color: QColors.cardDeep),
                 child: Explainable(
                   id: 'su_points',
                   child: Row(mainAxisSize: MainAxisSize.min, children: [

@@ -331,7 +331,7 @@ class _PromoFieldState extends State<_PromoField> {
         hintText: isAr ? 'QMR…' : 'QMR…',
         hintStyle: QText.body(size: 14, color: QColors.textMuted),
         filled: true,
-        fillColor: QColors.cardNavy,
+        fillColor: QColors.cardDeep,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.borderSoft)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.borderSoft)),
@@ -439,7 +439,7 @@ class _FeatureTable extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: QDecor.card(color: QColors.cardNavy, border: QColors.borderFaint, radius: QRadii.card),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.card),
       child: Column(
         children: [
           Row(
@@ -464,7 +464,7 @@ class _FeatureTable extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           for (final f in _features) ...[
-            const Divider(color: QColors.borderFaint, height: 1),
+            const Divider(color: QColors.borderSoft, height: 1),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 9),
               child: Row(

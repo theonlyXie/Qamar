@@ -355,7 +355,7 @@ class _ExplainSheetState extends State<ExplainSheet> {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 34),
           decoration: const BoxDecoration(
-            color: QColors.cardSlate,
+            color: QColors.cardDeep,
             border: Border(top: BorderSide(color: QColors.borderStrong)),
             borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
           ),

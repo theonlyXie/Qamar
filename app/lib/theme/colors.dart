@@ -34,14 +34,18 @@ class QColors {
   /// ends).
   static const onAccent = Color(0xFFFFFFFF);
 
+  /// Two surfaces for content, one step apart: a card, and a card raised
+  /// (a pressed control, a gradient's light end, the glass). There were
+  /// four, two of them a hair from the others (0xFF0F172A, 0xFF0B1324).
   static const cardDeep = Color(0xFF111827);
   static const cardMid = Color(0xFF141C2E);
-  static const cardSlate = Color(0xFF0F172A);
-  static const cardNavy = Color(0xFF0B1324);
 
+  /// Two edges: the hairline every card and divider draws, and a strong
+  /// one for what has to be seen as a boundary (a sheet's top, a selected
+  /// or raised control). There were three within a few percent of each
+  /// other; the strong edge is now a clear step above the hairline.
   static const borderSoft = Color(0xFF263044);
-  static const borderFaint = Color(0xFF1F2940);
-  static const borderStrong = Color(0xFF2B3450);
+  static const borderStrong = Color(0xFF334063);
 
   /// What a sheet or a card over the page dims everything else with: the
   /// scan's black at 78%. One strength for every modal, so opening a sheet

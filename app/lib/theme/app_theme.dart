@@ -61,7 +61,7 @@ ThemeData buildQamarTheme() {
     ),
     splashFactory: NoSplash.splashFactory,
     highlightColor: Colors.transparent,
-    dividerColor: QColors.borderFaint,
+    dividerColor: QColors.borderSoft,
   );
 }
 

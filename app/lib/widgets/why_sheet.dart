@@ -37,7 +37,7 @@ class WhySheet extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(20, 22, 20, 34),
           decoration: const BoxDecoration(
-            color: QColors.cardSlate,
+            color: QColors.cardDeep,
             border: Border(top: BorderSide(color: QColors.borderStrong)),
             borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
           ),
@@ -50,7 +50,7 @@ class WhySheet extends StatelessWidget {
               Text(t.whyTitle, style: QText.display(size: 24, ar: QText.arabic(t.whyTitle), color: QColors.textPrimary)),
               for (final r in rows) ...[
                 const SizedBox(height: 11),
-                const Divider(color: QColors.borderFaint, height: 1),
+                const Divider(color: QColors.borderSoft, height: 1),
                 const SizedBox(height: 11),
                 Text(r.$1, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
                 const SizedBox(height: 4),

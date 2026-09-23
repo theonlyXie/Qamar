@@ -97,12 +97,12 @@ class WelcomeScreen extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Expanded(child: Divider(color: QColors.borderFaint, height: 1)),
+                  const Expanded(child: Divider(color: QColors.borderSoft, height: 1)),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Text(t.continueWith, style: QText.body(size: 12, color: QColors.textMuted)),
                   ),
-                  const Expanded(child: Divider(color: QColors.borderFaint, height: 1)),
+                  const Expanded(child: Divider(color: QColors.borderSoft, height: 1)),
                 ],
               ),
               const SizedBox(height: 12),

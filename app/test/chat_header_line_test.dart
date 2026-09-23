@@ -27,8 +27,8 @@ class _Ai implements AiGateway {
 AiQuota _chat(int remaining) => AiQuota(bucket: 'chat', used: 3 - remaining, limit: 3, extra: 0, remaining: remaining);
 
 /// The conversation's ground under the header (ask_qamar_overlay's scrim
-/// top, cardNavy at 95%, over the app's darkest background).
-final _ground = over(QColors.cardNavy.withValues(alpha: 0.95), QColors.bgBottom);
+/// top, cardDeep at 95%, over the app's darkest background).
+final _ground = over(QColors.cardDeep.withValues(alpha: 0.95), QColors.bgBottom);
 
 void main() {
   setUpAll(loadAppFonts);

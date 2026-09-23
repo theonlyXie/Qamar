@@ -143,7 +143,8 @@ class _RenderMinTap extends RenderShiftedBox {
 /// How a control with nothing to do is drawn, everywhere (O11): no press, a
 /// faint edge, a muted label, no fill or glow.
 abstract final class QDisabled {
-  static const edge = QColors.borderFaint;
+  /// Fainter than an enabled control's hairline.
+  static final edge = QColors.borderSoft.withValues(alpha: 0.55);
   static const label = QColors.textDisabled;
   static const fill = QColors.cardDeep;
 }

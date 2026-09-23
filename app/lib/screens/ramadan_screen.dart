@@ -61,7 +61,7 @@ class RamadanScreen extends StatelessWidget {
         // The switch.
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.card),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.card),
           child: Row(children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -91,7 +91,7 @@ class RamadanScreen extends StatelessWidget {
         // The sun's two times, and the water between them.
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.card),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.card),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(child: _TimeCell(label: isAr ? 'الإفطار' : 'Iftar', time: state.iso(SunTimes.clock(h.iftarMin)), sub: isAr ? 'المغرب، القاهرة' : 'Sunset, Cairo')),
@@ -144,7 +144,7 @@ class RamadanScreen extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: (state.seasonDaysLogged / season.days).clamp(0, 1).toDouble(),
                   minHeight: 6,
-                  backgroundColor: QColors.borderFaint,
+                  backgroundColor: QColors.borderSoft,
                   valueColor: const AlwaysStoppedAnimation(QColors.gold),
                 ),
               ),

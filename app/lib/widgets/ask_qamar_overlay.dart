@@ -30,12 +30,12 @@ import 'common.dart';
 /// Motion follows the same rule: short, critically damped, never decorative.
 /// Everything here honours the platform's reduce-motion setting by falling back
 /// to a plain cross-fade.
-final _scrimTop = QColors.cardNavy.withValues(alpha: 0.95);
+final _scrimTop = QColors.cardDeep.withValues(alpha: 0.95);
 final _scrimBottom = QColors.bgBottom.withValues(alpha: 0.98);
 
 /// The composer and the user's own words sit on the one surface that is a step
 /// lighter than the sheet — enough to separate, not enough to shout.
-final _raised = QColors.cardSlate.withValues(alpha: 0.9);
+final _raised = QColors.cardDeep.withValues(alpha: 0.9);
 const _userBubble = QColors.glassHigh;
 
 /// How long a press takes to show. Arrivals are on the settle spring
@@ -563,7 +563,7 @@ class _IconButtonState extends State<_IconButton> {
             width: 30,
             height: 30,
             decoration: BoxDecoration(shape: BoxShape.circle, color: enabled ? QColors.textMuted : QDisabled.edge),
-            child: Icon(widget.icon, size: widget.glyph, color: enabled ? QColors.cardNavy : QDisabled.label),
+            child: Icon(widget.icon, size: widget.glyph, color: enabled ? QColors.cardDeep : QDisabled.label),
           )
         : Icon(widget.icon, size: widget.glyph, color: enabled ? (widget.tint ?? QColors.textMuted) : QDisabled.label);
 

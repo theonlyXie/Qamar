@@ -70,7 +70,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         Container(
           padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
-          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: QColors.borderFaint))),
+          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: QColors.borderSoft))),
           child: Row(
             children: [
               // The way back to the welcome screen. The answers are kept:
@@ -121,7 +121,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         Container(
           key: OnboardingScreen.dockKey,
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 34),
-          decoration: const BoxDecoration(border: Border(top: BorderSide(color: QColors.borderFaint))),
+          decoration: const BoxDecoration(border: Border(top: BorderSide(color: QColors.borderSoft))),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -492,7 +492,7 @@ class _MacroBox extends StatelessWidget {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: QDecor.card(color: QColors.cardNavy, border: QColors.borderFaint, radius: QRadii.control),
+        decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.control),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
