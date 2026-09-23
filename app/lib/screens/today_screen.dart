@@ -345,40 +345,41 @@ class _NextMealCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = state.t;
     final nextMeal = meal;
-    return Explainable(
+    // The card lines up with the others; what the orb explains is the meal
+    // and its figure inside it.
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: QDecor.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(QText.eyebrowText(t.nextMeal, ar: state.isAr), style: QText.eyebrow(ar: state.isAr)),
+          const SizedBox(height: 6),
+          Explainable(
             id: 'next_meal',
             explanation: mealExplanation(nextMeal, iso: state.iso, digits: state.digits),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: QDecor.card(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(QText.eyebrowText(t.nextMeal, ar: state.isAr), style: QText.eyebrow(ar: state.isAr)),
-                  const SizedBox(height: 4),
-                  Text(state.isAr ? nextMeal.nameAr : nextMeal.nameEn,
-                      style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
-                  ExplainMark(
-                    child: Text(
-                      state.isAr
-                          ? 'حوالي ${state.iso('${mealKcal(nextMeal)}')} سعر'
-                          : 'About ${mealKcal(nextMeal)} kcal',
-                      style: QText.body(size: 15, color: QColors.inkSecondary),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(children: [
-                    // Only offered when the slot really has somewhere else to go.
-                    if (state.slotHasAlternative(nextMeal.id)) ...[
-                      QOutlineButton(label: t.swap, onTap: () => state.toggleSlotSwap(nextMeal.id), height: 36, icon: QIcons.swap),
-                      const SizedBox(width: 8),
-                    ],
-                    QOutlineButton(label: t.openPlan, onTap: () => state.go(AppScreen.plan), height: 36),
-                  ]),
-                ],
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(state.isAr ? nextMeal.nameAr : nextMeal.nameEn, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
+              ExplainMark(
+                child: Text(
+                  state.isAr ? 'حوالي ${state.iso('${mealKcal(nextMeal)}')} سعر' : 'About ${mealKcal(nextMeal)} kcal',
+                  style: QText.body(size: 15, color: QColors.inkSecondary),
+                ),
               ),
-            ),
-          );
+            ]),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            // Only offered when the slot really has somewhere else to go.
+            if (state.slotHasAlternative(nextMeal.id)) ...[
+              QOutlineButton(label: t.swap, onTap: () => state.toggleSlotSwap(nextMeal.id), height: 36, icon: QIcons.swap),
+              const SizedBox(width: 8),
+            ],
+            QOutlineButton(label: t.openPlan, onTap: () => state.go(AppScreen.plan), height: 36),
+          ]),
+        ],
+      ),
+    );
   }
 }
 
@@ -440,17 +441,19 @@ class _WaterCard extends StatelessWidget {
     final litres = WaterStatus.qty(w.litres);
     final left = WaterStatus.qty(w.litresLeft);
 
-    return Explainable(
-      id: 'water',
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: QDecor.card(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(QText.eyebrowText(isAr ? 'الماء' : 'Water', ar: isAr), style: QText.eyebrow(ar: isAr)),
-            const SizedBox(height: 8),
-            Row(
+    // The card lines up with the others; what the orb explains is the
+    // figure row inside it.
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: QDecor.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(QText.eyebrowText(isAr ? 'الماء' : 'Water', ar: isAr), style: QText.eyebrow(ar: isAr)),
+          const SizedBox(height: 8),
+          Explainable(
+            id: 'water',
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
@@ -464,46 +467,46 @@ class _WaterCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (state.fasting) ...[
-              const SizedBox(height: 8),
-              _HydrationLine(state: state),
-            ],
-            const SizedBox(height: 14),
-            QBar(value: w.progress),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _WaterAdd(
-                    label: isAr ? 'كوباية' : 'Glass',
-                    onTap: () => state.logWater(WaterUnit.glass),
-                  ),
+          ),
+          if (state.fasting) ...[
+            const SizedBox(height: 8),
+            _HydrationLine(state: state),
+          ],
+          const SizedBox(height: 14),
+          QBar(value: w.progress),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _WaterAdd(
+                  label: isAr ? 'كوباية' : 'Glass',
+                  onTap: () => state.logWater(WaterUnit.glass),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _WaterAdd(
-                    label: isAr ? 'زجاجة' : 'Bottle',
-                    onTap: () => state.logWater(WaterUnit.bottle),
-                  ),
-                ),
-              ],
-            ),
-            if (!w.isEmpty) ...[
-              const SizedBox(height: 4),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton(
-                  onPressed: state.undoWater,
-                  style: TextButton.styleFrom(minimumSize: const Size(QLayout.minTap, QLayout.minTap)),
-                  child: Text(
-                    isAr ? 'تراجع' : 'Undo',
-                    style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkSecondary),
-                  ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _WaterAdd(
+                  label: isAr ? 'زجاجة' : 'Bottle',
+                  onTap: () => state.logWater(WaterUnit.bottle),
                 ),
               ),
             ],
+          ),
+          if (!w.isEmpty) ...[
+            const SizedBox(height: 4),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                onPressed: state.undoWater,
+                style: TextButton.styleFrom(minimumSize: const Size(QLayout.minTap, QLayout.minTap)),
+                child: Text(
+                  isAr ? 'تراجع' : 'Undo',
+                  style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkSecondary),
+                ),
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
