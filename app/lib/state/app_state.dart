@@ -3757,12 +3757,19 @@ class AppState extends ChangeNotifier {
   /// The wall's turn in the conversation. Qamar+ comes first, every time
   /// (O13); under it, when [offerSu], this one question for Su; and the way
   /// that keeps what the person was doing ("Log it as a meal", O10).
+  /// Whether the wall's person is a member, as the server said when it
+  /// metered the use (the quota's plus) — the same answer the gateway's words
+  /// were chosen by — and the phone's entitlement only when it did not say.
+  /// A payment or a lapse the phone has not read yet cannot make the buttons
+  /// disagree with the words.
+  bool _memberAtWall(AiQuota q) => q.plus ?? plusActive;
+
   ChatTurn _wallTurn(AiQuotaException e, {required String words, required bool mealLog, required bool offerSu}) {
     final photo = e.quota.bucket == 'photo';
     // A member at their own question limit is not sold the Qamar+ they have:
     // the way on is the one that keeps what they were doing (O10), and the
     // gateway's words say to ask again in the morning.
-    if (!photo && plusActive) {
+    if (!photo && _memberAtWall(e.quota)) {
       final way = words.isEmpty
           ? ProblemAction(isAr ? 'رجوع للنهارده' : 'Back to Today', closeChat)
           : ProblemAction(isAr ? 'سجّلها كوجبة' : 'Log it as a meal', () => logTextAsMeal(words));
@@ -3819,7 +3826,7 @@ class AppState extends ChangeNotifier {
   bool get suQuestionOffered =>
       isBacked &&
       _walletRepo != null &&
-      !plusActive &&
+      !_memberAtWall(aiQuota) &&
       aiQuota.bucket == 'chat' &&
       aiQuota.exhausted &&
       aiQuota.extra == 0 &&

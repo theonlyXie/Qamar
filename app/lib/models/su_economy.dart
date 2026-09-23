@@ -109,12 +109,20 @@ class AiQuota {
   final int limit;
   final int extra;
   final int remaining;
+
+  /// Whether the server counted this against a member's limits: its own
+  /// answer, from the same call that metered the use (the gateway sends it
+  /// on every quota, the wall's 429 included). Null when it did not say.
+  /// The wall reads this before the phone's own entitlement, which can be
+  /// minutes stale around a payment or a lapse.
+  final bool? plus;
   const AiQuota({
     required this.bucket,
     required this.used,
     required this.limit,
     required this.extra,
     required this.remaining,
+    this.plus,
   });
 
   /// A fresh Lite day, before the server has said anything.
@@ -131,7 +139,7 @@ class AiQuota {
     final remaining = json['remaining'] is num
         ? (json['remaining'] as num).round()
         : (limit + extra - used).clamp(0, 1 << 30);
-    return AiQuota(bucket: bucket, used: used, limit: limit, extra: extra, remaining: remaining);
+    return AiQuota(bucket: bucket, used: used, limit: limit, extra: extra, remaining: remaining, plus: json['plus'] is bool ? json['plus'] as bool : null);
   }
 
   static int _int(Object? v, [int fallback = 0]) => v is num ? v.round() : fallback;
@@ -145,6 +153,7 @@ class AiQuota {
       limit: limit,
       extra: extra,
       remaining: (cap - next).clamp(0, cap),
+      plus: plus,
     );
   }
 
@@ -156,6 +165,7 @@ class AiQuota {
       limit: limit,
       extra: nextExtra,
       remaining: (limit + nextExtra - used).clamp(0, 1 << 30),
+      plus: plus,
     );
   }
 }

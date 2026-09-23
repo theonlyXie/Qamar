@@ -3604,6 +3604,64 @@ void main() {
       }
     });
 
+    test('just paid, not yet read by the phone: the server says member, so the buttons do too — no Qamar+, no Su', () async {
+      for (final lang in AppLang.values) {
+        final wallet = FakeWalletRepo()..stored = (available: 5000, lifetime: 5000);
+        final ai = FakeGateway()
+          ..quotas = const AiQuotas(
+            chat: AiQuota(bucket: 'chat', used: 50, limit: 50, extra: 0, remaining: 0, plus: true),
+            photo: AiQuota.emptyPhoto,
+            plan: AiQuota(bucket: 'plan', used: 0, limit: 3, extra: 0, remaining: 3),
+          );
+        // The phone's entitlement is still the free tier's.
+        final s = backed(wallet: wallet, ai: ai, billing: FakeBilling())..setLang(lang);
+        await settle();
+        expect(s.plusActive, isFalse);
+        s.openChat();
+        await s.sendChatMsg('is feteer ok before the gym?');
+        final wall = s.chat.last;
+        expect(wall.openPlus, isFalse, reason: 'the server counted a member: the words say ask again in the morning');
+        expect(wall.problem!.action.label, lang == AppLang.ar ? 'سجّلها كوجبة' : 'Log it as a meal');
+        expect(wall.problem!.secondary, isNull, reason: 'no Su button: 0067 would refuse a member the purchase');
+        expect(s.suQuestionOffered, isFalse);
+      }
+    });
+
+    test('just lapsed, not yet read by the phone: the server says free tier, so the wall offers Qamar+', () async {
+      final wallet = FakeWalletRepo()..stored = (available: 0, lifetime: 0);
+      final ai = FakeGateway()
+        ..quotas = const AiQuotas(
+          chat: AiQuota(bucket: 'chat', used: 3, limit: 3, extra: 0, remaining: 0, plus: false),
+          photo: AiQuota.emptyPhoto,
+          plan: AiQuota(bucket: 'plan', used: 0, limit: 3, extra: 0, remaining: 3),
+        );
+      final billing = FakeBilling()
+        ..current = PlusEntitlement(
+          status: 'active',
+          plan: 'monthly',
+          periodEnd: DateTime.now().toUtc().add(const Duration(days: 2)),
+          provider: 'paymob',
+        );
+      final s = backed(wallet: wallet, ai: ai, billing: billing)..setLang(AppLang.en);
+      await settle();
+      expect(s.plusActive, isTrue, reason: 'the phone still thinks member');
+      s.openChat();
+      await s.sendChatMsg('is feteer ok before the gym?');
+      final wall = s.chat.last;
+      expect(wall.openPlus, isTrue, reason: 'the words say "Qamar+ keeps the conversation going"; the button has to be there');
+      expect(wall.problem!.action.label, 'See Qamar+');
+      expect(wall.problem!.secondary!.label, 'Log it as a meal');
+    });
+
+    test('the server\'s plus survives the quota\'s parse, and is null when it is not sent', () {
+      expect(AiQuota.fromJson(const {'bucket': 'chat', 'used': 3, 'limit': 3, 'remaining': 0, 'plus': true}).plus, isTrue);
+      expect(AiQuota.fromJson(const {'bucket': 'chat', 'used': 3, 'limit': 3, 'remaining': 0, 'plus': false}).plus, isFalse);
+      expect(AiQuota.fromJson(const {'bucket': 'chat', 'used': 3, 'limit': 3, 'remaining': 0}).plus, isNull);
+      const q = AiQuota(bucket: 'chat', used: 3, limit: 3, extra: 0, remaining: 0, plus: false);
+      expect(q.withExtra(1).plus, isFalse);
+      expect(q.consumed().plus, isFalse);
+    });
+
     test('the price is the one the server charges', () async {
       final (:s, wallet: _, ai: _) = await atTheWall(price: 900);
       expect(s.chat.last.problem!.secondary!.label, 'Ask just this one for 900 Su');
