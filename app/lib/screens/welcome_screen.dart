@@ -81,7 +81,7 @@ class WelcomeScreen extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(t.brand, style: QText.display(size: 40, height: 48, color: const Color(0xFFF5F7FF))),
+              Text(t.brand, style: QText.display(size: 40, height: 48, color: QColors.textPrimary)),
               const SizedBox(height: 8),
               Text(t.promise, style: QText.body(size: 16, height: 24, color: QColors.textMid)),
             ],
@@ -95,7 +95,7 @@ class WelcomeScreen extends StatelessWidget {
                   const Expanded(child: Divider(color: QColors.borderFaint, height: 1)),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(t.continueWith, style: QText.body(size: 12, color: QColors.textFaint)),
+                    child: Text(t.continueWith, style: QText.body(size: 12, color: QColors.textMuted)),
                   ),
                   const Expanded(child: Divider(color: QColors.borderFaint, height: 1)),
                 ],
@@ -141,7 +141,7 @@ class WelcomeScreen extends StatelessWidget {
                   child: Text(
                     t.boundary,
                     textAlign: TextAlign.center,
-                    style: QText.body(size: 11, height: 17, color: QColors.textFaint),
+                    style: QText.body(size: 11, height: 17, color: QColors.textMuted),
                   ),
                 ),
               ),
@@ -167,7 +167,7 @@ Future<void> _askInvitationCode(BuildContext context, AppState state) async {
         textCapitalization: TextCapitalization.characters,
         textDirection: TextDirection.ltr,
         style: QText.number(size: 18, color: QColors.textHigh),
-        decoration: InputDecoration(hintText: 'QMR-XXXXX', hintStyle: QText.number(size: 18, color: QColors.textFaint)),
+        decoration: InputDecoration(hintText: 'QMR-XXXXX', hintStyle: QText.number(size: 18, color: QColors.textMuted)),
         onSubmitted: (v) => Navigator.of(ctx).pop(v),
       ),
       actions: [
@@ -205,7 +205,7 @@ class _FloatingPill extends StatelessWidget {
           constraints: BoxConstraints(maxWidth: maxWidth),
           padding: const EdgeInsets.symmetric(horizontal: 18),
           decoration: BoxDecoration(
-            color: emphasis ? const Color(0xD1141C2E) : const Color(0xDB111827),
+            color: QColors.glass,
             border: Border.all(color: emphasis ? QColors.violet.withOpacity(0.5) : QColors.borderSoft),
             // Lifted by its lighter fill and edge, not by a shadow: a black
             // shadow on a near-black ground drew a hard slab under the pill.
@@ -229,7 +229,7 @@ class _FloatingPill extends StatelessWidget {
                     Text(label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFF1F5FF))),
+                        style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
                     if (sub != null)
                       Text(sub!,
                           maxLines: 1,

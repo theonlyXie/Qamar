@@ -31,7 +31,7 @@ class HoldCoachMark extends StatelessWidget {
   const HoldCoachMark({super.key, required this.state});
 
   static const double width = 230;
-  static const _fill = Color(0xF2141C2E);
+  static const _fill = QColors.glass;
   static final _edge = QColors.violet.withValues(alpha: 0.55);
 
   /// The small point between the mark and the moon, its tip toward the moon:

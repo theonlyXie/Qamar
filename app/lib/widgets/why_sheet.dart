@@ -33,7 +33,7 @@ class WhySheet extends StatelessWidget {
       child: GestureDetector(
         onTap: state.closeWhy,
         child: Container(
-          color: const Color(0xB8050810),
+          color: QColors.scrim,
           alignment: Alignment.bottomCenter,
           child: GestureDetector(
             onTap: () {},
@@ -51,7 +51,7 @@ class WhySheet extends StatelessWidget {
                 children: [
                   Center(child: Container(width: 38, height: 4, decoration: BoxDecoration(color: QColors.borderStrong, borderRadius: BorderRadius.circular(999)))),
                   const SizedBox(height: 12),
-                  Text(t.whyTitle, style: QText.display(size: 26, height: 32, color: const Color(0xFFF5F7FF))),
+                  Text(t.whyTitle, style: QText.display(size: 26, height: 32, color: QColors.textPrimary)),
                   for (final r in rows) ...[
                     const SizedBox(height: 11),
                     const Divider(color: QColors.borderFaint, height: 1),

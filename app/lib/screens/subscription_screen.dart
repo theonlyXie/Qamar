@@ -118,7 +118,7 @@ class SubscriptionScreen extends StatelessWidget {
         Center(
           child: ShaderMask(
             shaderCallback: (r) => QColors.brandGradient.createShader(r),
-            child: Text('Qamar+', textDirection: TextDirection.ltr, style: QText.display(size: 34, height: 42, color: Colors.white)),
+            child: Text('Qamar+', textDirection: TextDirection.ltr, style: QText.display(size: 34, height: 42, color: QColors.textPrimary)),
           ),
         ),
         const SizedBox(height: 6),
@@ -178,7 +178,7 @@ class SubscriptionScreen extends StatelessWidget {
               : (isAr
                   ? 'لو أخصائي أو مدرّب بعتك، اكتب الكود هنا. السعر مش بيتغير — الكود بيربط خطتك بيه وبيديه نصيب من الاشتراك.'
                   : 'If a nutritionist or coach sent you, enter their code. The price does not change — the code links your plan to them and pays them a share.')),
-          style: QText.body(size: 12, height: 18, color: QColors.textFaint),
+          style: QText.body(size: 12, height: 18, color: QColors.textMuted),
         ),
         if (quote.promoError != null) ...[
           const SizedBox(height: 8),
@@ -249,7 +249,7 @@ class SubscriptionScreen extends StatelessWidget {
                 ? 'من غير بطاقة، ومفيش حاجة بتتجدد لوحدها: بعد ${state.iso('${AppState.trialOfferDays}')} أيام بترجع لقمر المجاني.'
                 : 'No card, and nothing renews on its own: after ${AppState.trialOfferDays} days you are simply back on the free Qamar.',
             textAlign: TextAlign.center,
-            style: QText.body(size: 11, height: 17, color: QColors.textFaint),
+            style: QText.body(size: 11, height: 17, color: QColors.textMuted),
           ),
           const SizedBox(height: 10),
         ],
@@ -274,16 +274,16 @@ class SubscriptionScreen extends StatelessWidget {
           '${paymentLine(isAr, quote.paymentMethods)} ${isAr ? 'نقاط Su مش بتتباع ومش بتتشحن بفلوس — بتتكسب بس. عمولة الأفلييت كاش بالجنيه، مش نقاط.' : 'Su Points are never sold or topped up with money — they are only earned. Affiliate commission is EGP cash, not Su.'}',
           key: SubscriptionScreen.paymentKey,
           textAlign: TextAlign.center,
-          style: QText.body(size: 11, height: 17, color: QColors.textFaint),
+          style: QText.body(size: 11, height: 17, color: QColors.textMuted),
         ),
         const SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             QLegalLink(label: isAr ? 'الشروط' : 'Terms', url: QamarConfig.termsUrl),
-            Text('  ·  ', style: QText.body(size: 11, color: QColors.textFaint)),
+            Text('  ·  ', style: QText.body(size: 11, color: QColors.textMuted)),
             QLegalLink(label: isAr ? 'الخصوصية' : 'Privacy', url: QamarConfig.privacyUrl),
-            Text('  ·  ', style: QText.body(size: 11, color: QColors.textFaint)),
+            Text('  ·  ', style: QText.body(size: 11, color: QColors.textMuted)),
             QLegalLink(label: isAr ? 'الدعم' : 'Support', url: QamarConfig.supportUrl),
           ],
         ),
@@ -327,7 +327,7 @@ class _PromoFieldState extends State<_PromoField> {
       style: QText.number(size: 15, color: QColors.textPrimary),
       decoration: InputDecoration(
         hintText: isAr ? 'QMR…' : 'QMR…',
-        hintStyle: QText.body(size: 14, color: QColors.textFaint),
+        hintStyle: QText.body(size: 14, color: QColors.textMuted),
         filled: true,
         fillColor: QColors.cardNavy,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -397,7 +397,7 @@ class _TierCard extends StatelessWidget {
               if (quote.discounted)
                 Text(
                   formatEgp(quote.listPounds, ar: isAr, eastern: state.easternDigits),
-                  style: QText.number(size: 11, color: QColors.textFaint).copyWith(
+                  style: QText.number(size: 11, color: QColors.textMuted).copyWith(
                     decoration: TextDecoration.lineThrough,
                   ),
                 ),
@@ -445,13 +445,13 @@ class _FeatureTable extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(isAr ? 'اللي بتاخده' : 'What you get',
-                    style: QText.body(size: 10, weight: FontWeight.w500, color: QColors.textFaint, letterSpacing: 0.5)),
+                    style: QText.body(size: 10, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.5)),
               ),
               SizedBox(
                 width: 52,
                 child: Text(isAr ? 'مجاني' : 'Free',
                     textAlign: TextAlign.center,
-                    style: QText.body(size: 10, weight: FontWeight.w500, color: QColors.textFaint)),
+                    style: QText.body(size: 10, weight: FontWeight.w500, color: QColors.textMuted)),
               ),
               SizedBox(
                 width: 52,
@@ -477,7 +477,7 @@ class _FeatureTable extends StatelessWidget {
                     child: Icon(
                       f.inFree ? Icons.check : Icons.remove,
                       size: 16,
-                      color: f.inFree ? QColors.green : QColors.textFaint,
+                      color: f.inFree ? QColors.green : QColors.textMuted,
                     ),
                   ),
                   const SizedBox(

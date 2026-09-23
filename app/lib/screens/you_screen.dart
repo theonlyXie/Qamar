@@ -52,7 +52,7 @@ class YouScreen extends StatelessWidget {
         Row(children: [
           QBackButton(onTap: state.back, isAr: isAr),
           const SizedBox(width: 6),
-          Expanded(child: Text(t.you, style: QText.display(size: 30, height: 38, color: const Color(0xFFF5F7FF)))),
+          Expanded(child: Text(t.you, style: QText.display(size: 30, height: 38, color: QColors.textPrimary))),
         ]),
         const SizedBox(height: 14),
         Container(
@@ -78,7 +78,7 @@ class YouScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(t.saveProgress, style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFE9ECFF))),
+                Text(t.saveProgress, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
                 const SizedBox(height: 4),
                 Text(t.saveProgressSub, style: QText.body(size: 13, height: 20, color: QColors.textMid)),
                 const SizedBox(height: 8),
@@ -92,7 +92,7 @@ class YouScreen extends StatelessWidget {
                       child: Ink(
                         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                         decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(999))),
-                        child: Text(t.linkAccount, style: QText.body(size: 13, weight: FontWeight.w600, color: Colors.white)),
+                        child: Text(t.linkAccount, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onAccent)),
                       ),
                     ),
                   ),
@@ -120,7 +120,7 @@ class YouScreen extends StatelessWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
-                      Text('Qamar+', textDirection: TextDirection.ltr, style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFE9ECFF))),
+                      Text('Qamar+', textDirection: TextDirection.ltr, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
                       if (state.plusActive) ...[
                         const SizedBox(width: 8),
                         Text(isAr ? 'مفعّل' : 'Active',
@@ -140,7 +140,7 @@ class YouScreen extends StatelessWidget {
                     ),
                   ]),
                 ),
-                const Icon(Icons.chevron_right, size: 20, color: QColors.textFaint),
+                const Icon(Icons.chevron_right, size: 20, color: QColors.textMuted),
               ]),
             ),
           ),
@@ -191,7 +191,7 @@ class YouScreen extends StatelessWidget {
                 isAr
                     ? 'سيري: «Ask Qamar» أو «Log a meal with Qamar». تسجيل الوجبة من الاختصار مجاناً ومش بيتعد. سؤال قمر بيتعد من التلات أسئلة اليومية.'
                     : 'Siri: “Ask Qamar” or “Log a meal with Qamar”. Logging a meal from a shortcut is free and never counted. Asking Qamar counts toward the daily three.',
-                style: QText.body(size: 12, height: 18, color: QColors.textFaint),
+                style: QText.body(size: 12, height: 18, color: QColors.textMuted),
               ),
             ],
           ),
@@ -205,14 +205,14 @@ class YouScreen extends StatelessWidget {
             const SizedBox(width: 14),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(t.walletTitle, style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFF2E4C6))),
+                Text(t.walletTitle, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.goldPale)),
                 // Lifetime earned keeps score (it is what Level is made of),
                 // so with "Points and streaks" off only the balance is said.
                 Text(
                   state.showScore
                       ? (isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح · ${state.iso(state.formatSu(state.suLifetime))} مكتسب' : '${state.formatSu(state.suAvailable)} available · ${state.formatSu(state.suLifetime)} lifetime')
                       : (isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح' : '${state.formatSu(state.suAvailable)} available'),
-                  style: QText.body(size: 12, color: const Color(0xFFB9A57C)),
+                  style: QText.body(size: 12, color: QColors.goldMuted),
                 ),
               ]),
             ),
@@ -265,7 +265,7 @@ class YouScreen extends StatelessWidget {
             decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(r.$1, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
-              Text(r.$2, style: QText.body(size: 13, color: QColors.textFaint)),
+              Text(r.$2, style: QText.body(size: 13, color: QColors.textMuted)),
             ]),
           ),
         ],
@@ -280,7 +280,7 @@ class YouScreen extends StatelessWidget {
                 style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
             Row(children: [
               QLegalLink(label: isAr ? 'الخصوصية' : 'Privacy', url: QamarConfig.privacyUrl, size: 12),
-              Text('  ·  ', style: QText.body(size: 12, color: QColors.textFaint)),
+              Text('  ·  ', style: QText.body(size: 12, color: QColors.textMuted)),
               QLegalLink(label: isAr ? 'الشروط' : 'Terms', url: QamarConfig.termsUrl, size: 12),
             ]),
           ]),
@@ -395,12 +395,12 @@ class YouScreen extends StatelessWidget {
                       margin: const EdgeInsets.only(left: 6),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: state.nudgesPerDay == n ? QColors.violet : Colors.transparent,
-                        border: Border.all(color: state.nudgesPerDay == n ? QColors.violet : QColors.borderSoft),
+                        color: state.nudgesPerDay == n ? QColors.violetDeep : Colors.transparent,
+                        border: Border.all(color: state.nudgesPerDay == n ? QColors.violetDeep : QColors.borderSoft),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(state.iso('$n'),
-                          style: QText.number(size: 13, weight: FontWeight.w600, color: state.nudgesPerDay == n ? Colors.white : QColors.textMuted)),
+                          style: QText.number(size: 13, weight: FontWeight.w600, color: state.nudgesPerDay == n ? QColors.onAccent : QColors.textMuted)),
                     ),
                   ),
                 ],
@@ -423,7 +423,7 @@ class YouScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Qamar+', textDirection: TextDirection.ltr, style: QText.display(size: 24, height: 30, color: const Color(0xFFF5F7FF))),
+              Text('Qamar+', textDirection: TextDirection.ltr, style: QText.display(size: 24, height: 30, color: QColors.textPrimary)),
               const SizedBox(height: 4),
               Text(t.plusSub, style: QText.body(size: 13, height: 20, color: QColors.textMid)),
               const SizedBox(height: 10),
@@ -436,7 +436,7 @@ class YouScreen extends StatelessWidget {
                     onTap: state.openSubscription,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
-                      decoration: BoxDecoration(color: const Color(0xFFF5F7FF), borderRadius: BorderRadius.circular(999)),
+                      decoration: BoxDecoration(color: QColors.textPrimary, borderRadius: BorderRadius.circular(999)),
                       child: Text(t.plusCta, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.cardNavy)),
                     ),
                   ),
@@ -450,7 +450,7 @@ class YouScreen extends StatelessWidget {
           child: Text(
             // In the language's own digits, like the consent version above.
             '${t.brand} ${state.iso(QamarConfig.buildLabel)}',
-            style: QText.number(size: 11, color: QColors.textFaint),
+            style: QText.number(size: 11, color: QColors.textMuted),
           ),
         ),
       ],
@@ -506,7 +506,7 @@ class _InvitationsCardState extends State<_InvitationsCard> {
             if (member)
               Text(
                 isAr ? 'باقي ${state.iso('$left')} من ${state.iso('${book.limit}')}' : '$left of ${book.limit} left',
-                style: QText.number(size: 12, color: left > 0 ? QColors.cyan : QColors.textFaint),
+                style: QText.number(size: 12, color: left > 0 ? QColors.cyan : QColors.textMuted),
               ),
           ]),
           const SizedBox(height: 4),
@@ -560,7 +560,7 @@ class _InvitationsCardState extends State<_InvitationsCard> {
                     decoration: InputDecoration(
                       isDense: true,
                       hintText: isAr ? 'اسم صاحبك' : 'Your friend’s name',
-                      hintStyle: QText.body(size: 14, color: QColors.textFaint),
+                      hintStyle: QText.body(size: 14, color: QColors.textMuted),
                       filled: true,
                       fillColor: QColors.cardMid,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -585,7 +585,7 @@ class _InvitationsCardState extends State<_InvitationsCard> {
             if (!state.isBacked) ...[
               const SizedBox(height: 10),
               Text(isAr ? 'اربط حسابك عشان تبعت دعوات.' : 'Link your account to send invitations.',
-                  style: QText.body(size: 12, color: QColors.textFaint)),
+                  style: QText.body(size: 12, color: QColors.textMuted)),
             ],
           ],
           if (state.invitationNotice != null) ...[
@@ -664,7 +664,7 @@ class _ProCodeCardState extends State<_ProCodeCard> {
                   decoration: InputDecoration(
                     isDense: true,
                     hintText: 'QMR…',
-                    hintStyle: QText.body(size: 14, color: QColors.textFaint),
+                    hintStyle: QText.body(size: 14, color: QColors.textMuted),
                     filled: true,
                     fillColor: QColors.cardMid,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -757,7 +757,7 @@ class _AffiliateCard extends StatelessWidget {
             isAr
                 ? '${formatEgp(wallet.balancePounds, ar: true, eastern: state.easternDigits)} متاح · ${formatEgp(wallet.lifetimeEarnedCents ~/ 100, ar: true, eastern: state.easternDigits)} مكتسب'
                 : '${formatEgp(wallet.balancePounds, ar: false)} available · ${formatEgp(wallet.lifetimeEarnedCents ~/ 100, ar: false)} earned',
-            style: QText.body(size: 12, color: QColors.textFaint),
+            style: QText.body(size: 12, color: QColors.textMuted),
           ),
           const SizedBox(height: 8),
           QOutlineButton(

@@ -50,7 +50,7 @@ class ReviewCard extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF141C3C), Color(0xFF0B1024)],
+            colors: [QColors.cardMid, QColors.cardNavy],
           ),
           borderRadius: BorderRadius.circular(28),
           border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
@@ -83,7 +83,7 @@ class ReviewCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         letters[review.days[i].day.weekday - 1],
-                        style: QText.number(size: 10, color: fills[i] == null ? QColors.textFaint : QColors.textMuted),
+                        style: QText.number(size: 10, color: fills[i] == null ? QColors.textMuted : QColors.textMid),
                       ),
                     ],
                   ),
@@ -92,7 +92,7 @@ class ReviewCard extends StatelessWidget {
             const SizedBox(height: 18),
             Text(
               isAr ? review.insight.ar : review.insight.en,
-              style: QText.body(size: 16, height: 24, weight: FontWeight.w600, color: const Color(0xFFF5F7FF)),
+              style: QText.body(size: 16, height: 24, weight: FontWeight.w600, color: QColors.textPrimary),
             ),
             const SizedBox(height: 8),
             Text(
@@ -119,7 +119,7 @@ class ReviewCard extends StatelessWidget {
                   )
                 else
                   const SizedBox.shrink(),
-                Text(footer, textDirection: TextDirection.ltr, style: QText.number(size: 10, color: QColors.textFaint)),
+                Text(footer, textDirection: TextDirection.ltr, style: QText.number(size: 10, color: QColors.textMuted)),
               ],
             ),
           ],

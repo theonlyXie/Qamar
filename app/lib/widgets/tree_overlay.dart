@@ -221,7 +221,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
               child: Container(
-                color: const Color(0xDC070C19),
+                color: QColors.bgBottom.withValues(alpha: 0.86),
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: QStateArea(child: GestureDetector(onTap: () {}, child: QStateCard(problem: problem))),
               ),
@@ -238,7 +238,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
             child: Container(
-              color: const Color(0xDC070C19),
+              color: QColors.bgBottom.withValues(alpha: 0.86),
               alignment: Alignment.center,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -258,7 +258,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                               builder: (context, _) => CustomPaint(painter: _BeamPainter(_c.value, beamAngles)),
                             ),
                           ),
-                          const Positioned(
+                          Positioned(
                             left: _canvas / 2 - 58,
                             top: _canvas / 2 - 58,
                             child: SizedBox(
@@ -267,7 +267,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  gradient: RadialGradient(colors: [Color(0x807B6CFF), Colors.transparent], stops: [0.0, 0.68]),
+                                  gradient: RadialGradient(colors: [QColors.violet.withValues(alpha: 0.5), Colors.transparent], stops: const [0.0, 0.68]),
                                 ),
                               ),
                             ),
@@ -378,7 +378,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                   ],
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 30),
-                    child: Text(hint, textAlign: TextAlign.center, style: QText.body(size: 12, color: QColors.textFaint)),
+                    child: Text(hint, textAlign: TextAlign.center, style: QText.body(size: 12, color: QColors.textMuted)),
                   ),
                 ],
               ),
@@ -549,7 +549,7 @@ class _RingButtonState extends State<_RingButton> with SingleTickerProviderState
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _down ? const Color(0xF21A2338) : const Color(0xEB141C2E),
+                        color: _down ? QColors.glassHigh : QColors.glass,
                         border: Border.all(color: color.withValues(alpha: 0.55)),
                         boxShadow: [BoxShadow(color: color.withValues(alpha: 0.22), blurRadius: 22)],
                       ),

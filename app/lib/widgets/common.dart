@@ -179,7 +179,7 @@ class QPrimaryButton extends StatelessWidget {
                 ),
           child: Text(label,
               textAlign: TextAlign.center,
-              style: QText.body(size: 16, weight: FontWeight.w600, color: enabled ? Colors.white : QDisabled.label)),
+              style: QText.body(size: 16, weight: FontWeight.w600, color: enabled ? QColors.onAccent : QDisabled.label)),
         ),
       ),
     );
@@ -378,7 +378,7 @@ class QPillChip extends StatelessWidget {
           border: Border.all(color: selected ? QColors.violet : QColors.borderSoft),
           borderRadius: BorderRadius.circular(QRadii.pill),
         ),
-        child: Text(label, style: QText.body(size: 14, weight: FontWeight.w500, color: selected ? QColors.textBrand : QColors.textMid)),
+        child: Text(label, style: QText.body(size: 14, weight: FontWeight.w500, color: selected ? QColors.textPrimary : QColors.textMid)),
       ),
     );
   }
@@ -722,7 +722,7 @@ class _Segment extends StatelessWidget {
             style: QText.body(
               size: large ? 13 : 12,
               weight: FontWeight.w600,
-              color: selected ? Colors.white : QColors.textMuted,
+              color: selected ? QColors.onAccent : QColors.textMuted,
             ),
           ),
         ),

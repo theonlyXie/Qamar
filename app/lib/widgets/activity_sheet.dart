@@ -30,7 +30,7 @@ class ActivitySheet extends StatelessWidget {
           child: GestureDetector(
             onTap: state.cancelActivity,
             child: Container(
-              color: const Color(0xC7050810),
+              color: QColors.scrim,
               alignment: Alignment.bottomCenter,
               child: GestureDetector(
                 onTap: () {},
@@ -38,7 +38,7 @@ class ActivitySheet extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
                   decoration: const BoxDecoration(
-                    gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xF7141C2E), Color(0xFF0A0F1A)]),
+                    gradient: QColors.sheet,
                     border: Border(top: BorderSide(color: QColors.borderStrong)),
                     borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
                   ),

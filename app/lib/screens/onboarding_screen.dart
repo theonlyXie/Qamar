@@ -86,7 +86,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(t.brand, style: QText.display(size: 20, height: 24, color: const Color(0xFFF5F7FF))),
+                    Text(t.brand, style: QText.display(size: 20, height: 24, color: QColors.textPrimary)),
                     Text('${t.obSub} · ${state.iso('${(state.step + 1).clamp(1, kOnboardingSteps.length)}/${kOnboardingSteps.length}')}',
                         maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 11, color: QColors.textMuted)),
                   ],
@@ -239,7 +239,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               : step != null
                                   ? (state.isAr ? 'اكتب ردك بكلامك…' : 'Or just type your answer…')
                                   : (state.isAr ? 'اسأل قمر أي حاجة…' : 'Ask Qamar anything…'),
-                          hintStyle: QText.body(size: 15, color: QColors.textFaint),
+                          hintStyle: QText.body(size: 15, color: QColors.textMuted),
                           filled: true,
                           fillColor: QColors.cardDeep,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -267,7 +267,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             key: OnboardingScreen.sendKey,
                             customBorder: const CircleBorder(),
                             onTap: step != null && !asked ? null : state.sendDraft,
-                            child: const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
+                            child: const Icon(Icons.arrow_upward, color: QColors.onAccent, size: 20),
                           ),
                         ),
                       ),
@@ -387,7 +387,7 @@ class _MessageBubble extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.circular(18)),
-              child: Text(msg.text(isAr), style: QText.body(size: 15, height: 23, color: Colors.white)),
+              child: Text(msg.text(isAr), style: QText.body(size: 15, height: 23, color: QColors.onAccent)),
             ),
           ),
         );
@@ -456,7 +456,7 @@ class _TargetCard extends StatelessWidget {
               children: [
                 ShaderMask(
                   shaderCallback: (r) => QColors.blueCyanGradient.createShader(r),
-                  child: Text(state.digits('${tg.kcal}'), style: QText.number(size: 36, weight: FontWeight.w600, color: Colors.white)),
+                  child: Text(state.digits('${tg.kcal}'), style: QText.number(size: 36, weight: FontWeight.w600, color: QColors.textPrimary)),
                 ),
                 const SizedBox(width: 8),
                 Text(t.kcalDay, style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
@@ -529,7 +529,7 @@ class _TrialOfferCard extends StatelessWidget {
           children: [
             Text(
               isAr ? '${state.iso('$days')} أيام من قمر كامل.' : '$days days of the full Qamar.',
-              style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFE9ECFF)),
+              style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh),
             ),
             const SizedBox(height: 4),
             Text(
@@ -549,7 +549,7 @@ class _TrialOfferCard extends StatelessWidget {
                     child: Ink(
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                       decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(999))),
-                      child: Text(isAr ? 'ابدأ' : 'Start', style: QText.body(size: 13, weight: FontWeight.w600, color: Colors.white)),
+                      child: Text(isAr ? 'ابدأ' : 'Start', style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onAccent)),
                     ),
                   ),
                 ),
@@ -586,7 +586,7 @@ class _SaveCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(t.saveTitle, style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFE9ECFF))),
+            Text(t.saveTitle, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
             const SizedBox(height: 4),
             Text(t.saveSub, style: QText.body(size: 13, height: 20, color: QColors.textMid)),
             const SizedBox(height: 8),
@@ -600,7 +600,7 @@ class _SaveCard extends StatelessWidget {
                     child: Ink(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(999))),
-                      child: Text(t.saveNow, style: QText.body(size: 12, weight: FontWeight.w600, color: Colors.white)),
+                      child: Text(t.saveNow, style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.onAccent)),
                     ),
                   ),
                 ),

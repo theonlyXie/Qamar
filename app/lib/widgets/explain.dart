@@ -297,7 +297,7 @@ class ExplainMark extends StatelessWidget {
   final Widget child;
   const ExplainMark({super.key, required this.child});
 
-  static const color = Color(0xB3A78BFA); // violetSoft at 70%
+  static final color = QColors.violetSoft.withValues(alpha: 0.7);
 
   @override
   Widget build(BuildContext context) {
@@ -342,7 +342,7 @@ class ExplainSheet extends StatelessWidget {
       child: GestureDetector(
         onTap: state.closeExplain,
         child: Container(
-          color: const Color(0xB8050810),
+          color: QColors.scrim,
           alignment: Alignment.bottomCenter,
           child: GestureDetector(
             onTap: () {},
@@ -376,7 +376,7 @@ class ExplainSheet extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(isAr ? ex.titleAr : ex.titleEn,
-                                style: QText.display(size: 22, height: 28, color: const Color(0xFFF5F7FF))),
+                                style: QText.display(size: 22, height: 28, color: QColors.textPrimary)),
                             const SizedBox(height: 6),
                             Text(isAr ? ex.bodyAr : ex.bodyEn,
                                 style: QText.body(size: 14, height: 22, color: QColors.textHigh)),

@@ -51,7 +51,7 @@ class RamadanScreen extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(state.digits(season.name(isAr)), style: QText.display(size: 30, height: 38, color: const Color(0xFFF5F7FF))),
+              Text(state.digits(season.name(isAr)), style: QText.display(size: 30, height: 38, color: QColors.textPrimary)),
               Text(subtitle, style: QText.body(size: 14, height: 22, color: QColors.textMuted)),
             ]),
           ),
@@ -106,7 +106,7 @@ class RamadanScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Row(children: [
-                  Icon(open == w ? Icons.water_drop : Icons.water_drop_outlined, size: 14, color: open == w ? QColors.cyan : QColors.textFaint),
+                  Icon(open == w ? Icons.water_drop : Icons.water_drop_outlined, size: 14, color: open == w ? QColors.cyan : QColors.textMuted),
                   const SizedBox(width: 8),
                   Expanded(child: Text(w.label(isAr), style: QText.body(size: 13, color: open == w ? QColors.textHigh : QColors.textMid))),
                   Text(
@@ -132,12 +132,12 @@ class RamadanScreen extends StatelessWidget {
                 isAr
                     ? 'سجّلت ${state.iso('${state.seasonDaysLogged}')} يوم من ${state.iso('${season.days}')}'
                     : 'Logged ${state.seasonDaysLogged} of ${season.days} days',
-                style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFF2E4C6)),
+                style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.goldPale),
               ),
               const SizedBox(height: 4),
               Text(
                 isAr ? 'وجبة واحدة كل يوم من الشهر — ${state.suAmount(500)} لما يكمّل.' : 'One meal logged every day of the month — ${state.suAmount(500)} when it is complete.',
-                style: QText.body(size: 12, height: 18, color: const Color(0xFFB9A57C)),
+                style: QText.body(size: 12, height: 18, color: QColors.goldMuted),
               ),
               const SizedBox(height: 10),
               ClipRRect(
@@ -173,7 +173,7 @@ class _TimeCell extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: QText.body(size: 12, color: QColors.textMuted)),
       Text(time, textDirection: TextDirection.ltr, style: QText.number(size: 26, weight: FontWeight.w600, color: QColors.textPrimary)),
-      Text(sub, style: QText.body(size: 11, color: QColors.textFaint)),
+      Text(sub, style: QText.body(size: 11, color: QColors.textMuted)),
     ]);
   }
 }

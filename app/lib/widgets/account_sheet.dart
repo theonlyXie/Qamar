@@ -88,14 +88,14 @@ class _ProviderButton extends StatelessWidget {
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(icon, size: 20, color: enabled ? QColors.textHigh : QColors.textFaint),
+                  Icon(icon, size: 20, color: enabled ? QColors.textHigh : QColors.textDisabled),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: QText.body(size: 13, weight: FontWeight.w600, color: enabled ? QColors.textHigh : QColors.textFaint),
+                      style: QText.body(size: 13, weight: FontWeight.w600, color: enabled ? QColors.textHigh : QColors.textDisabled),
                     ),
                   ),
                 ],
@@ -140,7 +140,7 @@ class _AccountSheetState extends State<AccountSheet> {
           child: GestureDetector(
             onTap: state.closeAuth,
             child: Container(
-              color: const Color(0xC7050810),
+              color: QColors.scrim,
               alignment: Alignment.bottomCenter,
               child: GestureDetector(
                 onTap: () {},
@@ -148,7 +148,7 @@ class _AccountSheetState extends State<AccountSheet> {
                   width: double.infinity,
                   padding: EdgeInsets.fromLTRB(20, 18, 20, 24 + MediaQuery.of(context).viewInsets.bottom),
                   decoration: const BoxDecoration(
-                    gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xF7141C2E), Color(0xFF0A0F1A)]),
+                    gradient: QColors.sheet,
                     border: Border(top: BorderSide(color: QColors.borderStrong)),
                     borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
                   ),
@@ -173,7 +173,7 @@ class _AccountSheetState extends State<AccountSheet> {
 
     if (state.authDone != null) {
       return [
-        Text(title, style: QText.display(size: 24, height: 30, color: const Color(0xFFF5F7FF))),
+        Text(title, style: QText.display(size: 24, height: 30, color: QColors.textPrimary)),
         const SizedBox(height: 10),
         Text(state.authDone!, style: QText.body(size: 14, height: 22, color: QColors.textHigh)),
         const SizedBox(height: 16),
@@ -184,7 +184,7 @@ class _AccountSheetState extends State<AccountSheet> {
     return [
       Row(
         children: [
-          Expanded(child: Text(title, style: QText.display(size: 24, height: 30, color: const Color(0xFFF5F7FF)))),
+          Expanded(child: Text(title, style: QText.display(size: 24, height: 30, color: QColors.textPrimary))),
           QRoundIconButton(icon: Icons.close, onTap: state.closeAuth, size: 34, label: state.isAr ? 'اقفل' : 'Close'),
         ],
       ),
@@ -210,7 +210,7 @@ class _AccountSheetState extends State<AccountSheet> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(isAr ? 'أو بالإيميل' : 'or with email',
-                style: QText.body(size: 12, color: QColors.textFaint)),
+                style: QText.body(size: 12, color: QColors.textMuted)),
           ),
           const Expanded(child: Divider(color: QColors.borderFaint, height: 1)),
         ],
@@ -297,7 +297,7 @@ class _Field extends StatelessWidget {
       style: QText.number(size: 15, color: QColors.textPrimary),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: QText.body(size: 14, color: QColors.textFaint),
+        hintStyle: QText.body(size: 14, color: QColors.textMuted),
         filled: true,
         fillColor: QColors.cardNavy,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),

@@ -111,7 +111,7 @@ class OrbGestureGuide extends StatelessWidget {
             isAr
                 ? 'الكتابة والصوت ببلاش على طول. الصور ${state.iso('$photos')} في اليوم.'
                 : 'Typing and speaking are always free. Photos, $photos a day.',
-            style: QText.body(size: 11, height: 16, color: QColors.textFaint),
+            style: QText.body(size: 11, height: 16, color: QColors.textMuted),
           ),
         ],
       ),

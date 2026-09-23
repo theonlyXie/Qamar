@@ -60,6 +60,10 @@ class LivingOrb extends StatefulWidget {
 }
 
 class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
+  /// The halo: cool on an ordinary day, warm (never red) on one that ran over.
+  static final _coolHalo = [QColors.violet.withValues(alpha: 0.55), QColors.blue.withValues(alpha: 0.12), Colors.transparent];
+  static final _warmHalo = [QColors.ember.withValues(alpha: 0.55), QColors.emberDeep.withValues(alpha: 0.12), Colors.transparent];
+
   late final AnimationController _breath =
       AnimationController(vsync: this, duration: widget.breathDuration)..repeat(reverse: true);
   late final AnimationController _halo =
@@ -111,9 +115,7 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
         // A day with nothing in it glows faintly; a full one, fully.
         final glowBase = day == null ? 0.32 : 0.16 + 0.24 * day.glow;
         final haloOpacity = (glowBase + 0.40 * haloT + (widget.speaking ? 0.2 : 0.0)).clamp(0.0, 1.0);
-        final haloColors = day?.over == true
-            ? const [Color(0x8CFFB36C), Color(0x1FFF7C4F), Colors.transparent]
-            : const [Color(0x8C7B6CFF), Color(0x1F4F7CFF), Colors.transparent];
+        final haloColors = day?.over == true ? _warmHalo : _coolHalo;
         final offset = widget.wander ? Offset(_wanderOffset.value.dx * s * widget.reach, _wanderOffset.value.dy * s * widget.reach) : Offset.zero;
 
         return Transform.translate(
@@ -190,7 +192,7 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
     return [
       _OrbitingSpark(key: LivingOrb.sparkKey(0), controller: _wander, radius: s * 0.62 * widget.reach, period: 1.0, size: 6, color: QColors.cyan),
       _OrbitingSpark(key: LivingOrb.sparkKey(1), controller: _wander, radius: s * 0.48 * widget.reach, period: 1.55, size: 4, color: QColors.violetSoft),
-      _OrbitingSpark(key: LivingOrb.sparkKey(2), controller: _wander, radius: s * 0.75 * widget.reach, period: 0.7, size: 3, color: QColors.textBrand),
+      _OrbitingSpark(key: LivingOrb.sparkKey(2), controller: _wander, radius: s * 0.75 * widget.reach, period: 0.7, size: 3, color: QColors.textPrimary),
     ];
   }
 
@@ -297,7 +299,7 @@ class StreakRingPainter extends CustomPainter {
   }
 
   static Color colorFor(int count) {
-    if (count >= daysPerTurn) return const Color(0xFFF2C56B);
+    if (count >= daysPerTurn) return QColors.gold;
     if (count >= 3) return QColors.cyan;
     return QColors.violet;
   }

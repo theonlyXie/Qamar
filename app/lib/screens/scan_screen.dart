@@ -87,7 +87,7 @@ class _ScanScreenState extends State<ScanScreen> {
                 alignment: Alignment.center,
                 children: [
                   Container(
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), color: const Color(0xFF0D131F)),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), color: QColors.cardNavy),
                   ),
                   // Once a shot is taken, show it in the frame so the user can
                   // see what Qamar is reading.
@@ -119,14 +119,14 @@ class _ScanScreenState extends State<ScanScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(_busy ? Icons.hourglass_empty : Icons.photo_camera_outlined,
-                              size: 34, color: QColors.textFaint),
+                              size: 34, color: QColors.textMuted),
                           const SizedBox(height: 10),
                           Text(
                             _busy
                                 ? (isAr ? 'بفتح الكاميرا…' : 'Opening the camera…')
                                 : (isAr ? 'اضغط الزرار عشان تفتح الكاميرا وتصوّر تقرير InBody' : 'Tap the button to open the camera and photograph your InBody report'),
                             textAlign: TextAlign.center,
-                            style: QText.body(size: 13, height: 20, color: QColors.textFaint),
+                            style: QText.body(size: 13, height: 20, color: QColors.textMuted),
                           ),
                         ],
                       ),
@@ -144,7 +144,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(22),
                       child: Container(
-                        color: const Color(0xD1050810),
+                        color: QColors.scrim,
                         alignment: Alignment.center,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -193,7 +193,7 @@ class _ScanScreenState extends State<ScanScreen> {
                         ),
                         child: Icon(
                           _busy ? Icons.more_horiz : Icons.photo_camera,
-                          color: Colors.white.withValues(alpha: 0.92),
+                          color: QColors.onAccent.withValues(alpha: 0.92),
                           size: 26,
                         ),
                       ),
@@ -212,7 +212,7 @@ class _ScanScreenState extends State<ScanScreen> {
                   onPressed: state.startOnboarding,
                   child: Text(t.typeInstead, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textMuted)),
                 ),
-                Text(t.scanPriv, textAlign: TextAlign.center, style: QText.body(size: 11, height: 16, color: QColors.textFaint)),
+                Text(t.scanPriv, textAlign: TextAlign.center, style: QText.body(size: 11, height: 16, color: QColors.textMuted)),
               ],
             ),
           ),
@@ -245,7 +245,7 @@ class _CircleAction extends StatelessWidget {
               color: QColors.cardDeep,
               border: Border.all(color: QColors.borderSoft),
             ),
-            child: Icon(icon, size: 20, color: onTap == null ? QColors.textFaint : QColors.textMid),
+            child: Icon(icon, size: 20, color: onTap == null ? QColors.textDisabled : QColors.textMid),
           ),
         ),
       ),

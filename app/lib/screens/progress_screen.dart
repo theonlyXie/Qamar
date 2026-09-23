@@ -55,7 +55,7 @@ class ProgressScreen extends StatelessWidget {
         Row(children: [
           QBackButton(onTap: state.back, isAr: isAr),
           const SizedBox(width: 6),
-          Expanded(child: Text(t.progress, style: QText.display(size: 30, height: 38, color: const Color(0xFFF5F7FF)))),
+          Expanded(child: Text(t.progress, style: QText.display(size: 30, height: 38, color: QColors.textPrimary))),
         ]),
         const SizedBox(height: 4),
         Text(t.progressSub, style: QText.body(size: 14, height: 22, color: QColors.textMuted)),
@@ -70,7 +70,7 @@ class ProgressScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               decoration: QDecor.card(
                 gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
-                border: (streak.current > 0 ? QColors.violet : QColors.textFaint).withValues(alpha: 0.4),
+                border: streak.current > 0 ? QColors.violet.withValues(alpha: 0.4) : QColors.borderSoft,
                 radius: QRadii.xl,
               ),
               child: Row(
@@ -98,7 +98,7 @@ class ProgressScreen extends StatelessWidget {
                           isAr
                               ? 'أطول سلسلة ${state.iso('${streak.best}')} · تجميد متاح: ${state.iso('${streak.freezesAvailable}')}'
                               : 'best ${streak.best} · freezes available: ${streak.freezesAvailable}',
-                          style: QText.number(size: 10, color: QColors.textFaint),
+                          style: QText.number(size: 10, color: QColors.textMuted),
                         ),
                       ],
                     ),
@@ -106,7 +106,7 @@ class ProgressScreen extends StatelessWidget {
                   const SizedBox(width: 12),
                   Text(
                     state.iso('${streak.current}'),
-                    style: QText.display(size: 34, height: 38, color: streak.current > 0 ? QColors.textHigh : QColors.textFaint),
+                    style: QText.display(size: 34, height: 38, color: streak.current > 0 ? QColors.textHigh : QColors.textMuted),
                   ),
                 ],
               ),
@@ -120,7 +120,7 @@ class ProgressScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: QDecor.card(
             color: QColors.cardDeep,
-            border: (active > 0 ? QColors.green : QColors.textFaint).withValues(alpha: 0.4),
+            border: active > 0 ? QColors.green.withValues(alpha: 0.4) : QColors.borderSoft,
             radius: QRadii.xl,
           ),
           child: Column(
@@ -151,7 +151,7 @@ class ProgressScreen extends StatelessWidget {
                 children: [
                   Text(t.activeDays, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
                   // No target is set on the general-guidance route, so none is named.
-                  if (!state.generalGuidance) Text(isAr ? 'الهدف ${state.iso('$target')}' : 'target $target', style: QText.number(size: 10, color: QColors.textFaint)),
+                  if (!state.generalGuidance) Text(isAr ? 'الهدف ${state.iso('$target')}' : 'target $target', style: QText.number(size: 10, color: QColors.textMuted)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -186,7 +186,7 @@ class ProgressScreen extends StatelessWidget {
                     child: Text(
                       isAr ? 'محتاج قياسين على الأقل قبل ما أرسم اتجاه.' : 'A trend needs at least two readings.',
                       textAlign: TextAlign.center,
-                      style: QText.body(size: 13, height: 20, color: QColors.textFaint),
+                      style: QText.body(size: 13, height: 20, color: QColors.textMuted),
                     ),
                   ),
                 )
@@ -282,14 +282,14 @@ class _DayBar extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
                   gradient: empty ? null : const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [QColors.cyan, QColors.blue]),
-                  color: empty ? QColors.textFaint.withValues(alpha: 0.25) : null,
+                  color: empty ? QColors.borderSoft : null,
                 ),
               ),
             ),
           ),
         ),
         const SizedBox(height: 6),
-        Text(letter, style: QText.number(size: 10, color: empty ? QColors.textFaint : QColors.textMuted)),
+        Text(letter, style: QText.number(size: 10, color: empty ? QColors.textMuted : QColors.textMid)),
       ],
     );
   }
@@ -424,7 +424,7 @@ class _ShareableReviewState extends State<_ShareableReview> {
         ),
         Text(
           isAr ? 'الكارت من غير وزن أبداً، ومن غير سعرات إلا لو فتحت الأرقام.' : 'Never your weight; calories only if you turn numbers on.',
-          style: QText.body(size: 11, color: QColors.textFaint),
+          style: QText.body(size: 11, color: QColors.textMuted),
         ),
       ],
     );

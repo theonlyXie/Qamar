@@ -47,7 +47,7 @@ class _PlanScreenState extends State<PlanScreen> {
       Row(children: [
         QBackButton(onTap: state.back, isAr: state.isAr),
         const SizedBox(width: 6),
-        Expanded(child: Text(t.plan, style: QText.display(size: 30, height: 38, color: const Color(0xFFF5F7FF)))),
+        Expanded(child: Text(t.plan, style: QText.display(size: 30, height: 38, color: QColors.textPrimary))),
       ]),
       const SizedBox(height: 4),
       Text(t.planSub, style: QText.body(size: 14, height: 22, color: QColors.textMuted)),
@@ -139,7 +139,7 @@ class _DayChanged extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(t.dayChanged, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textBrand)),
+          Text(t.dayChanged, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textPrimary)),
           const SizedBox(height: 4),
           // Drawn as a 40pt pill, touched across 48 (O11).
           QTapArea(
@@ -152,7 +152,7 @@ class _DayChanged extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 alignment: Alignment.center,
                 decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),
-                child: Text(t.adjustRoute, style: QText.body(size: 13, weight: FontWeight.w600, color: Colors.white)),
+                child: Text(t.adjustRoute, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onAccent)),
               ),
             ),
           ),
@@ -247,7 +247,7 @@ class _DayTotal extends StatelessWidget {
                 style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.cyan)),
           ),
           const SizedBox(width: 8),
-          Text('· $vsTarget', style: QText.body(size: 11, color: QColors.textFaint)),
+          Text('· $vsTarget', style: QText.body(size: 11, color: QColors.textMuted)),
         ],
       ),
     );
@@ -292,7 +292,7 @@ class _MealCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(isAr ? 'المقادير' : 'Portions',
-                        style: QText.body(size: 10, weight: FontWeight.w500, color: QColors.textFaint, letterSpacing: 0.5)),
+                        style: QText.body(size: 10, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.5)),
                   ],
                 ),
                 const SizedBox(height: 6),

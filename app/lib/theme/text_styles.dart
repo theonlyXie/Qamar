@@ -22,7 +22,7 @@ class QText {
     required double size,
     double? height,
     FontWeight weight = FontWeight.w300,
-    Color color = QColors.textBrand,
+    Color color = QColors.textPrimary,
     double? letterSpacing,
   }) =>
       TextStyle(

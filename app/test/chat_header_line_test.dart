@@ -1,8 +1,9 @@
 // The conversation header's line (O8), seat 6's part: the line keeps its
 // height when it has nothing to say, so Qamar's name never jumps as a status
 // comes and goes; it is set at 12pt; and the quota is drawn in textMuted,
-// which passes AA on the conversation's ground where textFaint did not. What
-// the line says, and when, is seat 2's (conversation_header_test.dart).
+// which passes AA on the conversation's ground where the old faint grey did
+// not. What the line says, and when, is seat 2's
+// (conversation_header_test.dart).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,8 +27,8 @@ class _Ai implements AiGateway {
 AiQuota _chat(int remaining) => AiQuota(bucket: 'chat', used: 3 - remaining, limit: 3, extra: 0, remaining: remaining);
 
 /// The conversation's ground under the header (ask_qamar_overlay's scrim
-/// top, over the app's darkest background).
-const _ground = Color(0xFF0A0F1C);
+/// top, cardNavy at 95%, over the app's darkest background).
+final _ground = over(QColors.cardNavy.withValues(alpha: 0.95), QColors.bgBottom);
 
 void main() {
   setUpAll(loadAppFonts);

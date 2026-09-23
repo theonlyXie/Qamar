@@ -29,13 +29,13 @@ import 'common.dart';
 /// Motion follows the same rule: short, critically damped, never decorative.
 /// Everything here honours the platform's reduce-motion setting by falling back
 /// to a plain cross-fade.
-const _scrimTop = Color(0xF20A0F1C);
-const _scrimBottom = Color(0xFA060A14);
+final _scrimTop = QColors.cardNavy.withValues(alpha: 0.95);
+final _scrimBottom = QColors.bgBottom.withValues(alpha: 0.98);
 
 /// The composer and the user's own words sit on the one surface that is a step
 /// lighter than the sheet — enough to separate, not enough to shout.
-const _raised = Color(0xE60E1526);
-const _userBubble = Color(0xF21B2440);
+final _raised = QColors.cardSlate.withValues(alpha: 0.9);
+const _userBubble = QColors.glassHigh;
 
 /// How long anything in this overlay is allowed to take.
 const _enter = Duration(milliseconds: 240);
@@ -92,7 +92,7 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
           child: FadeTransition(
             opacity: CurvedAnimation(parent: _in, curve: Curves.easeOut),
             child: DecoratedBox(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [_scrimTop, _scrimBottom]),
               ),
               child: AnimatedBuilder(
@@ -131,8 +131,9 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 22),
                       // A fade where the conversation meets the composer, in
                       // place of a rule across the screen.
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x00060A14), Color(0xE6060A14)]),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                            begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [QColors.bgBottom.withValues(alpha: 0), QColors.bgBottom.withValues(alpha: 0.9)]),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -218,7 +219,7 @@ class _Header extends StatelessWidget {
     final quota = state.quotaLine;
     final line = heard.isNotEmpty ? heard : quota;
     // The quota is read, not glanced past: textMuted passes AA on the
-    // conversation's ground where textFaint did not (O8).
+    // conversation's ground where the old faint grey did not (O8).
     final colour = state.dictationError != null
         ? QColors.red
         : heard.isNotEmpty
@@ -237,7 +238,7 @@ class _Header extends StatelessWidget {
               children: [
                 // Large text reads too loose at its default tracking; the brand
                 // is the one place in this overlay that needs tightening.
-                Text(t.brand, style: QText.display(size: 19, height: 23, weight: FontWeight.w400, letterSpacing: -0.3, color: QColors.textBrand)),
+                Text(t.brand, style: QText.display(size: 19, height: 23, weight: FontWeight.w400, letterSpacing: -0.3, color: QColors.textPrimary)),
                 // The line keeps its height when it has nothing to say, so
                 // the name never jumps as a status comes and goes (O8).
                 SizedBox(
@@ -443,7 +444,8 @@ class _EndFade extends StatelessWidget {
       shaderCallback: (r) => LinearGradient(
         begin: rtl ? Alignment.centerRight : Alignment.centerLeft,
         end: rtl ? Alignment.centerLeft : Alignment.centerRight,
-        colors: const [Color(0xFFFFFFFF), Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+        // Only a dstIn mask's alpha counts: whole, whole, gone.
+        colors: const [QColors.bgBottom, QColors.bgBottom, Colors.transparent],
         stops: [0, 1 - fade / r.width, 1],
       ).createShader(r),
       child: child,
@@ -483,7 +485,7 @@ class _Composer extends StatelessWidget {
                 style: QText.body(size: 15.5, height: 21, color: QColors.textPrimary),
                 decoration: InputDecoration(
                   hintText: placeholder,
-                  hintStyle: QText.body(size: 15.5, height: 21, color: QColors.textFaint),
+                  hintStyle: QText.body(size: 15.5, height: 21, color: QColors.textMuted),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: (QLayout.minTap - 21) / 2 + 0.5),
@@ -589,7 +591,7 @@ class _Chip extends StatelessWidget {
         child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: pressed ? QColors.cardMid : (emphasis ? const Color(0x1AA78BFA) : _raised),
+          color: pressed ? QColors.cardMid : (emphasis ? QColors.violetSoft.withValues(alpha: 0.1) : _raised),
           border: Border.all(color: emphasis ? QColors.violetSoft.withValues(alpha: 0.4) : QColors.borderSoft),
           borderRadius: BorderRadius.circular(QRadii.pill),
         ),
@@ -698,7 +700,7 @@ Widget _photoThumb(String path, double size) {
       width: size,
       height: size,
       child: const DecoratedBox(
-        decoration: BoxDecoration(color: Color(0xFF182137)),
+        decoration: BoxDecoration(color: QColors.cardMid),
         child: Icon(Icons.photo_camera_outlined, size: 16, color: QColors.textMuted),
       ),
     ),

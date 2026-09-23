@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../theme/colors.dart';
 
 /// The Qamar moon, drawn rather than photographed.
 ///
@@ -325,7 +326,7 @@ class _MoonPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = math.max(1.0, r * 0.05)
-        ..color = const Color(0xFF7B6CFF).withValues(alpha: 0.16)
+        ..color = QColors.violet.withValues(alpha: 0.16)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * 0.09),
     );
   }

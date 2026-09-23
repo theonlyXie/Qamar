@@ -367,7 +367,7 @@ class OrbBandFade extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const IgnorePointer(
+    return IgnorePointer(
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -376,8 +376,8 @@ class OrbBandFade extends StatelessWidget {
             // From clear, where the page's last line comes to rest, to near
             // solid across the band itself, so the orb always sits on a calm
             // ground and what scrolls under it reads as behind.
-            colors: [Color(0x00070C19), Color(0xB8070C19), Color(0xEB070C19), Color(0xF7070C19)],
-            stops: [0.0, 0.3, 0.55, 1.0],
+            colors: [for (final a in const [0.0, 0.72, 0.92, 0.97]) QColors.bgBottom.withValues(alpha: a)],
+            stops: const [0.0, 0.3, 0.55, 1.0],
           ),
         ),
       ),
@@ -463,7 +463,7 @@ class _SuReceiptChipState extends State<SuReceiptChip> with SingleTickerProvider
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-            color: const Color(0xE6111827),
+            color: QColors.glass,
             border: Border.all(color: QColors.gold.withValues(alpha: 0.4)),
             borderRadius: BorderRadius.circular(999),
           ),

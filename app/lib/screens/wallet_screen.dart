@@ -30,13 +30,13 @@ class WalletScreen extends StatelessWidget {
         Row(children: [
           QBackButton(onTap: state.back, isAr: isAr),
           const SizedBox(width: 6),
-          Text(t.walletTitle, style: QText.display(size: 28, height: 34, color: const Color(0xFFF5F7FF))),
+          Text(t.walletTitle, style: QText.display(size: 28, height: 34, color: QColors.textPrimary)),
         ]),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF151B33), Color(0xFF0F1526)]),
+            gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardSlate]),
             border: Border.all(color: QColors.gold.withOpacity(0.32)),
             borderRadius: BorderRadius.circular(QRadii.xxxl),
           ),
@@ -48,7 +48,7 @@ class WalletScreen extends StatelessWidget {
                 const SizedBox(width: 14),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(t.suAvailable, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
-                  Text('${state.formatSu(state.suAvailable)}', style: QText.number(size: 34, weight: FontWeight.w600, color: const Color(0xFFF2E4C6))),
+                  Text('${state.formatSu(state.suAvailable)}', style: QText.number(size: 34, weight: FontWeight.w600, color: QColors.goldPale)),
                 ]),
                 const Spacer(),
                 // Lifetime earned is the number Level is made of and a
@@ -74,9 +74,9 @@ class WalletScreen extends StatelessWidget {
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                   Explainable(
                     id: 'level',
-                    child: ExplainMark(child: Text(isAr ? 'المستوى ${state.iso('${state.level()}')}' : 'Level ${state.level()}', style: QText.body(size: 11, color: QColors.textFaint))),
+                    child: ExplainMark(child: Text(isAr ? 'المستوى ${state.iso('${state.level()}')}' : 'Level ${state.level()}', style: QText.body(size: 11, color: QColors.textMuted))),
                   ),
-                  Text(t.levelNote, style: QText.body(size: 11, color: QColors.textFaint)),
+                  Text(t.levelNote, style: QText.body(size: 11, color: QColors.textMuted)),
                 ]),
               ],
             ],
@@ -118,7 +118,7 @@ class WalletScreen extends StatelessWidget {
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(entry.label, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textHigh)),
-                  Text(entry.when, style: QText.body(size: 11, color: QColors.textFaint)),
+                  Text(entry.when, style: QText.body(size: 11, color: QColors.textMuted)),
                 ]),
                 Text(entry.amount >= 0 ? '+${entry.amount}' : '${entry.amount}', style: QText.number(size: 14, weight: FontWeight.w600, color: entry.amount < 0 ? QColors.red : QColors.gold)),
               ]),
@@ -128,7 +128,7 @@ class WalletScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: QDecor.card(color: QColors.cardSlate, border: QColors.borderFaint, radius: QRadii.lg),
-          child: Text(t.walletTerms, style: QText.body(size: 12, height: 19, color: QColors.textFaint)),
+          child: Text(t.walletTerms, style: QText.body(size: 12, height: 19, color: QColors.textMuted)),
         ),
       ],
     );
@@ -184,7 +184,7 @@ class _SpendCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(isAr ? item.whatAr : item.whatEn, style: QText.body(size: 13, height: 20, color: QColors.textMuted)),
           const SizedBox(height: 4),
-          Text(isAr ? item.limitAr : item.limitEn, style: QText.body(size: 11, height: 17, color: QColors.textFaint)),
+          Text(isAr ? item.limitAr : item.limitEn, style: QText.body(size: 11, height: 17, color: QColors.textMuted)),
           const SizedBox(height: 8),
           Row(children: [
             Text('${state.t.balanceAfter}: ${state.formatSu(after)}', style: QText.body(size: 11, color: QColors.textMuted)),
@@ -197,7 +197,7 @@ class _SpendCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                   decoration: BoxDecoration(border: Border.all(color: afford ? QColors.gold.withOpacity(0.45) : QColors.borderSoft), borderRadius: BorderRadius.circular(999)),
-                  child: Text(done ? (isAr ? 'اتمت' : 'Redeemed') : state.t.spendCta, style: QText.body(size: 12, weight: FontWeight.w600, color: afford ? QColors.gold : QColors.textFaint)),
+                  child: Text(done ? (isAr ? 'اتمت' : 'Redeemed') : state.t.spendCta, style: QText.body(size: 12, weight: FontWeight.w600, color: afford ? QColors.gold : QColors.textMuted)),
                 ),
               ),
             ),

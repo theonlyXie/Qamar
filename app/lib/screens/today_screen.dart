@@ -142,7 +142,7 @@ class _Header extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(state.isAr ? 'صباح الخير،' : 'Good morning,', style: QText.body(size: 14, color: QColors.textMuted)),
-              Text(nameOr, style: QText.display(size: 34, height: 42, color: const Color(0xFFF5F7FF))),
+              Text(nameOr, style: QText.display(size: 34, height: 42, color: QColors.textPrimary)),
               if (streak != null) TodayStreakLine(text: streak),
             ],
           ),
@@ -304,7 +304,7 @@ class _NumbersCard extends StatelessWidget {
                       child: ExplainMark(
                         child: ShaderMask(
                           shaderCallback: (r) => QColors.cyanVioletGradient.createShader(r),
-                          child: Text(state.digits('$remaining'), style: QText.number(size: 38, height: 44, weight: FontWeight.w600, color: Colors.white)),
+                          child: Text(state.digits('$remaining'), style: QText.number(size: 38, height: 44, weight: FontWeight.w600, color: QColors.textPrimary)),
                         ),
                       ),
                     ),
@@ -448,7 +448,7 @@ class _WaterCard extends StatelessWidget {
                     shaderCallback: (r) => QColors.blueCyanGradient.createShader(r),
                     child: Text(
                       isAr ? '${state.iso(litres)} لتر' : '$litres L',
-                      style: QText.number(size: 28, weight: FontWeight.w600, color: Colors.white),
+                      style: QText.number(size: 28, weight: FontWeight.w600, color: QColors.textPrimary),
                     ),
                   ),
                 ),
@@ -506,7 +506,7 @@ class _WaterCard extends StatelessWidget {
                   onPressed: state.undoWater,
                   child: Text(
                     isAr ? 'تراجع' : 'Undo',
-                    style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textFaint),
+                    style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMuted),
                   ),
                 ),
               ),
@@ -623,7 +623,7 @@ class _ActivityCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             isAr ? 'تقدير. بنسجّل الحركة جنب الأكل ومش بنزوّد سعرات عليها.' : 'An estimate. Movement is logged beside the food, not added to its budget.',
-            style: QText.body(size: 11, height: 16, color: QColors.textFaint),
+            style: QText.body(size: 11, height: 16, color: QColors.textMuted),
           ),
         ],
       ),
@@ -826,7 +826,7 @@ class SuChip extends StatelessWidget {
               widthFactor: 1,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                decoration: BoxDecoration(border: Border.all(color: QColors.gold.withOpacity(0.4)), borderRadius: BorderRadius.circular(999), color: const Color(0xFF0F1730)),
+                decoration: BoxDecoration(border: Border.all(color: QColors.gold.withOpacity(0.4)), borderRadius: BorderRadius.circular(999), color: QColors.cardSlate),
                 child: Explainable(
                   id: 'su_points',
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
