@@ -71,4 +71,30 @@ void main() {
     expect(s.treeOpen, isFalse, reason: 'the tree gives way to the conversation');
     expect(s.dictationError, isNotNull, reason: 'it tried to listen: this test phone has no recogniser');
   });
+
+  testWidgets('the ring holds still: its circles do not drift under the finger', (tester) async {
+    final s = _tree(AppLang.en);
+    await _pump(tester, s);
+    await tester.pump(const Duration(milliseconds: 800));
+    final before = tester.getRect(find.text('Plan'));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 470));
+      expect(tester.getRect(find.text('Plan')), before, reason: 'only the light on the branches moves');
+    }
+  });
+
+  testWidgets('under reduce motion nothing on the ring runs', (tester) async {
+    final s = _tree(AppLang.en);
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(ChangeNotifierProvider.value(
+      value: s,
+      child: MaterialApp(
+        builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(disableAnimations: true), child: child!),
+        home: const Scaffold(body: Stack(children: [TreeOverlay()])),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(tester.binding.hasScheduledFrame, isFalse, reason: 'the ring comes to rest, and stays');
+  });
 }

@@ -116,8 +116,9 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
     }
     _focusAsked = state.composerFocus;
 
-    // Questions to ask are not offered while Qamar waits to hear a meal.
-    final showSuggestions = state.chatDraft.isEmpty && state.chatState != ChatState.thinking && !state.loggingMeal;
+    // Questions to ask are not offered while Qamar waits to hear a meal, or
+    // for one to be confirmed: the one thing to do then is answer.
+    final showSuggestions = state.chatDraft.isEmpty && state.chatState != ChatState.thinking && !state.loggingMeal && !state.hasProposal;
     final empty = state.chat.isEmpty && !state.hasProposal && state.chatState != ChatState.thinking;
 
     // Sized by the shell, not by a Stack: the overlay is handed a full-screen

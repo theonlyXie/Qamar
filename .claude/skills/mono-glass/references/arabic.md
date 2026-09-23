@@ -28,7 +28,7 @@ Our products are designed in Arabic and checked in English, not the other way ro
 - **Never reverse a number's digits.** A number reads left to right in both scripts. Sequences such as "1 of 3" and fractions follow the sentence.
 - **Separators:** Arabic uses ٫ for decimals and ٬ for thousands, and ٪ for percent. Check that the font has the glyph; Noto Sans Arabic does.
 - **Live values are tabular** (`QText.number`), so a changing count doesn't jiggle.
-- **No middle dot beside Arabic-Indic digits.** "١٦ · وجبة" reads as "١٦٠ وجبة": the dot is the shape of ٠. Where English separates with " · ", Arabic uses "، " (or words). Between Arabic words the dot is harmless, but "،" is still more natural.
+- **No middle dot beside Arabic-Indic digits.** "١٦ · وجبة" reads as "١٦٠ وجبة": the dot is the shape of ٠. Where English separates with " · ", Arabic uses "، " (or words). Between Arabic words the dot is harmless, but "،" is still more natural. This holds for lines put together from parts too: a `parts.join(' · ')` over "٢٩ سنة" and "١٧٢ سم" is the same mistake, so join Arabic with `'، '`. (Qamar's `arabic_separator_test` reads every screen's rendered text, direction isolates included, as well as the source.)
 - **Arabic-Indic zero:** ٠ is a small dot-like diamond. In dot numerals, set a bare "٠" large (hero only), or write the state in words ("لسه ما شربتش") rather than showing a lonely zero.
 
 ## Words

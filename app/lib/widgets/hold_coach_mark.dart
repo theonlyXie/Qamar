@@ -16,9 +16,11 @@ abstract final class HoldCopy {
   /// line wraps (in the mark's two lines) it is never split from its verb,
   /// and "بصوتك" never ends a line alone.
   static const whatAr = 'تتكلم\u00A0مع\u00A0قمر\u00A0بصوتك';
-  static const whatEn = 'talk to Qamar — with your voice';
+  static const whatEn = 'talk to Qamar with your voice';
 
-  static String line(bool isAr) => isAr ? '$doAr — $whatAr' : '$doEn — $whatEn';
+  /// The dash is held to the verb before it, so it never starts a line (or
+  /// stands on one alone, as it did in the gesture guide's narrow cell).
+  static String line(bool isAr) => isAr ? '$doAr\u00A0— $whatAr' : '$doEn\u00A0— $whatEn';
 }
 
 /// A one-time hint by the orb (O1): after the tree has opened and closed

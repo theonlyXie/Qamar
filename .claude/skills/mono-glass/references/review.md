@@ -44,7 +44,8 @@ Use this on a screen, a diff or a screenshot. Every "no" is a finding, and every
 - [ ] Arrivals use the settle spring and leave by the same path. There's no bounce unless the element was flicked.
 - [ ] Frequent actions barely animate.
 - [ ] Everything is interruptible, and input is never locked during a transition.
-- [ ] Reduce Motion gives fades. There's no breathing, orbit or parallax, and the meaning is still conveyed in words.
+- [ ] Reduce Motion gives fades. There's no breathing, orbit or parallax, and the meaning is still conveyed in words. The screen settles: nothing keeps scheduling frames (a widget test's `pumpAndSettle` returns).
+- [ ] No control drifts on its own. Buttons, chips and ring circles hold still.
 
 ## 7. Shape and space
 - [ ] Controls are capsules, icon buttons are circles, cards are 24, sheets are 32.

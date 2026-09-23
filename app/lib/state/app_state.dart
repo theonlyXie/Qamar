@@ -1629,7 +1629,7 @@ class AppState extends ChangeNotifier {
           if (read?.bodyFatPct != null) '${read!.bodyFatPct}% body fat',
         ];
         _pushQ(
-          'من تقريرك: ${ar.join(' · ')}. لو في حاجة غلط اكتبهالي.',
+          'من تقريرك: ${ar.join('، ')}. لو في حاجة غلط اكتبهالي.',
           'From your report: ${en.join(' · ')}. Type a fix if anything is off.',
         );
         advance();
@@ -5687,7 +5687,8 @@ class AppState extends ChangeNotifier {
       text: kind == QuickLog.voice
           ? (isAr ? 'أنا سامعك. أكلت إيه؟' : 'I am listening. What did you eat?')
           : (isAr ? 'اكتبلي أكلت إيه.' : 'Tell me what you ate.'),
-      sub: isAr ? 'مفيش حاجة بتتسجل قبل ما تأكد.' : 'Nothing is saved until you confirm.',
+      // "Nothing is saved until you confirm" is said once, on the card that
+      // asks for the confirmation, where it matters.
     );
     chat.add(ask);
     _listeningLine = kind == QuickLog.voice ? ask : null;

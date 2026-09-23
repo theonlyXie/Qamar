@@ -58,7 +58,20 @@ class _QamarMoonState extends State<QamarMoon> with SingleTickerProviderStateMix
   void initState() {
     super.initState();
     if (widget.staticPhase == null) {
-      _phase = AnimationController(vsync: this, duration: widget.phaseDuration)..repeat(reverse: true);
+      _phase = AnimationController(vsync: this, duration: widget.phaseDuration, value: 0.5);
+    }
+  }
+
+  /// Under reduce motion the drift stops, mid-band: the moon is still.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final phase = _phase;
+    if (phase == null) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      phase.stop();
+    } else if (!phase.isAnimating) {
+      phase.repeat(reverse: true);
     }
   }
 

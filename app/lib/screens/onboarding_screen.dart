@@ -622,7 +622,9 @@ class _TargetCard extends StatelessWidget {
     final parts = isAr
         ? ['${state.iso('${p.age}')}$nbسنة', sex, '${state.iso('${p.height}')}$nbسم', '${state.iso('${p.weight}')}$nbكجم', activityWords(state)]
         : ['${p.age}${nb}years', sex, '${p.height}${nb}cm', '${p.weight}${nb}kg', activityWords(state)];
-    final from = '${isAr ? 'من إجاباتك:' : 'From your answers:'} ${parts.join('$nb· ')}';
+    // Arabic separates with its comma: beside ١٧٢ a middle dot reads as a
+    // zero.
+    final from = '${isAr ? 'من إجاباتك:' : 'From your answers:'} ${parts.join(isAr ? '، ' : '$nb· ')}';
     final kcal = state.digits('${tg.kcal}');
 
     return Container(

@@ -7,7 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
+import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/messages.dart';
+import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/ask_qamar_overlay.dart';
 
@@ -49,6 +51,19 @@ void main() {
     expect(_suggestion, findsNothing, reason: 'Qamar is waiting to hear a meal, not a question');
     final field = tester.widget<TextField>(find.descendant(of: find.byType(AskQamarOverlay), matching: find.byType(TextField)));
     expect(field.focusNode!.hasFocus, isTrue);
+  });
+
+  testWidgets('a reading to confirm: no questions offered, and "nothing is saved" said once, on the card', (tester) async {
+    final s = await _open(tester, (s) {
+      s.quickLog(QuickLog.text);
+      s.proposal = const MealAnalysis([
+        ConfirmItemDef(ar: 'كشري', en: 'Koshary', portionAr: 'طبق وسط', portionEn: '1 medium bowl', conf: Confidence.high, kcal: 640, p: 19, c: 118, f: 11),
+      ]);
+      s.proposalQty = [1];
+    });
+    expect(s.hasProposal, isTrue);
+    expect(_suggestion, findsNothing, reason: 'the one thing to do is confirm or cancel');
+    expect(find.text('Nothing is saved until you confirm.'), findsOneWidget);
   });
 
   testWidgets('a photo keeps the greeting, for a camera that is cancelled', (tester) async {

@@ -63,10 +63,11 @@ Under reduce motion: stop the controller and hold at 1.0.
 5. **Frequent means quiet.** Sending a message, ticking water or toggling a switch gets a press and a fade, no more.
 6. **One moving thing at a time.** Two simultaneous large motions read as chaos. Stagger them or choose one.
 7. **The orb is alive, but gently.** Its idle breath and float are slow (4.6 s, 9–11 s) and small in amplitude. Listening speeds the breath to 2.4 s. Under reduce motion, the orb is still.
+8. **A control never drifts.** Nothing a finger has to hit moves on its own: no bobbing buttons, no floating chips. On a ring of choices the circles hold still and only a light may run along the branches. A moving target is harder to hit, and an automated tap (a test, an accessibility tool) waits for it to stop.
 
 ## Reduce Motion (`MediaQuery.disableAnimationsOf(context)`)
 
 - Every translate, scale or rotate becomes a fade of 150 ms or less.
-- There is no breathing, orbiting, float, parallax, dot stagger or blur animation.
+- There is no breathing, orbiting, float, parallax, dot stagger or blur animation. That includes the slow ones (a moon's phase drift, a light running along a branch): stop the controller in `didChangeDependencies` and draw the rest pose, so the screen settles and schedules no frames.
 - Springs become `QSpring.drive(…, still: true)`, a plain 150 ms tween that the caller draws as a fade.
 - Meaning must survive: if motion said "listening", the words must say it too.

@@ -230,7 +230,7 @@ class OrbGestureGuide extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '${isAr ? doAr : doEn} — ${isAr ? whatAr : whatEn}',
+                      '${isAr ? doAr : doEn}\u00A0— ${isAr ? whatAr : whatEn}',
                       style: QText.body(size: 15, color: learned.contains(g) ? QColors.inkTertiary : QColors.ink),
                     ),
                   ),

@@ -118,14 +118,29 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
   /// The halo: moonlight, white fading to nothing.
   static final _haloColors = [QColors.ink.withValues(alpha: 0.30), QColors.ink.withValues(alpha: 0.06), Colors.transparent];
 
-  late final AnimationController _breath =
-      AnimationController(vsync: this, duration: widget.breathDuration)..repeat(reverse: true);
-  late final AnimationController _halo =
-      AnimationController(vsync: this, duration: widget.haloDuration)..repeat(reverse: true);
-  late final AnimationController _wander =
-      AnimationController(vsync: this, duration: widget.wanderDuration)..repeat();
-  late final AnimationController _ring = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))
-    ..repeat();
+  late final AnimationController _breath = AnimationController(vsync: this, duration: widget.breathDuration);
+  late final AnimationController _halo = AnimationController(vsync: this, duration: widget.haloDuration);
+  late final AnimationController _wander = AnimationController(vsync: this, duration: widget.wanderDuration);
+  late final AnimationController _ring = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
+
+  /// Alive, or still: under reduce motion the orb rests in its quiet pose
+  /// (no breath, no swelling halo, no wander, rings at rest), as the
+  /// mono-glass skill has it; the state it shows stays, drawn still.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      for (final c in [_breath, _halo, _wander, _ring]) {
+        c.stop();
+        c.value = 0;
+      }
+      return;
+    }
+    if (!_breath.isAnimating) _breath.repeat(reverse: true);
+    if (!_halo.isAnimating) _halo.repeat(reverse: true);
+    if (!_wander.isAnimating) _wander.repeat();
+    if (!_ring.isAnimating) _ring.repeat();
+  }
 
   static const _wanderStops = [
     Offset(0, 0),

@@ -90,8 +90,8 @@ void main() {
   });
 
   test('it names the hold in the tutorial card’s own words', () {
-    expect(HoldCopy.line(false), 'Hold it — talk to Qamar — with your voice');
-    expect(HoldCopy.line(true), 'استمر ضاغط عليه — تتكلم\u00A0مع\u00A0قمر\u00A0بصوتك');
+    expect(HoldCopy.line(false), 'Hold it\u00A0— talk to Qamar with your voice');
+    expect(HoldCopy.line(true), 'استمر ضاغط عليه\u00A0— تتكلم\u00A0مع\u00A0قمر\u00A0بصوتك');
   });
 
   group('on screen', () {

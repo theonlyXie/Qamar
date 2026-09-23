@@ -172,7 +172,19 @@ class TreeOverlay extends StatefulWidget {
 }
 
 class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 3400))..repeat();
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 3400));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Under reduce motion the branches are drawn and nothing runs along
+    // them.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
 
   @override
   void dispose() {
@@ -180,11 +192,26 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
     super.dispose();
   }
 
+  /// The centre moon's name, under it.
+  static final _centreLabelStyle = QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkSecondary);
+  static const _labelTop = _canvas / 2 + _orbSize / 2 + 4;
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final t = state.t;
     final isAr = state.isAr;
+
+    final still = MediaQuery.disableAnimationsOf(context);
+    // The centre's name, measured as it is set, so no dot of a branch is
+    // drawn over its words.
+    final measure = TextPainter(
+      text: TextSpan(text: t.ask, style: _centreLabelStyle),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    final labelBox = Rect.fromLTWH(_canvas / 2 - measure.width / 2, _labelTop, measure.width, measure.height).inflate(6);
+    measure.dispose();
 
     final photosLeft = state.photoQuota.remaining;
     final repeatChoices = state.repeatChoices;
@@ -261,7 +288,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                             Positioned.fill(
                               child: AnimatedBuilder(
                                 animation: _c,
-                                builder: (context, _) => CustomPaint(painter: _BeamPainter(_c.value, beamAngles)),
+                                builder: (context, _) => CustomPaint(painter: _BeamPainter(still ? null : _c.value, beamAngles, labelBox)),
                               ),
                             ),
                             Positioned(
@@ -292,13 +319,13 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                             Positioned(
                               left: 0,
                               right: 0,
-                              top: _canvas / 2 + _orbSize / 2 + 4,
+                              top: _labelTop,
                               child: IgnorePointer(
                                 child: Text(
                                   t.ask,
                                   key: TreeOverlay.centreLabelKey,
                                   textAlign: TextAlign.center,
-                                  style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkSecondary),
+                                  style: _centreLabelStyle,
                                 ),
                               ),
                             ),
@@ -311,7 +338,6 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                                     icon: nodes[i].icon,
                                     label: nodes[i].label(isAr),
                                     color: nodes[i].color,
-                                    bob: true,
                                     onTap: () => _activate(state, nodes[i], i),
                                   ),
                                 ),
@@ -480,12 +506,14 @@ class _CentreMoon extends StatelessWidget {
 /// One circle on the ring: a destination, a log method or a water unit. The
 /// circle is a fixed size; the label is allowed to overflow past it rather
 /// than being squeezed inside and clipped.
+/// A circle on the ring and its name. It holds still: a control that drifts
+/// is harder to hit, and on the ring the only thing that moves is the light
+/// running out along the branches (the mono-glass skill: one moving thing).
 class _RingButton extends StatefulWidget {
   final IconData icon;
   final String label;
   final Color color;
   final bool locked;
-  final bool bob;
   final VoidCallback onTap;
   const _RingButton({
     required this.icon,
@@ -493,20 +521,12 @@ class _RingButton extends StatefulWidget {
     required this.color,
     required this.onTap,
     this.locked = false,
-    this.bob = false,
   });
   @override
   State<_RingButton> createState() => _RingButtonState();
 }
 
-class _RingButtonState extends State<_RingButton> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 5600))..repeat(reverse: true);
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
+class _RingButtonState extends State<_RingButton> {
   bool _down = false;
 
   @override
@@ -516,7 +536,7 @@ class _RingButtonState extends State<_RingButton> with SingleTickerProviderState
     // does what a finger on the circle does, and a screen reader hears the
     // name as the button's. The slot is wider than the circle so the name has
     // room; the circle stays centred where the ring puts it.
-    final button = SizedBox(
+    return SizedBox(
       width: _slotWidth,
       child: Align(
         alignment: Alignment.topCenter,
@@ -568,12 +588,6 @@ class _RingButtonState extends State<_RingButton> with SingleTickerProviderState
         ),
       ),
     );
-    if (!widget.bob) return button;
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, child) => Transform.translate(offset: Offset(0, -4 * _c.value), child: child),
-      child: button,
-    );
   }
 }
 
@@ -581,12 +595,17 @@ class _RingButtonState extends State<_RingButton> with SingleTickerProviderState
 /// Nothing's dot, in white — with one brighter dot travelling out along it,
 /// so the ring reads as thrown off the moon rather than laid round it.
 class _BeamPainter extends CustomPainter {
-  final double t;
+  /// Where the travelling light is along each branch, or null when nothing
+  /// runs (reduce motion).
+  final double? t;
 
   /// Which ring positions to light. When a node is fanned out only its
   /// choices exist, so only those get a line.
   final List<double> angles;
-  _BeamPainter(this.t, this.angles);
+
+  /// The centre moon's name: no dot is drawn over it.
+  final Rect keepOut;
+  _BeamPainter(this.t, this.angles, this.keepOut);
 
   static const double _innerGap = 46;
   static const double _pitch = 8;
@@ -602,15 +621,20 @@ class _BeamPainter extends CustomPainter {
       final n = (length / _pitch).floor();
       for (var k = 0; k <= n; k++) {
         final f = n == 0 ? 0.0 : k / n;
-        canvas.drawCircle(start + dir * (k * _pitch), 1.3, Paint()..color = QColors.ink.withValues(alpha: 0.5 - 0.38 * f));
+        final dot = start + dir * (k * _pitch);
+        if (keepOut.contains(dot)) continue;
+        canvas.drawCircle(dot, 1.3, Paint()..color = QColors.ink.withValues(alpha: 0.5 - 0.38 * f));
       }
-      final travel = (t + i * 0.14) % 1.0;
+      final at = t;
+      if (at == null) continue;
+      final travel = (at + i * 0.14) % 1.0;
       final head = Offset.lerp(start, end, Curves.easeInOut.transform(travel))!;
+      if (keepOut.contains(head)) continue;
       canvas.drawCircle(head, 2.4, Paint()..color = QColors.ink.withValues(alpha: 0.85 * (1 - travel)));
     }
   }
 
   @override
   bool shouldRepaint(covariant _BeamPainter oldDelegate) =>
-      oldDelegate.t != t || oldDelegate.angles.length != angles.length;
+      oldDelegate.t != t || oldDelegate.angles.length != angles.length || oldDelegate.keepOut != keepOut;
 }
