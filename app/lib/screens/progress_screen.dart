@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/strings.dart';
+import '../models/days.dart';
 import '../services/repositories.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
@@ -244,7 +245,8 @@ class ProgressScreen extends StatelessWidget {
 
   static String _trendLine(bool isAr, List<WeightReading> w) {
     final delta = w.last.kg - w.first.kg;
-    final days = w.last.at.difference(w.first.at).inDays;
+    // Calendar days between the readings ([Days]), not 24-hour spans.
+    final days = Days.between(w.first.at, w.last.at);
     final span = isAr ? 'على مدى ${days} يوم' : 'over $days days';
     if (delta.abs() < 0.3) {
       return isAr ? 'وزنك ثابت تقريباً $span. قياس واحد مش دليل.' : 'Essentially level $span. A single reading is not evidence.';

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'package:intl/intl.dart';
 
 import '../l10n/strings.dart';
+import '../models/days.dart';
 import '../models/dishes.dart';
 import '../models/meal.dart';
 import '../models/messages.dart';
@@ -4312,10 +4313,13 @@ class AppState extends ChangeNotifier {
   /// The last seven days ending today, oldest first. Today's entry always
   /// reflects the meals in memory, so a meal just logged shows immediately
   /// rather than waiting for the next hydrate.
+  ///
+  /// Stepped by the calendar ([Days]): stepped by 24 hours, the week after
+  /// Egypt's clocks change found none of its past days, and in April read
+  /// each as the day before.
   List<DayTotals> week() {
-    final now = _clock();
-    final today = DateTime(now.year, now.month, now.day);
-    final byDay = {for (final d in dayHistory) DateTime(d.day.year, d.day.month, d.day.day): d};
+    final today = Days.of(_clock());
+    final byDay = {for (final d in dayHistory) Days.of(d.day): d};
 
     final todayTotals = consumed();
     if (meals.isNotEmpty) {
@@ -4323,22 +4327,17 @@ class AppState extends ChangeNotifier {
     }
 
     return [
-      for (var i = 6; i >= 0; i--)
-        byDay[today.subtract(Duration(days: i))] ??
-            DayTotals(day: today.subtract(Duration(days: i)), kcal: 0, meals: 0),
+      for (var i = 6; i >= 0; i--) byDay[Days.add(today, -i)] ?? DayTotals(day: Days.add(today, -i), kcal: 0, meals: 0),
     ];
   }
 
   /// The seven days before [week], oldest first — the comparison the review
   /// card draws. Unlogged days are zeros here too.
   List<DayTotals> lastWeek() {
-    final now = _clock();
-    final today = DateTime(now.year, now.month, now.day);
-    final byDay = {for (final d in dayHistory) DateTime(d.day.year, d.day.month, d.day.day): d};
+    final today = Days.of(_clock());
+    final byDay = {for (final d in dayHistory) Days.of(d.day): d};
     return [
-      for (var i = 13; i >= 7; i--)
-        byDay[today.subtract(Duration(days: i))] ??
-            DayTotals(day: today.subtract(Duration(days: i)), kcal: 0, meals: 0),
+      for (var i = 13; i >= 7; i--) byDay[Days.add(today, -i)] ?? DayTotals(day: Days.add(today, -i), kcal: 0, meals: 0),
     ];
   }
 

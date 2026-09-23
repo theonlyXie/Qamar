@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'days.dart';
+
 /// Days in a row with at least one logged meal.
 ///
 /// A streak is arithmetic over the days that were actually logged — the same
@@ -48,7 +50,9 @@ class Streak {
       );
 
   /// Counts back from [today] over [loggedDays] (any time of day; only the
-  /// calendar date matters). [frozenDays] count as logged.
+  /// calendar date matters). [frozenDays] count as logged. It steps and
+  /// counts by the calendar ([Days]): stepped by 24 hours, a run broke where
+  /// Egypt's clocks change.
   factory Streak.fromDays(
     Iterable<DateTime> loggedDays, {
     required DateTime today,
@@ -56,17 +60,17 @@ class Streak {
     int freezesAvailable = 0,
   }) {
     final days = <DateTime>{
-      for (final d in loggedDays) DateTime(d.year, d.month, d.day),
-      for (final d in frozenDays) DateTime(d.year, d.month, d.day),
+      for (final d in loggedDays) Days.of(d),
+      for (final d in frozenDays) Days.of(d),
     };
-    final t = DateTime(today.year, today.month, today.day);
+    final t = Days.of(today);
     final todayCounted = days.contains(t);
 
-    var cursor = todayCounted ? t : t.subtract(const Duration(days: 1));
+    var cursor = todayCounted ? t : Days.add(t, -1);
     var current = 0;
     while (days.contains(cursor)) {
       current++;
-      cursor = cursor.subtract(const Duration(days: 1));
+      cursor = Days.add(cursor, -1);
     }
 
     // Best run anywhere in the data — an old streak that ended still counts
@@ -76,7 +80,7 @@ class Streak {
     var run = 0;
     DateTime? prev;
     for (final d in sorted) {
-      run = (prev != null && d.difference(prev).inDays == 1) ? run + 1 : 1;
+      run = (prev != null && Days.between(prev, d) == 1) ? run + 1 : 1;
       prev = d;
       best = math.max(best, run);
     }

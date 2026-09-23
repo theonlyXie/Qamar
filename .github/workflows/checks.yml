@@ -94,3 +94,14 @@ jobs:
 
       - name: Test
         run: flutter test
+
+      # Egypt moves its clocks: forward as the last Friday of April begins,
+      # back as the last Thursday of October ends. This runner keeps UTC,
+      # where every day is 24 hours, so the step above skips the scenarios
+      # that need a day of 23 or 25 (days_test.dart still fails anywhere if
+      # day arithmetic by duration comes back to lib/). Here they run on
+      # Cairo's clock, and REQUIRE_CAIRO fails the step if TZ does not take.
+      - name: Test in Cairo time
+        run: flutter test test/cairo_days_test.dart --dart-define=REQUIRE_CAIRO=true
+        env:
+          TZ: Africa/Cairo

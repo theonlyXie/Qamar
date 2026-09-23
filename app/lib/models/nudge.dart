@@ -11,6 +11,8 @@
 /// been asked and passed over the pulse stops.
 library;
 
+import 'days.dart';
+
 enum MealSlot { breakfast, lunch, dinner, iftar, suhoor }
 
 /// Which slot a clock hour belongs to — the same cut the Today screen uses to
@@ -161,7 +163,7 @@ class NudgeCopy {
 
   static String text(MealSlot slot, DateTime day, {required bool ar}) {
     final variants = (ar ? _ar : _en)[slot]!;
-    final dayOfYear = day.difference(DateTime(day.year)).inDays;
+    final dayOfYear = Days.between(DateTime(day.year), day);
     return variants[dayOfYear % variants.length];
   }
 
@@ -266,16 +268,19 @@ class NudgeSchedule {
     MealTimes Function(DateTime day)? timesOn,
   }) {
     if (perDay.clamp(0, maxPerDay) == 0) return const [];
-    final today = DateTime(now.year, now.month, now.day);
-    final first = firstDay == null ? today : DateTime(firstDay.year, firstDay.month, firstDay.day);
+    // Calendar days and wall-clock times ([Days]): stepped by 24 hours, a
+    // schedule set before Egypt's clocks change asked every question an hour
+    // off after it, for the person who has not opened the app since.
+    final today = Days.of(now);
+    final first = firstDay == null ? today : Days.of(firstDay);
     final out = <Nudge>[];
     for (var d = 0; d < days; d++) {
-      final day = today.add(Duration(days: d));
-      if (day.difference(first).inDays >= externalDays) break;
+      final day = Days.add(today, d);
+      if (Days.between(first, day) >= externalDays) break;
       final fastingDay = fastingOn?.call(day) ?? fasting;
       final dayTimes = timesOn?.call(day) ?? times;
       for (final slot in slotsFor(perDay, fasting: fastingDay)) {
-        final at = day.add(Duration(minutes: dayTimes.of(slot)));
+        final at = Days.at(day, dayTimes.of(slot));
         if (d == 0 && (!at.isAfter(now) || loggedToday.contains(slot))) continue;
         out.add(Nudge(slot: slot, at: at, dayIndex: d));
       }
@@ -298,10 +303,9 @@ class NudgeSchedule {
     Set<MealSlot> loggedToday = const {},
     bool fasting = false,
   }) {
-    final today = DateTime(now.year, now.month, now.day);
     for (final slot in slotsFor(perDay, fasting: fasting)) {
       if (loggedToday.contains(slot)) continue;
-      final at = today.add(Duration(minutes: times.of(slot)));
+      final at = Days.at(now, times.of(slot));
       if (!now.isBefore(at) && now.isBefore(at.add(window))) {
         return Nudge(slot: slot, at: at, dayIndex: 0);
       }

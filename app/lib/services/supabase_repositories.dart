@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/activity.dart';
+import '../models/days.dart';
 import '../models/dishes.dart';
 import '../models/invitation.dart';
 import '../models/meal.dart';
@@ -375,7 +376,7 @@ class SupabaseMealRepository implements MealRepository {
   @override
   Future<List<DayTotals>> dailyTotals(String userId, {int days = 7}) async {
     final now = DateTime.now();
-    final from = DateTime(now.year, now.month, now.day).subtract(Duration(days: days - 1));
+    final from = Days.add(now, -(days - 1));
     final rows = await _client
         .from('meal_logs')
         .select('kcal, logged_at')
@@ -418,7 +419,7 @@ class SupabaseMealRepository implements MealRepository {
 
   @override
   Future<List<LoggedMeal>> recentMeals(String userId, {int days = 7}) async {
-    final from = DateTime.now().subtract(Duration(days: days)).toIso8601String();
+    final from = Days.ago(DateTime.now(), days).toIso8601String();
     final rows = await _client
         .from('meal_logs')
         .select()
@@ -460,7 +461,7 @@ class SupabaseMealRepository implements MealRepository {
 
   @override
   Future<List<WeightReading>> weightHistory(String userId, {int days = 60}) async {
-    final from = DateTime.now().subtract(Duration(days: days));
+    final from = Days.ago(DateTime.now(), days);
     final rows = await _client
         .from('weight_entries')
         .select('value_kg, measured_at')

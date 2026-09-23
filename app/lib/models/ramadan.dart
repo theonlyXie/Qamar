@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../services/repositories.dart';
+import 'days.dart';
 import 'water.dart';
 
 /// Ramadan as a product mode (the blueprint's acquisition loop): a season
@@ -47,7 +48,7 @@ class Season {
   static const leadDays = 7;
   static const tailDays = 7;
 
-  int get days => endsOn.difference(startsOn).inDays + 1;
+  int get days => Days.between(startsOn, endsOn) + 1;
 
   String name(bool ar) => ar ? nameAr : nameEn;
 
@@ -55,24 +56,24 @@ class Season {
 
   SeasonPhase phase(DateTime now) {
     final d = _date(now);
-    if (d.isBefore(startsOn.subtract(const Duration(days: leadDays)))) return SeasonPhase.none;
+    if (d.isBefore(Days.add(startsOn, -leadDays))) return SeasonPhase.none;
     if (d.isBefore(startsOn)) return SeasonPhase.before;
     if (!d.isAfter(endsOn)) return SeasonPhase.during;
-    if (!d.isAfter(eidOn.add(const Duration(days: tailDays)))) return SeasonPhase.after;
+    if (!d.isAfter(Days.add(eidOn, tailDays))) return SeasonPhase.after;
     return SeasonPhase.none;
   }
 
   /// 1-based day of the month, or null outside it.
   int? dayOf(DateTime now) {
     if (phase(now) != SeasonPhase.during) return null;
-    return _date(now).difference(startsOn).inDays + 1;
+    return Days.between(startsOn, now) + 1;
   }
 
   /// Days until the first fast; null once it has begun.
   int? daysUntil(DateTime now) {
     final d = _date(now);
     if (!d.isBefore(startsOn)) return null;
-    return startsOn.difference(d).inDays;
+    return Days.between(d, startsOn);
   }
 
   factory Season.fromJson(Map<String, dynamic> j) => Season(
@@ -103,7 +104,7 @@ class SunTimes {
   static double _rad(double deg) => deg * math.pi / 180;
   static double _deg(double rad) => rad * 180 / math.pi;
 
-  static int _dayOfYear(DateTime d) => d.difference(DateTime(d.year)).inDays + 1;
+  static int _dayOfYear(DateTime d) => Days.between(DateTime(d.year), d) + 1;
 
   /// Minutes after local midnight at which the sun's centre passes [zenith]
   /// degrees, in the evening ([evening]) or the morning.
@@ -235,7 +236,7 @@ class EidReport {
     DateTime? prev;
     for (final d in logged) {
       final day = DateTime(d.day.year, d.day.month, d.day.day);
-      run = (prev != null && day.difference(prev).inDays == 1) ? run + 1 : 1;
+      run = (prev != null && Days.between(prev, day) == 1) ? run + 1 : 1;
       prev = day;
       if (run > best) best = run;
     }
