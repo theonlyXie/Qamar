@@ -1,9 +1,12 @@
 // The string table, seat 6's part: no line of copy is kept that nothing
 // shows. "or type instead" was left behind when the scan's duplicate way to
-// type went (e04b50b) and is gone. The table still holds 32 other strings
-// nothing reads; they are listed here by name, owed to the seats whose
-// screens they came from, so that this test holds the line: a string that
-// stops being read is either used again or deleted, not kept.
+// type went (e04b50b) and is gone. So are the quest's Accept, Replace and
+// Completed, which O2 took away (the meal or glass pays the quest, not a
+// tap), and the plan's Mark eaten, which only opened the old Log page
+// before logging moved to the orb (seat 3). The table still holds 29 other
+// strings nothing reads; they are listed here by name, owed to the seats
+// whose screens they came from, so that this test holds the line: a string
+// that stops being read is either used again or deleted, not kept.
 
 import 'dart:io';
 
@@ -12,9 +15,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// Unread before this test, left for their owners to use or retire.
 const _owed = {
   'restart', 'startNow', 'guestNote', 'scanInbodySub', 'walletSub', 'priceLabel', 'limitLabel', 'barcode', 'barcodeSub',
-  'labelSub', 'suEarned', 'namePlaceholder', 'accept', 'done2', 'logMeal', 'logSub', 'voiceSub', 'textSub', 'recent',
+  'labelSub', 'suEarned', 'namePlaceholder', 'logMeal', 'logSub', 'voiceSub', 'textSub', 'recent',
   'recentSub', 'describeMeal', 'mealPlaceholder', 'continueLabel', 'permissionNote', 'analyzing', 'sourcePreview',
-  'uncertainNote', 'online', 'markEaten', 'sIdle', 'sAnswer', 'tapPrompt',
+  'uncertainNote', 'online', 'sIdle', 'sAnswer', 'tapPrompt',
 };
 
 void main() {
@@ -38,6 +41,15 @@ void main() {
     expect(fields, isNot(contains('typeInstead')));
     expect(table, isNot(contains('or type instead')));
     expect(table, isNot(contains('أو اكتب بدل الكلام')));
+  });
+
+  test('the quest\'s Accept, Replace and Completed, and the plan\'s Mark eaten, are gone from the table', () {
+    for (final name in const ['accept', 'replace', 'done2', 'markEaten']) {
+      expect(fields, isNot(contains(name)), reason: name);
+    }
+    for (final words in const ["'Accept'", "'Replace'", "'Completed'", "'Mark eaten'", "'موافق'", "'غيّرها'", "'اتعملت'", "'اتاكلت'"]) {
+      expect(table, isNot(contains(words)), reason: words);
+    }
   });
 
   test('every string in the table is read somewhere, but those owed to their seats', () {
