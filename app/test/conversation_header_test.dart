@@ -163,7 +163,7 @@ void main() {
       final s = _state(AppLang.ar, left: 2)
         ..photoQuota = const AiQuota(bucket: 'photo', used: 1, limit: 3, extra: 0, remaining: 2);
       final plain = s.quotaSummary.replaceAll(RegExp('[\u2066-\u2069]'), '');
-      expect(plain, 'فاضل النهارده — أسئلة: ٢ من ٣ · صور: ٢ من ٣');
+      expect(plain, 'فاضل النهارده — أسئلة: ٢ من ٣، صور: ٢ من ٣');
       final en = _state(AppLang.en, left: 2)
         ..photoQuota = const AiQuota(bucket: 'photo', used: 1, limit: 3, extra: 0, remaining: 2);
       expect(en.quotaSummary, 'Left today — questions: 2 of 3 · photos: 2 of 3');

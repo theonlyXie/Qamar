@@ -54,6 +54,13 @@ Future<void> _fonts() async {
   if (cupertino.isNotEmpty) {
     await (FontLoader('packages/cupertino_icons/CupertinoIcons')..addFont(Future.value(cupertino.last.readAsBytesSync().buffer.asByteData()))).load();
   }
+  // Apple's and Facebook's sign-in marks come from the Material font (the
+  // one exception to the family), which the app bundles.
+  final flutterRoot = Platform.environment['FLUTTER_ROOT'];
+  final material = File('${flutterRoot ?? '/opt/flutter'}/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf');
+  if (material.existsSync()) {
+    await (FontLoader('MaterialIcons')..addFont(Future.value(material.readAsBytesSync().buffer.asByteData()))).load();
+  }
   final loaders = <String, FontLoader>{};
   for (final f in Directory('assets/fonts').listSync().whereType<File>()) {
     final family = f.path.contains('Noto') ? 'Noto Sans Arabic' : 'Inter';

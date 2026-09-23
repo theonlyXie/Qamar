@@ -188,7 +188,7 @@ void main() {
       await pump(tester, DishCard(dish: d, facts: d.facts(), targetKcal: 2180, slot: MealSlot.lunch, isAr: true, iso: _iso), ar: true);
       final text = allText(tester);
       expect(text, contains('كشري'));
-      expect(text, contains('حوالي ٥٠٧ سعرة · ٢٣٪ من هدفك ٢١٨٠'));
+      expect(text, contains('حوالي ٥٠٧ سعرة، ٢٣٪ من هدفك ٢١٨٠'));
       expect(text, contains('تقدير'));
       expect(RegExp('[0-9]').hasMatch(text), isFalse, reason: text);
     });

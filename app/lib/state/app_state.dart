@@ -1876,7 +1876,7 @@ class AppState extends ChangeNotifier {
       });
       return;
     }
-    answerStep('$dateAr · ${iso('${p.age}')} سنة', '$dateEn · ${p.age} yrs', advance);
+    answerStep('$dateAr، ${iso('${p.age}')} سنة', '$dateEn · ${p.age} yrs', advance);
   }
   void bumpHeight(int d) => _bumpProfile(height: (profile.height + d).clamp(140, 210).toInt());
   void bumpWeight(int d) => _bumpProfile(weight: (profile.weight + d).clamp(40, 200).toInt());
@@ -1905,7 +1905,7 @@ class AppState extends ChangeNotifier {
     } else if (st.kind == StepKind.number) {
       final p = profile;
       answerStep(
-        '${iso('${p.height}')} سم · ${iso('${p.weight}')} كجم',
+        '${iso('${p.height}')} سم، ${iso('${p.weight}')} كجم',
         '${p.height} cm · ${p.weight} kg',
         advance,
       );
@@ -1975,7 +1975,7 @@ class AppState extends ChangeNotifier {
           profile = profile.copyWith(weight: w, height: h, age: age);
           _notify();
           final p = profile;
-          qamarSay('ظبطتها: ${iso('${p.age}')} سنة · ${iso('${p.height}')} سم · ${iso('${p.weight}')} كجم.', 'Updated: ${p.age} yrs · ${p.height} cm · ${p.weight} kg.');
+          qamarSay('ظبطتها: ${iso('${p.age}')} سنة، ${iso('${p.height}')} سم، ${iso('${p.weight}')} كجم.', 'Updated: ${p.age} yrs · ${p.height} cm · ${p.weight} kg.');
           return;
         }
       }
@@ -5037,7 +5037,7 @@ class AppState extends ChangeNotifier {
     final q = aiQuota, p = photoQuota;
     final qTotal = q.limit + q.extra, pTotal = p.limit + p.extra;
     return isAr
-        ? 'فاضل النهارده — أسئلة: ${iso('${q.remaining}')} من ${iso('$qTotal')} · صور: ${iso('${p.remaining}')} من ${iso('$pTotal')}'
+        ? 'فاضل النهارده — أسئلة: ${iso('${q.remaining}')} من ${iso('$qTotal')}، صور: ${iso('${p.remaining}')} من ${iso('$pTotal')}'
         : 'Left today — questions: ${q.remaining} of $qTotal · photos: ${p.remaining} of $pTotal';
   }
 

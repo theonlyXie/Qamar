@@ -761,7 +761,7 @@ class _ProgrammeSheetState extends State<_ProgrammeSheet> {
               Expanded(
                 child: Text(
                   isAr
-                      ? '${formatEgp(wallet.balancePounds, ar: true, eastern: state.easternDigits)} متاح · ${formatEgp(wallet.lifetimeEarnedCents ~/ 100, ar: true, eastern: state.easternDigits)} مكتسب'
+                      ? '${formatEgp(wallet.balancePounds, ar: true, eastern: state.easternDigits)} متاح، ${formatEgp(wallet.lifetimeEarnedCents ~/ 100, ar: true, eastern: state.easternDigits)} مكتسب'
                       : '${formatEgp(wallet.balancePounds, ar: false)} available · ${formatEgp(wallet.lifetimeEarnedCents ~/ 100, ar: false)} earned',
                   style: QText.number(size: 15, color: QColors.ink),
                 ),
@@ -802,7 +802,7 @@ class _ProgrammeSheetState extends State<_ProgrammeSheet> {
                               : c.targetKcal == null
                                   ? (isAr ? 'متوسط ${state.iso('${c.avgKcal}')} سعر في اليوم' : 'avg ${c.avgKcal} kcal a day')
                                   : (isAr
-                                      ? 'متوسط ${state.iso('${c.avgKcal}')} من ${state.iso('${c.targetKcal}')} سعر · ${TrialWords.nearTarget(c.onTargetDays, ar: true, iso: state.iso)}'
+                                      ? 'متوسط ${state.iso('${c.avgKcal}')} من ${state.iso('${c.targetKcal}')} سعر، ${TrialWords.nearTarget(c.onTargetDays, ar: true, iso: state.iso)}'
                                       : 'avg ${c.avgKcal} of ${c.targetKcal} kcal · ${TrialWords.nearTarget(c.onTargetDays, ar: false, iso: state.iso)}'),
                           style: QText.body(size: 13, height: 18, color: QColors.inkTertiary),
                         ),

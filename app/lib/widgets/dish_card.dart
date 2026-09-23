@@ -48,13 +48,14 @@ class DishCard extends StatelessWidget {
         MealSlot.suhoor => isAr ? 'على السحور' : 'For suhoor',
       };
 
-  /// "About 507 kcal · 23% of your 2180" / "حوالي ٥٠٧ سعرة · ٢٣٪ من هدفك ٢١٨٠".
+  /// "About 507 kcal · 23% of your 2180" / "حوالي ٥٠٧ سعرة، ٢٣٪ من هدفك ٢١٨٠"
+  /// (the Arabic comma: beside Arabic digits a middle dot reads as a zero).
   String costLine() {
     final t = targetKcal;
     final share = t == null || t <= 0 ? null : (facts.kcal * 100 / t).round();
     if (isAr) {
       final base = 'حوالي ${iso('${facts.kcal}')} سعرة';
-      return share == null ? base : '$base · ${iso('$share')}٪ من هدفك ${iso('$t')}';
+      return share == null ? base : '$base، ${iso('$share')}٪ من هدفك ${iso('$t')}';
     }
     final base = 'About ${facts.kcal} kcal';
     return share == null ? base : '$base · $share% of your $t';
