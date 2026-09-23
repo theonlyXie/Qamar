@@ -3407,9 +3407,12 @@ class AppState extends ChangeNotifier {
   /// here — Paymob tells the server, and the next entitlement read does.
   Future<void> startPlusPurchase() async {
     if (plusActive && !plusIsTrial) {
+      // There is nothing to cancel: a payment only extends the month.
+      final until = plusUntil?.toLocal();
+      final when = until == null ? '' : '${until.day}/${until.month}';
       plusNotice = isAr
-          ? 'اشتراكك شغال عن طريق Paymob. لو حابب تلغيه، راسل الدعم من الشاشة دي.'
-          : 'Your subscription is billed through Paymob. To cancel, write to support from this screen.';
+          ? '${until == null ? 'شهرك شغال' : 'شهرك شغال لحد ${iso(when)}'}، ومفيش حاجة بتتجدد لوحدها. لما يخلص، تقدر تدفع الشهر اللي بعده من هنا.'
+          : '${until == null ? 'Your month is on' : 'Your month runs until $when'}, and nothing renews on its own. When it ends, you can pay for the next one here.';
       _notify();
       return;
     }

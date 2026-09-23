@@ -1,0 +1,136 @@
+// What the paywall promises (O14). Every clause has to be true for the person
+// reading it: the price against one nutritionist visit, not below it; "same
+// price for everyone" only while no campaign code has lowered it; the earned
+// month in the server's numbers, only once the server has stated them and the
+// month can still be earned; and "nothing renews on its own", because nothing
+// does and there is nothing to cancel.
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+
+import 'package:qamar/l10n/strings.dart';
+import 'package:qamar/main.dart';
+import 'package:qamar/models/billing.dart';
+import 'package:qamar/screens/subscription_screen.dart';
+import 'package:qamar/state/app_state.dart';
+
+/// A free-tier person whose earned-month status the server has answered:
+/// no paid membership yet, so the window opens on the first payment.
+EarnedMonth _stated({int needed = 20, int window = 30, bool claimed = false, DateTime? windowStart, bool open = false}) => EarnedMonth(
+      open: open,
+      loggedDays: 0,
+      needed: needed,
+      windowDays: window,
+      daysLeft: 0,
+      eligible: false,
+      claimed: claimed,
+      windowStart: windowStart,
+    );
+
+AppState _lite(AppLang lang, {EarnedMonth? earned, PlusQuote? quote}) {
+  final s = AppState()..setLang(lang);
+  if (earned != null) s.earnedMonth = earned;
+  if (quote != null) s.plusQuote = quote;
+  return s;
+}
+
+Future<String> _paywall(WidgetTester tester, AppState s) async {
+  await tester.binding.setSurfaceSize(const Size(900, 3000));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+  s.go(AppScreen.subscription);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  return tester.widgetList<Text>(find.byType(Text)).map((t) => t.data ?? t.textSpan?.toPlainText() ?? '').join(' | ');
+}
+
+String _banner(WidgetTester tester) => tester.widget<Text>(find.byKey(SubscriptionScreen.bannerKey)).data!;
+
+void main() {
+  testWidgets('the agreed banner, in both languages, with the server\'s numbers', (tester) async {
+    await _paywall(tester, _lite(AppLang.en, earned: _stated()));
+    expect(
+      _banner(tester),
+      'EGP 500 a month — about one nutritionist visit, with Qamar at every meal. Same price for everyone. '
+      'Log 20 of your first 30 days after you subscribe and the next month is on us. Nothing renews on its own.',
+    );
+
+    await _paywall(tester, _lite(AppLang.ar, earned: _stated()));
+    final ar = _banner(tester);
+    expect(ar, contains('في حدود تمن كشف واحد عند أخصائي تغذية، وقمر معاك في كل وجبة.'));
+    expect(ar, contains('نفس السعر للكل.'));
+    expect(ar, contains('سجّل \u2066٢٠\u2069 يوم من أول \u2066٣٠\u2069 يوم بعد ما تشترك، والشهر اللي بعده علينا.'));
+    expect(ar, contains('ومفيش حاجة بتتجدد لوحدها.'));
+    expect(ar, isNot(contains('20')), reason: 'Eastern digits in Arabic');
+  });
+
+  testWidgets('a threshold tuned on the server is the one the banner states', (tester) async {
+    await _paywall(tester, _lite(AppLang.en, earned: _stated(needed: 24, window: 31)));
+    expect(_banner(tester), contains('Log 24 of your first 31 days after you subscribe'));
+  });
+
+  testWidgets('before the server has answered, the earned month is not stated from the fallback', (tester) async {
+    final s = _lite(AppLang.en);
+    expect(s.earnedMonth.stated, isFalse);
+    await _paywall(tester, s);
+    expect(_banner(tester), isNot(contains('Log ')));
+    expect(_banner(tester), isNot(contains('on us')));
+    expect(_banner(tester), contains('Nothing renews on its own.'));
+  });
+
+  testWidgets('once granted, or once the first 30 paid days are over, the month is not on offer', (tester) async {
+    await _paywall(tester, _lite(AppLang.en, earned: _stated(claimed: true)));
+    expect(_banner(tester), isNot(contains('on us')));
+    await _paywall(tester, _lite(AppLang.en, earned: _stated(windowStart: DateTime.utc(2026, 7, 1))));
+    expect(_banner(tester), isNot(contains('on us')), reason: 'the window opened on the first payment and has closed');
+    await _paywall(tester, _lite(AppLang.en, earned: _stated(windowStart: DateTime.utc(2026, 9, 10), open: true)));
+    expect(_banner(tester), contains('the next month is on us'), reason: 'still inside the window');
+  });
+
+  testWidgets('a campaign code that lowers the price takes "same price for everyone" away', (tester) async {
+    const campaign = PlusQuote(
+      plan: 'monthly',
+      days: 30,
+      listCents: 50000,
+      amountCents: 25000,
+      pricingReason: 'campaign',
+      firstPurchase: true,
+      promoCode: 'RAMADAN',
+      promoKind: 'campaign',
+    );
+    await _paywall(tester, _lite(AppLang.en, earned: _stated(), quote: campaign));
+    expect(_banner(tester), isNot(contains('Same price for everyone')));
+    expect(_banner(tester), startsWith('EGP 500 a month'), reason: 'the list price, which the tile shows struck through');
+  });
+
+  testWidgets('nothing on the paywall offers a cancel, a "less than one visit", or "no discounts"', (tester) async {
+    for (final lang in AppLang.values) {
+      final text = await _paywall(tester, _lite(lang, earned: _stated()));
+      for (final never in ['cancel', 'Cancel', 'less than', 'No annual', 'no discounts', 'إلغاء', 'أقل من زيارة', 'خصومات']) {
+        expect(text, isNot(contains(never)), reason: '$never, in ${lang.name}');
+      }
+      expect(text, contains(lang == AppLang.ar ? '٣٠ يوم · مفيش حاجة بتتجدد لوحدها' : '30 days · nothing renews on its own'), reason: 'the plan tile');
+    }
+  });
+
+  testWidgets('the paywall leads with tomorrow: the first line, and the first row of the table', (tester) async {
+    final text = await _paywall(tester, _lite(AppLang.en, earned: _stated()));
+    expect(tester.widget<Text>(find.byKey(SubscriptionScreen.leadKey)).data,
+        'Qamar+ tells you what to eat tomorrow: it writes the plan at night, in Egyptian dishes.');
+    final table = text.substring(text.indexOf('What you get'));
+    expect(table.indexOf('Tomorrow’s plan, written overnight'), lessThan(table.indexOf('Log meals by typing or speaking')),
+        reason: 'tomorrow’s plan is the table’s first row');
+  });
+
+  test('a paying member is told the month simply runs out, not how to cancel', () async {
+    for (final lang in AppLang.values) {
+      final s = AppState()
+        ..setLang(lang)
+        ..plusActive = true
+        ..plusUntil = DateTime.utc(2026, 10, 20, 12);
+      await s.startPlusPurchase();
+      expect(s.plusNotice, lang == AppLang.ar ? contains('ومفيش حاجة بتتجدد لوحدها') : contains('nothing renews on its own'));
+      expect(s.plusNotice, isNot(contains(lang == AppLang.ar ? 'تلغي' : 'cancel')));
+    }
+  });
+}

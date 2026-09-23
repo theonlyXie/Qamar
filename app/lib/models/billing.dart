@@ -342,6 +342,11 @@ class EarnedMonth {
   final DateTime? windowStart;
   final DateTime? windowEnd;
 
+  /// The server stated the rule: [needed] and [windowDays] came from
+  /// qamar_earned_month_status, not from the fallback below. A sentence that
+  /// states the rule is shown only when this is true.
+  final bool stated;
+
   const EarnedMonth({
     required this.open,
     required this.loggedDays,
@@ -353,10 +358,17 @@ class EarnedMonth {
     this.grantedUntil,
     this.windowStart,
     this.windowEnd,
+    this.stated = true,
   });
 
-  /// No paid membership yet, so no window.
-  static const none = EarnedMonth(open: false, loggedDays: 0, needed: 20, windowDays: 30, daysLeft: 0, eligible: false, claimed: false);
+  /// Before the server has answered: the launch rule, not stated by anyone.
+  static const none = EarnedMonth(open: false, loggedDays: 0, needed: 20, windowDays: 30, daysLeft: 0, eligible: false, claimed: false, stated: false);
+
+  /// The promo can still be earned by this person: the server has stated the
+  /// rule, it has not been granted, and either no paid membership has begun
+  /// (the window opens on the first payment) or the window is running. After
+  /// the first 30 paid days, or once granted, it is not on offer.
+  bool get onOffer => stated && !claimed && (windowStart == null || open);
 
   /// Still being earned: the window is open and the month is not yet reached.
   bool get inProgress => open && !eligible && !claimed;
@@ -375,6 +387,7 @@ class EarnedMonth {
       grantedUntil: when('granted_until'),
       windowStart: when('window_start'),
       windowEnd: when('window_end'),
+      stated: json['needed'] is num && json['window_days'] is num,
     );
   }
 }

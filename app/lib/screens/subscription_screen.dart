@@ -17,6 +17,36 @@ import '../widgets/moon.dart';
 class SubscriptionScreen extends StatelessWidget {
   const SubscriptionScreen({super.key});
 
+  static const leadKey = ValueKey('paywall-lead');
+  static const bannerKey = ValueKey('paywall-banner');
+
+  /// The price, as O14 agreed it: priced against a nutritionist, not against
+  /// apps, and every clause true for the person reading it.
+  /// - "About one visit": a visit costs EGP 350–800, a video consultation
+  ///   starts at 300; 500 is in that range, not below it.
+  /// - "Same price for everyone" goes whenever a campaign code has lowered
+  ///   this quote.
+  /// - The earned month is stated in the server's numbers, and only once the
+  ///   server has stated them and the month can still be earned.
+  /// - "Nothing renews on its own": a payment only extends the month
+  ///   (qamar_apply_paid_order), and there is nothing to cancel.
+  static String priceBanner(AppState state, PlusQuote quote) {
+    final isAr = state.isAr;
+    final price = formatEgp(quote.listPounds, ar: isAr, eastern: state.easternDigits);
+    final earned = state.earnedMonth;
+    return [
+      isAr
+          ? '$price في الشهر — في حدود تمن كشف واحد عند أخصائي تغذية، وقمر معاك في كل وجبة.'
+          : '$price a month — about one nutritionist visit, with Qamar at every meal.',
+      if (!quote.discounted) isAr ? 'نفس السعر للكل.' : 'Same price for everyone.',
+      if (earned.onOffer)
+        isAr
+            ? 'سجّل ${state.iso('${earned.needed}')} يوم من أول ${state.iso('${earned.windowDays}')} يوم بعد ما تشترك، والشهر اللي بعده علينا.'
+            : 'Log ${earned.needed} of your first ${earned.windowDays} days after you subscribe and the next month is on us.',
+      isAr ? 'ومفيش حاجة بتتجدد لوحدها.' : 'Nothing renews on its own.',
+    ].join(' ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -53,10 +83,19 @@ class SubscriptionScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
+        // What Qamar+ is for, first: the answer to "what do I eat?" The
+        // night job writes tomorrow's plan for every member at 22:00 Cairo.
+        Text(
+          isAr ? 'قمر+ بيقولك تاكل إيه بكرة: بيكتبلك الخطة بالليل، بأكل مصري.' : 'Qamar+ tells you what to eat tomorrow: it writes the plan at night, in Egyptian dishes.',
+          key: SubscriptionScreen.leadKey,
+          textAlign: TextAlign.center,
+          style: QText.body(size: 15, height: 23, weight: FontWeight.w600, color: QColors.textHigh),
+        ),
+        const SizedBox(height: 6),
         Text(
           isAr
-              ? 'قمر بيشتغل معاك من غير اشتراك: خطة اليوم، تلات صور وتلات أسئلة كل يوم، والكتابة والصوت بلا حد. Qamar+ بيفتح خطة بكرة وصور وأسئلة أكتر.'
-              : 'Qamar works without a subscription: today’s plan, three photos and three questions a day, and unlimited typing and speaking. Qamar+ opens tomorrow’s plan and more photos and questions.',
+              ? 'ومن غيره قمر شغال برضه: خطة النهارده، تلات صور وتلات أسئلة كل يوم، والكتابة والصوت بلا حد.'
+              : 'Without it Qamar still works: today’s plan, three photos and three questions a day, and unlimited typing and speaking.',
           textAlign: TextAlign.center,
           style: QText.body(size: 14, height: 22, color: QColors.textMuted),
         ),
@@ -69,9 +108,8 @@ class SubscriptionScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(QRadii.xl),
           ),
           child: Text(
-            isAr
-                ? '٥٠٠ ج.م في الشهر — أقل من زيارة واحدة لأخصائي. مفيش سنة ومفيش خصومات؛ سعر واحد، والإلغاء بضغطة من «حسابي».'
-                : 'EGP 500 a month — less than one visit to a nutritionist. No annual tier and no discounts; one price, and cancel in one tap from Me.',
+            priceBanner(state, quote),
+            key: SubscriptionScreen.bannerKey,
             style: QText.body(size: 13, height: 20, color: QColors.textHigh),
           ),
         ),
@@ -173,7 +211,7 @@ class SubscriptionScreen extends StatelessWidget {
         ],
         QPrimaryButton(
           label: state.plusActive && !state.plusIsTrial
-              ? (isAr ? 'إدارة الاشتراك' : 'Manage subscription')
+              ? (isAr ? 'شهرك' : 'Your month')
               : (isAr
                   ? 'ابدأ ${formatEgp(quote.amountPounds, ar: true, eastern: state.easternDigits)}'
                   : 'Start Qamar+ — ${formatEgp(quote.amountPounds, ar: false)}'),
@@ -240,6 +278,8 @@ class _PromoFieldState extends State<_PromoField> {
       controller: _controller,
       textCapitalization: TextCapitalization.characters,
       autocorrect: false,
+      // A code is Latin: left to right in both languages ("QMR…", not "…QMR").
+      textDirection: TextDirection.ltr,
       onChanged: (v) => context.read<AppState>().setPlusPromoCode(v),
       style: QText.number(size: 15, color: QColors.textPrimary),
       decoration: InputDecoration(
@@ -282,7 +322,7 @@ class _TierCard extends StatelessWidget {
                     : 'A month on us: ${earned.loggedDays} of ${earned.needed} days logged')
                 : quote.pricingReason == 'affiliate'
                     ? (isAr ? '٣٠ يوم · بكود أخصائيك' : '30 days · with your nutritionist’s code')
-                    : (isAr ? '٣٠ يوم · إلغاء بضغطة' : '30 days · cancel in one tap');
+                    : (isAr ? '٣٠ يوم · مفيش حاجة بتتجدد لوحدها' : '30 days · nothing renews on its own');
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -333,13 +373,14 @@ class _TierCard extends StatelessWidget {
 typedef PlusFeature = ({String ar, String en, bool inFree});
 
 const _features = <PlusFeature>[
+  // First, what Qamar+ is for: the answer to "what do I eat tomorrow?"
+  (ar: 'خطة بكرة، مكتوبة بالليل', en: 'Tomorrow’s plan, written overnight', inFree: false),
   (ar: 'تسجيل الوجبات بالكتابة أو الصوت، بلا حد', en: 'Log meals by typing or speaking, unlimited', inFree: true),
   (ar: 'خطة اليوم بأطباق حقيقية', en: 'Today’s plan in real dishes', inFree: true),
   (ar: 'تصوير الوجبة — ٣ في اليوم (٣٠ مع Qamar+)', en: 'Photograph a meal — 3 a day (30 with Qamar+)', inFree: true),
   (ar: 'أسئلة لقمر — ٣ في اليوم (٥٠ مع Qamar+)', en: 'Questions to Qamar — 3 a day (50 with Qamar+)', inFree: true),
   (ar: 'صورة زيادة من المحفظة بنقاط Su', en: 'An extra photo from the wallet with Su Points', inFree: true),
   (ar: 'نقاط Su والمهام اليومية', en: 'Su Points and daily quests', inFree: true),
-  (ar: 'خطة بكرة، مكتوبة بالليل', en: 'Tomorrow’s plan, written overnight', inFree: false),
   (ar: 'المراجعة الأسبوعية الكاملة والمشاركة', en: 'The full weekly review, shareable', inFree: false),
   (ar: 'أولوية في المزايا الجديدة', en: 'Early access to new features', inFree: false),
 ];
