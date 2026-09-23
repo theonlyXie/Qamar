@@ -48,7 +48,7 @@ final List<OnboardingStep> kOnboardingSteps = [
     id: 'consent',
     kind: StepKind.chips,
     askAr:
-        'أهلاً 👋 أنا قمر. هساعدك تاكل أحسن من غير رجيم قاسي. قبل أي سؤال: الخدمة دي إرشاد عام بالذكاء الاصطناعي ومش استشارة طبية، ولازم أعالج بياناتك اللي بتدخلها عشان أحسب الهدف — ودي حاجة أساسية. وفي اختيار تاني منفصل: تسمح نشوف إزاي بتستخدم التطبيق — من غير أكلك ولا وزنك ولا اسمك — عشان نحسّن قمر؟',
+        'أهلاً، أنا قمر. هساعدك تاكل أحسن من غير رجيم قاسي. قبل أي سؤال: الخدمة دي إرشاد عام بالذكاء الاصطناعي ومش استشارة طبية، ولازم أعالج بياناتك اللي بتدخلها عشان أحسب الهدف — ودي حاجة أساسية. وفي اختيار تاني منفصل: تسمح نشوف إزاي بتستخدم التطبيق — من غير أكلك ولا وزنك ولا اسمك — عشان نحسّن قمر؟',
     askEn:
         'Hi, I’m Qamar. I’ll help you eat better without a punishing diet. Before any question: this is AI-powered general guidance, not medical advice, and processing the data you enter is required to calculate your target. Separately and optionally: may we see how you use the app — never your food, your weight or your name — to improve Qamar?',
     options: const [
