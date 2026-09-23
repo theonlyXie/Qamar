@@ -118,19 +118,12 @@ void expectAboveFold(WidgetTester tester, Finder what, String name) {
 /// Seat 6's height budgets above the fold (O15): the header about 110,
 /// Qamar's card about 130 — up to 190 in the morning, when the night note
 /// carries its link to the plan and the header has no streak line yet — the
-/// calorie card at most 290, the slot 120. What they protect is the fold:
-/// the slot's first 120 points are always above the band.
+/// calorie card at most 290, the slot 120, for every slot card. What they
+/// protect is the fold: whatever is in the slot is whole above the band.
 const budgets = (header: 110.0, qamar: 140.0, qamarMorning: 190.0, numbers: 290.0, slot: 120.0);
 
-/// The slot cards whose agreed words are longer than the slot's 120 points:
-/// the season's question (a question, its two answers and what "yes"
-/// changes). It still starts in the slot and its first 120 points are above
-/// the fold; the rest scrolls. Every other card is wholly above it, the
-/// gestures card included since its three gestures became one row of cells.
-const overBudget = {TodayCard.fasting};
-
-/// Each zone within its budget, and the slot's first [budgets].slot points —
-/// the whole card when it keeps to them — above the orb's band.
+/// Each zone within its budget, and the slot's card, whole, above the orb's
+/// band and the orb.
 void expectBudgets(WidgetTester tester, TodayCard? card, String label) {
   Rect? zone(TodayZone z) => _rectOf(tester, TodayScreen.zoneKey(z));
   expect(zone(TodayZone.header)!.height, lessThanOrEqualTo(budgets.header), reason: 'the header ($label)');
@@ -142,12 +135,9 @@ void expectBudgets(WidgetTester tester, TodayCard? card, String label) {
   if (card == null) return;
   final slot = zone(TodayZone.slot)!;
   final orbTop = tester.getRect(find.byKey(OrbNav.orbKey)).top;
-  if (!overBudget.contains(card)) {
-    expect(slot.height, lessThanOrEqualTo(budgets.slot), reason: '$card keeps to the slot ($label)');
-  }
-  final shown = slot.top + (slot.height < budgets.slot ? slot.height : budgets.slot);
-  expect(shown, lessThanOrEqualTo(insetFold), reason: 'the slot’s first ${budgets.slot} points are above the band: $card ($label)');
-  expect(shown, lessThanOrEqualTo(orbTop), reason: 'and above the orb: $card ($label)');
+  expect(slot.height, lessThanOrEqualTo(budgets.slot), reason: '$card keeps to the slot’s ${budgets.slot} points ($label)');
+  expect(slot.bottom, lessThanOrEqualTo(insetFold), reason: 'the slot’s card is whole above the band: $card ($label)');
+  expect(slot.bottom, lessThanOrEqualTo(orbTop), reason: 'and above the orb: $card ($label)');
 }
 
 AppState _state(AppLang lang, {Iterable<TodayCard> due = const [], bool score = true}) {
@@ -363,6 +353,7 @@ void main() {
       expect(slot.contains(tester.getRect(card).center), isTrue, reason: 'in the slot, where the question was');
       expect(find.descendant(of: card, matching: find.byType(QStateLine)), findsOneWidget);
       expect(find.byType(QStateCard), findsNothing, reason: 'not a second card fighting the slot');
+      expectBudgets(tester, TodayCard.fasting, 'the fasting line, ${lang.name}');
       expectAboveFold(tester, find.byKey(QamarCard.logKey), '"Log a meal"');
       expectAboveFold(tester, find.byKey(const ValueKey('today-sentence')), 'Qamar’s sentence');
     });

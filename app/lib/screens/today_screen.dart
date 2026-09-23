@@ -654,9 +654,12 @@ class _FastingPrompt extends StatelessWidget {
     final lead = until == null
         ? (isAr ? 'رمضان كريم.' : 'Ramadan Kareem.')
         : (isAr ? 'رمضان بعد ${state.iso('$until')} ${until == 1 ? 'يوم' : 'أيام'}.' : 'Ramadan is $until ${until == 1 ? 'day' : 'days'} away.');
-    // Tight enough to sit whole above the fold in the slot (O15).
+    // Within the slot's 120 points (O15), in both languages. The answers
+    // are drawn 34 tall in a 48-point touch (O11), so the 7 points of touch
+    // under each outline are the card's bottom margin, and the 7 above it
+    // the gap to the line over them: 8 visible points on every side.
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 11, 14, 4),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 1),
       decoration: BoxDecoration(
         color: QColors.gold.withValues(alpha: 0.08),
         border: Border.all(color: QColors.gold.withValues(alpha: 0.32)),
@@ -673,14 +676,13 @@ class _FastingPrompt extends StatelessWidget {
                   style: QText.body(size: 14, height: 21, weight: FontWeight.w600, color: QColors.textHigh)),
             ),
           ]),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             isAr
                 ? 'لو أيوة: الخطة تبقى إفطار وسحور، والمياه على مواعيد الليل. ببلاش للكل.'
                 : 'If yes: the plan becomes iftar and suhoor, and water moves to the night’s windows. Free for everyone.',
             style: QText.body(size: 12, height: 18, color: QColors.textMuted),
           ),
-          const SizedBox(height: 2),
           Row(children: [
             QOutlineButton(label: isAr ? 'أيوة، صايم' : 'Yes, fasting', height: 34, color: QColors.gold, onTap: () => state.setFasting(true)),
             const SizedBox(width: 10),
