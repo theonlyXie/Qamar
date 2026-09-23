@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show Icons;
 
 /// Every glyph the app draws, by what it means (the mono-glass skill: one
 /// icon family). All of them are Cupertino icons — the open drawing of Apple's
@@ -82,4 +83,53 @@ abstract final class QIcons {
   static const time = CupertinoIcons.clock;
   static const gesture = CupertinoIcons.hand_draw;
   static const trend = CupertinoIcons.graph_square;
+  static const idea = CupertinoIcons.lightbulb;
+  static const shield = CupertinoIcons.shield;
+  static const star = CupertinoIcons.star;
+  static const thumbsUp = CupertinoIcons.hand_thumbsup;
+  static const thumbsDown = CupertinoIcons.hand_thumbsdown;
+
+  // Choosing: a round mark for one of several, the way a list picks one.
+  static const chosen = CupertinoIcons.largecircle_fill_circle;
+  static const unchosen = CupertinoIcons.circle;
+
+  // The orb's gestures, as the gestures guide names them.
+  static const tap = CupertinoIcons.hand_point_right;
+  static const move = CupertinoIcons.move;
+
+  // Things and places.
+  static const calendar = CupertinoIcons.calendar;
+  static const basket = CupertinoIcons.bag;
+  static const gallery = CupertinoIcons.photo_on_rectangle;
+  static const settings = CupertinoIcons.gear;
+  static const bell = CupertinoIcons.bell;
+  static const bellOff = CupertinoIcons.bell_slash;
+  static const language = CupertinoIcons.globe;
+  static const trash = CupertinoIcons.trash;
+  static const friends = CupertinoIcons.person_2;
+  static const account = CupertinoIcons.person_crop_circle;
+  static const link = CupertinoIcons.link;
+  static const mail = CupertinoIcons.envelope;
+  static const document = CupertinoIcons.doc_text;
+  static const card = CupertinoIcons.creditcard;
+  static const code = CupertinoIcons.qrcode;
+  static const shown = CupertinoIcons.eye;
+  static const hidden = CupertinoIcons.eye_slash;
+  static const refresh = CupertinoIcons.arrow_clockwise;
+  static const sunrise = CupertinoIcons.sunrise;
+  static const sunset = CupertinoIcons.sunset;
+  static const search = CupertinoIcons.search;
+  static const up = CupertinoIcons.chevron_up;
+  static const unlocked = CupertinoIcons.lock_open;
+
+  /// Leaving (sign out): the arrow points out of the box the way the
+  /// reading goes, so it mirrors in Arabic.
+  static const signOut = IconData(0xf90e, fontFamily: _font, fontPackage: _package, matchTextDirection: true);
+
+  // Other people's marks, in their owners' own drawing and in one ink: the
+  // sign-in buttons' Apple and Facebook. Neither is in the Cupertino family,
+  // and neither is ours to redraw; like Google's G (QBrandMarks) they are the
+  // one exception to the family, and they are named here and nowhere else.
+  static const appleMark = Icons.apple;
+  static const facebookMark = Icons.facebook;
 }
