@@ -15,42 +15,23 @@ import 'package:qamar/theme/icons.dart';
 
 Iterable<File> _lib() => Directory('lib').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart'));
 
-/// Screens still being redesigned, whose last Material glyphs go with their
-/// redesign: owed, the way strings_test keeps its owed strings. A file comes
-/// off this list the moment it is clean (the test below says so), and the
-/// list ends empty.
-const _owed = {
-  'lib/screens/subscription_screen.dart',
-  'lib/screens/you_screen.dart',
-  'lib/widgets/account_sheet.dart',
-};
-
 String _path(File f) => f.path.replaceAll(r'\', '/');
 
 void main() {
-  test('no screen draws a Material glyph, or a Cupertino one by its own name, but those owed', () {
+  test('no screen draws a Material glyph, or a Cupertino one by its own name', () {
     final material = RegExp(r'(?<![A-Za-z])Icons\.[a-z_]');
     final cupertino = RegExp(r'CupertinoIcons\.[a-z_]');
     final found = <String>[];
-    final stillOwing = <String>{};
     for (final f in _lib()) {
       final path = _path(f);
       if (path == 'lib/theme/icons.dart') continue;
       final lines = f.readAsLinesSync();
       for (var i = 0; i < lines.length; i++) {
         if (lines[i].trimLeft().startsWith('//')) continue;
-        if (material.hasMatch(lines[i]) || cupertino.hasMatch(lines[i])) {
-          if (_owed.contains(path)) {
-            stillOwing.add(path);
-          } else {
-            found.add('$path:${i + 1}: ${lines[i].trim()}');
-          }
-        }
+        if (material.hasMatch(lines[i]) || cupertino.hasMatch(lines[i])) found.add('$path:${i + 1}: ${lines[i].trim()}');
       }
     }
     expect(found, isEmpty, reason: 'name the glyph in QIcons instead:\n${found.join('\n')}');
-    final paid = _owed.difference(stillOwing);
-    expect(paid, isEmpty, reason: 'clean now, so no longer owed: take it off the list: $paid');
   });
 
   test('the family is Cupertino, but for the two marks that are not ours', () {

@@ -17,6 +17,7 @@ import 'package:qamar/main.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/app_theme.dart';
+import 'package:qamar/widgets/explain.dart';
 
 import 'support/app_fonts.dart';
 
@@ -102,6 +103,11 @@ void main() {
       s.closeChat();
       s.openWhy();
       await check('the Why sheet');
+      s.closeWhy();
+      // The explain sheet's tip is a notice, on the control corner: with the
+      // fields moved into their sheets, the one place the sweep meets it.
+      s.openExplain(kExplanations['kcal_remaining']!);
+      await check('the explain sheet');
       expect(seen, containsAll([QRadii.control, QRadii.card, QRadii.sheet, QRadii.pill]), reason: 'the sweep saw the scale in use');
     });
   }

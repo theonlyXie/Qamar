@@ -3654,8 +3654,10 @@ class AppState extends ChangeNotifier {
           : 'Finish in Paymob. Qamar+ turns on when the payment is confirmed — the app does not mark you paid on its own.';
     } catch (e) {
       plusNotice = isAr
-          ? 'Paymob مش جاهز يستقبل دفعات دلوقتي. لو المفاتيح لسه متعملت، دي الخطوة الجاية من دليل Paymob.'
-          : 'Paymob cannot take a payment yet. If the keys are still missing, that is the next step in the Paymob guide.';
+          // Said to the person, not the developer: what happened and what to
+          // do. The missing keys are the build's problem, and the README's.
+          ? 'الدفع مش متاح دلوقتي. جرّب تاني بعد شوية؛ مفيش حاجة اتخصمت.'
+          : 'Payment isn’t available right now. Try again in a while; nothing was charged.';
     }
     _notify();
   }
