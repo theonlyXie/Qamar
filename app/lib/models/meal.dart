@@ -201,8 +201,10 @@ const List<SpendItemDef> kSpendCatalog = [
     once: false,
     nameAr: 'تجميد السلسلة',
     nameEn: 'Streak freeze',
-    whatAr: 'يوم واحد من غير تسجيل ميقطعش سلسلتك. بيتصرف لوحده لما تحتاجه.',
-    whatEn: 'One day without a log will not break your streak. Applied automatically when a day is missed.',
+    // Forward only (0064): it covers the day it is taken on or a later one,
+    // never a day already missed — there is no "restore my streak" purchase.
+    whatAr: 'يوم واحد من غير تسجيل ميقطعش سلسلتك، من يوم ما تاخده ولقدام. بيتصرف لوحده لما يوم يفوت — بس مبيرجّعش يوم فات قبل ما تاخده.',
+    whatEn: 'From the day you take it, one day without a log will not break your streak. Applied automatically when a day is missed — never to a day missed before you took it.',
     limitAr: 'مرة في الشهر · ميتشتراش بفلوس',
     limitEn: 'Once a month · never for money',
   ),

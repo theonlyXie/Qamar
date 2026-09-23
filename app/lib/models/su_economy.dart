@@ -52,7 +52,8 @@ class SuEconomy {
   static const int extraAiUse = 400;
 
   static const int weeklyInsight = 600;
-  /// One freeze a month covers one empty day in a streak.
+  /// One freeze a month covers one empty day in a streak: the day it is
+  /// taken on or a later one, never a day already missed (0064).
   static const int streakFreeze = 600;
   static const int cosmetic = 2500;
 
