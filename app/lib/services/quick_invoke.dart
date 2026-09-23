@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 
 import '../state/app_state.dart';
@@ -128,7 +129,16 @@ class QuickInvoke {
     }
   }
 
+  /// Shortcuts and links as they arrive. A browser has no such channel,
+  /// and a platform without the plugin says so as an error on the stream:
+  /// both are simply no shortcuts, not a failure to report.
   static Stream<QuickAction> events() {
-    return _events.receiveBroadcastStream().map(parseMap).where((a) => a != null).cast<QuickAction>();
+    if (kIsWeb) return const Stream.empty();
+    return _events
+        .receiveBroadcastStream()
+        .handleError((Object _) {}, test: (e) => e is MissingPluginException || e is PlatformException)
+        .map(parseMap)
+        .where((a) => a != null)
+        .cast<QuickAction>();
   }
 }
