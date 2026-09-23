@@ -31,7 +31,9 @@ void main() {
 
   test('without a spike, last week is the comparison', () {
     final r = build([2000, 2000, 2000, 2000, 2000, 0, 0], lastWeek: [1600, 1600, 1600, 1600, 1600, 0, 0]);
-    expect(r.insight.en, 'Your daily average is 25% above last week.');
+    // The closing words wrap as one (no-break space): the card never ends on
+    // "week." alone.
+    expect(r.insight.en, 'Your daily average is 25% above last\u00A0week.');
     final flat = build([2000, 2000, 2000, 2000, 2000, 0, 0], lastWeek: [1960, 1960, 1960, 1960, 1960, 0, 0]);
     expect(flat.insight.en, contains('under 5%'));
   });
@@ -48,7 +50,7 @@ void main() {
     expect(r.enough, isFalse);
     expect(r.avgKcal, isNull);
     expect(r.insight.en, contains('Log at least 3 days'));
-    expect(r.insight.en, contains('1 to go'));
+    expect(r.insight.en, contains('1\u00A0to\u00A0go'), reason: 'the count and its words wrap as one');
     expect(r.change.en, contains('log just lunch'));
   });
 

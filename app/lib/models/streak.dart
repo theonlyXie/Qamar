@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import '../l10n/words.dart';
 import 'days.dart';
 
 /// Days in a row with at least one logged meal.
@@ -125,7 +126,7 @@ String? streakSentence(Streak s, {required bool ar, required String Function(Str
     const ordEn = ['Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
     return ar ? '${ordAr[n - 2]} يوم ورا بعض.' : '${ordEn[n - 2]} day running.';
   }
-  return ar ? '${iso('$n')} يوم ورا بعض.' : '$n days running.';
+  return ar ? '${Counted.day.of(n, ar: true, iso: iso)} ورا بعض.' : '$n days running.';
 }
 
 /// What the moon says about a day. Seat 4 owns what the states mean; seat 6

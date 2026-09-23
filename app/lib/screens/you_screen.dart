@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/words.dart';
 import '../models/billing.dart';
 import '../models/invitation.dart';
 import '../models/su_economy.dart';
@@ -29,14 +30,9 @@ class YouScreen extends StatelessWidget {
   /// How many things Qamar remembers, counted the way each language counts:
   /// "1 item" and "2 items"; in Arabic one, two (the dual), three to ten
   /// (the plural) and eleven on (the singular), where both used to say the
-  /// plural for every number ("1 items", "١ عناصر").
-  static String itemsLine(int n, {required bool isAr, required String Function(String) iso}) {
-    if (!isAr) return n == 1 ? '1 item' : '$n items';
-    if (n == 1) return 'عنصر واحد';
-    if (n == 2) return 'عنصرين';
-    final lastTwo = n % 100;
-    return lastTwo >= 3 && lastTwo <= 10 ? '${iso('$n')} عناصر' : '${iso('$n')} عنصر';
-  }
+  /// plural for every number ("1 items", "١ عناصر"). The app's one count
+  /// rule ([Counted]).
+  static String itemsLine(int n, {required bool isAr, required String Function(String) iso}) => Counted.item.of(n, ar: isAr, iso: iso);
 
   /// The read-out of what Qamar holds, and the wallet card.
   static const readOutKey = ValueKey('you-read-out');

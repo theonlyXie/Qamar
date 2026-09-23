@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import '../l10n/words.dart';
 import '../services/repositories.dart';
 import 'streak.dart';
 
@@ -105,9 +106,12 @@ class WeekReview {
     final ReviewLine insight;
     if (loggedDays < minDays) {
       final left = minDays - loggedDays;
+      // The days counted the way each language counts ([Counted]: يومين, يوم
+      // واحد), and the closing count kept whole ([together]): on the card
+      // "go." was left alone on a line of its own.
       insight = (
-        ar: 'سجّل ${iso('$minDays')} أيام على الأقل وأقدر أقولك حاجة متتوقعها. لسه ${iso('$left')} ${left == 1 ? 'يوم' : 'أيام'}.',
-        en: 'Log at least $minDays days and I can tell you something you did not expect — $left to go.',
+        ar: 'سجّل ${Counted.day.of(minDays, ar: true, iso: iso)} على الأقل وأقدر أقولك حاجة متتوقعها. ${together('لسه ${Counted.day.of(left, ar: true, iso: iso)}.')}',
+        en: 'Log at least ${Counted.day.of(minDays, ar: false, iso: iso)} and I can tell you something you did not expect — ${together('$left to go.')}',
       );
     } else if (spike != null) {
       final w = spike.day.day.weekday - 1;
@@ -119,8 +123,8 @@ class WeekReview {
       final more = weekDiffPct > 0;
       final n = iso('${weekDiffPct.abs()}');
       insight = (
-        ar: more ? 'متوسطك اليومي أعلى من الأسبوع اللي فات بـ $n٪.' : 'متوسطك اليومي أقل من الأسبوع اللي فات بـ $n٪.',
-        en: more ? 'Your daily average is ${weekDiffPct.abs()}% above last week.' : 'Your daily average is ${weekDiffPct.abs()}% below last week.',
+        ar: more ? 'متوسطك اليومي أعلى من الأسبوع اللي فات ${together('بـ $n٪.')}' : 'متوسطك اليومي أقل من الأسبوع اللي فات ${together('بـ $n٪.')}',
+        en: more ? 'Your daily average is ${weekDiffPct.abs()}% above ${together('last week.')}' : 'Your daily average is ${weekDiffPct.abs()}% below ${together('last week.')}',
       );
     } else if (weekDiffPct != null) {
       insight = (
@@ -136,7 +140,7 @@ class WeekReview {
       );
     } else {
       insight = (
-        ar: '${iso('$loggedDays')} أيام مسجلة من ${iso('7')} — ده اللي بيخلّي الأرقام تتكلم.',
+        ar: '${iso('$loggedDays')} أيام مسجلة من ${iso('7')} — ده اللي بيخلّي ${together('الأرقام تتكلم.')}',
         en: '$loggedDays days logged out of 7 — that is what lets the numbers speak.',
       );
     }
@@ -152,13 +156,13 @@ class WeekReview {
       );
     } else if (loggedDays < 4) {
       change = (
-        ar: 'الأسبوع الجاي: سجّل الغدا بس، ${iso('5')} أيام. الباقي أنا أحسبه.',
-        en: 'Next week: log just lunch, five days. I’ll do the rest.',
+        ar: 'الأسبوع الجاي: سجّل الغدا بس، ${iso('5')} أيام. الباقي ${together('أنا أحسبه.')}',
+        en: 'Next week: log just lunch, five days. I’ll do ${together('the rest.')}',
       );
     } else if (hasTarget && inRange * 2 < loggedDays) {
       change = (
         ar: 'الأسبوع الجاي: التزم بغدا الخطة ${iso('3')} أيام.',
-        en: 'Next week: stick to the lunch on the plan three days.',
+        en: 'Next week: stick to the lunch on the plan ${together('three days.')}',
       );
     } else {
       change = (
