@@ -393,6 +393,25 @@ class SuReceiptChip extends StatefulWidget {
   final SuReceipt receipt;
   const SuReceiptChip({super.key, required this.receipt});
 
+  /// How the receipt moves over its two seconds, [t] from 0 to 1 (O9): it
+  /// rises the last few points into place as it fades in — an ease-out, so it
+  /// arrives and stops, never overshoots — holds, and fades out with an
+  /// ease-in. [rise] is how far below its place it is drawn. With reduced
+  /// motion it does not move: it appears and, at the end, goes.
+  static ({double opacity, double rise}) motionAt(double t, {required bool still}) {
+    if (still) return (opacity: 1.0, rise: 0.0);
+    const inEnd = 0.12, outStart = 0.85, travel = 5.0;
+    if (t < inEnd) {
+      final e = Curves.easeOutCubic.transform(t / inEnd);
+      return (opacity: e, rise: travel * (1 - e));
+    }
+    if (t > outStart) {
+      final e = Curves.easeInCubic.transform((t - outStart) / (1 - outStart));
+      return (opacity: 1 - e, rise: 0.0);
+    }
+    return (opacity: 1.0, rise: 0.0);
+  }
+
   @override
   State<SuReceiptChip> createState() => _SuReceiptChipState();
 }
@@ -438,10 +457,8 @@ class _SuReceiptChipState extends State<SuReceiptChip> with SingleTickerProvider
         builder: (context, child) {
           final v = _c.value;
           if (_c.isCompleted) return const SizedBox.shrink();
-          // A short fade in and out; with reduced motion it simply appears
-          // and goes.
-          final opacity = still ? 1.0 : (v < 0.08 ? v / 0.08 : v > 0.85 ? (1 - v) / 0.15 : 1.0);
-          return Opacity(opacity: opacity.clamp(0.0, 1.0), child: child);
+          final m = SuReceiptChip.motionAt(v, still: still);
+          return Transform.translate(offset: Offset(0, m.rise), child: Opacity(opacity: m.opacity, child: child));
         },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
