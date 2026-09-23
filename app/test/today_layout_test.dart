@@ -140,6 +140,13 @@ void expectBudgets(WidgetTester tester, TodayCard? card, String label) {
   expect(slot.bottom, lessThanOrEqualTo(orbTop), reason: 'and above the orb: $card ($label)');
 }
 
+/// Every control on screen meets the three tap-target guidelines (O11).
+Future<void> expectTouchable(WidgetTester tester, String where) async {
+  await expectLater(tester, meetsGuideline(androidTapTargetGuideline), reason: '48dp: $where');
+  await expectLater(tester, meetsGuideline(iOSTapTargetGuideline), reason: '44pt: $where');
+  await expectLater(tester, meetsGuideline(labeledTapTargetGuideline), reason: 'every control named: $where');
+}
+
 AppState _state(AppLang lang, {Iterable<TodayCard> due = const [], bool score = true}) {
   final s = AppState(clock: () => _now)..setLang(lang);
   s.profile = s.profile.copyWith(name: 'Basel');
@@ -346,6 +353,7 @@ void main() {
       await s.setFasting(true);
       expect(todayCardsDue(s), [TodayCard.fasting]);
 
+      final semantics = tester.ensureSemantics();
       await _pump(tester, s, _phone);
       expect(tester.takeException(), isNull, reason: 'nothing overflows on a phone');
       final slot = tester.getRect(find.byKey(TodayScreen.zoneKey(TodayZone.slot)));
@@ -354,6 +362,8 @@ void main() {
       expect(find.descendant(of: card, matching: find.byType(QStateLine)), findsOneWidget);
       expect(find.byType(QStateCard), findsNothing, reason: 'not a second card fighting the slot');
       expectBudgets(tester, TodayCard.fasting, 'the fasting line, ${lang.name}');
+      await expectTouchable(tester, 'the fasting line (${lang.name})');
+      semantics.dispose();
       expectAboveFold(tester, find.byKey(QamarCard.logKey), '"Log a meal"');
       expectAboveFold(tester, find.byKey(const ValueKey('today-sentence')), 'Qamar’s sentence');
     });
@@ -385,6 +395,19 @@ void main() {
           expectBudgets(tester, c.card, '${c.card.name}, $moment, ${lang.name}');
         });
       }
+    }
+
+    // O11 on every slot card: each alone in the slot, on the phone, every
+    // control a whole touch (48 on Android, 44 on iOS) with a name.
+    for (final c in slotCases) {
+      testWidgets('every control is a whole touch with a name, ${c.card.name} in the slot (${lang.name})', (tester) async {
+        final s = _state(lang, due: [c.card]);
+        final semantics = tester.ensureSemantics();
+        await _pump(tester, s, _phone);
+        expect(todayFocus(s), c.card);
+        await expectTouchable(tester, '${c.card.name} in the slot (${lang.name})');
+        semantics.dispose();
+      });
     }
 
     testWidgets('the calorie card’s estimate note is one line, in a colour that passes AA (${lang.name})', (tester) async {
