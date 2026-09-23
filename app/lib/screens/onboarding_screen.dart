@@ -7,6 +7,7 @@ import '../models/profile.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/motion.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/dish_card.dart';
@@ -17,12 +18,18 @@ class OnboardingScreen extends StatefulWidget {
 
   /// The composer's send button, for tests.
   static const sendKey = ValueKey('onboarding-send');
+
+  /// The conversation, drawn from the bottom up (O7).
+  static const transcriptKey = ValueKey('onboarding-transcript');
+
+  /// The dock under it: the step's inputs and the composer.
+  static const dockKey = ValueKey('onboarding-dock');
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  final _chat = ChatScroller();
+  final _chat = ChatScroller(reversed: true);
   final _draftCtrl = TextEditingController();
 
   @override
@@ -39,7 +46,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final step = state.currentStep;
 
     // Any change in the transcript — a new message, or the typing bubble
-    // appearing or going away — re-pins the list to the bottom.
+    // appearing or going away — re-pins the list to the newest message.
     _chat.sync(state.msgs.length * 2 + (state.typing ? 1 : 0));
     if (_draftCtrl.text != state.draft) {
       _draftCtrl.value = TextEditingValue(text: state.draft, selection: TextSelection.collapsed(offset: state.draft.length));
@@ -91,105 +98,129 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ],
           ),
         ),
+        // Drawn from the bottom up (O7): each question sits right on the
+        // answer it asks for, and the empty space is sky above the
+        // conversation instead of a gap between a question and its control.
         Expanded(
           child: ListView.separated(
+            key: OnboardingScreen.transcriptKey,
             controller: _chat.controller,
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+            reverse: true,
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
             itemCount: state.msgs.length + (state.typing ? 1 : 0),
             separatorBuilder: (_, __) => const SizedBox(height: 14),
             itemBuilder: (context, i) {
-              if (i >= state.msgs.length) return const _TypingBubble();
-              return _MessageBubble(msg: state.msgs[i]);
+              // Newest first: the typing bubble while Qamar types, then the
+              // messages from the latest back.
+              if (state.typing && i == 0) return const _TypingBubble();
+              final back = i - (state.typing ? 1 : 0);
+              return _MessageBubble(msg: state.msgs[state.msgs.length - 1 - back]);
             },
           ),
         ),
         Container(
+          key: OnboardingScreen.dockKey,
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 34),
           decoration: const BoxDecoration(border: Border(top: BorderSide(color: QColors.borderFaint))),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (stepChips) ...[
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: step.options.map((o) {
-                    final selected = step.kind == StepKind.multi
-                        ? state.profile.prefs.contains(o.value)
-                        : (step.id == 'goal'
-                            ? state.profile.goal.name == o.value
-                            : step.id == 'activity'
-                                ? state.profile.activity == o.value
-                                : false);
-                    return QPillChip(label: o.label(state.isAr), selected: selected, onTap: () => state.pickOption(o));
-                  }).toList(),
-                ),
-                const SizedBox(height: 10),
-              ],
-              if (stepDate) ...[
-                Row(
-                  children: [
-                    QWheelField(
-                      unit: state.isAr ? 'يوم' : 'day',
-                      value: state.profile.birthDay,
-                      min: 1,
-                      max: state.birthMonthLength,
-                      loop: true,
-                      onChanged: state.setBirthDay,
-                    ),
-                    const SizedBox(width: 8),
-                    QWheelField(
-                      unit: state.isAr ? 'شهر' : 'month',
-                      value: state.profile.birthMonth,
-                      min: 1,
-                      max: 12,
-                      loop: true,
-                      format: (m) => (state.isAr ? _monthsAr : _monthsEn)[m - 1],
-                      onChanged: state.setBirthMonth,
-                    ),
-                    const SizedBox(width: 8),
-                    QWheelField(
-                      unit: state.isAr ? 'سنة' : 'year',
-                      value: state.profile.birthYear,
-                      min: DateTime.now().year - 90,
-                      max: DateTime.now().year - 10,
-                      onChanged: state.setBirthYear,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                _AgeReadout(state: state),
-                const SizedBox(height: 10),
-              ],
-              if (stepNumber) ...[
-                Row(
-                  children: [
-                    QWheelField(
-                      unit: state.isAr ? 'سم' : 'cm',
-                      value: state.profile.height,
-                      min: 140,
-                      max: 210,
-                      onChanged: state.setHeight,
-                    ),
-                    const SizedBox(width: 8),
-                    QWheelField(
-                      unit: state.isAr ? 'كجم' : 'kg',
-                      value: state.profile.weight,
-                      min: 40,
-                      max: 200,
-                      onChanged: state.setWeight,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-              ],
-              if (hasSubmit) ...[
-                QPrimaryButton(
-                  label: step == null ? (state.isAr ? 'يلا نبدأ' : 'Let’s start') : t.next,
-                  onTap: state.primarySubmit,
-                ),
-                const SizedBox(height: 10),
-              ],
+              // The step's inputs. Between one question and the next the
+              // dock keeps its height, so the conversation above it stays put;
+              // the inputs' entrance starts on the frame their question paints.
+              QKeepHeight(
+                child: (stepChips || stepDate || stepNumber || hasSubmit)
+                    ? _Entrance(
+                        key: ValueKey('inputs-${step?.id ?? 'end'}'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (stepChips) ...[
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: step.options.map((o) {
+                                  final selected = step.kind == StepKind.multi
+                                      ? state.profile.prefs.contains(o.value)
+                                      : (step.id == 'goal'
+                                          ? state.profile.goal.name == o.value
+                                          : step.id == 'activity'
+                                              ? state.profile.activity == o.value
+                                              : false);
+                                  return QPillChip(label: o.label(state.isAr), selected: selected, onTap: () => state.pickOption(o));
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            if (stepDate) ...[
+                              Row(
+                                children: [
+                                  QWheelField(
+                                    unit: state.isAr ? 'يوم' : 'day',
+                                    value: state.profile.birthDay,
+                                    min: 1,
+                                    max: state.birthMonthLength,
+                                    loop: true,
+                                    onChanged: state.setBirthDay,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  QWheelField(
+                                    unit: state.isAr ? 'شهر' : 'month',
+                                    value: state.profile.birthMonth,
+                                    min: 1,
+                                    max: 12,
+                                    loop: true,
+                                    format: (m) => (state.isAr ? _monthsAr : _monthsEn)[m - 1],
+                                    onChanged: state.setBirthMonth,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  QWheelField(
+                                    unit: state.isAr ? 'سنة' : 'year',
+                                    value: state.profile.birthYear,
+                                    min: DateTime.now().year - 90,
+                                    max: DateTime.now().year - 10,
+                                    onChanged: state.setBirthYear,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              _AgeReadout(state: state),
+                              const SizedBox(height: 10),
+                            ],
+                            if (stepNumber) ...[
+                              Row(
+                                children: [
+                                  QWheelField(
+                                    unit: state.isAr ? 'سم' : 'cm',
+                                    value: state.profile.height,
+                                    min: 140,
+                                    max: 210,
+                                    onChanged: state.setHeight,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  QWheelField(
+                                    unit: state.isAr ? 'كجم' : 'kg',
+                                    value: state.profile.weight,
+                                    min: 40,
+                                    max: 200,
+                                    onChanged: state.setWeight,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            if (hasSubmit) ...[
+                              QPrimaryButton(
+                                label: step == null ? (state.isAr ? 'يلا نبدأ' : 'Let’s start') : t.next,
+                                onTap: state.primarySubmit,
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                          ],
+                        ),
+                      )
+                    : null,
+              ),
               Row(
                 children: [
                   Expanded(
@@ -212,9 +243,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           filled: true,
                           fillColor: QColors.cardDeep,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: QColors.borderSoft)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: QColors.borderSoft)),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: QColors.violet)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.pill), borderSide: const BorderSide(color: QColors.borderSoft)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.pill), borderSide: const BorderSide(color: QColors.borderSoft)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.pill), borderSide: const BorderSide(color: QColors.violet)),
                         ),
                       ),
                     ),
@@ -587,3 +618,27 @@ class _SaveCard extends StatelessWidget {
 
 const _monthsAr = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 const _monthsEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/// A step's inputs arriving (O7): from the first frame their question is on
+/// screen, they fade in and rise the last few points into place with an
+/// ease-out, so they arrive and stop. With reduced motion they are simply
+/// there.
+class _Entrance extends StatelessWidget {
+  final Widget child;
+  const _Entrance({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final still = MediaQuery.disableAnimationsOf(context);
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: still ? 1 : 0, end: 1),
+      duration: still ? Duration.zero : QMotion.riseIn,
+      curve: Curves.easeOutCubic,
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(offset: Offset(0, 8 * (1 - t)), child: child),
+      ),
+      child: child,
+    );
+  }
+}

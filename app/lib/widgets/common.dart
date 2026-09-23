@@ -546,10 +546,11 @@ class _QWheelFieldState extends State<QWheelField> {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.md),
+        // One radius across the answer stack: the wheels and Continue (O7).
+        decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.lg),
         child: Column(
           children: [
-            Text(widget.unit, style: QText.body(size: 10, color: QColors.textMuted)),
+            Text(widget.unit, style: QText.body(size: 12, color: QColors.textMuted)),
             const SizedBox(height: 2),
             SizedBox(
               height: 88,
@@ -698,19 +699,28 @@ class _Segment extends StatelessWidget {
 
 /// Keeps a message list pinned to the newest message.
 ///
-/// A single post-frame `animateTo(maxScrollExtent)` is not enough: the extent
-/// is measured before tall content (the target card, a meal breakdown) has
-/// finished laying out, so the list stops short and the newest message stays
-/// off screen until the user scrolls by hand. This re-settles a moment later,
-/// and gets out of the way if the user has deliberately scrolled up to read
-/// back through the conversation.
+/// For a list drawn bottom-up ([reversed], `ListView(reverse: true)` with the
+/// newest message first), the newest message is always at offset 0, however
+/// tall the content above it grows, so pinning is one step: back to 0 when
+/// something new arrives, unless the person has scrolled up to read back
+/// (O7, O10).
+///
+/// For a list drawn top-down a single post-frame `animateTo(maxScrollExtent)`
+/// is not enough: the extent is measured before tall content (the target
+/// card, a meal breakdown) has finished laying out, so the list stops short
+/// and the newest message stays off screen until the user scrolls by hand.
+/// This re-settles a moment later, and gets out of the way if the user has
+/// deliberately scrolled up to read back through the conversation.
 class ChatScroller {
   final ScrollController controller = ScrollController();
+  final bool reversed;
+  ChatScroller({this.reversed = false});
+
   Timer? _settle;
   int _signature = -1;
 
-  /// Distance from the bottom within which we still consider the user "at the
-  /// bottom" and safe to auto-scroll.
+  /// Distance from the newest message within which we still consider the
+  /// user "at the bottom" and safe to auto-scroll.
   static const _stickyWindow = 160.0;
 
   /// Call from build with a value that changes whenever the content does.
@@ -722,6 +732,7 @@ class ChatScroller {
 
   void _schedule() {
     WidgetsBinding.instance.addPostFrameCallback((_) => _go(animate: true));
+    if (reversed) return;
     _settle?.cancel();
     // Second pass once late-laid-out content has grown the extent.
     _settle = Timer(const Duration(milliseconds: 240), () => _go(animate: false));
@@ -730,6 +741,12 @@ class ChatScroller {
   void _go({required bool animate}) {
     if (!controller.hasClients) return;
     final pos = controller.position;
+    if (reversed) {
+      // Never yank the view away from someone reading earlier messages.
+      if (pos.pixels > _stickyWindow || pos.pixels == 0) return;
+      controller.animateTo(0, duration: const Duration(milliseconds: 240), curve: Curves.easeOutCubic);
+      return;
+    }
     // Never yank the view away from someone reading earlier messages.
     if (pos.pixels < pos.maxScrollExtent - _stickyWindow && !animate) return;
     if (animate) {
@@ -746,6 +763,58 @@ class ChatScroller {
   }
 }
 
+/// Holds the height its child last had while the child is empty (O7): a
+/// dock whose inputs go away between one question and the next keeps its
+/// place, so the conversation above it does not drop and come back. When the
+/// next inputs arrive it grows or shrinks to them once, smoothly.
+class QKeepHeight extends StatefulWidget {
+  /// Null while there is nothing to show; the last height is held.
+  final Widget? child;
+  const QKeepHeight({super.key, required this.child});
+
+  @override
+  State<QKeepHeight> createState() => _QKeepHeightState();
+}
+
+class _QKeepHeightState extends State<QKeepHeight> {
+  double _held = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = widget.child;
+    final still = MediaQuery.disableAnimationsOf(context);
+    return AnimatedSize(
+      duration: still ? Duration.zero : const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.bottomCenter,
+      child: child == null
+          ? SizedBox(height: _held)
+          : _ReportHeight(onHeight: (h) => _held = h, child: child),
+    );
+  }
+}
+
+class _ReportHeight extends SingleChildRenderObjectWidget {
+  final ValueChanged<double> onHeight;
+  const _ReportHeight({required this.onHeight, required Widget super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderReportHeight(onHeight);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderReportHeight renderObject) => renderObject.onHeight = onHeight;
+}
+
+class _RenderReportHeight extends RenderProxyBox {
+  _RenderReportHeight(this.onHeight);
+  ValueChanged<double> onHeight;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    onHeight(size.height);
+  }
+}
 
 /// A text link to one of the public pages on dr-qamar.com.
 ///
