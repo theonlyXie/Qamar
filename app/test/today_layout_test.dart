@@ -19,6 +19,7 @@
 // seat 6's, against [expectAboveFold] below.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -36,6 +37,7 @@ import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/state/today_focus.dart';
+import 'package:qamar/theme/colors.dart';
 import 'package:qamar/theme/layout.dart';
 import 'package:qamar/widgets/common.dart';
 import 'package:qamar/widgets/living_orb.dart';
@@ -43,6 +45,7 @@ import 'package:qamar/widgets/orb_nav.dart';
 import 'package:qamar/widgets/quest_card.dart';
 
 import 'support/app_fonts.dart';
+import 'support/contrast.dart';
 
 /// A gateway whose plan is always refused by the daily cap.
 class _PlanCapped implements AiGateway {
@@ -110,6 +113,41 @@ void expectAboveFold(WidgetTester tester, Finder what, String name) {
   expect(bottom, lessThanOrEqualTo(insetFold), reason: '$name stays above the orb’s band ($insetFold), whatever is due');
   final orbTop = tester.getRect(orb).top;
   expect(bottom, lessThanOrEqualTo(orbTop), reason: '$name stays above the orb itself ($orbTop), whatever is due');
+}
+
+/// Seat 6's height budgets above the fold (O15): the header about 110,
+/// Qamar's card about 130 — up to 190 in the morning, when the night note
+/// carries its link to the plan and the header has no streak line yet — the
+/// calorie card at most 290, the slot 120. What they protect is the fold:
+/// the slot's first 120 points are always above the band.
+const budgets = (header: 110.0, qamar: 140.0, qamarMorning: 190.0, numbers: 290.0, slot: 120.0);
+
+/// The slot cards whose agreed words are longer than the slot's 120 points:
+/// the gestures card (three rows, seat 1 and seat 2's words) and the season's
+/// question (a question, its two answers and what "yes" changes). They still
+/// start in the slot and their first 120 points are above the fold; the rest
+/// scrolls. Every other card is wholly above it.
+const overBudget = {TodayCard.tutorial, TodayCard.fasting};
+
+/// Each zone within its budget, and the slot's first [budgets].slot points —
+/// the whole card when it keeps to them — above the orb's band.
+void expectBudgets(WidgetTester tester, TodayCard? card, String label) {
+  Rect? zone(TodayZone z) => _rectOf(tester, TodayScreen.zoneKey(z));
+  expect(zone(TodayZone.header)!.height, lessThanOrEqualTo(budgets.header), reason: 'the header ($label)');
+  final morning = label.contains('morning');
+  expect(zone(TodayZone.qamar)!.height, lessThanOrEqualTo(morning ? budgets.qamarMorning : budgets.qamar), reason: 'Qamar’s card ($label)');
+  if (zone(TodayZone.numbers) case final numbers?) {
+    expect(numbers.height, lessThanOrEqualTo(budgets.numbers), reason: 'the calorie card ($label)');
+  }
+  if (card == null) return;
+  final slot = zone(TodayZone.slot)!;
+  final orbTop = tester.getRect(find.byKey(OrbNav.orbKey)).top;
+  if (!overBudget.contains(card)) {
+    expect(slot.height, lessThanOrEqualTo(budgets.slot), reason: '$card keeps to the slot ($label)');
+  }
+  final shown = slot.top + (slot.height < budgets.slot ? slot.height : budgets.slot);
+  expect(shown, lessThanOrEqualTo(insetFold), reason: 'the slot’s first ${budgets.slot} points are above the band: $card ($label)');
+  expect(shown, lessThanOrEqualTo(orbTop), reason: 'and above the orb: $card ($label)');
 }
 
 AppState _state(AppLang lang, {Iterable<TodayCard> due = const [], bool score = true}) {
@@ -327,6 +365,52 @@ void main() {
       expect(find.byType(QStateCard), findsNothing, reason: 'not a second card fighting the slot');
       expectAboveFold(tester, find.byKey(QamarCard.logKey), '"Log a meal"');
       expectAboveFold(tester, find.byKey(const ValueKey('today-sentence')), 'Qamar’s sentence');
+    });
+  }
+
+  // Seat 6's budgets, card by card: each slot card alone in the slot, at the
+  // top of the screen's tallest (the morning's note, or a log with the
+  // streak line), in both languages.
+  for (final lang in AppLang.values) {
+    for (final moment in const ['morning', 'after a log']) {
+      for (final c in slotCases) {
+        testWidgets('within the height budgets, ${c.card.name} in the slot, $moment (${lang.name})', (tester) async {
+          final s = _state(lang, due: [c.card]);
+          if (moment == 'morning') {
+            s.nightNote = NightNote(
+              day: _now,
+              ar: 'بكرة جاهز: ٢١٨٠ سعرة على ٣ وجبات، مبني على هدفك — النهارده مفيش تسجيل.',
+              en: 'Tomorrow is ready: 2180 kcal over 3 meals, built on your target — nothing was logged today.',
+              planKcal: 2180,
+              todayKcal: 0,
+            );
+          } else {
+            s.serverStreak = const Streak(current: 3, best: 3, todayCounted: false);
+            s.meals.add(LoggedMeal(name: 'Koshary', sub: '', kcal: 640, p: 20, c: 100, f: 18, at: _now));
+          }
+          await _pump(tester, s, _phone);
+          expect(tester.takeException(), isNull);
+          expect(todayFocus(s), c.card);
+          expectBudgets(tester, c.card, '${c.card.name}, $moment, ${lang.name}');
+        });
+      }
+    }
+
+    testWidgets('the calorie card’s estimate note is one line, in a colour that passes AA (${lang.name})', (tester) async {
+      final s = _state(lang);
+      await _pump(tester, s, _phone);
+      final note = find.byKey(TodayScreen.estimateKey);
+      final paragraph = tester.renderObject<RenderParagraph>(note);
+      expect(paragraph.didExceedMaxLines, isFalse, reason: 'the whole sentence, on one line');
+      expect(tester.getSize(note).height, lessThanOrEqualTo(17));
+      final colour = tester.widget<Text>(note).style!.color!;
+      expect(contrastRatio(colour, QColors.cardMid), greaterThanOrEqualTo(4.5));
+    });
+
+    testWidgets('the Su chip’s number is 13pt, so the Arabic zero reads as a digit (${lang.name})', (tester) async {
+      final s = _state(lang);
+      await _pump(tester, s, _phone);
+      expect(tester.widget<Text>(find.byKey(SuChip.amountKey)).style!.fontSize, 13);
     });
   }
 

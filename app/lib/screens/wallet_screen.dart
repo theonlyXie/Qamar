@@ -25,7 +25,7 @@ class WalletScreen extends StatelessWidget {
     final isAr = state.isAr;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 56, 20, QLayout.pageBottom),
+      padding: const EdgeInsets.fromLTRB(20, QLayout.pageTop, 20, QLayout.pageBottom),
       children: [
         Row(children: [
           QBackButton(onTap: state.back, isAr: isAr),

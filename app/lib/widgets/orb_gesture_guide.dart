@@ -45,7 +45,7 @@ class OrbGestureGuide extends StatelessWidget {
     final learned = state.gesturesLearned;
     final photos = state.photoQuota.limit;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 11),
       decoration: BoxDecoration(
         color: QColors.violet.withValues(alpha: 0.08),
         border: Border.all(color: QColors.violet.withValues(alpha: 0.3)),
@@ -86,7 +86,7 @@ class OrbGestureGuide extends StatelessWidget {
           SizedBox(height: dismissible ? 0 : 8),
           for (final (g, icon, doAr, doEn, whatAr, whatEn) in rows()) ...[
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
+              padding: const EdgeInsets.symmetric(vertical: 2),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

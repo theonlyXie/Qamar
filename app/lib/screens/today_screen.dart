@@ -30,6 +30,9 @@ class TodayScreen extends StatefulWidget {
   static Key cardKey(TodayCard card) => ValueKey('today-card-${card.name}');
   static const guideKey = ValueKey('today-guide-below');
 
+  /// The calorie card's one line saying these are estimates.
+  static const estimateKey = ValueKey('today-estimate');
+
   @override
   State<TodayScreen> createState() => _TodayScreenState();
 }
@@ -84,7 +87,7 @@ class _TodayScreenState extends State<TodayScreen> {
     };
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 56, 20, QLayout.pageBottom),
+      padding: const EdgeInsets.fromLTRB(20, QLayout.pageTop, 20, QLayout.pageBottom),
       children: [
         for (final zone in TodayZone.values)
           if (zones[zone] case final w?) ...[
@@ -282,39 +285,44 @@ class _NumbersCard extends StatelessWidget {
     final con = state.consumed();
     final remaining = (tg.kcal - con.kcal).clamp(0, 1 << 30);
     double pct(int a, int b) => b == 0 ? 0 : (a / b).clamp(0, 1).toDouble();
+    // Within its budget above the fold (O15, <=290pt; about 250 here): the
+    // number with its unit under it and the question it raises beside it,
+    // the three macros in tight rows, and one line saying these are
+    // estimates, in a colour that passes AA.
     return Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
           decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardSlate]), border: QColors.borderStrong, radius: QRadii.xxxl,
-              shadow: [BoxShadow(color: QColors.blue.withOpacity(0.12), blurRadius: 40)]),
+              shadow: [BoxShadow(color: QColors.blue.withValues(alpha: 0.12), blurRadius: 40)]),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-                Explainable(
-                  id: 'kcal_remaining',
-                  child: ExplainMark(
-                    child: ShaderMask(
-                      shaderCallback: (r) => QColors.cyanVioletGradient.createShader(r),
-                      child: Text(state.digits('$remaining'), style: QText.number(size: 38, weight: FontWeight.w600, color: Colors.white)),
+              Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Explainable(
+                      id: 'kcal_remaining',
+                      child: ExplainMark(
+                        child: ShaderMask(
+                          shaderCallback: (r) => QColors.cyanVioletGradient.createShader(r),
+                          child: Text(state.digits('$remaining'), style: QText.number(size: 38, height: 44, weight: FontWeight.w600, color: Colors.white)),
+                        ),
+                      ),
                     ),
-                  ),
+                    Text(t.kcalRemaining, style: QText.body(size: 13, height: 18, weight: FontWeight.w500, color: QColors.textMuted)),
+                  ]),
                 ),
                 const SizedBox(width: 8),
-                Text(t.kcalRemaining, style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
+                // Next to the number it explains.
+                QOutlineButton(label: t.whyCta, onTap: state.openWhy, height: 30),
               ]),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Explainable(id: 'protein', child: _MacroRow(label: t.protein, text: state.isAr ? '${state.iso('${con.p} / ${tg.protein}')} جم' : '${con.p} / ${tg.protein} g', pct: pct(con.p, tg.protein))),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Explainable(id: 'carbs', child: _MacroRow(label: t.carbs, text: state.isAr ? '${state.iso('${con.c} / ${tg.carbs}')} جم' : '${con.c} / ${tg.carbs} g', pct: pct(con.c, tg.carbs))),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Explainable(id: 'fat', child: _MacroRow(label: t.fat, text: state.isAr ? '${state.iso('${con.f} / ${tg.fat}')} جم' : '${con.f} / ${tg.fat} g', pct: pct(con.f, tg.fat))),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(child: Text(t.estimateNote, style: QText.body(size: 11, color: QColors.textFaint))),
-                  QOutlineButton(label: t.whyCta, onTap: state.openWhy, height: 30),
-                ],
-              ),
+              const SizedBox(height: 12),
+              Text(t.estimateNote, key: TodayScreen.estimateKey, maxLines: 1, style: QText.body(size: 12, height: 16, color: QColors.textMuted)),
             ],
           ),
         );
@@ -555,10 +563,10 @@ class _MacroRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(label, style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMuted)),
-          ExplainMark(child: Text(text, style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMuted))),
+          Text(label, style: QText.body(size: 12, height: 16, weight: FontWeight.w500, color: QColors.textMuted)),
+          ExplainMark(child: Text(text, style: QText.body(size: 12, height: 16, weight: FontWeight.w500, color: QColors.textMid))),
         ]),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         ClipRRect(
           borderRadius: BorderRadius.circular(999),
           child: LinearProgressIndicator(
@@ -646,8 +654,9 @@ class _FastingPrompt extends StatelessWidget {
     final lead = until == null
         ? (isAr ? 'رمضان كريم.' : 'Ramadan Kareem.')
         : (isAr ? 'رمضان بعد ${state.iso('$until')} ${until == 1 ? 'يوم' : 'أيام'}.' : 'Ramadan is $until ${until == 1 ? 'day' : 'days'} away.');
+    // Tight enough to sit whole above the fold in the slot (O15).
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      padding: const EdgeInsets.fromLTRB(14, 11, 14, 4),
       decoration: BoxDecoration(
         color: QColors.gold.withValues(alpha: 0.08),
         border: Border.all(color: QColors.gold.withValues(alpha: 0.32)),
@@ -664,14 +673,14 @@ class _FastingPrompt extends StatelessWidget {
                   style: QText.body(size: 14, height: 21, weight: FontWeight.w600, color: QColors.textHigh)),
             ),
           ]),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             isAr
                 ? 'لو أيوة: الخطة تبقى إفطار وسحور، والمياه على مواعيد الليل. ببلاش للكل.'
                 : 'If yes: the plan becomes iftar and suhoor, and water moves to the night’s windows. Free for everyone.',
             style: QText.body(size: 12, height: 18, color: QColors.textMuted),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 2),
           Row(children: [
             QOutlineButton(label: isAr ? 'أيوة، صايم' : 'Yes, fasting', height: 34, color: QColors.gold, onTap: () => state.setFasting(true)),
             const SizedBox(width: 10),
@@ -766,7 +775,7 @@ class _EarnedMonthCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(title, style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.green, letterSpacing: 0.3)),
               ]),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(body, style: QText.body(size: 14, height: 21, color: QColors.textHigh)),
               if (!granted) ...[
                 const SizedBox(height: 10),
@@ -780,7 +789,7 @@ class _EarnedMonthCard extends StatelessWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(note, style: QText.body(size: 12, height: 18, color: QColors.textMuted)),
             ],
           ),
@@ -794,6 +803,9 @@ class _EarnedMonthCard extends StatelessWidget {
 /// Today's one Su display: a coin and the balance, which opens the wallet
 /// (O9). The chip draws small; its touch area is the full 48 points.
 class SuChip extends StatelessWidget {
+  /// The balance's number, for tests.
+  static const amountKey = ValueKey('su-chip-amount');
+
   final AppState state;
   const SuChip({super.key, required this.state});
 
@@ -820,7 +832,8 @@ class SuChip extends StatelessWidget {
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     const SuCoinIcon(size: 16),
                     const SizedBox(width: 6),
-                    ExplainMark(child: Text(state.formatSu(state.suAvailable), style: QText.number(size: 11, weight: FontWeight.w600, color: QColors.gold))),
+                    // 13pt: at 11 the Arabic zero read as a dot.
+                    ExplainMark(child: Text(state.formatSu(state.suAvailable), key: SuChip.amountKey, style: QText.number(size: 13, weight: FontWeight.w600, color: QColors.gold))),
                   ]),
                 ),
               ),

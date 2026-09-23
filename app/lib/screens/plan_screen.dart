@@ -61,7 +61,7 @@ class _PlanScreenState extends State<PlanScreen> {
       return CustomScrollView(
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 56, 20, 0),
+            padding: const EdgeInsets.fromLTRB(20, QLayout.pageTop, 20, 0),
             sliver: SliverList(delegate: SliverChildListDelegate(header)),
           ),
           SliverFillRemaining(
@@ -83,7 +83,7 @@ class _PlanScreenState extends State<PlanScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 56, 20, QLayout.pageBottom),
+      padding: const EdgeInsets.fromLTRB(20, QLayout.pageTop, 20, QLayout.pageBottom),
       children: [
         ...header,
         ...[

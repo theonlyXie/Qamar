@@ -333,7 +333,7 @@ class QStrings {
     saveTitle: 'Save your progress?', saveSub: 'Link an account to recover your data on any device. You can keep going without it.',
     saveNow: 'Link account', saveLater: 'Later', suEarned: 'earned',
     obSub: 'Getting to know you', dailyTarget: 'Your daily target', kcalDay: 'kcal / day',
-    estimateNote: 'These are general-wellness estimates, not medical values.',
+    estimateNote: 'General-wellness estimates, not medical values.',
     namePlaceholder: 'First name', skip: 'Skip', next: 'Continue', done: 'Done',
     today: 'Today', log: 'Log', plan: 'Plan', progress: 'Progress', you: 'You',
     kcalRemaining: 'kcal remaining today', nextMeal: 'Next meal', nextQuest: 'Today’s quest',

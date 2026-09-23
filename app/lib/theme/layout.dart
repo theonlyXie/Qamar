@@ -14,6 +14,11 @@ abstract final class QLayout {
   /// is still scrolling passes under the band's soft fade.
   static const double pageBottom = orbBand + 24;
 
+  /// Where a page starts under the status bar: close, as a large title sits
+  /// under a phone's own bar. It was 56, which spent a band of empty sky
+  /// above every page and pushed Today's slot below the fold (O15).
+  static const double pageTop = 16;
+
   /// The smallest touch any control takes, each way (O11). 48 rather than
   /// Apple's 44: most phones in Egypt run Android, whose guideline is 48dp,
   /// and 48 clears 44 as well.
