@@ -29,9 +29,9 @@ class TrialWords {
       ? 'أسبوعك مع قمر كامل بدأ: ${_days(days, ar, iso)}، من غير بطاقة، ومفيش حاجة بتتجدد لوحدها.'
       : 'Your week of the full Qamar has started: ${_days(days, ar, iso)}, no card, and nothing renews on its own.';
 
-  /// The paywall's button.
-  static String paywallButton(int days, {required bool ar, required Iso iso}) =>
-      ar ? 'ابدأ أسبوعك المجاني: ${_days(days, ar, iso)} من قمر كامل' : 'Start your free week: ${_days(days, ar, iso)} of the full Qamar';
+  /// The paywall's button: a verb and what it starts, short enough for one
+  /// line. Its days are said by [paywallRule], right under it.
+  static String paywallButton({required bool ar}) => ar ? 'ابدأ الأسبوع المجاني' : 'Start the free week';
 
   /// The paywall's rule under the button.
   static String paywallRule(int days, {required bool ar, required Iso iso}) => ar

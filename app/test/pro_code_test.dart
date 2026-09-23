@@ -1,7 +1,7 @@
-// A nutritionist's code in Me (O12, 0069). The client's card takes the code
-// and never states a trial length of its own; the professional's card
-// promises clients the free days only when the operator has confirmed the
-// code, and in the server's days.
+// A nutritionist's code in Me (O12, 0069), each side one row away in its
+// own sheet. The client's sheet takes the code and never states a trial
+// length of its own; the professional's sheet promises clients the free days
+// only when the operator has confirmed the code, and in the server's days.
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
 import 'package:qamar/models/billing.dart';
+import 'package:qamar/screens/you_screen.dart';
 import 'package:qamar/state/app_state.dart';
 
 /// The latest definition of [name] across every migration, as the database
@@ -31,18 +32,32 @@ String _latestFunction(String name) {
 Future<String> _me(WidgetTester tester, AppState s) async {
   await tester.binding.setSurfaceSize(const Size(900, 3200)); // tall: this checks the words, not the layout
   addTearDown(() => tester.binding.setSurfaceSize(null));
+  // A fresh app each time: a sheet left open by the last one goes with it.
+  await tester.pumpWidget(const SizedBox());
   await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
   s.go(AppScreen.you);
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
-  return tester.widgetList<Text>(find.byType(Text)).map((t) => t.data ?? t.textSpan?.toPlainText() ?? '').join(' | ');
+  return _texts(tester);
+}
+
+String _texts(WidgetTester tester) => tester.widgetList<Text>(find.byType(Text)).map((t) => t.data ?? t.textSpan?.toPlainText() ?? '').join(' | ');
+
+/// Opens the sheet behind [row] on Me, and reads what is on screen.
+Future<String> _open(WidgetTester tester, Key row) async {
+  await tester.tap(find.byKey(row));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 700)); // the sheet rises
+  return _texts(tester);
 }
 
 void main() {
   testWidgets('the client types the code in Me; with no account yet it waits on the phone and says so', (tester) async {
     final s = AppState()..setLang(AppLang.en);
-    final text = await _me(tester, s);
-    expect(text, contains('Your nutritionist’s code'));
+    var text = await _me(tester, s);
+    expect(text, contains('Nutritionist’s code'), reason: 'the row on Me');
+    expect(text, contains('If a nutritionist or coach sent you, add their code.'), reason: 'and what it is for, under it');
+    text = await _open(tester, YouScreen.proCodeRowKey);
     expect(text, contains('If a nutritionist or coach sent you, enter their code.'));
     expect(text, isNot(contains('14')), reason: 'the length is the server’s; the answer says the days given');
 
@@ -62,6 +77,12 @@ void main() {
       final text = await _me(tester, s);
       expect(text, contains(lang == AppLang.ar ? 'كود Dr. Sara على حسابك' : 'Dr. Sara’s code is on your account.'));
       expect(find.byKey(const ValueKey('pro-code-field')), findsNothing);
+      // The row names them, and asks for no other: it goes nowhere.
+      expect(find.descendant(of: find.byKey(YouScreen.proCodeRowKey), matching: find.text('Dr. Sara')), findsOneWidget);
+      await tester.tap(find.byKey(YouScreen.proCodeRowKey));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(find.byKey(const ValueKey('pro-code-field')), findsNothing, reason: 'no field to type another into');
     }
   });
 
@@ -69,26 +90,30 @@ void main() {
     final confirmed = AppState()
       ..setLang(AppLang.en)
       ..affiliateWallet = const AffiliateWallet(code: 'QMRSARA1', professional: true, clientTrialDays: 14);
-    var text = await _me(tester, confirmed);
+    await _me(tester, confirmed);
+    var text = await _open(tester, YouScreen.programmeRowKey);
     expect(text, contains('A client who enters it in Me before subscribing also gets 14 days of Qamar+ free.'));
 
     final unconfirmed = AppState()
       ..setLang(AppLang.en)
       ..affiliateWallet = const AffiliateWallet(code: 'QMROMAR1', clientTrialDays: 14);
-    text = await _me(tester, unconfirmed);
+    await _me(tester, unconfirmed);
+    text = await _open(tester, YouScreen.programmeRowKey);
     expect(text, contains('Once Qamar confirms you are a nutritionist or coach, a client who enters it in Me also gets 14 days of Qamar+ free.'));
     expect(text, isNot(contains('before subscribing also gets')));
 
     final tuned = AppState()
       ..setLang(AppLang.ar)
       ..affiliateWallet = const AffiliateWallet(code: 'QMRSARA1', professional: true, clientTrialDays: 21);
-    text = await _me(tester, tuned);
+    await _me(tester, tuned);
+    text = await _open(tester, YouScreen.programmeRowKey);
     expect(text, contains('٢١'), reason: 'the server’s number, in Eastern digits');
 
     final unstated = AppState()
       ..setLang(AppLang.en)
       ..affiliateWallet = const AffiliateWallet(code: 'QMRSARA1', professional: true);
-    text = await _me(tester, unstated);
+    await _me(tester, unstated);
+    text = await _open(tester, YouScreen.programmeRowKey);
     expect(text, isNot(contains('days of Qamar+ free')), reason: 'no days stated by the server, no promise');
   });
 

@@ -29,6 +29,7 @@ import 'package:qamar/models/invitation.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/colors.dart';
+import 'package:qamar/theme/icons.dart';
 import 'package:qamar/theme/text_styles.dart';
 import 'package:qamar/widgets/account_sheet.dart';
 import 'package:qamar/widgets/common.dart';
@@ -207,8 +208,10 @@ void main() {
       expect(sheet, findsOneWidget);
       expect(find.descendant(of: sheet, matching: find.byType(GoogleMark)), findsOneWidget, reason: 'Google’s own mark');
       expect(find.descendant(of: sheet, matching: find.byIcon(Icons.g_mobiledata)), findsNothing, reason: 'not the mobile-data glyph');
+      // Each provider a whole-width button of its own, named with a verb:
+      // "Continue with Google", "كمّل بـ Google".
       for (final way in const ['Google', 'Apple', 'Facebook']) {
-        expect(find.descendant(of: sheet, matching: find.text(way)), findsOneWidget, reason: way);
+        expect(find.descendant(of: sheet, matching: find.text(lang == AppLang.ar ? 'كمّل بـ $way' : 'Continue with $way')), findsOneWidget, reason: way);
       }
       expect(find.descendant(of: sheet, matching: find.byType(TextField)), findsOneWidget, reason: 'and email');
     });
@@ -372,8 +375,14 @@ void main() {
       expect(find.byIcon(Icons.radio_button_checked), findsNothing, reason: 'one plan is not a choice');
       expect(find.byIcon(Icons.radio_button_unchecked), findsNothing);
 
-      final checks = tester.widgetList<Icon>(find.byIcon(Icons.check)).map((i) => i.color).toSet();
-      expect(checks, {QColors.inkSecondary}, reason: 'included is one ink in both columns');
+      // Included is a check and left out a dash, both in the ink, so the
+      // shape says which rather than a shade; one ink in both columns.
+      final checks = tester.widgetList<Icon>(find.byIcon(QIcons.check)).map((i) => i.color).toSet();
+      expect(checks, {QColors.ink}, reason: 'included is one ink in both columns');
+      final dashes = tester.widgetList<Icon>(find.byIcon(QIcons.remove)).toList();
+      expect(dashes, isNotEmpty, reason: 'what the free tier does not have is marked, not left blank');
+      expect(dashes.map((i) => i.color).toSet(), {QColors.inkTertiary});
+      expect(find.byIcon(Icons.check), findsNothing, reason: 'no Material glyph');
     });
   }
 }

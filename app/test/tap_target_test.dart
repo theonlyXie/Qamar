@@ -147,7 +147,7 @@ void main() {
   });
 
   for (final lang in AppLang.values) {
-    testWidgets('on You, each count of Qamar’s questions is a whole touch, named for what it sets (${lang.name})', (tester) async {
+    testWidgets('on Me, each count of Qamar’s questions is a whole touch, named for what it sets (${lang.name})', (tester) async {
       tester.view.devicePixelRatio = 3;
       tester.view.physicalSize = const Size(390, 844) * 3;
       addTearDown(tester.view.reset);
@@ -165,8 +165,10 @@ void main() {
         final touch = find.descendant(of: seg, matching: find.byType(QTapArea));
         expect(tester.getSize(touch).width, greaterThanOrEqualTo(QLayout.minTap), reason: '$n: 48 across');
         expect(tester.getSize(touch).height, greaterThanOrEqualTo(QLayout.minTap), reason: '$n: 48 tall');
+        // Words, on Me's row "How many a day": off, once, twice.
         final label = tester.getSemantics(touch).label;
-        expect(label, lang == AppLang.ar ? contains('في اليوم') : '$n a day', reason: 'named for what it sets, not a bare digit');
+        const named = {AppLang.en: ['Off', 'Once', 'Twice'], AppLang.ar: ['مقفولة', 'مرة', 'مرتين']};
+        expect(label, named[lang]![n], reason: 'named for what it sets, not a bare digit');
       }
       await tester.tap(find.byKey(YouScreen.nudgeKey(1)));
       await tester.pump();
