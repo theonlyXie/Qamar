@@ -99,6 +99,20 @@ void main() {
       expect(tester.takeException(), isNull, reason: 'while building $screen');
       expectNoLatinDigits(tester, where: '$screen');
     }
+
+    // The wallet opens on Spend; its History is a column of numbers, one
+    // per row. An earning and a spend in the thousands, so the separator is
+    // checked with the digits.
+    state.ledgerExtra.addAll(const [
+      LedgerEntry(label: 'خلصت الإعداد', amount: 1000, when: 'امبارح'),
+      LedgerEntry(label: 'سؤال زيادة', amount: -800, when: 'دلوقتي'),
+    ]);
+    state.go(AppScreen.wallet);
+    state.showHistory();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('خلصت الإعداد'), findsOneWidget, reason: 'the History rows are drawn');
+    expectNoLatinDigits(tester, where: 'the wallet’s History');
   });
 
   // O11: every control is a whole touch — 48 points each way on Android, 44

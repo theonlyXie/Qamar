@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
 import 'package:qamar/models/activity.dart';
+import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/screens/today_screen.dart';
 import 'package:qamar/screens/wallet_screen.dart';
@@ -263,5 +264,36 @@ void main() {
       expect(plain(s.suAmount(250, signed: true)), '+٢٥٠ نقطة Su');
       expect(s.suAmount(100), isNot(contains(RegExp('[0-9]'))));
     });
+
+    // The wallet's History: the number alone, signed, through the same
+    // formatter as the balance above it. It drew the raw int: "+1000" under
+    // "1,000", and in Arabic "+1000" and "-800" in Latin digits under a
+    // balance in Eastern ones.
+    test('History\'s signed numbers: separated, and Eastern in Arabic with the sign before the number', () {
+      final en = AppState()..setLang(AppLang.en);
+      expect(en.suSigned(1000), '+1,000');
+      expect(en.suSigned(-800), '-800');
+      expect(en.suSigned(100), '+100');
+      final ar = AppState()..setLang(AppLang.ar);
+      expect(ar.suSigned(1000), '\u2066+١٬٠٠٠\u2069');
+      expect(ar.suSigned(-800), '\u2066-٨٠٠\u2069');
+    });
+
+    for (final lang in AppLang.values) {
+      testWidgets('the wallet\'s History draws them (${lang.name})', (tester) async {
+        final s = AppState()..setLang(lang);
+        s.ledgerExtra.addAll(const [
+          LedgerEntry(label: 'Onboarding', amount: 1000, when: 'Yesterday'),
+          LedgerEntry(label: 'Extra question', amount: -800, when: 'Just now'),
+        ]);
+        s.go(AppScreen.wallet);
+        s.showHistory();
+        await _pumpApp(tester, s);
+        await tester.pump(const Duration(milliseconds: 400));
+        final shown = _texts(tester, find.byType(MaterialApp));
+        expect(shown, containsAll([s.suSigned(1000), s.suSigned(-800)]));
+        expect(shown, isNot(contains('+1000')));
+      });
+    }
   });
 }

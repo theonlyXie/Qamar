@@ -4188,6 +4188,15 @@ class AppState extends ChangeNotifier {
   /// Arabic the name with the number agreement Arabic needs — "٥ نقاط Su",
   /// "١٠٠ نقطة Su". Where space is tight a coin and the number stand in for
   /// all of it; where only the name is needed it is `t.suName`.
+  /// A signed Su number standing alone, where a column of them is the
+  /// list (the wallet's History): "+1,000", "-800"; in Arabic "+١٬٠٠٠" and
+  /// "-٨٠٠", isolated so the sign stays before the number in a
+  /// right-to-left line.
+  String suSigned(int n) {
+    final text = '${n > 0 ? '+' : ''}${formatSu(n)}';
+    return isAr ? iso(text) : text;
+  }
+
   String suAmount(int n, {bool signed = false}) {
     final sign = signed && n > 0 ? '+' : '';
     if (!isAr) return '$sign${formatSu(n)} Su';

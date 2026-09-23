@@ -131,7 +131,7 @@ class WalletScreen extends StatelessWidget {
                   Text(entry.label, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textHigh)),
                   Text(entry.when, style: QText.body(size: 11, color: QColors.textMuted)),
                 ]),
-                Text(entry.amount >= 0 ? '+${entry.amount}' : '${entry.amount}', style: QText.number(size: 14, weight: FontWeight.w600, color: entry.amount < 0 ? QColors.red : QColors.gold)),
+                Text(state.suSigned(entry.amount), style: QText.number(size: 14, weight: FontWeight.w600, color: entry.amount < 0 ? QColors.red : QColors.gold)),
               ]),
             ),
           ],
