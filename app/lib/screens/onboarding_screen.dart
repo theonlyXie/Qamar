@@ -596,7 +596,8 @@ class _SaveCard extends StatelessWidget {
                   color: Colors.transparent,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(QRadii.pill),
-                    onTap: state.dismissSave,
+                    // "Link account" links one: the account sheet opens.
+                    onTap: state.linkFromSaveCard,
                     child: Ink(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),

@@ -2294,6 +2294,14 @@ class AppState extends ChangeNotifier {
     _notify();
   }
 
+  /// "Link account" on the save card: the account sheet opens, to link one
+  /// now. The card has done its job either way; Me keeps the same link.
+  void linkFromSaveCard() {
+    _track('save_link_opened');
+    openLinkAccount();
+    dismissSave();
+  }
+
   // ---- the free week, offered after the reveal (O12) ------------------------
   //
   // The blueprint's 7:30: after the plan reveal, never before it, the trial

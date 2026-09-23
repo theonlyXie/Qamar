@@ -17,6 +17,7 @@ import 'package:qamar/models/nudge.dart';
 import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/state/app_state.dart';
+import 'package:qamar/widgets/account_sheet.dart';
 import 'package:qamar/widgets/common.dart';
 
 Future<void> _wait([int ms = 1000]) => Future<void>.delayed(Duration(milliseconds: ms));
@@ -230,6 +231,35 @@ void main() {
       expect(transcript, contains('٪ من هدفك'), reason: 'the dish is costed against the target');
       expect(RegExp('[0-9]').hasMatch(transcript), isFalse, reason: transcript);
     });
+
+    for (final lang in AppLang.values) {
+      testWidgets('the reveal’s "Link account" opens the account sheet to link one; "Later" only puts the card away (${lang.name})', (tester) async {
+        final s = AppState()..setLang(lang);
+        await pump(tester, s);
+        s.go(AppScreen.onboard);
+        s.msgs.add(const ObMessage.save());
+        await tester.pump();
+        expect(find.text(s.t.saveTitle), findsOneWidget);
+
+        await tester.tap(find.text(s.t.saveNow));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500)); // the sheet rises
+        expect(s.authOpen, isTrue, reason: 'it links: the account sheet is open');
+        expect(s.authLinking, isTrue, reason: 'to link this account, not to sign in to another');
+        expect(find.byType(AccountSheet), findsOneWidget);
+        expect(find.text(s.t.saveTitle), findsNothing, reason: 'the card has done its job');
+
+        final later = AppState()..setLang(lang);
+        await pump(tester, later);
+        later.go(AppScreen.onboard);
+        later.msgs.add(const ObMessage.save());
+        await tester.pump();
+        await tester.tap(find.text(later.t.saveLater));
+        await tester.pump();
+        expect(later.authOpen, isFalse);
+        expect(find.text(later.t.saveTitle), findsNothing);
+      });
+    }
 
     testWidgets('a free week left at "Not now" is waiting on the Me tile, in both languages', (tester) async {
       final s = AppState()..plusTrialEligible = true;
