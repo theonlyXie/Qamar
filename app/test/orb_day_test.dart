@@ -15,6 +15,7 @@ import 'package:qamar/models/review.dart';
 import 'package:qamar/models/streak.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
+import 'package:qamar/widgets/living_orb.dart';
 import 'package:qamar/widgets/moon.dart';
 import 'package:qamar/widgets/review_card.dart';
 
@@ -76,6 +77,59 @@ void main() {
       OrbState at(int kcal) => OrbState.derive(consumedKcal: kcal, targetKcal: 2000, mealsToday: 3, planSlots: 3, streak: Streak.none);
       expect(at(2200).over, isFalse);
       expect(at(2600).over, isTrue);
+    });
+  });
+
+  group('the halo', () {
+    OrbState day(int kcal, {int? target = 2000, int meals = 1}) =>
+        OrbState.derive(consumedKcal: kcal, targetKcal: target, mealsToday: meals, planSlots: 3, streak: Streak.none);
+
+    test('an unknown day glows exactly as the moon at rest, never dimmer', () {
+      final rest = LivingOrb.glowBaseFor(null);
+      expect(rest, LivingOrb.restGlow);
+      expect(LivingOrb.glowBaseFor(day(0, meals: 0)), rest, reason: 'nothing logged: at rest, not half-lit');
+      expect(LivingOrb.glowBaseFor(OrbState.rest), rest);
+      for (final meals in [0, 1, 3, 5]) {
+        expect(LivingOrb.glowBaseFor(day(1800, target: null, meals: meals)), rest,
+            reason: 'no target ($meals meals): no reading, so no count against three');
+      }
+    });
+
+    test('a day the moon reads glows with its meals, as before', () {
+      expect(LivingOrb.glowBaseFor(day(600, meals: 1)), closeTo(0.16 + 0.24 / 3, 1e-9));
+      expect(LivingOrb.glowBaseFor(day(2000, meals: 3)), closeTo(0.40, 1e-9));
+    });
+
+    test('in the app: before the first log, and on the general-guidance route after three meals', () {
+      final s = AppState();
+      expect(LivingOrb.glowBaseFor(s.orbState()), LivingOrb.restGlow);
+      s.profile = s.profile.copyWith(safety: SafetyAnswer.pregnant);
+      for (var i = 0; i < 3; i++) {
+        s.meals.add(const LoggedMeal(name: 'فول', sub: '', kcal: 500, p: 20, c: 60, f: 12));
+      }
+      expect(s.orbState().day, OrbDay.unknown);
+      expect(LivingOrb.glowBaseFor(s.orbState()), LivingOrb.restGlow);
+    });
+
+    testWidgets('drawn: an unknown day’s halo is the decorative orb’s, frame for frame', (tester) async {
+      final unknown = OrbState.derive(consumedKcal: 0, targetKcal: 2000, mealsToday: 0, planSlots: 3, streak: Streak.none);
+      final read = OrbState.derive(consumedKcal: 600, targetKcal: 2000, mealsToday: 1, planSlots: 3, streak: Streak.none);
+      const a = ValueKey('decorative'), b = ValueKey('unknown'), c = ValueKey('read');
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Row(children: [
+            const LivingOrb(key: a, size: 56),
+            LivingOrb(key: b, size: 56, state: unknown),
+            LivingOrb(key: c, size: 56, state: read),
+          ]),
+        ),
+      ));
+      double halo(Key orb) => tester.widget<Opacity>(find.descendant(of: find.byKey(orb), matching: find.byKey(LivingOrb.haloKey))).opacity;
+      for (final ms in [0, 700, 1900, 3100]) {
+        await tester.pump(Duration(milliseconds: ms));
+        expect(halo(b), halo(a), reason: 'at ${ms}ms');
+        expect(halo(c), lessThan(halo(a)), reason: 'a read day with one meal of three still glows faintly');
+      }
     });
   });
 

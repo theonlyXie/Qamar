@@ -473,7 +473,7 @@ void streakAndOrb() {
   });
 
   group('orb state', () {
-    test('an empty day is unknown: the moon at rest, never a dark crescent, with a faint glow', () {
+    test('an empty day is unknown: the moon at rest, never a dark crescent, and no meals counted', () {
       final o = OrbState.derive(consumedKcal: 0, targetKcal: 2000, mealsToday: 0, planSlots: 3, streak: Streak.none);
       expect(o.day, OrbDay.unknown);
       expect(o.fill, 0);

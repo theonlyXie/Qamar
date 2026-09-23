@@ -159,6 +159,8 @@ class OrbState {
   final double fill;
 
   /// 0..1: meals eaten today against the plan's slots (or three, unplanned).
+  /// Drawn only on a day the moon reads: an [OrbDay.unknown] day's halo is the
+  /// moon's at rest (LivingOrb.glowBaseFor).
   final double glow;
 
   final Streak streak;

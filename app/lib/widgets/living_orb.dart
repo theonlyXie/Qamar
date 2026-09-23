@@ -40,6 +40,23 @@ class LivingOrb extends StatefulWidget {
   /// Each orbiting spark, for tests.
   static ValueKey<String> sparkKey(int i) => ValueKey('orb-spark-$i');
 
+  /// The halo, for tests.
+  static const haloKey = ValueKey('orb-halo');
+
+  /// The halo's glow at rest: the decorative orb's (welcome, subscription),
+  /// and the orb on any day it does not read.
+  static const restGlow = 0.32;
+
+  /// The halo's base glow for [day]. Only a day the moon reads (under, at,
+  /// over) glows with its meals, from faint to full. An [OrbDay.unknown] day —
+  /// nothing logged, or no target on the general-guidance route — is no
+  /// reading at all, so it glows exactly as the moon at rest does, never
+  /// dimmer: a dimmer orb on an empty morning would say "dark means a bad
+  /// day", and on the general-guidance route meals are not counted against
+  /// three.
+  static double glowBaseFor(OrbState? day) =>
+      day == null || day.day == OrbDay.unknown ? restGlow : 0.16 + 0.24 * day.glow;
+
   const LivingOrb({
     super.key,
     required this.size,
@@ -112,8 +129,7 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
         final haloT = _halo.value;
         final haloScale = 1.0 + (widget.speaking ? 0.38 : 0.22) * haloT;
         final day = widget.state;
-        // A day with nothing in it glows faintly; a full one, fully.
-        final glowBase = day == null ? 0.32 : 0.16 + 0.24 * day.glow;
+        final glowBase = LivingOrb.glowBaseFor(day);
         final haloOpacity = (glowBase + 0.40 * haloT + (widget.speaking ? 0.2 : 0.0)).clamp(0.0, 1.0);
         final haloColors = day?.over == true ? _warmHalo : _coolHalo;
         final offset = widget.wander ? Offset(_wanderOffset.value.dx * s * widget.reach, _wanderOffset.value.dy * s * widget.reach) : Offset.zero;
@@ -139,6 +155,7 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
                 Transform.scale(
                   scale: haloScale,
                   child: Opacity(
+                    key: LivingOrb.haloKey,
                     opacity: haloOpacity,
                     child: Container(
                       width: s * 1.55,
