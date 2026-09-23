@@ -59,7 +59,7 @@ class OrbGestureGuide extends StatelessWidget {
               Expanded(
                 child: Text(
                   isAr ? 'القمر بيفهم تلات حركات' : 'The moon knows three gestures',
-                  style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.violetSoft, letterSpacing: 0.3),
+                  style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.violetSoft),
                 ),
               ),
               if (dismissible)

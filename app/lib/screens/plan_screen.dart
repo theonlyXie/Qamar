@@ -47,7 +47,7 @@ class _PlanScreenState extends State<PlanScreen> {
       Row(children: [
         QBackButton(onTap: state.back, isAr: state.isAr),
         const SizedBox(width: 6),
-        Expanded(child: Text(t.plan, style: QText.display(size: 30, height: 38, color: QColors.textPrimary))),
+        Expanded(child: Text(t.plan, style: QText.display(size: 30, ar: QText.arabic(t.plan), color: QColors.textPrimary))),
       ]),
       const SizedBox(height: 4),
       Text(t.planSub, style: QText.body(size: 14, height: 22, color: QColors.textMuted)),
@@ -274,14 +274,14 @@ class _MealCard extends StatelessWidget {
         children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text(isAr ? meal.slotAr : meal.slotEn,
-                style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+                style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
             ExplainMark(
               child: Text(isAr ? '${state.iso('$kcal')} سعر' : '$kcal kcal',
                   style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.cyan)),
             ),
           ]),
           Text(isAr ? meal.nameAr : meal.nameEn,
-              style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),
+              style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textPrimary)),
           Text(isAr ? meal.noteAr : meal.noteEn, style: QText.body(size: 12, color: QColors.textMuted)),
           const SizedBox(height: 12),
           Container(
@@ -292,7 +292,7 @@ class _MealCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(isAr ? 'المقادير' : 'Portions',
-                        style: QText.body(size: 10, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.5)),
+                        style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
                   ],
                 ),
                 const SizedBox(height: 6),

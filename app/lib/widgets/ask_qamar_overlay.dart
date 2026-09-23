@@ -238,7 +238,7 @@ class _Header extends StatelessWidget {
               children: [
                 // Large text reads too loose at its default tracking; the brand
                 // is the one place in this overlay that needs tightening.
-                Text(t.brand, style: QText.display(size: 19, height: 23, weight: FontWeight.w400, letterSpacing: -0.3, color: QColors.textPrimary)),
+                Text(t.brand, style: QText.display(size: 20, ar: QText.arabic(t.brand), weight: FontWeight.w400, color: QColors.textPrimary)),
                 // The line keeps its height when it has nothing to say, so
                 // the name never jumps as a status comes and goes (O8).
                 SizedBox(
@@ -301,7 +301,7 @@ class _ChatBubble extends StatelessWidget {
                     ClipRRect(borderRadius: BorderRadius.circular(14), child: _photoThumb(turn.photoPath!, 132)),
                     const SizedBox(height: 8),
                   ],
-                  Text(turn.text, style: QText.body(size: 15.5, height: 23, color: QColors.textPrimary)),
+                  Text(turn.text, style: QText.body(size: 15, height: 23, color: QColors.textPrimary)),
                 ],
               ),
             ),
@@ -315,7 +315,7 @@ class _ChatBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(turn.text, style: QText.body(size: 15.5, height: 25, color: QColors.textHigh)),
+            Text(turn.text, style: QText.body(size: 15, height: 25, color: QColors.textHigh)),
             if (turn.sub != null && turn.sub!.isNotEmpty) ...[
               const SizedBox(height: 6),
               Text(turn.sub!, style: QText.body(size: 13, height: 21, color: QColors.textMuted)),
@@ -348,7 +348,7 @@ class _Thinking extends StatelessWidget {
     if (_stillness(context)) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 18),
-        child: Text(context.read<AppState>().t.sThinking, style: QText.body(size: 15.5, height: 25, color: QColors.textMuted)),
+        child: Text(context.read<AppState>().t.sThinking, style: QText.body(size: 15, height: 25, color: QColors.textMuted)),
       );
     }
     return const Padding(
@@ -482,10 +482,10 @@ class _Composer extends StatelessWidget {
                 textInputAction: TextInputAction.send,
                 onChanged: state.onChatDraftChanged,
                 onSubmitted: (_) => state.sendChat(),
-                style: QText.body(size: 15.5, height: 21, color: QColors.textPrimary),
+                style: QText.body(size: 15, height: 21, color: QColors.textPrimary),
                 decoration: InputDecoration(
                   hintText: placeholder,
-                  hintStyle: QText.body(size: 15.5, height: 21, color: QColors.textMuted),
+                  hintStyle: QText.body(size: 15, height: 21, color: QColors.textMuted),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: (QLayout.minTap - 21) / 2 + 0.5),

@@ -118,7 +118,7 @@ class SubscriptionScreen extends StatelessWidget {
         Center(
           child: ShaderMask(
             shaderCallback: (r) => QColors.brandGradient.createShader(r),
-            child: Text('Qamar+', textDirection: TextDirection.ltr, style: QText.display(size: 34, height: 42, color: QColors.textPrimary)),
+            child: Text('Qamar+', textDirection: TextDirection.ltr, style: QText.display(size: 40, ar: false, color: QColors.textPrimary)),
           ),
         ),
         const SizedBox(height: 6),
@@ -403,7 +403,7 @@ class _TierCard extends StatelessWidget {
                 ),
               Text(
                 formatEgp(quote.amountPounds, ar: isAr, eastern: state.easternDigits),
-                style: QText.number(size: 16, weight: FontWeight.w600, color: QColors.textPrimary),
+                style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.textPrimary),
               ),
             ],
           ),
@@ -445,19 +445,19 @@ class _FeatureTable extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(isAr ? 'اللي بتاخده' : 'What you get',
-                    style: QText.body(size: 10, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.5)),
+                    style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
               ),
               SizedBox(
                 width: 52,
                 child: Text(isAr ? 'مجاني' : 'Free',
                     textAlign: TextAlign.center,
-                    style: QText.body(size: 10, weight: FontWeight.w500, color: QColors.textMuted)),
+                    style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
               ),
               SizedBox(
                 width: 52,
                 child: Text('Qamar+', textDirection: TextDirection.ltr,
                     textAlign: TextAlign.center,
-                    style: QText.body(size: 10, weight: FontWeight.w600, color: QColors.violetSoft)),
+                    style: QText.body(size: 11, weight: FontWeight.w600, color: QColors.violetSoft)),
               ),
             ],
           ),

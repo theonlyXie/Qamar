@@ -38,7 +38,7 @@ class QuestCard extends StatelessWidget {
               height: 36,
               child: Row(
                 children: [
-                  Text(state.t.nextQuest, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+                  Text(state.t.nextQuest, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
                   if (state.showScore && q.amount > 0) ...[
                     const SizedBox(width: 8),
                     const SuCoinIcon(size: 14),
@@ -56,7 +56,7 @@ class QuestCard extends StatelessWidget {
                 ],
               ),
             ),
-            Text(q.kind.title(ar: isAr, iso: state.iso), style: QText.body(size: 16, height: 22, weight: FontWeight.w600, color: QColors.textPrimary)),
+            Text(q.kind.title(ar: isAr, iso: state.iso), style: QText.body(size: 15, height: 22, weight: FontWeight.w600, color: QColors.textPrimary)),
             const SizedBox(height: 2),
             Text(
               q.done ? (isAr ? 'خلصت النهارده، واتسجّلت.' : 'Done for today, and logged.') : q.kind.why(ar: isAr),

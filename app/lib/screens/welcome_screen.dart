@@ -81,9 +81,9 @@ class WelcomeScreen extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(t.brand, style: QText.display(size: 40, height: 48, color: QColors.textPrimary)),
+              Text(t.brand, style: QText.display(size: 40, ar: QText.arabic(t.brand), color: QColors.textPrimary)),
               const SizedBox(height: 8),
-              Text(t.promise, style: QText.body(size: 16, height: 24, color: QColors.textMid)),
+              Text(t.promise, style: QText.body(size: 17, height: 25, color: QColors.textMid)),
             ],
           ),
           const SizedBox(height: 12),
@@ -160,14 +160,14 @@ Future<void> _askInvitationCode(BuildContext context, AppState state) async {
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: QColors.cardDeep,
-      title: Text(isAr ? 'كود الدعوة' : 'Invitation code', style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.textHigh)),
+      title: Text(isAr ? 'كود الدعوة' : 'Invitation code', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.textHigh)),
       content: TextField(
         controller: controller,
         autofocus: true,
         textCapitalization: TextCapitalization.characters,
         textDirection: TextDirection.ltr,
-        style: QText.number(size: 18, color: QColors.textHigh),
-        decoration: InputDecoration(hintText: 'QMR-XXXXX', hintStyle: QText.number(size: 18, color: QColors.textMuted)),
+        style: QText.number(size: 17, color: QColors.textHigh),
+        decoration: InputDecoration(hintText: 'QMR-XXXXX', hintStyle: QText.number(size: 17, color: QColors.textMuted)),
         onSubmitted: (v) => Navigator.of(ctx).pop(v),
       ),
       actions: [

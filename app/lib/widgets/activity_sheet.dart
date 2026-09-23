@@ -47,7 +47,7 @@ class ActivitySheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(isAr ? '$name — قد إيه؟' : '$name — how long?',
-                          style: QText.body(size: 18, weight: FontWeight.w600, color: QColors.textHigh)),
+                          style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.textHigh)),
                       const SizedBox(height: 4),
                       Text(
                         isAr ? 'تقدير على وزنك. بيتسجّل جنب الأكل.' : 'An estimate from your weight. Logged beside the food.',

@@ -34,7 +34,7 @@ class WeekGlanceCard extends StatelessWidget {
             height: 36,
             child: Row(
               children: [
-                Text(isAr ? 'أسبوعك مع قمر' : 'Your week with Qamar', style: QText.body(size: 11, weight: FontWeight.w600, color: QColors.violetSoft, letterSpacing: 0.4)),
+                Text(isAr ? 'أسبوعك مع قمر' : 'Your week with Qamar', style: QText.body(size: 11, weight: FontWeight.w600, color: QColors.violetSoft)),
                 const Spacer(),
                 QOutlineButton(key: openKey, label: isAr ? 'شوف الأسبوع' : 'See the week', onTap: state.openWeekCard, height: 34, color: QColors.textMid),
               ],

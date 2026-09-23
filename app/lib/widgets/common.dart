@@ -179,7 +179,7 @@ class QPrimaryButton extends StatelessWidget {
                 ),
           child: Text(label,
               textAlign: TextAlign.center,
-              style: QText.body(size: 16, weight: FontWeight.w600, color: enabled ? QColors.onAccent : QDisabled.label)),
+              style: QText.body(size: 17, weight: FontWeight.w600, color: enabled ? QColors.onAccent : QDisabled.label)),
         ),
       ),
     );
@@ -234,7 +234,7 @@ class QStateCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          Text(p.what, textAlign: TextAlign.center, style: QText.body(size: 16, height: 23, weight: FontWeight.w600, color: QColors.textHigh)),
+          Text(p.what, textAlign: TextAlign.center, style: QText.body(size: 17, height: 24, weight: FontWeight.w600, color: QColors.textHigh)),
           if (p.why != null && p.why!.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(p.why!, textAlign: TextAlign.center, style: QText.body(size: 14, height: 21, color: QColors.textMuted)),
@@ -572,7 +572,7 @@ class _QWheelFieldState extends State<QWheelField> {
           child: Text(
             widget.format?.call(v) ?? '$v',
             maxLines: 1,
-            style: QText.number(size: 19, weight: FontWeight.w600),
+            style: QText.number(size: 20, weight: FontWeight.w600),
           ),
         ),
     ];

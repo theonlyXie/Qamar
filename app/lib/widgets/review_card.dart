@@ -61,7 +61,7 @@ class ReviewCard extends StatelessWidget {
           children: [
             Text(
               isAr ? 'أسبوعي مع قمر' : 'My week with Qamar',
-              style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.violetSoft, letterSpacing: 0.4),
+              style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.violetSoft),
             ),
             const SizedBox(height: 16),
             Row(
@@ -83,7 +83,7 @@ class ReviewCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         letters[review.days[i].day.weekday - 1],
-                        style: QText.number(size: 10, color: fills[i] == null ? QColors.textMuted : QColors.textMid),
+                        style: QText.number(size: 11, color: fills[i] == null ? QColors.textMuted : QColors.textMid),
                       ),
                     ],
                   ),
@@ -92,7 +92,7 @@ class ReviewCard extends StatelessWidget {
             const SizedBox(height: 18),
             Text(
               isAr ? review.insight.ar : review.insight.en,
-              style: QText.body(size: 16, height: 24, weight: FontWeight.w600, color: QColors.textPrimary),
+              style: QText.body(size: 15, height: 23, weight: FontWeight.w600, color: QColors.textPrimary),
             ),
             const SizedBox(height: 8),
             Text(
@@ -119,7 +119,7 @@ class ReviewCard extends StatelessWidget {
                   )
                 else
                   const SizedBox.shrink(),
-                Text(footer, textDirection: TextDirection.ltr, style: QText.number(size: 10, color: QColors.textMuted)),
+                Text(footer, textDirection: TextDirection.ltr, style: QText.number(size: 11, color: QColors.textMuted)),
               ],
             ),
           ],

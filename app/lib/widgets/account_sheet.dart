@@ -173,7 +173,7 @@ class _AccountSheetState extends State<AccountSheet> {
 
     if (state.authDone != null) {
       return [
-        Text(title, style: QText.display(size: 24, height: 30, color: QColors.textPrimary)),
+        Text(title, style: QText.display(size: 24, ar: QText.arabic(title), color: QColors.textPrimary)),
         const SizedBox(height: 10),
         Text(state.authDone!, style: QText.body(size: 14, height: 22, color: QColors.textHigh)),
         const SizedBox(height: 16),
@@ -184,7 +184,7 @@ class _AccountSheetState extends State<AccountSheet> {
     return [
       Row(
         children: [
-          Expanded(child: Text(title, style: QText.display(size: 24, height: 30, color: QColors.textPrimary))),
+          Expanded(child: Text(title, style: QText.display(size: 24, ar: QText.arabic(title), color: QColors.textPrimary))),
           QRoundIconButton(icon: Icons.close, onTap: state.closeAuth, size: 34, label: state.isAr ? 'اقفل' : 'Close'),
         ],
       ),

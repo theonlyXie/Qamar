@@ -55,7 +55,7 @@ class ProgressScreen extends StatelessWidget {
         Row(children: [
           QBackButton(onTap: state.back, isAr: isAr),
           const SizedBox(width: 6),
-          Expanded(child: Text(t.progress, style: QText.display(size: 30, height: 38, color: QColors.textPrimary))),
+          Expanded(child: Text(t.progress, style: QText.display(size: 30, ar: QText.arabic(t.progress), color: QColors.textPrimary))),
         ]),
         const SizedBox(height: 4),
         Text(t.progressSub, style: QText.body(size: 14, height: 22, color: QColors.textMuted)),
@@ -79,7 +79,7 @@ class ProgressScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ExplainMark(child: Text(isAr ? 'السلسلة' : 'Streak', style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4))),
+                        ExplainMark(child: Text(isAr ? 'السلسلة' : 'Streak', style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted))),
                         const SizedBox(height: 4),
                         Text(
                           streak.current == 0
@@ -98,7 +98,7 @@ class ProgressScreen extends StatelessWidget {
                           isAr
                               ? 'أطول سلسلة ${state.iso('${streak.best}')} · تجميد متاح: ${state.iso('${streak.freezesAvailable}')}'
                               : 'best ${streak.best} · freezes available: ${streak.freezesAvailable}',
-                          style: QText.number(size: 10, color: QColors.textMuted),
+                          style: QText.number(size: 11, color: QColors.textMuted),
                         ),
                       ],
                     ),
@@ -106,7 +106,9 @@ class ProgressScreen extends StatelessWidget {
                   const SizedBox(width: 12),
                   Text(
                     state.iso('${streak.current}'),
-                    style: QText.display(size: 34, height: 38, color: streak.current > 0 ? QColors.textHigh : QColors.textMuted),
+                    // A figure, in the figures' face: in the serif's old-style
+                    // numerals a 1 read as a capital I.
+                    style: QText.number(size: 28, weight: FontWeight.w600, color: streak.current > 0 ? QColors.textHigh : QColors.textMuted),
                   ),
                 ],
               ),
@@ -126,7 +128,7 @@ class ProgressScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(t.thisWeek, style: QText.body(size: 11, weight: FontWeight.w500, color: active > 0 ? QColors.green : QColors.textMuted, letterSpacing: 0.4)),
+              Text(t.thisWeek, style: QText.body(size: 11, weight: FontWeight.w500, color: active > 0 ? QColors.green : QColors.textMuted)),
               const SizedBox(height: 4),
               Text(
                 active == 0
@@ -149,9 +151,9 @@ class ProgressScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(t.activeDays, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+                  Text(t.activeDays, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
                   // No target is set on the general-guidance route, so none is named.
-                  if (!state.generalGuidance) Text(isAr ? 'الهدف ${state.iso('$target')}' : 'target $target', style: QText.number(size: 10, color: QColors.textMuted)),
+                  if (!state.generalGuidance) Text(isAr ? 'الهدف ${state.iso('$target')}' : 'target $target', style: QText.number(size: 11, color: QColors.textMuted)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -177,7 +179,7 @@ class ProgressScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(t.weightTrend, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+              Text(t.weightTrend, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
               const SizedBox(height: 10),
               if (weights.length < 2)
                 SizedBox(
@@ -212,7 +214,7 @@ class ProgressScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(t.weeklyInsight, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.skyBlue, letterSpacing: 0.4)),
+              Text(t.weeklyInsight, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.skyBlue)),
               const SizedBox(height: 4),
               // An insight is a claim about the person's week. Until there are
               // enough logged days to support one, this says what is missing
@@ -289,7 +291,7 @@ class _DayBar extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Text(letter, style: QText.number(size: 10, color: empty ? QColors.textMuted : QColors.textMid)),
+        Text(letter, style: QText.number(size: 11, color: empty ? QColors.textMuted : QColors.textMid)),
       ],
     );
   }

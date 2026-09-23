@@ -142,7 +142,7 @@ class _Header extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(state.isAr ? 'صباح الخير،' : 'Good morning,', style: QText.body(size: 14, color: QColors.textMuted)),
-              Text(nameOr, style: QText.display(size: 34, height: 42, color: QColors.textPrimary)),
+              Text(nameOr, style: QText.display(size: 30, ar: QText.arabic(nameOr), color: QColors.textPrimary)),
               if (streak != null) TodayStreakLine(text: streak),
             ],
           ),
@@ -304,7 +304,7 @@ class _NumbersCard extends StatelessWidget {
                       child: ExplainMark(
                         child: ShaderMask(
                           shaderCallback: (r) => QColors.cyanVioletGradient.createShader(r),
-                          child: Text(state.digits('$remaining'), style: QText.number(size: 38, height: 44, weight: FontWeight.w600, color: QColors.textPrimary)),
+                          child: Text(state.digits('$remaining'), style: QText.number(size: 40, height: 46, weight: FontWeight.w600, color: QColors.textPrimary)),
                         ),
                       ),
                     ),
@@ -348,7 +348,7 @@ class _NextMealCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(t.nextMeal, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.green, letterSpacing: 0.4)),
+                  Text(t.nextMeal, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.green)),
                   Text(state.isAr ? nextMeal.nameAr : nextMeal.nameEn,
                       style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.textPrimary)),
                   ExplainMark(
@@ -387,7 +387,7 @@ class _LoggedMeals extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
           const SizedBox(height: 4),
-          Text(t.loggedToday, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+          Text(t.loggedToday, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
           const SizedBox(height: 8),
           for (final m in state.meals) ...[
             Container(
@@ -437,7 +437,7 @@ class _WaterCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(isAr ? 'الماء' : 'Water',
-                style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+                style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
             const SizedBox(height: 8),
             Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -448,7 +448,7 @@ class _WaterCard extends StatelessWidget {
                     shaderCallback: (r) => QColors.blueCyanGradient.createShader(r),
                     child: Text(
                       isAr ? '${state.iso(litres)} لتر' : '$litres L',
-                      style: QText.number(size: 28, weight: FontWeight.w600, color: QColors.textPrimary),
+                      style: QText.number(size: 28, weight: FontWeight.w600, color: QColors.textPrimary, ar: isAr),
                     ),
                   ),
                 ),
@@ -600,7 +600,7 @@ class _ActivityCard extends StatelessWidget {
           Row(children: [
             Expanded(
               child: Text(isAr ? 'حركة النهاردة' : 'Today’s movement',
-                  style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+                  style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
             ),
             Text(
               isAr
@@ -773,7 +773,7 @@ class _EarnedMonthCard extends StatelessWidget {
               Row(children: [
                 const Icon(Icons.workspace_premium_outlined, size: 15, color: QColors.green),
                 const SizedBox(width: 6),
-                Text(title, style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.green, letterSpacing: 0.3)),
+                Text(title, style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.green)),
               ]),
               const SizedBox(height: 6),
               Text(body, style: QText.body(size: 14, height: 21, color: QColors.textHigh)),

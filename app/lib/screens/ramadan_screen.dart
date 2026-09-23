@@ -51,7 +51,7 @@ class RamadanScreen extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(state.digits(season.name(isAr)), style: QText.display(size: 30, height: 38, color: QColors.textPrimary)),
+              Text(state.digits(season.name(isAr)), style: QText.display(size: 30, ar: isAr, color: QColors.textPrimary)),
               Text(subtitle, style: QText.body(size: 14, height: 22, color: QColors.textMuted)),
             ]),
           ),
@@ -172,7 +172,7 @@ class _TimeCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: QText.body(size: 12, color: QColors.textMuted)),
-      Text(time, textDirection: TextDirection.ltr, style: QText.number(size: 26, weight: FontWeight.w600, color: QColors.textPrimary)),
+      Text(time, textDirection: TextDirection.ltr, style: QText.number(size: 28, weight: FontWeight.w600, color: QColors.textPrimary)),
       Text(sub, style: QText.body(size: 11, color: QColors.textMuted)),
     ]);
   }

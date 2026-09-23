@@ -73,7 +73,7 @@ class DishCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (slot != null) ...[
-            Text(slotLine(slot!, isAr), style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.green, letterSpacing: 0.4)),
+            Text(slotLine(slot!, isAr), style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.green)),
             const SizedBox(height: 6),
           ],
           Text(isAr ? dish.nameAr : dish.nameEn, style: QText.body(size: 17, height: 24, weight: FontWeight.w600, color: QColors.textPrimary)),

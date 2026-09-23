@@ -86,7 +86,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(t.brand, style: QText.display(size: 20, height: 24, color: QColors.textPrimary)),
+                    Text(t.brand, style: QText.display(size: 20, ar: QText.arabic(t.brand), color: QColors.textPrimary)),
                     Text('${t.obSub} · ${state.iso('${(state.step + 1).clamp(1, kOnboardingSteps.length)}/${kOnboardingSteps.length}')}',
                         maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 11, color: QColors.textMuted)),
                   ],
@@ -448,7 +448,7 @@ class _TargetCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(t.dailyTarget, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+            Text(t.dailyTarget, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
             const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -456,7 +456,7 @@ class _TargetCard extends StatelessWidget {
               children: [
                 ShaderMask(
                   shaderCallback: (r) => QColors.blueCyanGradient.createShader(r),
-                  child: Text(state.digits('${tg.kcal}'), style: QText.number(size: 36, weight: FontWeight.w600, color: QColors.textPrimary)),
+                  child: Text(state.digits('${tg.kcal}'), style: QText.number(size: 34, weight: FontWeight.w600, color: QColors.textPrimary)),
                 ),
                 const SizedBox(width: 8),
                 Text(t.kcalDay, style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
@@ -497,7 +497,7 @@ class _MacroBox extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label, style: QText.body(size: 11, color: QColors.textMuted)),
-            Text(grams, style: QText.number(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),
+            Text(grams, style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.textPrimary)),
           ],
         ),
       ),

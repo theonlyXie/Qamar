@@ -30,7 +30,7 @@ class WalletScreen extends StatelessWidget {
         Row(children: [
           QBackButton(onTap: state.back, isAr: isAr),
           const SizedBox(width: 6),
-          Text(t.walletTitle, style: QText.display(size: 28, height: 34, color: QColors.textPrimary)),
+          Text(t.walletTitle, style: QText.display(size: 30, ar: QText.arabic(t.walletTitle), color: QColors.textPrimary)),
         ]),
         const SizedBox(height: 14),
         Container(
@@ -58,7 +58,7 @@ class WalletScreen extends StatelessWidget {
                 if (state.showScore)
                   Column(key: WalletScreen.lifetimeKey, crossAxisAlignment: CrossAxisAlignment.end, children: [
                     Text(t.suLifetime, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
-                    Text('${state.formatSu(state.suLifetime)}', style: QText.number(size: 18, weight: FontWeight.w600, color: QColors.textMid)),
+                    Text('${state.formatSu(state.suLifetime)}', style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.textMid)),
                   ]),
               ]),
               // Level lives here only (O9), and only while the score is shown

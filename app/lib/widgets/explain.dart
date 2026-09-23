@@ -376,7 +376,7 @@ class ExplainSheet extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(isAr ? ex.titleAr : ex.titleEn,
-                                style: QText.display(size: 22, height: 28, color: QColors.textPrimary)),
+                                style: QText.display(size: 24, ar: isAr, color: QColors.textPrimary)),
                             const SizedBox(height: 6),
                             Text(isAr ? ex.bodyAr : ex.bodyEn,
                                 style: QText.body(size: 14, height: 22, color: QColors.textHigh)),

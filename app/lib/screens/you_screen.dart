@@ -52,7 +52,7 @@ class YouScreen extends StatelessWidget {
         Row(children: [
           QBackButton(onTap: state.back, isAr: isAr),
           const SizedBox(width: 6),
-          Expanded(child: Text(t.you, style: QText.display(size: 30, height: 38, color: QColors.textPrimary))),
+          Expanded(child: Text(t.you, style: QText.display(size: 30, ar: QText.arabic(t.you), color: QColors.textPrimary))),
         ]),
         const SizedBox(height: 14),
         Container(
@@ -62,7 +62,7 @@ class YouScreen extends StatelessWidget {
             const QamarMoon(size: 48),
             const SizedBox(width: 14),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(state.profile.name.isNotEmpty ? state.profile.name : (isAr ? 'يا صاحبي' : 'friend'), style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.textPrimary)),
+              Text(state.profile.name.isNotEmpty ? state.profile.name : (isAr ? 'يا صاحبي' : 'friend'), style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.textPrimary)),
               Text(state.accountEmail ?? t.guestAccount, style: QText.body(size: 12, color: QColors.textMuted)),
             ]),
           ]),
@@ -423,7 +423,7 @@ class YouScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Qamar+', textDirection: TextDirection.ltr, style: QText.display(size: 24, height: 30, color: QColors.textPrimary)),
+              Text('Qamar+', textDirection: TextDirection.ltr, style: QText.display(size: 24, ar: false, color: QColors.textPrimary)),
               const SizedBox(height: 4),
               Text(t.plusSub, style: QText.body(size: 13, height: 20, color: QColors.textMid)),
               const SizedBox(height: 10),
@@ -739,7 +739,7 @@ class _AffiliateCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   code ?? (isAr ? 'اربط حسابك عشان يطلعلك كود' : 'Link an account to get a code'),
-                  style: QText.number(size: 16, weight: FontWeight.w600, color: QColors.textPrimary),
+                  style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.textPrimary),
                 ),
               ),
               if (code != null)
@@ -829,7 +829,7 @@ class _ClientsCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   Text(
                     isAr ? '${state.iso('${c.daysLogged}')}/${state.iso('7')}' : '${c.daysLogged}/7',
-                    style: QText.number(size: 18, weight: FontWeight.w600, color: c.daysLogged >= 5 ? QColors.green : QColors.textPrimary),
+                    style: QText.number(size: 17, weight: FontWeight.w600, color: c.daysLogged >= 5 ? QColors.green : QColors.textPrimary),
                   ),
                 ],
               ),
