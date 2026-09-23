@@ -3771,6 +3771,108 @@ void main() {
       expect(s.chat.last.problem!.also!.label, 'سجّلها كوجبة');
     });
   });
+
+  group('what to avoid, after the consultation (gap 4)', () {
+    const meal = (
+      id: 'lunch', slotAr: 'غدا', slotEn: 'Lunch',
+      nameAr: 'كشري', nameEn: 'Koshary', noteAr: '', noteEn: '',
+      portions: <PlanPortion>[(ar: 'كشري', en: 'Koshary', amountAr: 'طبق', amountEn: '1 bowl', kcal: 520)],
+    );
+
+    test('a new allergy is saved to the account first, then the phone and the dish picker follow; the event carries counts only', () async {
+      final profiles = FakeProfileRepo();
+      final a = MemoryAnalytics();
+      final state = backed(profiles: profiles, analytics: a)..setLang(AppLang.en);
+      await settle();
+      await state.setImprove(true);
+      expect(state.profile.prefs, isEmpty);
+
+      expect(await state.saveAvoid(['nuts']), isTrue);
+      expect(profiles.stored!.prefs, ['nuts'], reason: 'the account’s copy, which every plan and the conversation read');
+      expect(state.profile.prefs, ['nuts']);
+      expect(state.avoidNotice, startsWith('Saved.'));
+      final e = a.named('avoid_updated').single;
+      expect(e['added'], 1);
+      expect(e['removed'], 0);
+      expect(e.values.whereType<String>().where((v) => v.contains('nut')), isEmpty, reason: 'never what is avoided: it can be health data');
+      for (final slot in MealSlot.values) {
+        final d = pickDish(targetKcal: 2180, goal: state.profile.goal, exclusions: state.profile.prefs, slot: slot);
+        expect(d!.ruledOutBy.intersection({'nuts'}), isEmpty);
+      }
+    });
+
+    test('something newly avoided writes today’s plan again; taking something off writes nothing', () async {
+      final ai = FakeGateway()..plan = const DayPlan(date: '2026-08-15', slots: [(meal, meal)]);
+      final state = backed(ai: ai)..setLang(AppLang.en);
+      await settle();
+      await state.ensurePlan();
+      expect(ai.planCalls, 1);
+
+      await state.saveAvoid(['meat']);
+      expect(ai.planCalls, 2, reason: 'the saved plan was written before this');
+      expect(ai.lastForce, isTrue, reason: 'forced: the gateway returns the saved day otherwise');
+      expect(state.avoidNotice, contains('written again'));
+
+      await state.saveAvoid([]);
+      expect(ai.planCalls, 2, reason: 'nothing new to avoid, nothing to rewrite');
+      expect(state.avoidNotice, 'Saved.');
+    });
+
+    test('a save that cannot reach the account changes nothing, says so, and rewrites nothing', () async {
+      final profiles = FakeProfileRepo()..failWith = StateError('no signal');
+      final ai = FakeGateway()..plan = const DayPlan(date: '2026-08-15', slots: [(meal, meal)]);
+      final state = backed(profiles: profiles, ai: ai)..setLang(AppLang.en);
+      await settle();
+      await state.ensurePlan();
+
+      expect(await state.saveAvoid(['lactose']), isFalse);
+      expect(state.profile.prefs, isEmpty, reason: 'the phone never says one thing while the account says another');
+      expect(state.avoidNotice, contains('nothing changed'));
+      expect(ai.planCalls, 1);
+    });
+
+    test('a plan not yet on the phone is still written anew when it is next opened, even after a restart', () async {
+      final prefs = MemoryDevicePrefs();
+      final ai = FakeGateway()..plan = const DayPlan(date: '2026-08-15', slots: [(meal, meal)]);
+      final state = backed(ai: ai, prefs: prefs);
+      await settle();
+      await state.saveAvoid(['nuts']);
+      expect(ai.planCalls, 0, reason: 'no plan on the phone: nothing is spent until it is opened');
+
+      final ai2 = FakeGateway()..plan = const DayPlan(date: '2026-08-15', slots: [(meal, meal)]);
+      final again = backed(ai: ai2, prefs: prefs); // the app, opened again
+      await settle();
+      await again.ensurePlan();
+      expect(ai2.lastForce, isTrue, reason: 'the night job may have written it before the change');
+      await again.ensurePlan();
+      expect(ai2.planCalls, 1, reason: 'once written anew, the day’s plan is kept as usual');
+    });
+
+    test('when today’s plan cannot be written again, the notice says to check it', () async {
+      final ai = FakeGateway()..plan = const DayPlan(date: '2026-08-15', slots: [(meal, meal)]);
+      final state = backed(ai: ai)..setLang(AppLang.en);
+      await settle();
+      await state.ensurePlan();
+      ai.planFailsWith = AiQuotaException('That’s enough plans for today.', const AiQuota(bucket: 'plan', used: 4, limit: 4, extra: 0, remaining: 0));
+      await state.saveAvoid(['nuts']);
+      expect(state.profile.prefs, ['nuts'], reason: 'saved all the same');
+      expect(state.avoidNotice, contains('check it before you cook'));
+    });
+
+    test('the reveal says only what can be changed afterwards, in both languages', () async {
+      for (final lang in AppLang.values) {
+        final state = AppState()..setLang(lang);
+        state.startOnboarding();
+        state.step = kOnboardingSteps.indexWhere((s) => s.id == 'food');
+        state.primarySubmit();
+        await Future<void>.delayed(const Duration(milliseconds: 2600));
+        final said = state.msgs.map((m) => m.text(lang == AppLang.ar)).join(' | ');
+        expect(said, isNot(contains('change them any time')));
+        expect(said, isNot(contains('تعدلها في أي وقت')));
+        expect(said, contains(lang == AppLang.ar ? 'واللي بتتجنبه في الأكل تقدر تغيّره من «حسابي»' : 'What you avoid in food can be changed in Me'));
+      }
+    });
+  });
 }
 
 class FakeBilling implements BillingGateway {

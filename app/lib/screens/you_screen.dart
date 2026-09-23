@@ -12,6 +12,7 @@ import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/layout.dart';
 import '../theme/text_styles.dart';
+import '../widgets/avoid_editor.dart';
 import '../widgets/common.dart';
 import '../widgets/orb_gesture_guide.dart';
 import '../widgets/moon.dart';
@@ -36,6 +37,9 @@ class YouScreen extends StatelessWidget {
 
   /// The read-out of what Qamar holds, and the wallet card.
   static const readOutKey = ValueKey('you-read-out');
+
+  /// The way to change what to avoid after the consultation (gap 4).
+  static const avoidEntryKey = ValueKey('you-avoid-entry');
   static const walletCardKey = ValueKey('you-wallet');
 
   @override
@@ -289,6 +293,22 @@ class YouScreen extends StatelessWidget {
             ],
           ]),
         ),
+        // What to avoid, changed after the consultation (gap 4): the same
+        // question and choices, so a new allergy reaches every plan.
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: QOutlineButton(
+            key: YouScreen.avoidEntryKey,
+            label: isAr ? 'غيّر اللي بتتجنبه في الأكل' : 'Change what you avoid in food',
+            onTap: () => AvoidEditor.show(context, state),
+            height: 48,
+          ),
+        ),
+        if (state.avoidNotice != null) ...[
+          const SizedBox(height: 6),
+          Text(state.avoidNotice!, style: QText.body(size: 12, height: 18, color: QColors.textMuted)),
+        ],
+        const SizedBox(height: 14),
         // Both of these are store requirements, and the second is a legal
         // obligation — they cannot stay as decoration.
         Container(

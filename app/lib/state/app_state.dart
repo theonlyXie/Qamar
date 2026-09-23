@@ -203,7 +203,9 @@ class AppState extends ChangeNotifier {
       final proWho = await p.getString(_kProName);
       final lockDay = await p.getString(_kLockOfferDay);
       final stop = await p.getString(_kOrbStop);
+      final stale = await p.getString(_kPlanStaleDays);
       if (_disposed) return;
+      if (stale != null && stale.trim().isNotEmpty) _planStaleDays.addAll(stale.split(',').where((d) => d.trim().isNotEmpty));
       // A code from an earlier launch is still waiting to be redeemed.
       if (invite != null && invite.trim().isNotEmpty) pendingInvitationCode ??= invite.trim();
       if (proCode != null && proCode.trim().isNotEmpty) pendingProCode ??= proCode.trim();
@@ -2248,9 +2250,11 @@ class AppState extends ChangeNotifier {
   void _revealTarget() {
     typing = false;
     msgs.addAll([
+      // Only what can be changed afterwards is said to be changeable: what to
+      // avoid, in Me (saveAvoid). The target's own answers cannot be, yet.
       const ObMessage.q(
-        ar: 'حسبتلك الهدف على أساس اللي قلته. دي تقديرات، وتقدر تعدلها في أي وقت.',
-        en: 'I calculated your target from what you told me. These are estimates and you can change them any time.',
+        ar: 'حسبتلك الهدف على أساس اللي قلته. دي تقديرات. واللي بتتجنبه في الأكل تقدر تغيّره من «حسابي» في أي وقت.',
+        en: 'I calculated your target from what you told me. These are estimates. What you avoid in food can be changed in Me at any time.',
       ),
       const ObMessage.target(),
       const ObMessage.save(),
@@ -2300,6 +2304,96 @@ class AppState extends ChangeNotifier {
     _track('save_link_opened');
     openLinkAccount();
     dismissSave();
+  }
+
+  // ---- what to avoid, after the consultation (gap 4) ----------------------
+  //
+  // The consultation asks once what Qamar must never suggest. A new allergy,
+  // or meat given up, has to be recordable afterwards, or every plan keeps
+  // suggesting it: Me asks the same question, with the same choices. What is
+  // chosen is the account's, which the dish picker, the conversation and
+  // every plan read.
+
+  /// The consultation's own question and choices for what to avoid.
+  static OnboardingStep get avoidStep => kOnboardingSteps.firstWhere((s) => s.id == 'food');
+
+  /// What the last change said, shown on Me; null before one.
+  String? avoidNotice;
+  bool avoidBusy = false;
+
+  static const _kPlanStaleDays = 'plan_stale_days';
+
+  /// Days whose plan may have been written before something new was to be
+  /// avoided: today's, and tomorrow's, which the night job may already have
+  /// written. The next writing of such a day's plan is a new one. Kept on
+  /// the phone, so a restart does not bring the old plan back.
+  final Set<String> _planStaleDays = {};
+
+  void _savePlanStaleDays() => _prefs?.setString(_kPlanStaleDays, _planStaleDays.join(',')).catchError((_) {});
+
+  /// Saves [chosen] as what to avoid. The account's copy is saved first: if
+  /// that fails, nothing changes, and the notice says so. Anything newly
+  /// avoided also rewrites a plan already written for today.
+  Future<bool> saveAvoid(Iterable<String> chosen) async {
+    final picked = chosen.toSet();
+    final next = [
+      for (final o in avoidStep.options)
+        if (o.value != 'none' && picked.contains(o.value)) o.value as String,
+    ];
+    final before = profile.prefs;
+    final added = [for (final v in next) if (!before.contains(v)) v];
+    final removed = [for (final v in before) if (!next.contains(v)) v];
+    if (added.isEmpty && removed.isEmpty) {
+      avoidNotice = isAr ? 'مفيش حاجة اتغيرت.' : 'Nothing changed.';
+      _notify();
+      return true;
+    }
+    final updated = profile.copyWith(prefs: next);
+    final repo = _profileRepo;
+    final uid = _userId;
+    if (isBacked && repo != null && uid != null) {
+      avoidBusy = true;
+      avoidNotice = null;
+      _notify();
+      try {
+        await repo.saveProfile(uid, updated);
+      } catch (_) {
+        if (_disposed) return false;
+        avoidBusy = false;
+        avoidNotice = isAr
+            ? 'مقدرتش أحفظ دلوقتي، فمفيش حاجة اتغيرت. جرّب تاني وانت متوصل.'
+            : 'I couldn’t save that just now, so nothing changed. Try again with a connection.';
+        _notify();
+        return false;
+      }
+      if (_disposed) return true;
+    }
+    profile = profile.copyWith(prefs: next);
+    // Counts only: what someone avoids can be health data.
+    _track('avoid_updated', {'added': added.length, 'removed': removed.length});
+    var planLine = '';
+    if (added.isNotEmpty && !generalGuidance) {
+      final today = _today();
+      _planStaleDays
+        ..add(today)
+        ..add(Days.add(DateTime.now(), 1).toIso8601String().substring(0, 10));
+      _savePlanStaleDays();
+      if (hasPlan && planDate == today) {
+        await ensurePlan(force: true);
+        if (_disposed) return true;
+        planLine = !_planStaleDays.contains(today)
+            ? (isAr ? ' وخطة النهارده اتكتبت من جديد على كده.' : ' Today’s plan has been written again to match.')
+            : (isAr
+                ? ' خطة النهارده اتكتبت قبل التغيير ومقدرتش أكتبها تاني دلوقتي، فراجعها قبل ما تطبخ.'
+                : ' Today’s plan was written before this and couldn’t be written again just now, so check it before you cook.');
+      }
+    }
+    avoidBusy = false;
+    avoidNotice = added.isNotEmpty
+        ? (isAr ? 'اتحفظ. الاقتراحات والخطط هتمشي على كده من دلوقتي.$planLine' : 'Saved. Suggestions and plans follow this from now on.$planLine')
+        : (isAr ? 'اتحفظ.' : 'Saved.');
+    _notify();
+    return true;
   }
 
   // ---- the free week, offered after the reveal (O12) ------------------------
@@ -4668,6 +4762,9 @@ class AppState extends ChangeNotifier {
     // row), so it is not asked. The Plan screen says why instead.
     if (generalGuidance) return;
     final today = _today();
+    // Something new to avoid since this day's plan was written: a new plan,
+    // never the saved one, which the gateway returns unless forced.
+    if (_planStaleDays.contains(today)) force = true;
     final note = instruction?.trim();
     if (!force && (note == null || note.isEmpty) && planDate == today && hasPlan) return;
     if (planLoading) return;
@@ -4698,6 +4795,7 @@ class AppState extends ChangeNotifier {
       if (_disposed) return;
       await _pullQuota(gateway);
       _installPlan(built);
+      if (_planStaleDays.remove(today)) _savePlanStaleDays();
     } on AiQuotaException catch (e) {
       if (_disposed) return;
       _absorb(e.quota);
