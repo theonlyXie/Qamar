@@ -105,7 +105,7 @@ void main() {
       s.setScanProblem(s.cameraProblem(PlatformException(code: 'camera_access_denied'), instead: ProblemAction('Type it instead', () {})));
       await _pumpApp(tester, s);
       expect(find.byType(QStateCard), findsOneWidget);
-      expect(find.textContaining('Tap the button to open the camera'), findsNothing, reason: 'the placeholder is not left under the card');
+      expect(find.text(s.t.scanInbodySub), findsNothing, reason: 'the placeholder is not left under the card');
       expect(find.byKey(const ValueKey('state-glyph-permission')), findsOneWidget);
     });
   });

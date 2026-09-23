@@ -448,6 +448,22 @@ void main() {
     expect(s.authError, 'Something went wrong on our side. Try again in a moment.');
   });
 
+  for (final lang in AppLang.values) {
+    testWidgets('the InBody scan says what it gives before the camera opens (${lang.code})', (tester) async {
+      final s = AppState()..setLang(lang);
+      s.openScan();
+      await tester.binding.setSurfaceSize(const Size(900, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+      await tester.pump();
+      expect(
+        find.text(lang == AppLang.ar ? 'صوّر التقرير وأنا هقرا أرقامك.' : 'Photograph the report and I’ll read your numbers.'),
+        findsOneWidget,
+        reason: 'what a scan gives is said before capture, not only its name on the welcome',
+      );
+    });
+  }
+
   testWidgets('the InBody scan: a camera that will not open says so plainly, with typing the numbers as the way on', (tester) async {
     // In tests the image picker has no plugin behind it, which is exactly a
     // camera that will not open.

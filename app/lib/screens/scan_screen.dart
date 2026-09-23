@@ -122,10 +122,10 @@ class _ScanScreenState extends State<ScanScreen> {
                           Icon(_busy ? Icons.hourglass_empty : Icons.photo_camera_outlined,
                               size: 34, color: QColors.textMuted),
                           const SizedBox(height: 10),
+                          // Before the camera opens, what a scan gives: the
+                          // welcome's button names the scan and no more.
                           Text(
-                            _busy
-                                ? (isAr ? 'بفتح الكاميرا…' : 'Opening the camera…')
-                                : (isAr ? 'اضغط الزرار عشان تفتح الكاميرا وتصوّر تقرير InBody' : 'Tap the button to open the camera and photograph your InBody report'),
+                            _busy ? (isAr ? 'بفتح الكاميرا…' : 'Opening the camera…') : t.scanInbodySub,
                             textAlign: TextAlign.center,
                             style: QText.body(size: 13, height: 20, color: QColors.textMuted),
                           ),
