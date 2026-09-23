@@ -12,6 +12,7 @@ import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/nudge.dart';
 import 'package:qamar/models/reply.dart';
+import 'package:qamar/models/streak.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/state/app_state.dart';
@@ -37,7 +38,7 @@ String _line(AppState s, DayNumbers d) => dayLineFor(d, ar: s.isAr, iso: s.iso);
 
 /// Every shape, and around its edges, for the sweeps below.
 Iterable<(LoggedMeal, DayNumbers)> _sweep() sync* {
-  for (final kcal in [0, 400, 900, 1500, 1900, 2000, 2080, 2150, 2600, 3400]) {
+  for (final kcal in [0, 400, 900, 1500, 1900, 2000, 2080, 2150, 2300, 2480, 2600, 3400]) {
     for (final protein in [10, 60, 120, 139, 140, 190]) {
       for (final hour in [8, 13, 16, 21]) {
         for (final next in [null, _dinner, (nameAr: 'كشري', nameEn: 'Koshary', kcal: 1400)]) {
@@ -52,16 +53,32 @@ Iterable<(LoggedMeal, DayNumbers)> _sweep() sync* {
 
 void main() {
   group('the shapes of a day', () {
-    test('over the target: said without blame, and tomorrow starts fresh', () {
-      final d = _day(kcal: 2400);
+    test('over the target, where the orb’s halo warms: said without blame, and tomorrow starts fresh', () {
+      final d = _day(kcal: 2600);
       expect(shapeOf(d), DayShape.over);
-      expect(_reply(_en, _meal(700), d), '700 kcal, which takes today about 400 past your target — nothing to make up, tomorrow starts fresh.');
+      expect(_reply(_en, _meal(700), d), '700 kcal, which takes today about 600 past your target — nothing to make up, tomorrow starts fresh.');
       expect(_reply(_ar, _meal(700), d), contains('مفيش حاجة تتعوّض'));
       final blame = RegExp(r'too much|bad|exceed|careful|should not|shouldn’t|guilt|مش كويس|كتير|غلط|خلي بالك|ما كانش', caseSensitive: false);
-      for (final s in [_ar, _en]) {
-        expect(blame.hasMatch(_reply(s, _meal(700), d)), isFalse);
-        expect(blame.hasMatch(_line(s, d)), isFalse);
+      for (final day in [d, _day(kcal: 2300)]) {
+        for (final s in [_ar, _en]) {
+          expect(blame.hasMatch(_reply(s, _meal(700), day)), isFalse);
+          expect(blame.hasMatch(_line(s, day)), isFalse);
+        }
       }
+    });
+
+    test('a little past the target, within what an estimate can tell apart: said as both', () {
+      // At a 2,000 target the moon warms only past 2,500 (25%, never under
+      // 400); between 2,100 and 2,500 it reads the day as at the target.
+      for (final kcal in [2101, 2300, 2500]) {
+        expect(shapeOf(_day(kcal: kcal)), DayShape.nearOver, reason: '$kcal');
+      }
+      expect(shapeOf(_day(kcal: 2501)), DayShape.over);
+      expect(_line(_en, _day(kcal: 2300)), 'About 300 kcal past your target — within what an estimate can tell apart.');
+      expect(_reply(_en, _meal(500), _day(kcal: 2300)), '500 kcal; about 300 past your target — within what an estimate can tell apart.');
+      expect(_line(_ar, _day(kcal: 2300)), 'النهارده فوق هدفك بحوالي ${_ar.iso('300')} سعرة — وده جوّه هامش التقدير.');
+      expect(_reply(_ar, _meal(500), _day(kcal: 2300)), contains('جوّه هامش التقدير'));
+      expect(_line(_en, _day(kcal: 2300)), isNot(contains('make up')), reason: 'nothing to make up is the over line; here there is nothing to say sorry for at all');
     });
 
     test('at the target, within 5% (and never under 100 kcal)', () {
@@ -125,6 +142,22 @@ void main() {
       }
       final shapes = {for (final (m, d) in _sweep()) shapeOf(d, meal: m)};
       expect(shapes, DayShape.values.toSet(), reason: 'every shape is reachable');
+    });
+
+    test('the words and the moon read every day the same way', () {
+      // One reading of the day: the orb's (OrbState.dayFor). Over only where
+      // the halo warms, at or a little past wherever the moon reads "at".
+      for (final target in [1500, 2000, 2800]) {
+        for (var kcal = 25; kcal <= 4500; kcal += 25) {
+          final d = _day(kcal: kcal, target: target);
+          final moon = OrbState.dayFor(consumedKcal: kcal, targetKcal: target, logged: true);
+          for (final shape in [shapeOf(d), shapeOf(d, meal: _meal(300))]) {
+            final reason = '$kcal of $target: moon $moon, words $shape';
+            expect(shape == DayShape.over, moon == OrbDay.over, reason: reason);
+            expect(shape == DayShape.atTarget || shape == DayShape.nearOver, moon == OrbDay.at, reason: reason);
+          }
+        }
+      }
     });
 
     test('no reply and no day line ever says Su, points or earned, in either language', () {
@@ -201,6 +234,15 @@ void main() {
       final second = s.chat.last.text;
       expect(first, replyFor(s.meals.first, (s..meals.removeLast()).dayNumbers(), ar: true, iso: s.iso));
       expect(second, isNot(first), reason: 'the same meal, a different day by then');
+    });
+
+    test('in the app, a day a little past the target: the orb reads at, and Today’s line says so, without the over words', () {
+      final s = state(AppLang.en);
+      final target = s.target().kcal;
+      s.meals.add(LoggedMeal(name: 'Feteer', sub: '', kcal: target + 300, p: 40, c: 300, f: 90, at: now));
+      expect(s.orbState().day, OrbDay.at, reason: 'within what an estimate can tell apart');
+      expect(shapeOf(s.dayNumbers()), DayShape.nearOver);
+      expect(dayLineFor(s.dayNumbers(), ar: false, iso: s.iso), 'About 300 kcal past your target — within what an estimate can tell apart.');
     });
 
     testWidgets('Today’s sentence after the first log is the day read in words', (tester) async {

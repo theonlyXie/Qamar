@@ -186,8 +186,10 @@ class OrbState {
   /// The same mapping for any day — the review card draws a week of them.
   static double phaseForFill(double fill) => restPhase - (restPhase - fullPhase) * fill.clamp(0.0, 1.0);
 
-  /// How close counts as at the target: 5%, and never under 100 kcal, the
-  /// same reach Qamar's words use for "right at your target" (reply.dart).
+  /// How close counts as at the target: 5%, and never under 100 kcal. Qamar's
+  /// words (reply.dart) classify the day through [dayFor], so they read it the
+  /// same way: "right at your target" within this, and past it but under
+  /// [overMargin] "within what an estimate can tell apart".
   static int atTolerance(int target) => math.max(100, (target * 0.05).round());
 
   /// How far past the target a day must go before the moon warms: further

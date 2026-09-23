@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'meal.dart';
 import 'nudge.dart';
+import 'streak.dart';
 
 /// Qamar's words after a log, and Today's sentence once something is logged
 /// (O3): one sentence about this meal against this day.
@@ -49,17 +50,29 @@ class DayNumbers {
   /// Room left today. Negative past the target.
   int get left => targetKcal - kcal;
 
-  /// How close counts as "at the target": 5% of it, and never under 100 kcal.
-  int get tolerance => math.max(100, (targetKcal * 0.05).round());
+  /// How close counts as "right at the target": 5% of it, and never under
+  /// 100 kcal. The moon's own reach (OrbState.atTolerance), so there is one.
+  int get tolerance => OrbState.atTolerance(targetKcal);
 }
 
 /// Which way the day reads. The first that applies, in this order.
+///
+/// The first three are the moon's own reading of the day (OrbState.dayFor),
+/// so the words and the orb never disagree: [over] only where the halo warms,
+/// and [atTarget] or [nearOver] wherever the moon reads the day as at its
+/// target.
 enum DayShape {
-  /// Past the target by more than the tolerance. Said without blame.
+  /// Past the target by more than an estimate can tell apart from it
+  /// (OrbState.overMargin: 25%, and never under 400 kcal), where the orb's
+  /// halo warms. Said without blame.
   over,
 
-  /// Within the tolerance of the target.
+  /// Within 5% of the target (never under 100 kcal).
   atTarget,
+
+  /// Past the target, but by less than an estimate can tell apart: the moon
+  /// reads it as at the target, and the words say both.
+  nearOver,
 
   /// The day's protein is reached (for a reply: reached by this meal).
   proteinDone,
@@ -79,8 +92,10 @@ enum DayShape {
 
 DayShape shapeOf(DayNumbers d, {LoggedMeal? meal}) {
   final t = d.tolerance;
-  if (d.left < -t) return DayShape.over;
-  if (d.left.abs() <= t) return DayShape.atTarget;
+  // One reading of the day: the moon's.
+  final moon = OrbState.dayFor(consumedKcal: d.kcal, targetKcal: d.targetKcal, logged: meal != null || d.kcal > 0);
+  if (moon == OrbDay.over) return DayShape.over;
+  if (moon == OrbDay.at) return -d.left > t ? DayShape.nearOver : DayShape.atTarget;
   final reached = d.targetProtein > 0 && d.protein >= d.targetProtein;
   final reachedNow = meal == null ? reached : reached && d.protein - meal.p < d.targetProtein;
   if (reachedNow) return DayShape.proteinDone;
@@ -106,6 +121,9 @@ String replyFor(LoggedMeal meal, DayNumbers day, {required bool ar, required Str
         ? '$m سعرة، وكده النهارده عدّى هدفك بحوالي $over — مفيش حاجة تتعوّض، وبكرة يوم جديد.'
         : '$m kcal, which takes today about $over past your target — nothing to make up, tomorrow starts fresh.',
     DayShape.atTarget => ar ? '$m سعرة، وكده النهارده وصل لهدفك بالظبط.' : '$m kcal, and that brings today right to your target.',
+    DayShape.nearOver => ar
+        ? '$m سعرة؛ النهارده فوق هدفك بحوالي $over — وده جوّه هامش التقدير.'
+        : '$m kcal; about $over past your target — within what an estimate can tell apart.',
     DayShape.proteinDone => ar
         ? '$m سعرة، وكده بروتين النهارده كمل، وفاضل $left سعرة.'
         : '$m kcal, and with it today’s protein is done, with $left kcal left.',
@@ -138,6 +156,9 @@ String dayLineFor(DayNumbers day, {required bool ar, required String Function(St
         ? 'النهارده عدّى هدفك بحوالي $over سعرة — مفيش حاجة تتعوّض، وبكرة يوم جديد.'
         : 'Today is about $over kcal past your target — nothing to make up, tomorrow starts fresh.',
     DayShape.atTarget => ar ? 'النهارده وصل لهدفك بالظبط.' : 'Today is right at your target.',
+    DayShape.nearOver => ar
+        ? 'النهارده فوق هدفك بحوالي $over سعرة — وده جوّه هامش التقدير.'
+        : 'About $over kcal past your target — within what an estimate can tell apart.',
     DayShape.proteinDone => ar ? 'بروتين النهارده كمل، وفاضل $left سعرة.' : 'Today’s protein is done, with $left kcal left.',
     DayShape.proteinShort => ar
         ? 'فاضل $left سعرة، والنهارده لسه محتاج حوالي $gap جم بروتين.'
