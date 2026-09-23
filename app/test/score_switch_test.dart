@@ -22,6 +22,8 @@ import 'package:qamar/screens/wallet_screen.dart';
 import 'package:qamar/screens/you_screen.dart';
 import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/state/app_state.dart';
+import 'package:qamar/theme/icons.dart';
+import 'package:qamar/widgets/dot_number.dart';
 import 'package:qamar/widgets/living_orb.dart';
 import 'package:qamar/widgets/orb_nav.dart';
 import 'package:qamar/widgets/quest_card.dart';
@@ -121,7 +123,8 @@ void main() {
       await tester.tap(find.text(ar ? 'النقاط والسلسلة' : 'Points and streaks'));
       await tester.pump();
       expect(s.showScore, isFalse, reason: 'a tap on the words turns it off');
-      await tester.tap(find.textContaining(ar ? 'بتستخبى بس' : 'Off only hides them'));
+      // Anywhere on the row: its glyph, at the other end from the switch.
+      await tester.tap(find.descendant(of: find.byKey(YouScreen.scoreRowKey), matching: find.byIcon(QIcons.star)));
       await tester.pump();
       expect(s.showScore, isTrue, reason: 'and on again');
     });
@@ -140,21 +143,22 @@ void main() {
 
       s.setShowScore(false);
       await tester.pump();
-      expect(find.text(s.formatSu(1250)), findsOneWidget, reason: 'the balance stays: spending needs it');
+      // The balance is the wallet's hero, drawn in dots.
+      expect(tester.widget<DotNumber>(find.byKey(WalletScreen.balanceKey)).text, s.formatSu(1250), reason: 'the balance stays: spending needs it');
       expect(find.byKey(WalletScreen.levelKey), findsNothing, reason: 'the Level bar keeps score');
       expect(find.text(level), findsNothing);
       expect(find.text(s.t.levelNote), findsNothing);
       expect(find.byKey(WalletScreen.lifetimeKey), findsNothing, reason: 'lifetime earned is what Level is made of');
       expect(find.text(s.formatSu(3400)), findsNothing);
 
-      // And Me's wallet card says only the balance.
+      // And Me's wallet row says only the balance.
       s.go(AppScreen.you);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 800));
       await tester.dragUntilVisible(find.text(s.t.walletTitle), find.byType(ListView).first, const Offset(0, -200));
       await tester.pump();
       expect(find.textContaining(s.formatSu(3400)), findsNothing);
-      expect(find.text(ar ? '${s.iso(s.formatSu(1250))} متاح' : '1,250 available'), findsOneWidget);
+      expect(find.descendant(of: find.byKey(YouScreen.walletRowKey), matching: find.text(s.formatSu(1250))), findsOneWidget);
     });
 
     testWidgets('Today with it off: no Su chip, streak line, quest, ring or receipt (${lang.name})', (tester) async {

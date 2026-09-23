@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/meal.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/icons.dart';
 import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
+import '../widgets/dot_number.dart';
 import '../widgets/explain.dart';
 
+/// The Su Points wallet: the balance is the page's one hero, drawn in dots;
+/// under it the two tabs, Spend and History, and under them plain rows.
 class WalletScreen extends StatelessWidget {
   const WalletScreen({super.key});
 
@@ -20,6 +25,13 @@ class WalletScreen extends StatelessWidget {
   static const availableLabelKey = ValueKey('wallet-available-label');
   static const lifetimeLabelKey = ValueKey('wallet-lifetime-label');
 
+  /// The balance's dot figure.
+  static const balanceKey = ValueKey('wallet-balance');
+
+  /// The two tabs, and the white segment under the chosen one.
+  static Key tabKey(WalletTab tab) => ValueKey('wallet-tab-${tab.name}');
+  static const thumbKey = ValueKey('wallet-tab-thumb');
+
   /// The terms at the foot of both tabs, whatever "Points and streaks" is
   /// set to: they are where the wallet says Su are earned, never sold.
   static const termsKey = ValueKey('wallet-terms');
@@ -29,155 +41,209 @@ class WalletScreen extends StatelessWidget {
     final state = context.watch<AppState>();
     final t = state.t;
     final isAr = state.isAr;
+    final balance = state.formatSu(state.suAvailable);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, QLayout.pageTop, 20, QLayout.pageBottom),
+      padding: const EdgeInsets.fromLTRB(QSpace.page, QLayout.pageTop, QSpace.page, QLayout.pageBottom),
       children: [
         Row(children: [
           QBackButton(onTap: state.back, isAr: isAr),
-          const SizedBox(width: 6),
-          Text(t.walletTitle, style: QText.display(size: 34, ar: QText.arabic(t.walletTitle), color: QColors.ink)),
-        ]),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [QColors.surfaceRaised, QColors.surface]),
-            border: Border.all(color: QColors.ink.withOpacity(0.32)),
-            borderRadius: BorderRadius.circular(QRadii.card),
+          const SizedBox(width: QSpace.sm),
+          Expanded(
+            child: Text(t.walletTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.display(size: 34, ar: QText.arabic(t.walletTitle))),
           ),
+        ]),
+        const SizedBox(height: QSpace.xxl),
+
+        // The hero: what there is to spend, in dots, with the coin as its
+        // unit. Lifetime earned and Level keep score, so they go with "Points
+        // and streaks" (O4); the balance stays, because spending needs it.
+        Container(
+          padding: const EdgeInsets.all(QSpace.xl),
+          decoration: QDecor.card(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // The two labels share a baseline, and the coin sits with the
-              // number it counts: the labels used to stagger by 35px because
-              // the coin and the balance were centred against each other.
-              Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(t.suAvailable, key: WalletScreen.availableLabelKey, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.inkTertiary)),
-                  Row(children: [
-                    const SuCoinIcon(size: 30),
-                    const SizedBox(width: 10),
-                    Text('${state.formatSu(state.suAvailable)}', style: QText.number(size: 34, weight: FontWeight.w600, color: QColors.ink)),
-                  ]),
-                ]),
-                const Spacer(),
-                // Lifetime earned is the number Level is made of and a
-                // leaderboard would rank, so it keeps score: it goes with
-                // "Points and streaks" (O4). The balance stays, because
-                // spending needs it.
-                if (state.showScore)
-                  Column(key: WalletScreen.lifetimeKey, crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Text(t.suLifetime, key: WalletScreen.lifetimeLabelKey, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.inkTertiary)),
-                    Text('${state.formatSu(state.suLifetime)}', style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.inkSecondary)),
-                  ]),
+              // The two labels share a baseline; a long figure or a large
+              // text size wraps the second rather than pushing it off the card.
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+                Text(QText.eyebrowText(t.suAvailable, ar: isAr), key: WalletScreen.availableLabelKey, style: QText.eyebrow(ar: isAr)),
+                if (state.showScore) ...[
+                  const SizedBox(width: QSpace.md),
+                  Flexible(
+                    child: Row(
+                      key: WalletScreen.lifetimeKey,
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Flexible(child: Text(QText.eyebrowText(t.suLifetime, ar: isAr), key: WalletScreen.lifetimeLabelKey, textAlign: TextAlign.end, style: QText.eyebrow(ar: isAr))),
+                        const SizedBox(width: QSpace.sm),
+                        Text(state.formatSu(state.suLifetime), style: QText.number(size: 13, weight: FontWeight.w600, color: QColors.inkSecondary)),
+                      ],
+                    ),
+                  ),
+                ],
+              ]),
+              const SizedBox(height: QSpace.lg),
+              Row(children: [
+                const SuCoinIcon(size: 28),
+                const SizedBox(width: QSpace.md),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: AlignmentDirectional.centerStart,
+                    child: DotNumber(balance, key: WalletScreen.balanceKey, height: 48, semanticsLabel: '$balance ${t.suName}, ${t.suAvailable}'),
+                  ),
+                ),
               ]),
               // Level lives here only (O9), and only while the score is shown
               // (O4): it buys nothing, and it is the leaderboard's number.
               if (state.showScore) ...[
-                const SizedBox(height: 16),
-                ClipRRect(
-                  key: WalletScreen.levelKey,
-                  borderRadius: BorderRadius.circular(QRadii.pill),
-                  child: LinearProgressIndicator(value: state.levelPct() / 100, minHeight: 6, backgroundColor: QColors.hairline, valueColor: const AlwaysStoppedAnimation(QColors.ink)),
-                ),
-                const SizedBox(height: 6),
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                const SizedBox(height: QSpace.xl),
+                QBar(key: WalletScreen.levelKey, value: state.levelPct() / 100),
+                const SizedBox(height: QSpace.sm),
+                Row(children: [
                   Explainable(
                     id: 'level',
-                    child: ExplainMark(child: Text(isAr ? 'المستوى ${state.iso('${state.level()}')}' : 'Level ${state.level()}', style: QText.body(size: 11, color: QColors.inkTertiary))),
+                    child: ExplainMark(child: Text(isAr ? 'المستوى ${state.iso('${state.level()}')}' : 'Level ${state.level()}', style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.inkSecondary))),
                   ),
-                  Text(t.levelNote, style: QText.body(size: 11, color: QColors.inkTertiary)),
+                  const SizedBox(width: QSpace.md),
+                  Expanded(child: Text(t.levelNote, textAlign: TextAlign.end, style: QText.body(size: 13, color: QColors.inkTertiary))),
                 ]),
               ],
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        Container(
-          // The tabs take the whole height as their touch (O11); the gold
-          // pill is drawn inside, as before.
-          decoration: BoxDecoration(color: QColors.surface, border: Border.all(color: QColors.hairline), borderRadius: BorderRadius.circular(QRadii.pill)),
-          child: Row(children: [
-            Expanded(child: _WalletTab(label: t.spendTab, active: state.walletTab == WalletTab.spend, onTap: state.showSpend)),
-            Expanded(child: _WalletTab(label: t.historyTab, active: state.walletTab == WalletTab.history, onTap: state.showHistory)),
-          ]),
+        const SizedBox(height: QSpace.xxl),
+
+        _Tabs(
+          tabs: [(WalletTab.spend, t.spendTab), (WalletTab.history, t.historyTab)],
+          chosen: state.walletTab,
+          onChoose: (tab) => tab == WalletTab.spend ? state.showSpend() : state.showHistory(),
         ),
-        const SizedBox(height: 14),
-        if (state.walletTab == WalletTab.spend)
-          for (final item in kSpendCatalog) ...[
-            _SpendCard(item: item),
-            const SizedBox(height: 12),
-          ]
-        else if (state.ledger().isEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-            decoration: QDecor.card(color: QColors.surface, border: QColors.hairline, radius: QRadii.control),
-            child: Text(
-              state.isAr
-                  ? 'مفيش حركات لسه. كل نقطة بتتكسب هتظهر هنا بسببها.'
-                  : 'No entries yet. Every point you earn shows up here with its reason.',
-              style: QText.body(size: 13, height: 20, color: QColors.inkTertiary),
-            ),
-          )
-        else
-          for (final entry in state.ledger()) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: QDecor.card(color: QColors.surface, border: QColors.hairline, radius: QRadii.control),
-              child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(entry.label, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.ink)),
-                  Text(entry.when, style: QText.body(size: 11, color: QColors.inkTertiary)),
-                ]),
-                Text(state.suSigned(entry.amount), style: QText.number(size: 15, weight: FontWeight.w600, color: entry.amount < 0 ? QColors.ink : QColors.ink)),
-              ]),
-            ),
-          ],
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: QDecor.card(color: QColors.surface, border: QColors.hairline, radius: QRadii.control),
-          child: Text(t.walletTerms, key: WalletScreen.termsKey, style: QText.body(size: 12, height: 19, color: QColors.inkTertiary)),
+        const SizedBox(height: QSpace.lg),
+
+        AnimatedSwitcher(
+          duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 200),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeOutCubic,
+          layoutBuilder: (current, previous) => Stack(alignment: Alignment.topCenter, children: [...previous, if (current != null) current]),
+          child: KeyedSubtree(
+            key: ValueKey(state.walletTab),
+            child: state.walletTab == WalletTab.spend ? const _SpendList() : const _History(),
+          ),
+        ),
+        const SizedBox(height: QSpace.md),
+        Padding(
+          padding: const EdgeInsetsDirectional.symmetric(horizontal: QSpace.lg),
+          child: Text(t.walletTerms, key: WalletScreen.termsKey, style: QText.body(size: 13, height: 18, color: QColors.inkTertiary)),
         ),
       ],
     );
   }
 }
 
-class _WalletTab extends StatelessWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-  const _WalletTab({required this.label, required this.active, required this.onTap});
+/// Two tabs as one segmented control: a capsule track, and under the chosen
+/// tab a white segment with black words, which slides to the other when it is
+/// chosen (a state change: 220 ms, ease-out; with reduce motion it simply
+/// moves). Each tab is a whole touch and says it is selected.
+class _Tabs extends StatelessWidget {
+  final List<(WalletTab, String)> tabs;
+  final WalletTab chosen;
+  final ValueChanged<WalletTab> onChoose;
+  const _Tabs({required this.tabs, required this.chosen, required this.onChoose});
+
   @override
   Widget build(BuildContext context) {
-    return QTapArea(
-      onTap: onTap,
-      builder: (context, pressed) => Container(
-        height: QLayout.minTap,
-        padding: const EdgeInsets.all(5),
-        child: Container(
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            // The chosen tab is the app's one lighter surface with a gold
-            // edge; gold washed over navy read as warm grey, the only warm
-            // surface in the app.
-            color: active ? QColors.surfaceHigh : (pressed ? QColors.surfaceRaised : Colors.transparent),
-            border: Border.all(color: active ? QColors.ink.withValues(alpha: 0.45) : Colors.transparent),
-            borderRadius: BorderRadius.circular(QRadii.pill),
+    final still = MediaQuery.disableAnimationsOf(context);
+    final index = tabs.indexWhere((t) => t.$1 == chosen);
+    const track = 40.0;
+    const inset = 3.0;
+    // The track is drawn 40 tall in a band a whole touch tall (O11): each
+    // tab takes the full 48, the capsule and its white segment sit inside.
+    return SizedBox(
+      height: QLayout.minTap,
+      child: Stack(children: [
+        Positioned.fill(
+          child: Center(
+            child: Container(height: track, decoration: QDecor.capsule(edge: QColors.hairline, fill: QColors.surface)),
           ),
-          child: Text(label, style: QText.body(size: 13, weight: FontWeight.w600, color: active ? QColors.ink : QColors.inkTertiary)),
         ),
-      ),
+        Positioned.fill(
+          child: Center(
+            child: SizedBox(
+              height: track,
+              child: Padding(
+                padding: const EdgeInsets.all(inset),
+                child: AnimatedAlign(
+                  duration: still ? Duration.zero : const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  alignment: AlignmentDirectional(index == 0 ? -1 : 1, 0),
+                  child: FractionallySizedBox(
+                    widthFactor: 1 / tabs.length,
+                    heightFactor: 1,
+                    child: const DecoratedBox(key: WalletScreen.thumbKey, decoration: QDecor.inkButton),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Row(children: [
+          for (final (tab, label) in tabs)
+            Expanded(
+              child: Semantics(
+                selected: tab == chosen,
+                child: QTapArea(
+                  key: WalletScreen.tabKey(tab),
+                  onTap: () {
+                    if (tab == chosen) return;
+                    HapticFeedback.selectionClick();
+                    onChoose(tab);
+                  },
+                  builder: (context, pressed) => Center(
+                    child: AnimatedDefaultTextStyle(
+                      duration: still ? Duration.zero : const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      style: QText.body(size: 15, weight: FontWeight.w600, color: tab == chosen ? QColors.onInk : (pressed ? QColors.ink : QColors.inkSecondary)),
+                      child: Text(label),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ]),
+      ]),
     );
   }
 }
 
-class _SpendCard extends StatelessWidget {
+/// What Su can buy, one row each on one card: the name and the price, what
+/// it does and its limit, and the one way to take it. A price the balance
+/// does not reach is off (O11), not a live-looking button that quietly does
+/// nothing, and only then does it say what would be left.
+class _SpendList extends StatelessWidget {
+  const _SpendList();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: QDecor.card(),
+      child: Column(children: [
+        for (final (i, item) in kSpendCatalog.indexed) ...[
+          if (i > 0) const Divider(height: 1, thickness: 1, indent: QSpace.lg, color: QColors.hairline),
+          _SpendRow(item: item),
+        ],
+      ]),
+    );
+  }
+}
+
+class _SpendRow extends StatelessWidget {
   final SpendItemDef item;
-  const _SpendCard({required this.item});
+  const _SpendRow({required this.item});
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -186,38 +252,77 @@ class _SpendCard extends StatelessWidget {
     final afford = state.suAvailable >= item.price && !done;
     final after = state.suAvailable - item.price < 0 ? 0 : state.suAvailable - item.price;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: QDecor.card(color: QColors.surface, border: QColors.hairline, radius: QRadii.card),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(QSpace.lg, QSpace.lg, QSpace.lg, QSpace.md),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Expanded(child: Text(isAr ? item.nameAr : item.nameEn, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink))),
-            Text('${state.formatSu(item.price)} Su', style: QText.number(size: 13, weight: FontWeight.w600, color: QColors.ink)),
+          Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+            Expanded(child: Text(isAr ? item.nameAr : item.nameEn, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink))),
+            const SizedBox(width: QSpace.md),
+            Text(state.suAmount(item.price), style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink, ar: isAr)),
           ]),
-          const SizedBox(height: 6),
-          Text(isAr ? item.whatAr : item.whatEn, style: QText.body(size: 13, height: 20, color: QColors.inkTertiary)),
-          const SizedBox(height: 4),
-          Text(isAr ? item.limitAr : item.limitEn, style: QText.body(size: 11, height: 17, color: QColors.inkTertiary)),
-          const SizedBox(height: 8),
-          // What the balance would be is said only when it can be spent:
-          // "after: 0" under a price the balance does not reach read as a
-          // promise. Out of reach, the button is off (O11), not a tap that
-          // quietly does nothing.
+          const SizedBox(height: QSpace.xs),
+          Text(isAr ? item.whatAr : item.whatEn, style: QText.body(size: 15, color: QColors.inkSecondary)),
+          const SizedBox(height: QSpace.xs),
+          Text(isAr ? item.limitAr : item.limitEn, style: QText.body(size: 13, height: 18, color: QColors.inkTertiary)),
           Row(children: [
-            if (afford) Text('${state.t.balanceAfter}: ${state.formatSu(after)}', style: QText.body(size: 11, color: QColors.inkTertiary)),
-            const Spacer(),
+            Expanded(
+              child: afford
+                  ? Text('${state.t.balanceAfter} ${state.formatSu(after)}', style: QText.number(size: 13, color: QColors.inkTertiary, ar: isAr))
+                  : const SizedBox.shrink(),
+            ),
             QOutlineButton(
               key: ValueKey('redeem-${item.id}'),
-              label: done ? (isAr ? 'اتمت' : 'Redeemed') : state.t.spendCta,
+              label: done ? (isAr ? 'اتستخدم' : 'Redeemed') : state.t.spendCta,
               height: 36,
-              color: QColors.ink,
               onTap: afford ? () => state.redeem(item) : null,
             ),
           ]),
         ],
       ),
+    );
+  }
+}
+
+/// Every point, the reason it came or went, and when: one row each.
+class _History extends StatelessWidget {
+  const _History();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final isAr = state.isAr;
+    final ledger = state.ledger();
+    if (ledger.isEmpty) {
+      return QStateLine(
+        icon: QIcons.empty,
+        line: isAr ? 'مفيش حركات لسه. كل نقطة بتتكسب هتظهر هنا بسببها.' : 'Nothing here yet. Every point you earn shows up here with its reason.',
+      );
+    }
+    return Container(
+      decoration: QDecor.card(),
+      child: Column(children: [
+        for (final (i, entry) in ledger.indexed) ...[
+          if (i > 0) const Divider(height: 1, thickness: 1, indent: QSpace.lg, color: QColors.hairline),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: QSpace.lg, vertical: QSpace.md),
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(entry.label, style: QText.body(size: 17, color: QColors.ink)),
+                    Text(entry.when, style: QText.body(size: 13, height: 18, color: QColors.inkTertiary)),
+                  ]),
+                ),
+                const SizedBox(width: QSpace.md),
+                Text(state.suSigned(entry.amount), style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink)),
+              ]),
+            ),
+          ),
+        ],
+      ]),
     );
   }
 }

@@ -13,6 +13,7 @@ import 'package:qamar/main.dart';
 import 'package:qamar/models/billing.dart';
 import 'package:qamar/screens/subscription_screen.dart';
 import 'package:qamar/state/app_state.dart';
+import 'package:qamar/widgets/common.dart';
 
 /// A free-tier person whose earned-month status the server has answered:
 /// no paid membership yet, so the window opens on the first payment.
@@ -125,7 +126,8 @@ void main() {
     final text = await _paywall(tester, _lite(AppLang.en, earned: _stated()));
     expect(tester.widget<Text>(find.byKey(SubscriptionScreen.leadKey)).data,
         'Qamar+ tells you what to eat tomorrow: it writes the plan at night, in Egyptian dishes.');
-    final table = text.substring(text.indexOf('What you get'));
+    // The table's name is an eyebrow: set in capitals in English.
+    final table = text.substring(text.indexOf('WHAT YOU GET'));
     expect(table.indexOf('Tomorrow’s plan, written overnight'), lessThan(table.indexOf('Log meals by typing or speaking')),
         reason: 'tomorrow’s plan is the table’s first row');
   });
@@ -190,9 +192,27 @@ void main() {
       expect(line, isNot(contains('Code applied')));
     });
 
-    testWidgets('with no reason, the line is what it was', (tester) async {
+    testWidgets('with no reason, the line is what it was, one tap away behind "Have a … code?"', (tester) async {
       await _paywall(tester, _lite(AppLang.en, earned: _stated()));
+      // Most people have no code: the field waits behind one quiet line.
+      expect(find.byKey(SubscriptionScreen.codeLineKey), findsNothing);
+      await tester.tap(find.byKey(SubscriptionScreen.codeToggleKey));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
       expect(tester.widget<Text>(find.byKey(SubscriptionScreen.codeLineKey)).data, startsWith('If a nutritionist or coach sent you'));
+      expect(find.byType(TextField), findsOneWidget, reason: 'and the field to type it in');
+    });
+
+    testWidgets('a code already typed, or one already applied, keeps the field open', (tester) async {
+      final typed = _lite(AppLang.en, earned: _stated())..plusPromoCode = 'QMRSARA1';
+      await _paywall(tester, typed);
+      expect(find.byKey(SubscriptionScreen.codeLineKey), findsOneWidget);
+      const applied = PlusQuote(
+        plan: 'monthly', days: 30, listCents: 50000, amountCents: 50000,
+        pricingReason: 'affiliate', firstPurchase: true, promoCode: 'QMRSARA1', promoKind: 'affiliate',
+      );
+      await _paywall(tester, _lite(AppLang.en, earned: _stated(), quote: applied));
+      expect(tester.widget<Text>(find.byKey(SubscriptionScreen.codeLineKey)).data, startsWith('Code applied.'));
     });
   });
 
@@ -228,5 +248,45 @@ void main() {
       expect(line, isNot(contains('Mastercard')), reason: 'no card integration was named');
     });
   });
-}
 
+  // One white button, and never a hard sell: the free week while it is on
+  // offer (the month is then an outline under its price), the month when it
+  // is not, and nothing to buy while a paid month is running — there is
+  // nothing to renew and nothing to cancel.
+  group('one thing to do', () {
+    for (final lang in AppLang.values) {
+      final ar = lang == AppLang.ar;
+      testWidgets('the free week, while it is on offer, with its rule under it; the month an outline (${lang.name})', (tester) async {
+        final s = _lite(lang, earned: _stated())..plusTrialEligible = true;
+        await _paywall(tester, s);
+        expect(find.byType(QPrimaryButton), findsOneWidget);
+        expect(tester.widget<QPrimaryButton>(find.byKey(SubscriptionScreen.primaryKey)).label, ar ? 'ابدأ الأسبوع المجاني' : 'Start the free week');
+        expect(
+          find.text(ar
+              ? 'من غير بطاقة، ومفيش حاجة بتتجدد لوحدها: بعد \u2066٧\u2069 أيام بترجع لقمر المجاني.'
+              : 'No card, and nothing renews on its own: after 7 days you are simply back on the free Qamar.'),
+          findsOneWidget,
+        );
+        expect(tester.widget<QOutlineButton>(find.byKey(SubscriptionScreen.buyKey)).label, ar ? 'ادفع شهر بـ ٥٠٠ ج.م' : 'Pay EGP 500 for a month');
+      });
+
+      testWidgets('with the week used, the month is the one white button, at the quoted price (${lang.name})', (tester) async {
+        await _paywall(tester, _lite(lang, earned: _stated()));
+        expect(find.byType(QPrimaryButton), findsOneWidget);
+        expect(tester.widget<QPrimaryButton>(find.byKey(SubscriptionScreen.primaryKey)).label, ar ? 'ادفع شهر بـ ٥٠٠ ج.م' : 'Pay EGP 500 for a month');
+        expect(find.byKey(SubscriptionScreen.buyKey), findsNothing, reason: 'not twice');
+      });
+
+      testWidgets('with a paid month running, nothing to buy: the month says when it ends (${lang.name})', (tester) async {
+        final s = _lite(lang, earned: _stated())
+          ..plusActive = true
+          ..plusUntil = DateTime(2026, 10, 20, 12);
+        final text = await _paywall(tester, s);
+        expect(find.byType(QPrimaryButton), findsNothing);
+        expect(find.byKey(SubscriptionScreen.buyKey), findsNothing);
+        expect(text.replaceAll(RegExp('[\u2066-\u2069]'), ''), contains(ar ? 'شهرك شغال · لحد ٢٠/١٠' : 'Your month · until 20/10'));
+        expect(find.byKey(SubscriptionScreen.codeToggleKey), findsNothing, reason: 'a code rides on a payment, and there is none to make');
+      });
+    }
+  });
+}

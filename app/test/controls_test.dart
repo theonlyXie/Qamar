@@ -1,9 +1,10 @@
 // Controls that say what they will do, seat 6's part (the scorecard's 08,
 // 09, 11 and 12): switches drawn in the palette, not stock grey; a spend or
 // a payout the balance does not reach is off, not a live-looking button
-// that quietly does nothing; the wallet's chosen tab is a cool surface, not
-// gold washed to warm grey; a placeholder for a code is an instruction, not
-// a title; and the scan offers typing once, not three times.
+// that quietly does nothing; the wallet's chosen tab is inverted, a white
+// segment with black words, where it was gold washed to warm grey; a
+// placeholder for a code is an instruction, not a title; and the scan offers
+// typing once, not three times.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +15,7 @@ import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
 import 'package:qamar/models/billing.dart';
 import 'package:qamar/screens/you_screen.dart';
+import 'package:qamar/screens/wallet_screen.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/app_theme.dart';
 import 'package:qamar/theme/colors.dart';
@@ -90,20 +92,24 @@ void main() {
       expect(find.textContaining(s.t.balanceAfter), findsWidgets);
     });
 
-    testWidgets('the wallet’s chosen tab is a cool surface with a gold edge (${lang.name})', (tester) async {
+    testWidgets('the wallet’s chosen tab is inverted: a white segment under black words, the other in the second ink (${lang.name})', (tester) async {
       final s = AppState()..setLang(lang);
       s.go(AppScreen.today);
       s.go(AppScreen.wallet);
       await _pumpApp(tester, s);
-      final spend = find.text(s.t.spendTab);
-      final boxes = tester
-          .widgetList<Container>(find.ancestor(of: spend.first, matching: find.byType(Container)))
-          .map((c) => c.decoration)
-          .whereType<BoxDecoration>()
-          .where((d) => d.color != null);
-      final fill = boxes.first.color!;
-      expect(fill, QColors.surfaceHigh);
-      expect(fill.b, fill.r, reason: 'a grey, with no hue in it');
+      Color ink(String label) => tester.widget<RichText>(find.descendant(of: find.text(label), matching: find.byType(RichText))).text.style!.color!;
+      final thumb = find.byKey(WalletScreen.thumbKey);
+      expect((tester.widget<DecoratedBox>(thumb).decoration as BoxDecoration).color, QColors.ink, reason: 'the chosen segment is white');
+      expect(ink(s.t.spendTab), QColors.onInk, reason: 'with black words');
+      expect(ink(s.t.historyTab), QColors.inkSecondary);
+      expect(tester.getRect(thumb).contains(tester.getCenter(find.text(s.t.spendTab))), isTrue, reason: 'under the chosen tab');
+
+      s.showHistory();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(ink(s.t.historyTab), QColors.onInk);
+      expect(ink(s.t.spendTab), QColors.inkSecondary);
+      expect(tester.getRect(thumb).contains(tester.getCenter(find.text(s.t.historyTab))), isTrue, reason: 'it moved to the other');
     });
 
     testWidgets('below the smallest payout, the payout is off; with no code, the way to one is an instruction (${lang.name})', (tester) async {
@@ -111,11 +117,19 @@ void main() {
       s.go(AppScreen.today);
       s.go(AppScreen.you);
       await _pumpApp(tester, s);
+      // A guest's way to save their progress is a whole row of Me's first
+      // card, the width of the card, not a pill beside words.
+      final save = tester.getRect(find.byKey(YouScreen.saveProgressKey));
+      expect(save.height, greaterThanOrEqualTo(56), reason: 'a settings row');
+      expect(save.width, greaterThan(390 * 0.8), reason: 'the whole row is the touch');
+      expect(find.descendant(of: find.byKey(YouScreen.saveProgressKey), matching: find.text(s.t.saveProgress)), findsOneWidget);
+
+      // The programme lives in its own sheet, one row away.
+      await tester.tap(find.byKey(YouScreen.programmeRowKey));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 700));
       final payout = s.isAr ? 'حوّل العمولة' : 'Redeem EGP';
       expect(_outline(tester, payout).onTap, isNull, reason: 'EGP 0: nothing to send');
-      final link = tester.getSize(find.ancestor(of: find.text(s.t.linkAccount), matching: find.byType(QPillButton)));
-      expect(link.width, lessThan(390 * 0.6), reason: 'a compact pill, as wide as its label');
-      expect(link.height, greaterThanOrEqualTo(48), reason: 'touched across 48');
       final placeholder = tester.widget<Text>(find.byKey(YouScreen.proCodeKey));
       expect(placeholder.style!.color, QColors.inkTertiary);
       expect(placeholder.style!.fontSize, lessThan(17), reason: 'not set like the code it stands in for');

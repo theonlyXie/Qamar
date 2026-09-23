@@ -1,6 +1,7 @@
 // Help after the tutorial (seat 2): the moon's three gestures stay in Me for
-// good, so once Today's tutorial card is put away they can still be looked
-// up. The card is the same one Today shows, with the same ticks.
+// good, one row away ("Gestures and shortcuts"), so once Today's tutorial
+// card is put away they can still be looked up. The card is the same one
+// Today shows, with the same ticks.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
 import 'package:qamar/models/su_economy.dart';
+import 'package:qamar/screens/you_screen.dart';
 import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/hold_coach_mark.dart';
@@ -25,6 +27,13 @@ Future<void> _pump(WidgetTester tester, AppState s) async {
   await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
+}
+
+/// Me's help: the row that opens it, and the sheet risen.
+Future<void> _openHelp(WidgetTester tester) async {
+  await tester.tap(find.byKey(YouScreen.helpRowKey));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 700));
 }
 
 void main() {
@@ -52,6 +61,7 @@ void main() {
     s.go(AppScreen.you);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    await _openHelp(tester);
     expect(find.byType(OrbGestureGuide), findsOneWidget, reason: 'and there for good in Me');
     expect(find.text('Got it'), findsNothing, reason: 'nothing to put away in Me');
     for (final (_, _, _, doEn, _, _) in OrbGestureGuide.rows()) {
@@ -111,6 +121,7 @@ void main() {
     s.closeTree();
     s.go(AppScreen.you);
     await _pump(tester, s);
+    await _openHelp(tester);
     final guide = find.byType(OrbGestureGuide);
     expect(find.descendant(of: guide, matching: find.byIcon(Icons.check_circle)), findsOneWidget);
     expect(find.descendant(of: guide, matching: find.byIcon(Icons.mic_none)), findsOneWidget, reason: 'the hold, not yet');
@@ -121,6 +132,7 @@ void main() {
     s.photoQuota = const AiQuota(bucket: 'photo', used: 0, limit: 30, extra: 0, remaining: 30);
     s.go(AppScreen.you);
     await _pump(tester, s);
+    await _openHelp(tester);
     final texts = drawnTexts(tester, within: find.byType(OrbGestureGuide));
     expect(texts.any((t) => t.contains('الصور ٣٠ في اليوم')), isTrue, reason: '$texts');
     expectNoLatinDigits(tester, within: find.byType(OrbGestureGuide));

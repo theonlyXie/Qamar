@@ -1,15 +1,16 @@
-// One way to each thing on You, seat 6's part (the scorecard's 09: "two
-// affordances for the same act"). Pinned down on the tall renders: the
-// wallet had a card with its Spend button and, further down, a "Su Points
-// wallet" row with the same balance, a second entry to the same place, and
-// a row that did not even respond. The row is gone. The one way in is the
-// card's top row, named for the wallet and led on by the Qamar+ card's
-// chevron, where it was a small "Spend" that named one of the wallet's
-// tabs (seat 2). The rows left (target, what to avoid, memory, consents)
-// are a read-out, one card with a line each, not four bordered rows
-// dressed as controls that do nothing when touched. What to avoid reads
-// out what is avoided, by the consultation's own names for its choices, on
-// one line, where it said a bare "2" (seat 2).
+// One way to each thing on Me, seat 6's part (the scorecard's 09: "two
+// affordances for the same act"), in Me's settings layout: a row to a thing,
+// one card to a group. The wallet had a card with its Spend button and,
+// further down, a "Su Points wallet" row with the same balance, a second
+// entry to the same place. The one way in is the wallet's row, named for the
+// wallet, and led on by the same chevron as every row that goes somewhere,
+// where it was a small "Spend" that named one of the wallet's tabs (seat 2).
+// The food group is one card with a line each under hairlines; the lines
+// that only read out (the target, what Qamar remembers) are drawn with no
+// chevron and take no touch, so nothing pretends to be a control, and the
+// one that changes something, what to avoid, is a whole row with the
+// chevron. What to avoid reads out what is avoided, by the consultation's
+// own names for its choices, on one line, where it said a bare "2" (seat 2).
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -21,6 +22,8 @@ import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
 import 'package:qamar/screens/you_screen.dart';
 import 'package:qamar/state/app_state.dart';
+import 'package:qamar/theme/icons.dart';
+import 'package:qamar/widgets/avoid_editor.dart';
 import 'package:qamar/widgets/common.dart';
 
 import 'support/app_fonts.dart';
@@ -35,7 +38,7 @@ void main() {
   });
 
   for (final lang in AppLang.values) {
-    testWidgets('the wallet has one way in, and the read-out is not dressed as controls (${lang.name})', (tester) async {
+    testWidgets('the wallet has one way in, and the read-outs are not dressed as controls (${lang.name})', (tester) async {
       tester.view.devicePixelRatio = 3;
       tester.view.physicalSize = const Size(390, 2600) * 3;
       addTearDown(tester.view.reset);
@@ -48,41 +51,46 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.text(s.t.walletTitle), findsOneWidget, reason: 'the wallet is named once on You');
+      expect(find.text(s.t.walletTitle), findsOneWidget, reason: 'the wallet is named once on Me');
       final card = find.byKey(YouScreen.walletCardKey);
       expect(find.descendant(of: card, matching: find.byType(QOutlineButton)), findsNothing, reason: 'no button beside the name');
       expect(find.text(s.t.spendTab), findsNothing, reason: 'the way in is not named for one of the wallet’s tabs');
 
-      // The card's top row is the way in: the whole width of the card, a
-      // whole touch, the title in it, and the Qamar+ card's chevron.
+      // The wallet's row is the way in: the whole width of its card, a whole
+      // touch, the title in it, and the chevron every row that goes
+      // somewhere carries, the same as the Qamar+ row's.
       final row = find.byKey(YouScreen.walletRowKey);
       expect(find.descendant(of: card, matching: row), findsOneWidget);
       expect(find.descendant(of: row, matching: find.text(s.t.walletTitle)), findsOneWidget);
       final rowRect = tester.getRect(row);
-      expect(rowRect.height, greaterThanOrEqualTo(48));
+      expect(rowRect.height, greaterThanOrEqualTo(56), reason: 'a settings row, 56 at least');
       expect(rowRect.width, moreOrLessEquals(tester.getRect(card).width, epsilon: 2.5), reason: 'the whole row, not a part of it');
-      final chevrons = tester.widgetList<Icon>(find.byIcon(Icons.chevron_right)).toList();
-      final walletChevron = tester.widget<Icon>(find.descendant(of: row, matching: find.byIcon(Icons.chevron_right)));
-      expect(chevrons.length, 2, reason: 'the Qamar+ card’s and the wallet’s');
-      expect(walletChevron.size, chevrons.first.size, reason: 'the same chevron');
-      expect(walletChevron.color, chevrons.first.color);
+      final walletChevron = tester.widget<Icon>(find.descendant(of: row, matching: find.byIcon(QIcons.forward)));
+      final plusChevron = tester.widget<Icon>(find.descendant(of: find.byKey(YouScreen.plusRowKey), matching: find.byIcon(QIcons.forward)));
+      expect(walletChevron.size, plusChevron.size, reason: 'the same chevron');
+      expect(walletChevron.color, plusChevron.color);
       final data = tester.getSemantics(row).getSemanticsData();
       expect(data.hasAction(SemanticsAction.tap), isTrue);
       expect(data.flagsCollection.isButton, isTrue);
       expect(data.label, startsWith(s.t.walletTitle), reason: 'heard by the wallet’s name');
       expect(data.label, contains(lang == AppLang.ar ? 'متاح' : 'available'), reason: 'and its balance');
 
+      // The food: one card, three lines under hairlines.
       final readOut = find.byKey(YouScreen.readOutKey);
       expect(readOut, findsOneWidget);
-      final lines = find.descendant(of: readOut, matching: find.byType(Divider));
-      expect(lines, findsNWidgets(3), reason: 'four lines of one card, under hairlines');
-      final node = tester.getSemantics(readOut);
-      var tappable = false;
-      node.visitChildren((n) {
-        if (n.getSemanticsData().hasAction(SemanticsAction.tap)) tappable = true;
+      expect(find.descendant(of: readOut, matching: find.byType(Divider)), findsNWidgets(2), reason: 'three lines of one card, under hairlines');
+      // One of them changes something, and says so with the chevron; the
+      // read-outs carry neither a chevron nor a touch.
+      expect(find.descendant(of: readOut, matching: find.byIcon(QIcons.forward)), findsOneWidget);
+      final avoid = find.byKey(YouScreen.avoidEntryKey);
+      expect(find.descendant(of: avoid, matching: find.byIcon(QIcons.forward)), findsOneWidget, reason: 'what to avoid goes somewhere');
+      var buttons = 0;
+      tester.getSemantics(readOut).visitChildren((n) {
+        if (n.getSemanticsData().hasAction(SemanticsAction.tap)) buttons++;
         return true;
       });
-      expect(tappable || node.getSemanticsData().hasAction(SemanticsAction.tap), isFalse, reason: 'a read-out, nothing in it pretends to be a button');
+      expect(buttons, 1, reason: 'the target and the memory are read-outs; only what to avoid is a button');
+      expect(tester.getSemantics(avoid).getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
 
       await tester.tap(find.text(s.t.walletTitle));
       await tester.pump();
@@ -92,7 +100,7 @@ void main() {
   }
 
   for (final lang in AppLang.values) {
-    testWidgets('What to avoid names what is avoided, on one line, and the way to change it stays under it (${lang.name})', (tester) async {
+    testWidgets('What to avoid names what is avoided, on one line, and its row is the way to change it (${lang.name})', (tester) async {
       final ar = lang == AppLang.ar;
       tester.view.devicePixelRatio = 3;
       tester.view.physicalSize = const Size(390, 2600) * 3;
@@ -107,8 +115,9 @@ void main() {
       }
 
       final readOut = find.byKey(YouScreen.readOutKey);
+      final label = AvoidEditor.title(isAr: ar);
       Finder line() => find.descendant(
-            of: find.ancestor(of: find.text(ar ? 'ما يجب تجنبه' : 'What to avoid'), matching: find.byType(Row)).first,
+            of: find.ancestor(of: find.text(label), matching: find.byType(Row)).first,
             matching: find.byType(Text),
           ).last;
 
@@ -141,13 +150,16 @@ void main() {
       final r = tester.getRect(line());
       expect(r.left, greaterThanOrEqualTo(card.left));
       expect(r.right, lessThanOrEqualTo(card.right));
-      final label = tester.getRect(find.text(ar ? 'ما يجب تجنبه' : 'What to avoid'));
-      expect(ar ? r.right <= label.left : r.left >= label.right, isTrue, reason: 'beside its label, never over it');
+      final labelRect = tester.getRect(find.text(label));
+      expect(ar ? r.right <= labelRect.left : r.left >= labelRect.right, isTrue, reason: 'beside its label, never over it');
 
-      // Seat 1's way to change it is still right under the read-out.
-      final entry = tester.getRect(find.byKey(YouScreen.avoidEntryKey));
-      expect(entry.top, greaterThanOrEqualTo(card.bottom));
-      expect(entry.top - card.bottom, lessThan(16));
+      // Seat 1's way to change it is the row itself: the words, the value
+      // and the chevron are one touch, inside the card.
+      final entry = find.byKey(YouScreen.avoidEntryKey);
+      expect(find.descendant(of: readOut, matching: entry), findsOneWidget);
+      expect(find.descendant(of: entry, matching: find.text(label)), findsOneWidget);
+      expect(find.descendant(of: entry, matching: line()), findsOneWidget);
+      expect(tester.getRect(entry).height, greaterThanOrEqualTo(56));
     });
   }
 }

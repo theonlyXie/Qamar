@@ -13,6 +13,7 @@ import 'package:qamar/main.dart';
 import 'package:qamar/models/activity.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/screens/welcome_screen.dart';
+import 'package:qamar/screens/you_screen.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/explain.dart';
 
@@ -97,7 +98,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(tester.takeException(), isNull, reason: 'while building $screen');
-      expectNoLatinDigits(tester, where: '$screen');
+      // Me's digits choice shows the Western option in its own digits.
+      expectNoLatinDigits(tester, where: '$screen', allow: [if (screen == AppScreen.you) RegExp('^${YouScreen.westernDigits}\$')]);
     }
 
     // The wallet opens on Spend; its History is a column of numbers, one

@@ -12,6 +12,7 @@ import 'package:qamar/main.dart';
 import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/services/ai_gateway.dart';
+import 'package:qamar/screens/you_screen.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/ask_qamar_overlay.dart';
 import 'package:qamar/widgets/explain.dart';
@@ -176,7 +177,8 @@ void main() {
       await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
       await tester.pump();
       expect(drawnTexts(tester).where((t) => t.startsWith('فاضل النهارده')), hasLength(1));
-      expectNoLatinDigits(tester, where: 'Me');
+      // Me's digits choice shows the Western option in its own digits.
+      expectNoLatinDigits(tester, where: 'Me', allow: [RegExp('^${YouScreen.westernDigits}\$')]);
     });
   });
 
