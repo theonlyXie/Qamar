@@ -19,9 +19,12 @@ class LivingOrb extends StatefulWidget {
   final VoidCallback? onTap;
 
   /// The day, on the orb. Null is the decorative orb (welcome, subscription):
-  /// waxing crescent, steady halo, no ring. With a state the moon fills
-  /// toward today's target, the halo brightens with the day's meals and warms
-  /// when intake runs over, and the streak ring closes one day at a time.
+  /// waxing crescent, steady halo, no ring. With a state the moon brightens
+  /// from that resting crescent toward today's target, the halo brightens
+  /// with the day's meals and warms only when the day is past the target by
+  /// more than an estimate can tell apart ([OrbDay.over]), and the streak
+  /// ring closes one day at a time. An [OrbDay.unknown] day (nothing logged,
+  /// or no target) is the moon at rest, never a dark one.
   final OrbState? state;
 
   /// Qamar has something to say (a meal's question is waiting and the hold

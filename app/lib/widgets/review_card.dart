@@ -8,9 +8,10 @@ import 'moon.dart';
 
 /// The one thing in the product designed to be shared.
 ///
-/// A moon for each day of the week, lit as far as that day's intake reached
-/// the target; the sentence the person did not expect; the one change for
-/// next week. No weight, ever. Calories only when [showNumbers]. The footer
+/// A moon for each day of the week, brightened from the resting crescent as
+/// far as that day's intake reached the target (a day with nothing logged is
+/// the resting moon, faint, never dark); the sentence the person did not
+/// expect; the one change for next week. No weight, ever. Calories only when [showNumbers]. The footer
 /// carries the link the card travels with.
 class ReviewCard extends StatelessWidget {
   final WeekReview review;
@@ -70,11 +71,13 @@ class ReviewCard extends StatelessWidget {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // An unknown day (nothing logged, or no target) is the
+                      // moon at rest, faint: no reading, and never dark.
                       Opacity(
                         opacity: fills[i] == null ? 0.35 : 1,
                         child: QamarMoon(
                           size: 30,
-                          staticPhase: fills[i] == null ? 1.0 : OrbState.phaseForFill(fills[i]!),
+                          staticPhase: fills[i] == null ? OrbState.restPhase : OrbState.phaseForFill(fills[i]!),
                         ),
                       ),
                       const SizedBox(height: 6),

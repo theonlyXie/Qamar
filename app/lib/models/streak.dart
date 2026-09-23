@@ -124,45 +124,110 @@ String? streakSentence(Streak s, {required bool ar, required String Function(Str
   return ar ? '${iso('$n')} يوم ورا بعض.' : '$n days running.';
 }
 
-/// What the orb looks like right now, derived from the day rather than from
-/// a clock. The moon fills as today's intake approaches the target; the glow
-/// follows how much of the day's rhythm has happened; the ring is the streak.
-class OrbState {
-  /// 0 = nothing logged, 1 = at target. Clamped; going over is [over].
-  final double fill;
+/// What the moon says about a day. Seat 4 owns what the states mean; seat 6
+/// owns how they are drawn, and can restyle each by name.
+///
+/// Only [under], [at] and [over] are readings of a day. [unknown] is no
+/// reading at all, and is never drawn as a dark moon: nothing logged is not a
+/// bad day, and on the general-guidance route there is no target to read a
+/// day against.
+enum OrbDay {
+  /// Nothing logged, or no target to read against: the moon at rest, as it
+  /// is on every screen where it is not reading a day.
+  unknown,
 
-  /// Intake past 110% of target — the glow warms instead of brightening.
-  final bool over;
+  /// Logged, and short of the target: the moon brightens toward full.
+  under,
+
+  /// Within reach of the target: a moon a day from full.
+  at,
+
+  /// Past the target by more than an estimate can tell apart from it
+  /// ([OrbState.overMargin]): full, and the halo warms.
+  over,
+}
+
+/// What the orb looks like right now, derived from the day rather than from
+/// a clock: which [OrbDay] it is, how far the moon has brightened toward the
+/// target, how much of the day's rhythm has happened (the glow), and the
+/// streak (the ring).
+class OrbState {
+  final OrbDay day;
+
+  /// 0..1: how far the day has come toward the target. 0 when [unknown], 1
+  /// at or past the target.
+  final double fill;
 
   /// 0..1: meals eaten today against the plan's slots (or three, unplanned).
   final double glow;
 
   final Streak streak;
 
-  const OrbState({required this.fill, required this.over, required this.glow, required this.streak});
+  const OrbState({required this.day, required this.fill, required this.glow, required this.streak});
 
-  static const rest = OrbState(fill: 0, over: false, glow: 0, streak: Streak.none);
+  static const rest = OrbState(day: OrbDay.unknown, fill: 0, glow: 0, streak: Streak.none);
 
-  /// The moon painter's phase: 0 is fully lit, 1 fully dark. An empty day is
-  /// a thin crescent, a day at target a moon a day from full.
-  double get moonPhase => phaseForFill(fill);
+  /// Past the target by more than an estimate can tell apart: the halo warms.
+  bool get over => day == OrbDay.over;
+
+  /// The moon painter's phase (0 fully lit, 1 fully dark), or null for an
+  /// [OrbDay.unknown] day: the moon at rest, drifting as it does everywhere.
+  double? get moonPhase => day == OrbDay.unknown ? null : phaseForFill(fill);
+
+  /// The resting crescent, where a day's moon starts: the middle of the drift
+  /// the moon has everywhere it is not reading a day (moon.dart, 0.58-0.67).
+  /// A day's moon only ever brightens from here, so logging a small meal
+  /// never draws it darker than logging nothing at all.
+  static const restPhase = 0.62;
+
+  /// A day at the target: a moon a day from full.
+  static const fullPhase = 0.06;
 
   /// The same mapping for any day — the review card draws a week of them.
-  static double phaseForFill(double fill) => 0.92 - 0.86 * fill.clamp(0.0, 1.0);
+  static double phaseForFill(double fill) => restPhase - (restPhase - fullPhase) * fill.clamp(0.0, 1.0);
+
+  /// How close counts as at the target: 5%, and never under 100 kcal, the
+  /// same reach Qamar's words use for "right at your target" (reply.dart).
+  static int atTolerance(int target) => math.max(100, (target * 0.05).round());
+
+  /// How far past the target a day must go before the moon warms: further
+  /// than an estimate can tell apart from the target. The target is itself an
+  /// estimate that can be 10% or more off for a given person (knowledge base,
+  /// 03-energy-and-protein), and what is logged is an estimate on top of it,
+  /// so a day within a quarter of the target, or 400 kcal, whichever is more,
+  /// reads as at the target. "One heavy day inside a good month changes very
+  /// little" (06-egyptian-eating-culture). It used to be 110%.
+  static int overMargin(int target) => math.max(400, (target * 0.25).round());
+
+  /// Which state a day is in. [targetKcal] is null where there is no target
+  /// (the general-guidance route); [logged] is whether anything was logged.
+  static OrbDay dayFor({required int consumedKcal, required int? targetKcal, required bool logged}) {
+    final target = targetKcal;
+    if (!logged || target == null || target <= 0) return OrbDay.unknown;
+    if (consumedKcal > target + overMargin(target)) return OrbDay.over;
+    if (consumedKcal >= target - atTolerance(target)) return OrbDay.at;
+    return OrbDay.under;
+  }
+
+  /// How far the moon has brightened for a day in [day]'s state.
+  static double fillFor(OrbDay day, {required int consumedKcal, required int? targetKcal}) => switch (day) {
+        OrbDay.unknown => 0,
+        OrbDay.under => (consumedKcal / math.max(targetKcal ?? 1, 1)).clamp(0.0, 1.0),
+        OrbDay.at || OrbDay.over => 1,
+      };
 
   factory OrbState.derive({
     required int consumedKcal,
-    required int targetKcal,
+    required int? targetKcal,
     required int mealsToday,
     required int planSlots,
     required Streak streak,
   }) {
-    final target = math.max(targetKcal, 1);
-    final ratio = consumedKcal / target;
+    final day = dayFor(consumedKcal: consumedKcal, targetKcal: targetKcal, logged: mealsToday > 0);
     final slots = planSlots > 0 ? planSlots : 3;
     return OrbState(
-      fill: ratio.clamp(0.0, 1.0),
-      over: ratio > 1.1,
+      day: day,
+      fill: fillFor(day, consumedKcal: consumedKcal, targetKcal: targetKcal),
       glow: (mealsToday / slots).clamp(0.0, 1.0),
       streak: streak,
     );

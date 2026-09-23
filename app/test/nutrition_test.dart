@@ -473,12 +473,13 @@ void streakAndOrb() {
   });
 
   group('orb state', () {
-    test('an empty day is a thin crescent with a faint glow', () {
+    test('an empty day is unknown: the moon at rest, never a dark crescent, with a faint glow', () {
       final o = OrbState.derive(consumedKcal: 0, targetKcal: 2000, mealsToday: 0, planSlots: 3, streak: Streak.none);
+      expect(o.day, OrbDay.unknown);
       expect(o.fill, 0);
       expect(o.glow, 0);
       expect(o.over, isFalse);
-      expect(o.moonPhase, closeTo(0.92, 1e-9), reason: 'the painter reads 1 as dark');
+      expect(o.moonPhase, isNull, reason: 'the resting drift, as on every screen not reading a day; it used to pin 0.92, near dark');
     });
 
     test('a day at target is a near-full moon', () {

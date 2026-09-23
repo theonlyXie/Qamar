@@ -59,10 +59,14 @@ void main() {
     expect(r.change.en, contains('stick to the lunch on the plan'));
   });
 
-  test('a moon per day: unlogged days are dark, logged days lit to their share of the target', () {
+  test('a moon per day: unlogged days are unknown and rest, logged days lit to their share of the target', () {
     final r = build([1000, 2000, 3000, 0, 0, 0, 0]);
     expect(r.fills, [0.5, 1.0, 1.0, null, null, null, null]);
-    expect(OrbState.phaseForFill(0), closeTo(0.92, 1e-9));
+    expect(r.orbDays, [OrbDay.under, OrbDay.at, OrbDay.over, OrbDay.unknown, OrbDay.unknown, OrbDay.unknown, OrbDay.unknown]);
+    // A day's moon starts at the resting crescent, not a dark one, and
+    // brightens to a moon a day from full at the target.
+    expect(OrbState.phaseForFill(0), closeTo(OrbState.restPhase, 1e-9));
+    expect(OrbState.phaseForFill(0), closeTo(0.62, 1e-9));
     expect(OrbState.phaseForFill(1), closeTo(0.06, 1e-9));
   });
 

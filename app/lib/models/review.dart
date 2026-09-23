@@ -27,6 +27,10 @@ class WeekReview {
   final ReviewLine insight;
   final ReviewLine change;
 
+  /// False on the general-guidance route: no target, so no day's moon is a
+  /// reading, and every day is drawn at rest ([OrbDay.unknown]).
+  final bool hasTarget;
+
   const WeekReview({
     required this.days,
     required this.targetKcal,
@@ -37,6 +41,7 @@ class WeekReview {
     required this.streak,
     required this.insight,
     required this.change,
+    this.hasTarget = true,
   });
 
   /// Three logged days is the least a claim about "your week" can rest on.
@@ -44,10 +49,18 @@ class WeekReview {
 
   bool get enough => loggedDays >= minDays;
 
-  /// How lit each day's moon is: intake against target, clamped. An unlogged
-  /// day is null — drawn dark, not as a day that happened to be tiny.
+  /// What each day's moon says (OrbState.dayFor): [OrbDay.unknown] for a day
+  /// with nothing logged, or every day when there is no target.
+  List<OrbDay> get orbDays => [
+        for (final d in days) OrbState.dayFor(consumedKcal: d.kcal, targetKcal: hasTarget ? targetKcal : null, logged: d.meals > 0),
+      ];
+
+  /// How far each day's moon has brightened toward the target, or null for
+  /// an unknown day, which is drawn at rest: not dark, and not a day that
+  /// happened to be tiny.
   List<double?> get fills => [
-        for (final d in days) d.meals == 0 ? null : (d.kcal / math.max(targetKcal, 1)).clamp(0.0, 1.0),
+        for (final (i, day) in orbDays.indexed)
+          day == OrbDay.unknown ? null : OrbState.fillFor(day, consumedKcal: days[i].kcal, targetKcal: targetKcal),
       ];
 
   static const _dayAr = ['الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت', 'الحد'];
@@ -61,6 +74,7 @@ class WeekReview {
     required int targetKcal,
     required Streak streak,
     required String Function(String) iso,
+    bool hasTarget = true,
   }) {
     final logged = week.where((d) => d.meals > 0).toList();
     final loggedDays = logged.length;
@@ -159,6 +173,7 @@ class WeekReview {
       streak: streak,
       insight: insight,
       change: change,
+      hasTarget: hasTarget,
     );
   }
 }

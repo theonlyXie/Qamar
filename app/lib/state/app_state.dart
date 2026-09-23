@@ -4075,6 +4075,7 @@ class AppState extends ChangeNotifier {
         week: week(),
         lastWeek: lastWeek(),
         targetKcal: target().kcal,
+        hasTarget: !generalGuidance,
         streak: streak(),
         iso: iso,
       );
@@ -4154,7 +4155,9 @@ class AppState extends ChangeNotifier {
   /// follows the day's meals against the plan, the ring is the streak.
   OrbState orbState() => OrbState.derive(
         consumedKcal: consumed().kcal,
-        targetKcal: target().kcal,
+        // No target on the general-guidance route, so nothing to read the
+        // day against: the moon stays at rest (OrbDay.unknown).
+        targetKcal: generalGuidance ? null : target().kcal,
         mealsToday: meals.length,
         planSlots: plan?.slots.length ?? 0,
         // The ring is the streak, so it goes with "Points and streaks" (O4).
