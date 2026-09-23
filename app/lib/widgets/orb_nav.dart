@@ -42,6 +42,10 @@ class OrbNav extends StatefulWidget {
   /// drift, stays inside the band (O9).
   static const double bandReach = 0.6;
 
+  /// How far beside the moon's edge its receipt sits: clear of the sparks'
+  /// widest orbit, so a spark never crosses the number.
+  static final double receiptGap = LivingOrb.sparkOrbits.map((o) => o.across * moon + o.size / 2).reduce(math.max) - moon / 2 + 2;
+
   /// How far the start and end stops sit from the screen's edges: the page's
   /// own margin, so the orb lines up with what is above it.
   static const double gutter = 20;
@@ -210,7 +214,7 @@ class _OrbLayout extends MultiChildLayoutDelegate {
       final r = layoutChild(_OrbPart.receipt, BoxConstraints.loose(size));
       final moonX = orbAt.dx + orb.width / 2;
       final towardRight = (moonX - size.width / 2).abs() < 1 ? !rtl : moonX < size.width / 2;
-      final left = towardRight ? orbAt.dx + orb.width + 6 : orbAt.dx - r.width - 6;
+      final left = towardRight ? orbAt.dx + orb.width + OrbNav.receiptGap : orbAt.dx - r.width - OrbNav.receiptGap;
       positionChild(_OrbPart.receipt, Offset(left.clamp(4.0, size.width - r.width - 4), orbAt.dy + (orb.height - r.height) / 2));
     }
     if (!hasChild(_OrbPart.mark)) return;

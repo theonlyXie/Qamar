@@ -33,12 +33,45 @@ class LivingOrb extends StatefulWidget {
   /// bounce, and never a sound.
   final bool speaking;
 
-  /// How far the sparks orbit and the moon drifts, against its size: 1 is
-  /// the full orbit; the nav orb, resting in its band, keeps them inside it.
+  /// How far the moon drifts and how tall the sparks' orbit is, against the
+  /// moon's size: 1 is the full height; the nav orb, resting in its band,
+  /// keeps both inside it. The orbit's width is not scaled: the band is as
+  /// wide as the screen, and it is the width that carries the sparks clear
+  /// of the moon.
   final double reach;
 
   /// Each orbiting spark, for tests.
   static ValueKey<String> sparkKey(int i) => ValueKey('orb-spark-$i');
+
+  /// The sparks' orbits: across, against the moon's size; turns per drift
+  /// cycle, whole numbers so the loop has no seam (1.55 of a turn jumped
+  /// back every eleven seconds), the third turning the other way; where on
+  /// the ring each starts, so the three are spread round it rather than
+  /// bunched at one side; and the spark's size. A ring seen at a tilt:
+  /// [sparkAt] flattens it.
+  static const sparkOrbits = <({double across, double speed, double phase, double size})>[
+    (across: 0.68, speed: 1, phase: 0.0, size: 6),
+    (across: 0.7, speed: 2, phase: 0.37, size: 4),
+    (across: 0.75, speed: -1, phase: 0.71, size: 3),
+  ];
+
+  /// How much the ring is flattened at [reach] 1.
+  static const sparkTilt = 0.7;
+
+  /// Where spark [i] is at [t] (the drift's cycle, 0 → 1) around a moon of
+  /// [size], and whether it is on the near side of the ring. The near half
+  /// (the lower one) passes in front of the moon; the far half goes behind
+  /// it, hidden where the moon's disc is. So the sparks are always drawn
+  /// over the moon, never simply under it: under it, at the band's reach,
+  /// every one of them was inside the disc and none was ever seen.
+  static ({Offset at, bool near}) sparkAt(int i, double t, {required double size, required double reach}) {
+    final o = sparkOrbits[i];
+    final angle = (t * o.speed + o.phase) * 2 * math.pi;
+    final rx = size * o.across;
+    final ry = rx * sparkTilt * reach;
+    final dy = math.sin(angle) * ry;
+    return (at: Offset(math.cos(angle) * rx, dy), near: dy >= 0);
+  }
 
   /// The halo, for tests.
   static const haloKey = ValueKey('orb-halo');
@@ -170,7 +203,6 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                if (widget.sparks) ..._buildSparks(s),
                 if (widget.activeRings) ..._buildActiveRings(s),
                 if (day != null && day.streak.current > 0)
                   CustomPaint(
@@ -191,6 +223,9 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
                     child: QamarMoon(size: s, phase: day?.moonPhase),
                   ),
                 ),
+                // Over the moon: the near half of each orbit in front of it,
+                // the far half clipped where the disc is, as if behind.
+                if (widget.sparks) ..._buildSparks(s, moonRadius: s / 2 * scale),
               ],
               ),
             ),
@@ -205,11 +240,20 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
     return core;
   }
 
-  List<Widget> _buildSparks(double s) {
+  static const _sparkColors = [QColors.cyan, QColors.violetSoft, QColors.textPrimary];
+
+  List<Widget> _buildSparks(double s, {required double moonRadius}) {
     return [
-      _OrbitingSpark(key: LivingOrb.sparkKey(0), controller: _wander, radius: s * 0.62 * widget.reach, period: 1.0, size: 6, color: QColors.cyan),
-      _OrbitingSpark(key: LivingOrb.sparkKey(1), controller: _wander, radius: s * 0.48 * widget.reach, period: 1.55, size: 4, color: QColors.violetSoft),
-      _OrbitingSpark(key: LivingOrb.sparkKey(2), controller: _wander, radius: s * 0.75 * widget.reach, period: 0.7, size: 3, color: QColors.textPrimary),
+      for (var i = 0; i < LivingOrb.sparkOrbits.length; i++)
+        _OrbitingSpark(
+          key: LivingOrb.sparkKey(i),
+          index: i,
+          controller: _wander,
+          moonSize: s,
+          moonRadius: moonRadius,
+          reach: widget.reach,
+          color: _sparkColors[i],
+        ),
     ];
   }
 
@@ -254,32 +298,35 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
 }
 
 class _OrbitingSpark extends StatelessWidget {
+  final int index;
   final AnimationController controller;
-  final double radius;
-  final double period; // relative speed multiplier
-  final double size;
+  final double moonSize;
+  final double moonRadius;
+  final double reach;
   final Color color;
 
   const _OrbitingSpark({
     super.key,
+    required this.index,
     required this.controller,
-    required this.radius,
-    required this.period,
-    required this.size,
+    required this.moonSize,
+    required this.moonRadius,
+    required this.reach,
     required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
+    final size = LivingOrb.sparkOrbits[index].size;
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final angle = controller.value * 2 * math.pi * period;
-        final dx = math.cos(angle) * radius;
-        final dy = math.sin(angle) * radius;
+        final p = LivingOrb.sparkAt(index, controller.value, size: moonSize, reach: reach);
+        final o = LivingOrb.sparkOrbits[index];
+        final angle = (controller.value * o.speed + o.phase) * 2 * math.pi;
         final twinkle = 0.4 + 0.6 * ((math.sin(angle * 2) + 1) / 2);
-        return Transform.translate(
-          offset: Offset(dx, dy),
+        Widget spark = Transform.translate(
+          offset: p.at,
           child: Opacity(
             opacity: twinkle,
             child: Container(
@@ -288,14 +335,33 @@ class _OrbitingSpark extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: color,
-                boxShadow: [BoxShadow(color: color.withOpacity(0.9), blurRadius: size * 1.6)],
+                boxShadow: [BoxShadow(color: color.withValues(alpha: 0.9), blurRadius: size * 1.6)],
               ),
             ),
           ),
         );
+        // On the far side the moon is in front of it.
+        if (!p.near) spark = ClipPath(clipper: _BehindMoon(moonRadius), child: spark);
+        return spark;
       },
     );
   }
+}
+
+/// Everything but the moon's disc, centred in the box: what is visible of a
+/// spark behind the moon.
+class _BehindMoon extends CustomClipper<Path> {
+  final double radius;
+  const _BehindMoon(this.radius);
+
+  @override
+  Path getClip(Size size) => Path()
+    ..fillType = PathFillType.evenOdd
+    ..addRect(Rect.fromLTWH(-size.width * 4, -size.height * 4, size.width * 9, size.height * 9))
+    ..addOval(Rect.fromCircle(center: size.center(Offset.zero), radius: radius));
+
+  @override
+  bool shouldReclip(_BehindMoon old) => old.radius != radius;
 }
 
 /// The streak as a ring: one arc segment per day of the current week of the
