@@ -9,6 +9,11 @@ abstract final class QLayout {
   /// passing receipt.
   static const double orbBand = 72;
 
+  /// Where an orb screen's list ends: the band, and a gap above it, so the
+  /// last thing on the page comes to rest above the orb (O1). Content that
+  /// is still scrolling passes under the band's soft fade.
+  static const double pageBottom = orbBand + 24;
+
   /// The smallest touch any control takes, each way (O11). 48 rather than
   /// Apple's 44: most phones in Egypt run Android, whose guideline is 48dp,
   /// and 48 clears 44 as well.

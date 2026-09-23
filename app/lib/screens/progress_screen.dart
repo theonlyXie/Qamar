@@ -8,6 +8,7 @@ import '../services/repositories.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../services/config.dart';
 import '../widgets/common.dart';
@@ -49,7 +50,7 @@ class ProgressScreen extends StatelessWidget {
     final peak = [target.toDouble(), ...week.map((d) => d.kcal.toDouble())].reduce((a, b) => a > b ? a : b);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 56, 20, 160),
+      padding: const EdgeInsets.fromLTRB(20, 56, 20, QLayout.pageBottom),
       children: [
         Row(children: [
           QBackButton(onTap: state.back, isAr: isAr),

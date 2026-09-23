@@ -1,11 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/su_economy.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
+import '../theme/layout.dart';
+import '../theme/motion.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
 import 'explain.dart';
@@ -21,12 +26,98 @@ import 'living_orb.dart';
 ///  * **hold** (350 ms) — the conversation opens and the moon is already
 ///    listening. The one gesture people have to learn; everything else is tap,
 ///  * **drag** — moves the orb, and dropping it on a value explains it.
-class OrbNav extends StatelessWidget {
+class OrbNav extends StatefulWidget {
   const OrbNav({super.key});
 
   /// The orb's own box — the moon and whatever rides under it — for tests
   /// and for anything placed from the orb's rect.
   static const orbKey = ValueKey('orb');
+
+  /// The moon's drawn size.
+  static const double moon = 56;
+
+  /// How far the nav orb's sparks and drift reach, against the orb's own
+  /// ([LivingOrb.reach]): enough that the outermost spark, at the top of the
+  /// drift, stays inside the band (O9).
+  static const double bandReach = 0.6;
+
+  /// How far the start and end stops sit from the screen's edges: the page's
+  /// own margin, so the orb lines up with what is above it.
+  static const double gutter = 20;
+
+  /// The start edge of the orb at [stop], from the screen's start edge.
+  static double stopStart(OrbStop stop, double width) => switch (stop) {
+        OrbStop.start => gutter,
+        OrbStop.centre => (width - moon) / 2,
+        OrbStop.end => width - gutter - moon,
+      };
+
+  /// The orb's top at rest: centred in the band at the bottom of [height].
+  static double restTop(double height) => height - QLayout.orbBand + (QLayout.orbBand - moon) / 2;
+
+  /// The stop nearest to where a release at [start] (start-relative)
+  /// moving at [velocity] would come to rest.
+  static OrbStop nearestStop(double start, double velocity, double width) {
+    final projected = start + QSpring.project(velocity);
+    return OrbStop.values.reduce((a, b) => (stopStart(a, width) - projected).abs() <= (stopStart(b, width) - projected).abs() ? a : b);
+  }
+
+  @override
+  State<OrbNav> createState() => _OrbNavState();
+}
+
+class _OrbNavState extends State<OrbNav> with TickerProviderStateMixin {
+  // The orb's place while it springs home, start-relative, in points. Two
+  // springs, one per axis: a throw sideways and a drop downwards settle on
+  // their own clocks without dragging each other off line.
+  late final AnimationController _x = AnimationController.unbounded(vsync: this);
+  late final AnimationController _y = AnimationController.unbounded(vsync: this);
+
+  // With reduced motion there is no spring: the orb fades in at its stop.
+  late final AnimationController _fade = AnimationController(vsync: this, duration: const Duration(milliseconds: 220), value: 1);
+
+  bool get _springing => _x.isAnimating || _y.isAnimating;
+
+  @override
+  void dispose() {
+    _x.dispose();
+    _y.dispose();
+    _fade.dispose();
+    super.dispose();
+  }
+
+  /// A finger takes the orb: from where it is on screen, even mid-spring,
+  /// so grabbing it never makes it jump.
+  void _grab(AppState state, Size size, double maxX, double maxY) {
+    if (_springing) {
+      final x = _x.value, y = _y.value;
+      _x.stop();
+      _y.stop();
+      state.setOrbPosition(x, y, maxX: maxX, maxY: maxY);
+    } else if (!state.orbHeld) {
+      state.setOrbPosition(OrbNav.stopStart(state.orbStop, size.width), OrbNav.restTop(size.height), maxX: maxX, maxY: maxY);
+    }
+  }
+
+  /// The finger lets go at [velocity] (points a second, on screen). The orb
+  /// rests at the stop nearest where the throw would carry it, or, after
+  /// explaining a value, back at the stop it came from; the spring starts
+  /// where the finger left it and at the finger's speed.
+  void _release(AppState state, Size size, bool rtl, Offset velocity, {required bool returnHome}) {
+    final fromX = state.orbStart, fromY = state.orbY;
+    final along = rtl ? -velocity.dx : velocity.dx;
+    final stop = returnHome ? state.orbStop : OrbNav.nearestStop(fromX, along, size.width);
+    state.settleOrb(stop);
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _fade.forward(from: 0);
+      return;
+    }
+    final spring = velocity.distance > QSpring.flickSpeed && !returnHome ? QSpring.flick : QSpring.settle;
+    _x.value = fromX;
+    _y.value = fromY;
+    _x.animateWith(SpringSimulation(spring, fromX, OrbNav.stopStart(stop, size.width), along));
+    _y.animateWith(SpringSimulation(spring, fromY, OrbNav.restTop(size.height), velocity.dy));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,34 +125,54 @@ class OrbNav extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final state = context.watch<AppState>();
-          final maxX = constraints.maxWidth - 96;
-          final maxY = constraints.maxHeight - 118;
-          final start = state.orbStart.clamp(4, maxX < 4 ? 4 : maxX).toDouble();
-          final top = state.orbY.clamp(46, maxY < 46 ? 46 : maxY).toDouble();
-          // The hold's one-time mark rides with the orb: above it, or below
-          // it while the orb rests in the top half of the screen.
-          final markBelow = top < constraints.maxHeight / 2;
-          return CustomMultiChildLayout(
-            delegate: _OrbLayout(
-              start: start,
-              top: top,
-              rtl: Directionality.of(context) == TextDirection.rtl,
-              markBelow: markBelow,
-            ),
-            children: [
-              // A credit's passing receipt (O9). Its own child, so the orb's
-              // box is the moon alone and never changes size.
-              if (state.showScore && state.suReceipt != null)
-                LayoutId(id: _OrbPart.receipt, child: SuReceiptChip(receipt: state.suReceipt!)),
-              if (state.holdCoachDue) ...[
-                LayoutId(id: _OrbPart.mark, child: HoldCoachMark(state: state)),
-                LayoutId(id: _OrbPart.caret, child: HoldCoachMark.caret(up: markBelow)),
-              ],
-              LayoutId(
-                id: _OrbPart.orb,
-                child: _DraggableOrb(key: OrbNav.orbKey, maxX: maxX < 4 ? 4 : maxX, maxY: maxY < 46 ? 46 : maxY),
-              ),
-            ],
+          final size = constraints.biggest;
+          final maxX = math.max(4.0, size.width - OrbNav.moon - 4);
+          final maxY = math.max(46.0, size.height - OrbNav.moon - 4);
+          final rtl = Directionality.of(context) == TextDirection.rtl;
+          return AnimatedBuilder(
+            animation: Listenable.merge([_x, _y, _fade]),
+            builder: (context, _) {
+              final double start, top;
+              if (state.orbHeld) {
+                start = state.orbStart.clamp(4.0, maxX);
+                top = state.orbY.clamp(46.0, maxY);
+              } else if (_springing) {
+                start = _x.value;
+                top = _y.value;
+              } else {
+                start = OrbNav.stopStart(state.orbStop, size.width);
+                top = OrbNav.restTop(size.height);
+              }
+              // The hold's one-time mark rides with the orb: above it, or below
+              // it while the orb is held in the top half of the screen.
+              final markBelow = top < size.height / 2;
+              return CustomMultiChildLayout(
+                delegate: _OrbLayout(start: start, top: top, rtl: rtl, markBelow: markBelow),
+                children: [
+                  // A credit's passing receipt (O9), beside the orb in its band.
+                  // Its own child, so the orb's box is the moon alone.
+                  if (state.showScore && state.suReceipt != null)
+                    LayoutId(id: _OrbPart.receipt, child: SuReceiptChip(receipt: state.suReceipt!)),
+                  if (state.holdCoachDue) ...[
+                    LayoutId(id: _OrbPart.mark, child: HoldCoachMark(state: state)),
+                    LayoutId(id: _OrbPart.caret, child: HoldCoachMark.caret(up: markBelow)),
+                  ],
+                  LayoutId(
+                    id: _OrbPart.orb,
+                    child: FadeTransition(
+                      opacity: _fade,
+                      child: _DraggableOrb(
+                        key: OrbNav.orbKey,
+                        maxX: maxX,
+                        maxY: maxY,
+                        onGrab: () => _grab(state, size, maxX, maxY),
+                        onRelease: (v, returnHome) => _release(state, size, rtl, v, returnHome: returnHome),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),
@@ -71,9 +182,10 @@ class OrbNav extends StatelessWidget {
 
 enum _OrbPart { orb, receipt, mark, caret }
 
-/// The orb at the position state holds (the one place it is placed), and,
-/// while it is due, the hold's mark placed from the orb's own rect: centred
-/// on the moon, kept 8 points inside the screen, its caret on the moon.
+/// The orb at the position given (the one place it is placed), the receipt
+/// beside it, and, while it is due, the hold's mark placed from the orb's own
+/// rect: centred on the moon, kept 8 points inside the screen, its caret on
+/// the moon.
 ///
 /// The position is start-relative: [start] is the gap from the start edge to
 /// the orb's start side, so in Arabic it is measured from the right and the
@@ -91,12 +203,14 @@ class _OrbLayout extends MultiChildLayoutDelegate {
     final orbAt = Offset(rtl ? size.width - orb.width - start : start, top);
     positionChild(_OrbPart.orb, orbAt);
     if (hasChild(_OrbPart.receipt)) {
-      // Centred on the moon, under it, where the old balance pill sat; above
-      // it while the hold's mark takes the space below.
+      // Beside the moon, on its level, on the side facing the middle of the
+      // screen — in the band, not over the page (O9). At the centre stop, on
+      // the end side.
       final r = layoutChild(_OrbPart.receipt, BoxConstraints.loose(size));
-      final left = (orbAt.dx + orb.width / 2 - r.width / 2).clamp(4.0, size.width - r.width - 4);
-      final receiptTop = markBelow && hasChild(_OrbPart.mark) ? orbAt.dy - r.height - 2 : orbAt.dy + orb.height + 2;
-      positionChild(_OrbPart.receipt, Offset(left, receiptTop));
+      final moonX = orbAt.dx + orb.width / 2;
+      final towardRight = (moonX - size.width / 2).abs() < 1 ? !rtl : moonX < size.width / 2;
+      final left = towardRight ? orbAt.dx + orb.width + 6 : orbAt.dx - r.width - 6;
+      positionChild(_OrbPart.receipt, Offset(left.clamp(4.0, size.width - r.width - 4), orbAt.dy + (orb.height - r.height) / 2));
     }
     if (!hasChild(_OrbPart.mark)) return;
     final mark = layoutChild(_OrbPart.mark, BoxConstraints.loose(size));
@@ -120,7 +234,9 @@ class _OrbLayout extends MultiChildLayoutDelegate {
 class _DraggableOrb extends StatefulWidget {
   final double maxX;
   final double maxY;
-  const _DraggableOrb({super.key, required this.maxX, required this.maxY});
+  final VoidCallback onGrab;
+  final void Function(Offset velocity, bool returnHome) onRelease;
+  const _DraggableOrb({super.key, required this.maxX, required this.maxY, required this.onGrab, required this.onRelease});
 
   @override
   State<_DraggableOrb> createState() => _DraggableOrbState();
@@ -146,6 +262,8 @@ class _DraggableOrbState extends State<_DraggableOrb> {
     _dragDistance += d.delta.distance;
     // The finger moves in screen space; the orb is kept from the start edge,
     // which in Arabic is the right, so a move to the right brings it closer.
+    // Anywhere on the screen while held: explain reads the moon's centre
+    // mid-drag (O1).
     final rtl = Directionality.of(context) == TextDirection.rtl;
     final along = rtl ? -d.delta.dx : d.delta.dx;
     state.setOrbPosition(state.orbStart + along, state.orbY + d.delta.dy, maxX: widget.maxX, maxY: widget.maxY);
@@ -155,17 +273,20 @@ class _DraggableOrbState extends State<_DraggableOrb> {
     state.setExplainHover(hit);
   }
 
-  void _dragEnd(AppState state) {
+  void _dragEnd(AppState state, Offset velocity) {
     final hovering = state.explainHoverId;
-    if (hovering != null && _dragDistance >= 6) {
+    final explained = hovering != null && _dragDistance >= 6;
+    state.setExplainHover(null);
+    // Letting go puts the orb back in its band: after explaining a value, at
+    // the stop it came from (the drag was to explain, not to move it);
+    // otherwise at the stop the throw carries it to.
+    widget.onRelease(explained ? Offset.zero : velocity, explained);
+    if (explained) {
       final ex = ExplainRegistry.instance.explanationFor(hovering);
-      state.setExplainHover(null);
       if (ex != null) {
         HapticFeedback.mediumImpact();
         state.openExplain(ex);
       }
-    } else {
-      state.setExplainHover(null);
     }
   }
 
@@ -208,9 +329,13 @@ class _DraggableOrbState extends State<_DraggableOrb> {
         PanGestureRecognizer: GestureRecognizerFactoryWithHandlers<PanGestureRecognizer>(
           () => PanGestureRecognizer(),
           (r) {
-            r.onStart = (_) => _dragDistance = 0;
+            r.onStart = (_) {
+              _dragDistance = 0;
+              widget.onGrab();
+            };
             r.onUpdate = (d) => _dragUpdate(state, d);
-            r.onEnd = (_) => _dragEnd(state);
+            r.onEnd = (d) => _dragEnd(state, d.velocity.pixelsPerSecond);
+            r.onCancel = () => _dragEnd(state, Offset.zero);
           },
         ),
       },
@@ -221,9 +346,41 @@ class _DraggableOrbState extends State<_DraggableOrb> {
         key: _moonKey,
         width: 56,
         height: 56,
-        child: Center(child: LivingOrb(size: 56, wander: true, sparks: true, state: state.orbState(), speaking: state.orbSpeaking)),
+        // Its sparks and drift kept inside the band (O9).
+        child: Center(child: LivingOrb(size: 56, wander: true, sparks: true, reach: OrbNav.bandReach, state: state.orbState(), speaking: state.orbSpeaking)),
       ),
     ),
+    );
+  }
+}
+
+/// The fade at the bottom of an orb screen, where content that is still
+/// scrolling meets the orb's band (O1): a scroll-edge fade in place of a hard
+/// divider, starting [reachAbove] points above the band. It draws and takes
+/// no touches.
+class OrbBandFade extends StatelessWidget {
+  const OrbBandFade({super.key});
+
+  /// How far above the band the fade begins: the gap [QLayout.pageBottom]
+  /// leaves under a page's last line, so a page at rest is never faded.
+  static const double reachAbove = QLayout.pageBottom - QLayout.orbBand;
+
+  @override
+  Widget build(BuildContext context) {
+    return const IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            // From clear, where the page's last line comes to rest, to near
+            // solid across the band itself, so the orb always sits on a calm
+            // ground and what scrolls under it reads as behind.
+            colors: [Color(0x00070C19), Color(0xB8070C19), Color(0xEB070C19), Color(0xF7070C19)],
+            stops: [0.0, 0.3, 0.55, 1.0],
+          ),
+        ),
+      ),
     );
   }
 }

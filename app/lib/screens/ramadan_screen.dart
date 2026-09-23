@@ -6,6 +6,7 @@ import '../models/ramadan.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/moon.dart';
@@ -40,7 +41,7 @@ class RamadanScreen extends StatelessWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 56, 20, 160),
+      padding: const EdgeInsets.fromLTRB(20, 56, 20, QLayout.pageBottom),
       children: [
         Row(children: [
           // The way back (the exit rule), where every screen keeps it.

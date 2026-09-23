@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../state/app_state.dart';
 import '../theme/colors.dart';
+import '../theme/layout.dart';
 import '../widgets/account_sheet.dart';
 import '../widgets/ask_qamar_overlay.dart';
 import '../widgets/explain.dart';
@@ -84,6 +85,10 @@ class HomeShell extends StatelessWidget {
                   child: KeyedSubtree(key: ValueKey(state.screen), child: _currentScreen(state.screen)),
                 ),
               ),
+              // The orb's band (O1): content that is still scrolling passes
+              // under a soft fade rather than a hard edge, and the fade takes
+              // no touches — only the orb does.
+              if (state.orbVisible) const Positioned(left: 0, right: 0, bottom: 0, height: QLayout.orbBand + OrbBandFade.reachAbove, child: OrbBandFade()),
               if (state.orbVisible) const OrbNav(),
               if (state.treeOpen) const TreeOverlay(),
               // The conversation arrives under its own fade and leaves under

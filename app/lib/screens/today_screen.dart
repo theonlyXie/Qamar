@@ -84,7 +84,7 @@ class _TodayScreenState extends State<TodayScreen> {
     };
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 56, 20, 160),
+      padding: const EdgeInsets.fromLTRB(20, 56, 20, QLayout.pageBottom),
       children: [
         for (final zone in TodayZone.values)
           if (zones[zone] case final w?) ...[

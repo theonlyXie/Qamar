@@ -33,6 +33,13 @@ class LivingOrb extends StatefulWidget {
   /// bounce, and never a sound.
   final bool speaking;
 
+  /// How far the sparks orbit and the moon drifts, against its size: 1 is
+  /// the full orbit; the nav orb, resting in its band, keeps them inside it.
+  final double reach;
+
+  /// Each orbiting spark, for tests.
+  static ValueKey<String> sparkKey(int i) => ValueKey('orb-spark-$i');
+
   const LivingOrb({
     super.key,
     required this.size,
@@ -45,6 +52,7 @@ class LivingOrb extends StatefulWidget {
     this.onTap,
     this.state,
     this.speaking = false,
+    this.reach = 1,
   });
 
   @override
@@ -106,7 +114,7 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
         final haloColors = day?.over == true
             ? const [Color(0x8CFFB36C), Color(0x1FFF7C4F), Colors.transparent]
             : const [Color(0x8C7B6CFF), Color(0x1F4F7CFF), Colors.transparent];
-        final offset = widget.wander ? Offset(_wanderOffset.value.dx * s, _wanderOffset.value.dy * s) : Offset.zero;
+        final offset = widget.wander ? Offset(_wanderOffset.value.dx * s * widget.reach, _wanderOffset.value.dy * s * widget.reach) : Offset.zero;
 
         return Transform.translate(
           offset: offset,
@@ -180,9 +188,9 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
 
   List<Widget> _buildSparks(double s) {
     return [
-      _OrbitingSpark(controller: _wander, radius: s * 0.62, period: 1.0, size: 6, color: QColors.cyan),
-      _OrbitingSpark(controller: _wander, radius: s * 0.48, period: 1.55, size: 4, color: QColors.violetSoft),
-      _OrbitingSpark(controller: _wander, radius: s * 0.75, period: 0.7, size: 3, color: QColors.textBrand),
+      _OrbitingSpark(key: LivingOrb.sparkKey(0), controller: _wander, radius: s * 0.62 * widget.reach, period: 1.0, size: 6, color: QColors.cyan),
+      _OrbitingSpark(key: LivingOrb.sparkKey(1), controller: _wander, radius: s * 0.48 * widget.reach, period: 1.55, size: 4, color: QColors.violetSoft),
+      _OrbitingSpark(key: LivingOrb.sparkKey(2), controller: _wander, radius: s * 0.75 * widget.reach, period: 0.7, size: 3, color: QColors.textBrand),
     ];
   }
 
@@ -234,6 +242,7 @@ class _OrbitingSpark extends StatelessWidget {
   final Color color;
 
   const _OrbitingSpark({
+    super.key,
     required this.controller,
     required this.radius,
     required this.period,

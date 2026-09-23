@@ -5,6 +5,7 @@ import '../models/plan.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/explain.dart';
@@ -42,7 +43,7 @@ class _PlanScreenState extends State<PlanScreen> {
     final dayTotal = meals.fold(0, (sum, m) => sum + mealKcal(m));
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 56, 20, 160),
+      padding: const EdgeInsets.fromLTRB(20, 56, 20, QLayout.pageBottom),
       children: [
         Row(children: [
           QBackButton(onTap: state.back, isAr: state.isAr),

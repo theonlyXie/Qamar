@@ -1,3 +1,7 @@
+import 'dart:math' as math;
+
+import 'package:flutter/physics.dart';
+
 /// Animation timings ported from the prototype's @keyframes (qbreath, qhalo,
 /// qfloat, qorbit…). Kept centralized so the orb's "alive" feel stays
 /// consistent everywhere it appears (welcome hero, nav orb, chat, tree).
@@ -37,3 +41,38 @@ class QMotion {
   static const scanReadDelay = Duration(milliseconds: 1700);
   static const analyzeDelay = Duration(milliseconds: 1900);
 }
+
+/// Springs for anything a finger moves (the orb, first): they start from
+/// where the thing is on screen, carry the finger's speed, and can be
+/// grabbed again mid-flight, which a fixed-length curve cannot.
+///
+/// Described the way Apple's fluid interfaces are, by two numbers: the
+/// damping ratio (1 settles with no overshoot; under 1 overshoots) and the
+/// response, roughly how long it takes to get there. Critically damped by
+/// default; a little bounce only when the finger threw it ([flick]).
+abstract final class QSpring {
+  /// Most motion: no overshoot.
+  static final settle = of(damping: 1.0, response: 0.35);
+
+  /// After a flick: the throw carries a small overshoot, as a thrown thing
+  /// would.
+  static final flick = of(damping: 0.8, response: 0.35);
+
+  /// How fast a release has to be (points a second) to count as a flick.
+  static const flickSpeed = 700.0;
+
+  /// A spring from a damping ratio and a response in seconds (mass 1).
+  static SpringDescription of({required double damping, required double response}) {
+    final stiffness = math.pow(2 * math.pi / response, 2).toDouble();
+    final c = 4 * math.pi * damping / response;
+    return SpringDescription(mass: 1, stiffness: stiffness, damping: c);
+  }
+
+  /// Where a release at [velocity] (points a second) would come to rest if
+  /// it simply slowed down, as a scrolled list does: Apple's projection, with
+  /// the deceleration of a normal scroll. Snapping to the target nearest this
+  /// point, rather than nearest the release, is what makes a flick throw.
+  static double project(double velocity, {double decelerationRate = 0.998}) =>
+      (velocity / 1000) * decelerationRate / (1 - decelerationRate);
+}
+

@@ -59,6 +59,11 @@ enum TreeSub { activity, repeat }
 /// hold talks to Qamar, dragging it onto a number explains that number.
 enum OrbGesture { tap, hold, explain }
 
+/// The three places the orb can rest in its band at the bottom of the
+/// screen (O1), start-relative: the start is the left in English and the
+/// right in Arabic.
+enum OrbStop { start, centre, end }
+
 enum AppScreen { welcome, scan, onboard, today, plan, progress, you, wallet, subscription, ramadan }
 
 enum ChatState { idle, listening, thinking }
@@ -173,6 +178,7 @@ class AppState extends ChangeNotifier {
   static const _kRamadanAsked = 'ramadan_asked';
   static const _kHoldCoachSeen = 'hold_coach_seen';
   static const _kWeekCardSeen = 'week_card_seen';
+  static const _kOrbStop = 'orb_stop';
 
   Future<void> _loadDevicePrefs() async {
     final p = _prefs;
@@ -195,6 +201,7 @@ class AppState extends ChangeNotifier {
       final proCode = await p.getString(_kPendingProCode);
       final proWho = await p.getString(_kProName);
       final lockDay = await p.getString(_kLockOfferDay);
+      final stop = await p.getString(_kOrbStop);
       if (_disposed) return;
       // A code from an earlier launch is still waiting to be redeemed.
       if (invite != null && invite.trim().isNotEmpty) pendingInvitationCode ??= invite.trim();
@@ -202,6 +209,10 @@ class AppState extends ChangeNotifier {
       if (proWho != null && proWho.trim().isNotEmpty) proName ??= proWho.trim();
       if (lockDay != null && lockDay.trim().isNotEmpty) _lockOfferDay = lockDay.trim();
       if (asked != null) ramadanAskedFor = asked;
+      // Where the person left the orb resting last time (O1).
+      for (final s in OrbStop.values) {
+        if (s.name == stop) orbStop = s;
+      }
       if (weekSeen != null) _weekCardSeenDay = weekSeen;
       if (reviewNumbers != null) reviewShowNumbers = reviewNumbers;
       if (consent != null) {
@@ -703,9 +714,20 @@ class AppState extends ChangeNotifier {
   int turn = 0;
   bool chatOpen = false;
 
-  /// Where the orb rests, measured from the start edge of the screen — the
+  /// Where the orb rests (O1): one of three stops in the band at the bottom
+  /// of the screen — start, centre, end — chosen by where the person lets go
+  /// of it, and kept on the phone. Start-relative, so the layout mirrors in
+  /// Arabic. The end stop by default.
+  OrbStop orbStop = OrbStop.end;
+
+  /// True while the orb is off the band: held under a finger, or placed at
+  /// [orbStart]/[orbY] by [setOrbPosition]. Letting go ([settleOrb]) puts it
+  /// back at a stop. It never rests on the page's content.
+  bool orbHeld = false;
+
+  /// Where a held orb is, measured from the start edge of the screen — the
   /// left in English, the right in Arabic — so the layout mirrors with the
-  /// language (O1). The default sits towards the end edge in both.
+  /// language (O1).
   double orbStart = 290;
   double orbY = 620;
 
@@ -5094,6 +5116,9 @@ class AppState extends ChangeNotifier {
         AppScreen.progress,
         AppScreen.you,
         AppScreen.wallet,
+        // The paywall keeps the orb, the way home from every in-app screen
+        // (way_back_test). It used to rest on the comparison table; in the
+        // band, with the page padded to clear it, it no longer can (O1).
         AppScreen.subscription,
         // Reached from the tree in season: without the orb, and with no back
         // control, it was the one screen with no way out.
@@ -5102,9 +5127,20 @@ class AppState extends ChangeNotifier {
 
   /// [start] is measured from the start edge (see [orbStart]); a drag in
   /// Arabic turns its physical movement into start-relative movement first.
+  /// Holds the orb at a place off the band, as a drag does.
   void setOrbPosition(double start, double y, {required double maxX, required double maxY}) {
     orbStart = start.clamp(4, maxX).toDouble();
     orbY = y.clamp(46, maxY).toDouble();
+    orbHeld = true;
+    _notify();
+  }
+
+  /// Lets go of the orb: it rests at [stop] in the band, and the phone keeps
+  /// that choice for the next launch.
+  void settleOrb(OrbStop stop) {
+    orbStop = stop;
+    orbHeld = false;
+    _prefs?.setString(_kOrbStop, stop.name).catchError((_) {});
     _notify();
   }
 
