@@ -127,7 +127,6 @@ class QStrings {
       plusCta,
       treeHint,
       ask,
-      typeInstead,
       sIdle,
       sListening,
       sThinking,
@@ -249,7 +248,6 @@ class QStrings {
     required this.plusCta,
     required this.treeHint,
     required this.ask,
-    required this.typeInstead,
     required this.sIdle,
     required this.sListening,
     required this.sThinking,
@@ -309,7 +307,7 @@ class QStrings {
     linkAccount: 'اربط الحساب',
     plusSub: 'خطة بكرة مكتوبة بالليل، وصور وأسئلة أكتر. خطة اليوم والكتابة والصوت مجاناً دايماً.',
     plusCta: 'اشترك بالجنيه', treeHint: 'دوس بره للخروج · استمر ضاغط على قمر عشان تتكلم معاه', ask: 'اسأل قمر',
-    typeInstead: 'أو اكتب بدل الكلام', sIdle: 'دوس على القمر واتكلم', sListening: 'بسمعك…', sThinking: 'بفكر…', sAnswer: 'قمر',
+    sIdle: 'دوس على القمر واتكلم', sListening: 'بسمعك…', sThinking: 'بفكر…', sAnswer: 'قمر',
     tapPrompt: 'إيه اللي في دماغك؟',
     protein: 'بروتين', carbs: 'كارب', fat: 'دهون',
   );
@@ -363,7 +361,7 @@ class QStrings {
     linkAccount: 'Link account',
     plusSub: 'Tomorrow’s plan written overnight, and more photos and questions. Today’s plan, typing and speaking stay free.',
     plusCta: 'Subscribe in EGP', treeHint: 'Tap outside to close · hold Qamar to talk', ask: 'Ask Qamar',
-    typeInstead: 'or type instead', sIdle: 'Tap the moon and speak', sListening: 'Listening…', sThinking: 'Thinking…', sAnswer: 'Qamar',
+    sIdle: 'Tap the moon and speak', sListening: 'Listening…', sThinking: 'Thinking…', sAnswer: 'Qamar',
     tapPrompt: 'What’s on your mind?',
     protein: 'Protein', carbs: 'Carbs', fat: 'Fat',
   );

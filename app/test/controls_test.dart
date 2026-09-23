@@ -132,7 +132,7 @@ void main() {
       s.openScan();
       await _pumpApp(tester, s);
       expect(find.byIcon(Icons.keyboard_outlined), findsOneWidget);
-      expect(find.text(s.t.typeInstead), findsNothing);
+      expect(find.text(lang == AppLang.ar ? 'أو اكتب بدل الكلام' : 'or type instead'), findsNothing);
       expect(find.byType(TextButton), findsNothing);
     });
   }
