@@ -202,7 +202,6 @@ class SubscriptionScreen extends StatelessWidget {
             ),
             Switch.adaptive(
               value: state.adherenceShare,
-              activeThumbColor: QColors.violet,
               onChanged: (v) => state.setAdherenceShare(v),
             ),
           ]),

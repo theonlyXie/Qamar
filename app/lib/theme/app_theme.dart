@@ -37,6 +37,18 @@ ThemeData buildQamarTheme() {
       bodyColor: QColors.textPrimary,
       displayColor: QColors.textPrimary,
     ),
+    // Switches in the palette, not Material's stock grey (scorecard 08):
+    // on is the brand's deep violet under a white thumb, off a card-coloured
+    // track with a visible edge and a muted thumb.
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.disabled)
+          ? QColors.textDisabled
+          : s.contains(WidgetState.selected)
+              ? QColors.onAccent
+              : QColors.textMuted),
+      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? QColors.violetDeep : QColors.cardMid),
+      trackOutlineColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? Colors.transparent : QColors.borderStrong),
+    ),
     splashFactory: NoSplash.splashFactory,
     highlightColor: Colors.transparent,
     dividerColor: QColors.borderFaint,

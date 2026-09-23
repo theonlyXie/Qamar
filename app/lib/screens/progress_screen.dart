@@ -419,7 +419,6 @@ class _ShareableReviewState extends State<_ShareableReview> {
             const SizedBox(width: 4),
             Switch.adaptive(
               value: state.reviewShowNumbers,
-              activeThumbColor: QColors.violet,
               onChanged: state.setReviewShowNumbers,
             ),
           ],

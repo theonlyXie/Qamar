@@ -186,6 +186,31 @@ class QPrimaryButton extends StatelessWidget {
   }
 }
 
+/// A compact call to action inside a card: the brand gradient drawn as a
+/// 40pt pill, touched across 48 (O11). Where [QPrimaryButton] would be too
+/// much, and a text link too little.
+class QPillButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const QPillButton({super.key, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => QTapArea(
+        onTap: onTap,
+        builder: (context, pressed) => AnimatedOpacity(
+          opacity: pressed ? 0.82 : 1,
+          duration: const Duration(milliseconds: 90),
+          child: Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),
+            child: Text(label, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onAccent)),
+          ),
+        ),
+      );
+}
+
 /// Centred text wrapped to even lines, the way CSS's `text-wrap: balance`
 /// does: at the narrowest width that keeps the same number of lines, so a
 /// centred sentence never ends on one orphaned word ("…Not a medical" /

@@ -76,7 +76,6 @@ class RamadanScreen extends StatelessWidget {
             ),
             Switch.adaptive(
               value: state.profile.fasting == FastingMode.ramadan,
-              activeThumbColor: QColors.gold,
               onChanged: (v) => state.setFasting(v),
             ),
           ]),

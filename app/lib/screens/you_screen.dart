@@ -21,6 +21,7 @@ class YouScreen extends StatelessWidget {
   /// The "Points and streaks" switch (O4) and its row, found by tests.
   static const scoreSwitchKey = ValueKey('points-and-streaks');
   static const scoreRowKey = ValueKey('points-and-streaks-row');
+  static const proCodeKey = ValueKey('affiliate-code');
 
   @override
   Widget build(BuildContext context) {
@@ -84,18 +85,7 @@ class YouScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 Align(
                   alignment: AlignmentDirectional.centerStart,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(999),
-                      onTap: state.openLinkAccount,
-                      child: Ink(
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                        decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(999))),
-                        child: Text(t.linkAccount, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onAccent)),
-                      ),
-                    ),
-                  ),
+                  child: QPillButton(label: t.linkAccount, onTap: state.openLinkAccount),
                 ),
               ],
             ),
@@ -249,7 +239,6 @@ class YouScreen extends StatelessWidget {
                   Switch.adaptive(
                     key: YouScreen.scoreSwitchKey,
                     value: state.showScore,
-                    activeThumbColor: QColors.violet,
                     onChanged: state.setShowScore,
                   ),
                 ]),
@@ -324,7 +313,6 @@ class YouScreen extends StatelessWidget {
             ),
             Switch.adaptive(
               value: state.improve,
-              activeThumbColor: QColors.violet,
               onChanged: (v) => state.setImprove(v),
             ),
           ]),
@@ -349,7 +337,6 @@ class YouScreen extends StatelessWidget {
             ),
             Switch.adaptive(
               value: state.adherenceShare,
-              activeThumbColor: QColors.violet,
               onChanged: (v) => state.setAdherenceShare(v),
             ),
           ]),
@@ -366,7 +353,6 @@ class YouScreen extends StatelessWidget {
               ]),
               Switch.adaptive(
                 value: state.easternDigits,
-                activeThumbColor: QColors.violet,
                 onChanged: state.setEasternDigits,
               ),
             ]),
@@ -736,11 +722,13 @@ class _AffiliateCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
+              // The code is set as a code; with none yet, the way to one is
+              // an instruction, not a title-sized line pretending to be one.
               Expanded(
-                child: Text(
-                  code ?? (isAr ? 'اربط حسابك عشان يطلعلك كود' : 'Link an account to get a code'),
-                  style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.textPrimary),
-                ),
+                child: code != null
+                    ? Text(code, key: YouScreen.proCodeKey, style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.textPrimary))
+                    : Text(isAr ? 'اربط حسابك عشان يطلعلك كود' : 'Link an account to get a code',
+                        key: YouScreen.proCodeKey, style: QText.body(size: 13, height: 20, color: QColors.textMuted)),
               ),
               if (code != null)
                 QOutlineButton(
@@ -760,11 +748,14 @@ class _AffiliateCard extends StatelessWidget {
             style: QText.body(size: 12, color: QColors.textMuted),
           ),
           const SizedBox(height: 8),
+          // Below the smallest payout there is nothing to send: the button
+          // says so by being off (O11), where it used to look ready at EGP 0
+          // and answer with a notice.
           QOutlineButton(
             label: isAr ? 'حوّل العمولة' : 'Redeem EGP',
             height: 36,
             color: QColors.gold,
-            onTap: state.requestAffiliatePayout,
+            onTap: wallet.canRedeem ? state.requestAffiliatePayout : null,
           ),
           if (state.affiliateNotice != null) ...[
             const SizedBox(height: 8),

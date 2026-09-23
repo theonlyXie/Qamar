@@ -207,11 +207,9 @@ class _ScanScreenState extends State<ScanScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                TextButton(
-                  onPressed: state.startOnboarding,
-                  child: Text(t.typeInstead, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textMuted)),
-                ),
+                // Typing instead is the keyboard beside the shutter; the line
+                // that repeated it under the row is gone.
+                const SizedBox(height: 18),
                 Text(t.scanPriv, textAlign: TextAlign.center, style: QText.body(size: 11, height: 16, color: QColors.textMuted)),
               ],
             ),

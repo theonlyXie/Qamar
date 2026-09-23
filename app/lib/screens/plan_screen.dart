@@ -141,21 +141,7 @@ class _DayChanged extends StatelessWidget {
         children: [
           Text(t.dayChanged, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textPrimary)),
           const SizedBox(height: 4),
-          // Drawn as a 40pt pill, touched across 48 (O11).
-          QTapArea(
-            onTap: state.openChat,
-            builder: (context, pressed) => AnimatedOpacity(
-              opacity: pressed ? 0.82 : 1,
-              duration: const Duration(milliseconds: 90),
-              child: Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),
-                child: Text(t.adjustRoute, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onAccent)),
-              ),
-            ),
-          ),
+          QPillButton(label: t.adjustRoute, onTap: state.openChat),
         ],
       ),
     );

@@ -150,7 +150,11 @@ class _WalletTab extends StatelessWidget {
         child: Container(
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: active ? QColors.gold.withValues(alpha: 0.16) : (pressed ? QColors.cardMid : Colors.transparent),
+            // The chosen tab is the app's one lighter surface with a gold
+            // edge; gold washed over navy read as warm grey, the only warm
+            // surface in the app.
+            color: active ? QColors.glassHigh : (pressed ? QColors.cardMid : Colors.transparent),
+            border: Border.all(color: active ? QColors.gold.withValues(alpha: 0.45) : Colors.transparent),
             borderRadius: BorderRadius.circular(QRadii.pill),
           ),
           child: Text(label, style: QText.body(size: 13, weight: FontWeight.w600, color: active ? QColors.gold : QColors.textMuted)),
@@ -186,20 +190,19 @@ class _SpendCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(isAr ? item.limitAr : item.limitEn, style: QText.body(size: 11, height: 17, color: QColors.textMuted)),
           const SizedBox(height: 8),
+          // What the balance would be is said only when it can be spent:
+          // "after: 0" under a price the balance does not reach read as a
+          // promise. Out of reach, the button is off (O11), not a tap that
+          // quietly does nothing.
           Row(children: [
-            Text('${state.t.balanceAfter}: ${state.formatSu(after)}', style: QText.body(size: 11, color: QColors.textMuted)),
+            if (afford) Text('${state.t.balanceAfter}: ${state.formatSu(after)}', style: QText.body(size: 11, color: QColors.textMuted)),
             const Spacer(),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(999),
-                onTap: () => state.redeem(item),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                  decoration: BoxDecoration(border: Border.all(color: afford ? QColors.gold.withOpacity(0.45) : QColors.borderSoft), borderRadius: BorderRadius.circular(999)),
-                  child: Text(done ? (isAr ? 'اتمت' : 'Redeemed') : state.t.spendCta, style: QText.body(size: 12, weight: FontWeight.w600, color: afford ? QColors.gold : QColors.textMuted)),
-                ),
-              ),
+            QOutlineButton(
+              key: ValueKey('redeem-${item.id}'),
+              label: done ? (isAr ? 'اتمت' : 'Redeemed') : state.t.spendCta,
+              height: 36,
+              color: QColors.gold,
+              onTap: afford ? () => state.redeem(item) : null,
             ),
           ]),
         ],
