@@ -3696,7 +3696,8 @@ void main() {
 
     test('a purchase the server refuses spends nothing, says so, and asks nothing', () async {
       final (:s, :wallet, :ai) = await atTheWall();
-      wallet.redeemFails = Exception('daily question cap reached');
+      // The redeem function's own refusal: its transaction rolled back.
+      wallet.redeemFails = const RedeemRefused('daily question cap reached');
       s.chat.last.problem!.secondary!.onTap();
       await settle();
       expect(s.suAvailable, 2000, reason: 'nothing spent');
@@ -3720,6 +3721,25 @@ void main() {
       lost.problem!.action.onTap();
       await settle();
       expect(wallet.redemptions, ['chat_extra'], reason: 'the server already holds the question: it is not bought again');
+      expect(ai.chatMessages, ['is feteer ok before the gym?', 'is feteer ok before the gym?']);
+      expect(s.chat.last.text, 'grounded answer');
+    });
+
+    test('a 5xx after the server took the purchase is never called unspent; "Try again" asks it, and buys nothing more', () async {
+      final (:s, :wallet, :ai) = await atTheWall();
+      // The purchase committed; the answer came back as a gateway error.
+      wallet.loseNextAnswer = Exception('502 Bad Gateway');
+      s.chat.last.problem!.secondary!.onTap();
+      await settle();
+      final failed = s.chat.last;
+      expect(failed.text, 'I could not confirm the question was bought. Tap Try again: if it went through I will ask it, and it is never charged twice.');
+      expect(failed.text, isNot(contains('no points were spent')), reason: 'a 5xx is not a refusal: the purchase may have committed');
+      expect(failed.problem!.action.label, 'Try again');
+      expect(failed.problem!.kind, ProblemKind.error, reason: 'the server’s trouble, not the phone’s connection');
+
+      failed.problem!.action.onTap();
+      await settle();
+      expect(wallet.redemptions, ['chat_extra'], reason: 'not bought a second time');
       expect(ai.chatMessages, ['is feteer ok before the gym?', 'is feteer ok before the gym?']);
       expect(s.chat.last.text, 'grounded answer');
     });

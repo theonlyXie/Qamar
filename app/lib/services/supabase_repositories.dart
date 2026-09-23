@@ -580,12 +580,24 @@ class SupabaseWalletRepository implements WalletRepository {
 
   @override
   Future<void> redeem(String userId, {required SpendItemDef item, required String idempotencyKey}) async {
-    await _client.rpc('qamar_wallet_redeem', params: {
-      'p_user_id': userId,
-      'p_catalog_item_id': item.id,
-      'p_idempotency_key': idempotencyKey,
-    });
+    try {
+      await _client.rpc('qamar_wallet_redeem', params: {
+        'p_user_id': userId,
+        'p_catalog_item_id': item.id,
+        'p_idempotency_key': idempotencyKey,
+      });
+    } catch (e) {
+      throw redeemFailure(e);
+    }
   }
+
+  /// What a failed redemption means. Only the redeem function's own RAISE
+  /// (SQLSTATE P0001, which PostgREST sends as the error's code) is a refusal
+  /// whose transaction rolled back. A 5xx arrives as a PostgrestException too,
+  /// but its code is the status ("502", "504") and the purchase may have
+  /// committed before it, so it stays what it was: unknown.
+  static Object redeemFailure(Object e) =>
+      e is PostgrestException && e.code == 'P0001' ? RedeemRefused(e.message) : e;
 
   @override
   Future<int?> questionPrice() async {

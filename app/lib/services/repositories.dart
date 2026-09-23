@@ -140,6 +140,19 @@ abstract class WaterRepository {
   Future<List<WaterSip>> sipsForDay(String userId, DateTime day);
 }
 
+/// A redemption the server itself refused: the redeem function raised
+/// (qamar_wallet_redeem — not enough Su, the day's allowance used, no wall
+/// met today), so its transaction rolled back and nothing was spent. Any
+/// other failure of [WalletRepository.redeem] — no connection, a timeout, a
+/// 5xx — may have come after the purchase committed, and is not this.
+class RedeemRefused implements Exception {
+  final String message;
+  const RedeemRefused(this.message);
+
+  @override
+  String toString() => 'RedeemRefused: $message';
+}
+
 abstract class WalletRepository {
   Future<({int available, int lifetime})> balance(String userId);
   Future<void> credit(String userId, {required int amount, required String reason, required String idempotencyKey});
@@ -154,6 +167,10 @@ abstract class WalletRepository {
 
   /// The onboarding bonus, once per account (qamar_grant_onboarding).
   Future<void> grantOnboarding(String userId);
+  /// Spends Su on [item]. Throws [RedeemRefused] only when the server
+  /// refused it (nothing spent); anything else it throws leaves the purchase
+  /// unknown, and a retry with the same [idempotencyKey] is the purchase that
+  /// already happened, if it did (0067).
   Future<void> redeem(String userId, {required SpendItemDef item, required String idempotencyKey});
   Future<List<LedgerEntry>> ledger(String userId);
 

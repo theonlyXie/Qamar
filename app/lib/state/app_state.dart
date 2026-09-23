@@ -3878,11 +3878,12 @@ class AppState extends ChangeNotifier {
       _buyingQuestion = false;
       if (_disposed) return;
       chatState = ChatState.idle;
-      // The server refused: its transaction rolled back, so nothing was
-      // spent. The connection failed: the purchase may have gone through
-      // with its answer lost, so the words say only what is known, and
-      // trying again is safe — the same key never charges twice (0067).
-      final refused = failureOf(e) == Failure.ours;
+      // The redeem function refused (RedeemRefused): its transaction rolled
+      // back, so nothing was spent. Anything else — no connection, a
+      // timeout, a 5xx — may have come after the purchase committed, so the
+      // words say only what is known, and trying again is safe: the same key
+      // never charges twice (0067).
+      final refused = e is RedeemRefused;
       final what = refused
           ? (isAr ? 'مقدرتش أشتري السؤال، ومفيش ولا نقطة اتصرفت.' : 'I could not buy the question, and no points were spent.')
           : (isAr
@@ -3899,7 +3900,7 @@ class AppState extends ChangeNotifier {
               ? ProblemAction(isAr ? 'شوف \u2066Qamar+\u2069' : 'See Qamar+', () => _leaveChatForWall(photo: false))
               : ProblemAction(isAr ? 'جرّب تاني' : 'Try again', () => _retryBoughtQuestion(text)),
           secondary: ProblemAction(isAr ? 'سجّلها كوجبة' : 'Log it as a meal', () => logTextAsMeal(text)),
-          kind: refused ? ProblemKind.error : ProblemKind.offline,
+          kind: refused || failureOf(e) == Failure.ours ? ProblemKind.error : ProblemKind.offline,
         ),
       ));
       _notify();
