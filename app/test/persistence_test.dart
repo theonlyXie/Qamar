@@ -3772,6 +3772,38 @@ void main() {
     });
   });
 
+  group('day counts, by the app’s one rule', () {
+    test('the earned month’s grant counts the days logged the same way', () async {
+      for (final lang in AppLang.values) {
+        final end = DateTime.utc(2026, 10, 15, 12);
+        final fb = FakeBilling()
+          ..current = PlusEntitlement(status: 'active', plan: 'monthly', provider: 'paymob', periodEnd: end, firstPurchase: false)
+          ..earned = const EarnedMonth(open: true, loggedDays: 5, needed: 5, windowDays: 30, daysLeft: 20, eligible: true, claimed: false);
+        final state = backed(billing: fb, clock: () => DateTime(2026, 9, 27, 9))..setLang(lang);
+        await settle();
+        expect(fb.earnedClaims, 1, reason: 'read on start: eligible, so claimed, and said');
+        final notice = state.plusNotice!.replaceAll(RegExp('[\u2066-\u2069]'), '');
+        expect(notice, lang == AppLang.ar ? contains('سجّلت ٥ أيام من أول ٣٠') : contains('you logged 5 of your first 30 days'));
+      }
+    });
+
+    test('an invitation’s days are counted in both languages: one day is, seven are', () async {
+      for (final (days, en, ar) in const [
+        (1, 'Basel invited you. 1 day of Qamar+ is yours from now.', 'Basel عزمك. يوم واحد قمر+ عليك من دلوقتي.'),
+        (7, 'Basel invited you. 7 days of Qamar+ are yours from now.', 'Basel عزمك. ٧ أيام قمر+ عليك من دلوقتي.'),
+        (14, 'Basel invited you. 14 days of Qamar+ are yours from now.', 'Basel عزمك. ١٤ يوم قمر+ عليك من دلوقتي.'),
+      ]) {
+        for (final lang in AppLang.values) {
+          final inv = FakeInvitationRepo()..redemption = InvitationRedemption(inviterName: 'Basel', inviteeName: 'Omar', trialDays: days);
+          final state = backed(invitations: inv)..setLang(lang);
+          await settle();
+          await state.redeemInvitation('QMR-7F3A1');
+          expect(state.invitationNotice!.replaceAll(RegExp('[\u2066-\u2069]'), ''), lang == AppLang.ar ? ar : en);
+        }
+      }
+    });
+  });
+
   group('what to avoid, after the consultation (gap 4)', () {
     const meal = (
       id: 'lunch', slotAr: 'غدا', slotEn: 'Lunch',

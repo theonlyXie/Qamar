@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/words.dart';
 import '../models/plan.dart';
 import '../models/reply.dart';
 import '../models/streak.dart';
@@ -750,14 +751,16 @@ class _EarnedMonthCard extends StatelessWidget {
     final title = granted
         ? (isAr ? 'شهر علينا' : 'A month on us')
         : (isAr ? 'شهر علينا — قيد الكسب' : 'A month on us — being earned');
+    // Days counted by the app's one rule: "1 day left", "باقي يومين".
+    String days(int n) => Counted.day.of(n, ar: isAr, iso: state.iso);
     final body = granted
-        ? (isAr ? 'سجّلت ${state.iso('${e.loggedDays}')} يوم من أول ${state.iso('${e.windowDays}')}. قمر+ شغال لحد $when.' : 'You logged ${e.loggedDays} of your first ${e.windowDays} days. Qamar+ runs until $when.')
+        ? (isAr ? 'سجّلت ${days(e.loggedDays)} من أول ${state.iso('${e.windowDays}')}. قمر+ شغال لحد $when.' : 'You logged ${e.loggedDays} of your first ${days(e.windowDays)}. Qamar+ runs until $when.')
         : (isAr
-            ? 'سجّلت ${state.iso('${e.loggedDays}')} يوم من ${state.iso('${e.needed}')} · باقي ${state.iso('${e.daysLeft}')} يوم'
-            : '${e.loggedDays} of ${e.needed} days logged · ${e.daysLeft} days left');
+            ? 'سجّلت ${days(e.loggedDays)} من ${state.iso('${e.needed}')} · باقي ${days(e.daysLeft)}'
+            : '${e.loggedDays} of ${days(e.needed)} logged · ${days(e.daysLeft)} left');
     final note = granted
         ? (isAr ? 'اضغط للإخفاء' : 'Tap to dismiss')
-        : (isAr ? 'سجّل ${state.iso('${e.needed}')} يوم من أول ${state.iso('${e.windowDays}')} والشهر اللي بعده علينا.' : 'Log ${e.needed} of your first ${e.windowDays} days and the next month is free.');
+        : (isAr ? 'سجّل ${days(e.needed)} من أول ${state.iso('${e.windowDays}')} والشهر اللي بعده علينا.' : 'Log ${e.needed} of your first ${days(e.windowDays)} and the next month is free.');
     final pct = e.needed == 0 ? 1.0 : (e.loggedDays / e.needed).clamp(0.0, 1.0);
     return Material(
       color: Colors.transparent,

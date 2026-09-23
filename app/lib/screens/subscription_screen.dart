@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/words.dart';
 import '../models/billing.dart';
 import '../services/config.dart';
 import '../state/app_state.dart';
@@ -81,8 +82,8 @@ class SubscriptionScreen extends StatelessWidget {
       if (!quote.discounted) isAr ? 'نفس السعر للكل.' : 'Same price for everyone.',
       if (earned.onOffer)
         isAr
-            ? 'سجّل ${state.iso('${earned.needed}')} يوم من أول ${state.iso('${earned.windowDays}')} يوم بعد ما تشترك، والشهر اللي بعده علينا.'
-            : 'Log ${earned.needed} of your first ${earned.windowDays} days after you subscribe and the next month is on us.',
+            ? 'سجّل ${Counted.day.of(earned.needed, ar: true, iso: state.iso)} من أول ${Counted.day.of(earned.windowDays, ar: true, iso: state.iso)} بعد ما تشترك، والشهر اللي بعده علينا.'
+            : 'Log ${earned.needed} of your first ${Counted.day.of(earned.windowDays, ar: false, iso: state.iso)} after you subscribe and the next month is on us.',
       isAr ? 'ومفيش حاجة بتتجدد لوحدها.' : 'Nothing renews on its own.',
     ].join(' ');
   }
@@ -363,8 +364,8 @@ class _TierCard extends StatelessWidget {
                 : 'A month on us · until ${until.day}/${until.month}')
             : state.plusActive && earned.inProgress
                 ? (isAr
-                    ? 'شهر علينا: ${state.iso('${earned.loggedDays}')} من ${state.iso('${earned.needed}')} يوم مسجّلين'
-                    : 'A month on us: ${earned.loggedDays} of ${earned.needed} days logged')
+                    ? 'شهر علينا: ${state.iso('${earned.loggedDays}')} من ${Counted.day.of(earned.needed, ar: true, iso: state.iso)} مسجّلين'
+                    : 'A month on us: ${earned.loggedDays} of ${Counted.day.of(earned.needed, ar: false, iso: state.iso)} logged')
                 : quote.pricingReason == 'affiliate'
                     ? (isAr ? '٣٠ يوم · بكود أخصائيك' : '30 days · with your nutritionist’s code')
                     : (isAr ? '٣٠ يوم · مفيش حاجة بتتجدد لوحدها' : '30 days · nothing renews on its own');

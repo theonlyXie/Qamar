@@ -53,6 +53,32 @@ void main() {
     expect(ar, isNot(contains('٢٨')));
   });
 
+  testWidgets('its days are counted by the app’s one rule, in both languages: "1 day left", "باقي يومين", "٥ أيام"', (tester) async {
+    AppState at({required int logged, required int left, required int needed, required AppLang lang}) {
+      final s = AppState()
+        ..plusActive = true
+        ..plusUntil = DateTime.now().toUtc().add(const Duration(days: 20))
+        ..earnedMonth = EarnedMonth(open: true, loggedDays: logged, needed: needed, windowDays: 30, daysLeft: left, eligible: false, claimed: false);
+      s.setLang(lang);
+      return s;
+    }
+    String plain(String t) => t.replaceAll(RegExp('[\u2066-\u2069]'), '');
+
+    final en = await _screenText(tester, at(logged: 9, left: 1, needed: 20, lang: AppLang.en), AppScreen.today);
+    expect(en, contains('9 of 20 days logged · 1 day left'));
+    expect(en, isNot(contains('1 days')));
+
+    final two = plain(await _screenText(tester, at(logged: 2, left: 2, needed: 20, lang: AppLang.ar), AppScreen.today));
+    expect(two, contains('سجّلت يومين من ٢٠ · باقي يومين'));
+
+    final few = plain(await _screenText(tester, at(logged: 5, left: 1, needed: 10, lang: AppLang.ar), AppScreen.today));
+    expect(few, contains('سجّلت ٥ أيام من ١٠ · باقي يوم واحد'));
+    expect(few, contains('سجّل ١٠ أيام من أول ٣٠'));
+
+    final tile = plain(await _screenText(tester, at(logged: 5, left: 1, needed: 10, lang: AppLang.ar), AppScreen.subscription));
+    expect(tile, contains('شهر علينا: ٥ من ١٠ أيام مسجّلين'));
+  });
+
   test('before the server answers, the fallback is the launch rule', () {
     expect(EarnedMonth.none.needed, 20);
     expect(EarnedMonth.none.windowDays, 30);

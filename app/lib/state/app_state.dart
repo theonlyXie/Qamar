@@ -6,6 +6,7 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'package:intl/intl.dart';
 
 import '../l10n/strings.dart';
+import '../l10n/words.dart';
 import '../models/days.dart';
 import '../models/dishes.dart';
 import '../models/meal.dart';
@@ -3309,8 +3310,8 @@ class AppState extends ChangeNotifier {
       final who = invitedBy ?? (isAr ? 'صاحبك' : 'A friend');
       invitationNotice = r.trialDays > 0
           ? (isAr
-              ? '$who عزمك. ${iso('${r.trialDays}')} يوم قمر+ عليك من دلوقتي.'
-              : '$who invited you. ${r.trialDays} days of Qamar+ are yours from now.')
+              ? '$who عزمك. ${Counted.day.of(r.trialDays, ar: true, iso: iso)} قمر+ عليك من دلوقتي.'
+              : '$who invited you. ${Counted.day.of(r.trialDays, ar: false, iso: iso)} of Qamar+ ${r.trialDays == 1 ? 'is' : 'are'} yours from now.')
           : (isAr ? '$who عزمك. أهلاً بيك.' : '$who invited you. Welcome.');
       _track('invitation_redeemed', {'trial_days': r.trialDays});
       await _refreshPlus();
@@ -3679,8 +3680,8 @@ class AppState extends ChangeNotifier {
         final until = plusUntil?.toLocal();
         final when = until == null ? '' : iso('${until.day}/${until.month}');
         plusNotice = isAr
-            ? 'شهر علينا: سجّلت ${iso('${status.loggedDays}')} يوم من أول ${iso('${status.windowDays}')}. قمر+ شغال لحد $when.'
-            : 'A month on us: you logged ${status.loggedDays} of your first ${status.windowDays} days. Qamar+ runs until $when.';
+            ? 'شهر علينا: سجّلت ${Counted.day.of(status.loggedDays, ar: true, iso: iso)} من أول ${iso('${status.windowDays}')}. قمر+ شغال لحد $when.'
+            : 'A month on us: you logged ${status.loggedDays} of your first ${Counted.day.of(status.windowDays, ar: false, iso: iso)}. Qamar+ runs until $when.';
       }
       earnedMonth = status;
       _notify();

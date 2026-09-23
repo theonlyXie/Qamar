@@ -69,6 +69,14 @@ void main() {
     expect(_banner(tester), contains('Log 24 of your first 31 days after you subscribe'));
   });
 
+  testWidgets('the banner counts its days by the app’s one rule in Arabic: "١٠ أيام", and 11 on in the singular', (tester) async {
+    await _paywall(tester, _lite(AppLang.ar, earned: _stated(needed: 10, window: 30)));
+    final ar = _banner(tester).replaceAll(RegExp('[\u2066-\u2069]'), '');
+    expect(ar, contains('سجّل ١٠ أيام من أول ٣٠ يوم بعد ما تشترك'));
+    await _paywall(tester, _lite(AppLang.en, earned: _stated(needed: 1, window: 1)));
+    expect(_banner(tester), contains('Log 1 of your first 1 day after you subscribe'), reason: 'never "1 days"');
+  });
+
   testWidgets('before the server has answered, the earned month is not stated from the fallback', (tester) async {
     final s = _lite(AppLang.en);
     expect(s.earnedMonth.stated, isFalse);
