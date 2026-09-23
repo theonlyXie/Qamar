@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../models/su_economy.dart';
 import '../state/app_state.dart';
+import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/layout.dart';
 import '../theme/motion.dart';
@@ -465,7 +466,7 @@ class _SuReceiptChipState extends State<SuReceiptChip> with SingleTickerProvider
           decoration: BoxDecoration(
             color: QColors.glass,
             border: Border.all(color: QColors.gold.withValues(alpha: 0.4)),
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(QRadii.pill),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             const SuCoinIcon(size: 14),

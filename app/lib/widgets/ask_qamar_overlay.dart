@@ -296,14 +296,14 @@ class _ChatBubble extends StatelessWidget {
               decoration: BoxDecoration(
                 color: _userBubble,
                 border: Border.all(color: QColors.borderSoft),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(QRadii.card),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (turn.photoPath != null && !kIsWeb) ...[
-                    ClipRRect(borderRadius: BorderRadius.circular(14), child: _photoThumb(turn.photoPath!, 132)),
+                    ClipRRect(borderRadius: BorderRadius.circular(QRadii.control), child: _photoThumb(turn.photoPath!, 132)),
                     const SizedBox(height: 8),
                   ],
                   Text(turn.text, style: QText.body(size: 15, height: 23, color: QColors.textPrimary)),
@@ -472,7 +472,7 @@ class _Composer extends StatelessWidget {
       decoration: BoxDecoration(
         color: _raised,
         border: Border.all(color: QColors.borderSoft),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(QRadii.card),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -625,12 +625,12 @@ class _Attachment extends StatelessWidget {
         decoration: BoxDecoration(
           color: _raised,
           border: Border.all(color: QColors.borderSoft),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(QRadii.control),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ClipRRect(borderRadius: BorderRadius.circular(10), child: _photoThumb(path, 36)),
+            ClipRRect(borderRadius: BorderRadius.circular(QRadii.inset), child: _photoThumb(path, 36)),
             const SizedBox(width: 10),
             Text(label, style: QText.body(size: 12, color: QColors.textMuted)),
             if (onRemove != null) ...[
@@ -739,7 +739,7 @@ class _ProposalCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: _raised,
           border: Border.all(color: QColors.borderStrong),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(QRadii.card),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

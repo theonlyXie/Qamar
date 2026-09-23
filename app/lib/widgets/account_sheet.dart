@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../services/auth_service.dart';
 import '../state/app_state.dart';
+import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
@@ -142,7 +143,7 @@ class _ProviderButton extends StatelessWidget {
           side: const BorderSide(color: QColors.borderSoft),
           backgroundColor: QColors.cardDeep,
           padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(QRadii.control)),
         ),
         child: busy
             ? const SizedBox(
@@ -215,7 +216,7 @@ class _AccountSheetState extends State<AccountSheet> {
                   decoration: const BoxDecoration(
                     gradient: QColors.sheet,
                     border: Border(top: BorderSide(color: QColors.borderStrong)),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -306,7 +307,7 @@ class _AccountSheetState extends State<AccountSheet> {
           decoration: BoxDecoration(
             color: QColors.amber.withValues(alpha: 0.1),
             border: Border.all(color: QColors.amber.withValues(alpha: 0.4)),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(QRadii.control),
           ),
           child: Text(state.authError!, style: QText.body(size: 12, height: 18, color: QColors.amberSoft)),
         ),
@@ -366,9 +367,9 @@ class _Field extends StatelessWidget {
         filled: true,
         fillColor: QColors.cardNavy,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: QColors.borderSoft)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: QColors.borderSoft)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: QColors.violet)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.borderSoft)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.borderSoft)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.violet)),
       ),
     );
   }

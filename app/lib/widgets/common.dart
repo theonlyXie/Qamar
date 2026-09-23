@@ -175,7 +175,7 @@ class QPrimaryButton extends StatelessWidget {
               : BoxDecoration(
                   color: QDisabled.fill,
                   border: Border.all(color: QDisabled.edge),
-                  borderRadius: BorderRadius.circular(QRadii.lg),
+                  borderRadius: BorderRadius.circular(QRadii.control),
                 ),
           child: Text(label,
               textAlign: TextAlign.center,
@@ -200,12 +200,13 @@ class QPillButton extends StatelessWidget {
         builder: (context, pressed) => AnimatedOpacity(
           opacity: pressed ? 0.82 : 1,
           duration: const Duration(milliseconds: 90),
+          // As wide as its label: a Container with an alignment would fill
+          // the row.
           child: Container(
             height: 40,
             padding: const EdgeInsets.symmetric(horizontal: 18),
-            alignment: Alignment.center,
             decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),
-            child: Text(label, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onAccent)),
+            child: Center(widthFactor: 1, child: Text(label, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onAccent))),
           ),
         ),
       );
@@ -325,7 +326,7 @@ class QStateCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [QColors.cardMid, QColors.cardDeep]),
         border: Border.all(color: QColors.borderSoft),
-        borderRadius: BorderRadius.circular(QRadii.xl),
+        borderRadius: BorderRadius.circular(QRadii.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -392,7 +393,7 @@ class QStateLine extends StatelessWidget {
       decoration: BoxDecoration(
         color: accent.withValues(alpha: 0.08),
         border: Border.all(color: accent.withValues(alpha: 0.32)),
-        borderRadius: BorderRadius.circular(QRadii.xl),
+        borderRadius: BorderRadius.circular(QRadii.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -447,7 +448,7 @@ class QOutlineButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: pressed ? QColors.moonlight.withValues(alpha: 0.06) : Colors.transparent,
             border: Border.all(color: enabled ? QColors.borderSoft : QDisabled.edge),
-            borderRadius: BorderRadius.circular(QRadii.md),
+            borderRadius: BorderRadius.circular(QRadii.control),
           ),
           child: Center(
             widthFactor: 1,
@@ -688,7 +689,7 @@ class _QWheelFieldState extends State<QWheelField> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         // One radius across the answer stack: the wheels and Continue (O7).
-        decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.lg),
+        decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.control),
         child: Column(
           children: [
             Text(widget.unit, style: QText.body(size: 12, color: QColors.textMuted)),

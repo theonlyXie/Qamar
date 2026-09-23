@@ -113,6 +113,9 @@ void main() {
       await _pumpApp(tester, s);
       final payout = s.isAr ? 'حوّل العمولة' : 'Redeem EGP';
       expect(_outline(tester, payout).onTap, isNull, reason: 'EGP 0: nothing to send');
+      final link = tester.getSize(find.ancestor(of: find.text(s.t.linkAccount), matching: find.byType(QPillButton)));
+      expect(link.width, lessThan(390 * 0.6), reason: 'a compact pill, as wide as its label');
+      expect(link.height, greaterThanOrEqualTo(48), reason: 'touched across 48');
       final placeholder = tester.widget<Text>(find.byKey(YouScreen.proCodeKey));
       expect(placeholder.style!.color, QColors.textMuted);
       expect(placeholder.style!.fontSize, lessThan(17), reason: 'not set like the code it stands in for');

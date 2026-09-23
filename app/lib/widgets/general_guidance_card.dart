@@ -30,7 +30,7 @@ class GeneralGuidanceCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: QColors.cyan.withValues(alpha: 0.06),
           border: Border.all(color: QColors.cyan.withValues(alpha: 0.3)),
-          borderRadius: BorderRadius.circular(QRadii.xl),
+          borderRadius: BorderRadius.circular(QRadii.card),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,

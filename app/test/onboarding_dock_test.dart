@@ -134,7 +134,7 @@ void main() {
           .map((d) => d.decoration)
           .whereType<BoxDecoration>()
           .firstWhere((d) => d.border != null);
-      expect(card.borderRadius, BorderRadius.circular(QRadii.lg), reason: 'the wheel cards');
+      expect(card.borderRadius, BorderRadius.circular(QRadii.control), reason: 'the wheel cards');
       final label = tester.widget<Text>(find.descendant(of: find.byWidget(w), matching: find.text(w.unit)));
       expect(label.style!.fontSize, 12);
     }
@@ -143,7 +143,7 @@ void main() {
         .map((d) => d.decoration)
         .whereType<BoxDecoration>()
         .firstWhere((d) => d.gradient != null);
-    expect(continueBox.borderRadius, BorderRadius.circular(QRadii.lg), reason: 'Continue, the same radius');
+    expect(continueBox.borderRadius, BorderRadius.circular(QRadii.control), reason: 'Continue, the same radius');
 
     final field = tester.widget<TextField>(find.descendant(of: find.byKey(OnboardingScreen.dockKey), matching: find.byType(TextField)));
     final border = field.decoration!.enabledBorder! as OutlineInputBorder;

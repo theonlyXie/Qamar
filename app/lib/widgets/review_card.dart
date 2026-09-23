@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/review.dart';
 import '../models/streak.dart';
+import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import 'moon.dart';
@@ -52,7 +53,7 @@ class ReviewCard extends StatelessWidget {
             end: Alignment.bottomRight,
             colors: [QColors.cardMid, QColors.cardNavy],
           ),
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(QRadii.card),
           border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
         ),
         child: Column(

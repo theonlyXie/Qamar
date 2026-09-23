@@ -217,7 +217,7 @@ class QamarCard extends StatelessWidget {
     if (offerWeek) WidgetsBinding.instance.addPostFrameCallback((_) => state.recordLockCardOffer());
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), radius: QRadii.xl),
+      decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), radius: QRadii.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -238,7 +238,7 @@ class QamarCard extends StatelessWidget {
               alignment: AlignmentDirectional.centerStart,
               child: InkWell(
                 key: offerWeek ? lockOfferKey : null,
-                borderRadius: BorderRadius.circular(QRadii.md),
+                borderRadius: BorderRadius.circular(QRadii.control),
                 onTap: offerWeek ? state.acceptLockCardTrial : state.openNightNote,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(minHeight: 48),
@@ -291,7 +291,7 @@ class _NumbersCard extends StatelessWidget {
     // estimates, in a colour that passes AA.
     return Container(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
-          decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardSlate]), border: QColors.borderStrong, radius: QRadii.xxxl,
+          decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardSlate]), border: QColors.borderStrong, radius: QRadii.card,
               shadow: [BoxShadow(color: QColors.blue.withValues(alpha: 0.12), blurRadius: 40)]),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,7 +344,7 @@ class _NextMealCard extends StatelessWidget {
             explanation: mealExplanation(nextMeal, iso: state.iso, digits: state.digits),
             child: Container(
               padding: const EdgeInsets.all(16),
-              decoration: QDecor.card(color: QColors.cardDeep, border: QColors.green.withOpacity(0.4), radius: QRadii.xl),
+              decoration: QDecor.card(color: QColors.cardDeep, border: QColors.green.withOpacity(0.4), radius: QRadii.card),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -393,7 +393,7 @@ class _LoggedMeals extends StatelessWidget {
             Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+              decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.control),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -431,7 +431,7 @@ class _WaterCard extends StatelessWidget {
         decoration: QDecor.card(
           color: QColors.cardDeep,
           border: QColors.borderFaint,
-          radius: QRadii.xl,
+          radius: QRadii.card,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -472,7 +472,7 @@ class _WaterCard extends StatelessWidget {
             ],
             const SizedBox(height: 12),
             ClipRRect(
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: BorderRadius.circular(QRadii.pill),
               child: LinearProgressIndicator(
                 value: w.progress,
                 minHeight: 6,
@@ -530,7 +530,7 @@ class _WaterAdd extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(QRadii.md),
+          borderRadius: BorderRadius.circular(QRadii.control),
           onTap: () {
             HapticFeedback.lightImpact();
             onTap();
@@ -539,7 +539,7 @@ class _WaterAdd extends StatelessWidget {
             decoration: BoxDecoration(
               color: QColors.cyan.withValues(alpha: 0.10),
               border: Border.all(color: QColors.cyan.withValues(alpha: 0.35)),
-              borderRadius: BorderRadius.circular(QRadii.md),
+              borderRadius: BorderRadius.circular(QRadii.control),
             ),
             child: Center(
               child: Text('+  $label',
@@ -568,7 +568,7 @@ class _MacroRow extends StatelessWidget {
         ]),
         const SizedBox(height: 5),
         ClipRRect(
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(QRadii.pill),
           child: LinearProgressIndicator(
             value: pct,
             minHeight: 6,
@@ -593,7 +593,7 @@ class _ActivityCard extends StatelessWidget {
     final isAr = state.isAr;
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -660,7 +660,7 @@ class _FastingPrompt extends StatelessWidget {
       decoration: BoxDecoration(
         color: QColors.gold.withValues(alpha: 0.08),
         border: Border.all(color: QColors.gold.withValues(alpha: 0.32)),
-        borderRadius: BorderRadius.circular(QRadii.xl),
+        borderRadius: BorderRadius.circular(QRadii.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -758,14 +758,14 @@ class _EarnedMonthCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(QRadii.xl),
+        borderRadius: BorderRadius.circular(QRadii.card),
         onTap: granted ? state.dismissEarnedMonthCard : null,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           decoration: BoxDecoration(
             color: QColors.green.withValues(alpha: 0.07),
             border: Border.all(color: QColors.green.withValues(alpha: 0.3)),
-            borderRadius: BorderRadius.circular(QRadii.xl),
+            borderRadius: BorderRadius.circular(QRadii.card),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -780,7 +780,7 @@ class _EarnedMonthCard extends StatelessWidget {
               if (!granted) ...[
                 const SizedBox(height: 10),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(QRadii.pill),
                   child: LinearProgressIndicator(
                     value: pct,
                     minHeight: 5,
@@ -818,7 +818,7 @@ class SuChip extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(QRadii.pill),
           onTap: state.openWallet,
           child: ConstrainedBox(
             constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
@@ -826,7 +826,7 @@ class SuChip extends StatelessWidget {
               widthFactor: 1,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                decoration: BoxDecoration(border: Border.all(color: QColors.gold.withOpacity(0.4)), borderRadius: BorderRadius.circular(999), color: QColors.cardSlate),
+                decoration: BoxDecoration(border: Border.all(color: QColors.gold.withOpacity(0.4)), borderRadius: BorderRadius.circular(QRadii.pill), color: QColors.cardSlate),
                 child: Explainable(
                   id: 'su_points',
                   child: Row(mainAxisSize: MainAxisSize.min, children: [

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/app_state.dart';
+import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import '../widgets/account_sheet.dart';
@@ -199,7 +200,7 @@ class _FloatingPill extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(QRadii.pill),
         onTap: onTap,
         child: Container(
           height: sub == null ? 52 : 60,
@@ -210,7 +211,7 @@ class _FloatingPill extends StatelessWidget {
             border: Border.all(color: emphasis ? QColors.violet.withOpacity(0.5) : QColors.borderSoft),
             // Lifted by its lighter fill and edge, not by a shadow: a black
             // shadow on a near-black ground drew a hard slab under the pill.
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(QRadii.pill),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -219,7 +220,7 @@ class _FloatingPill extends StatelessWidget {
                 Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: dot)),
                 const SizedBox(width: 9),
               ] else ...[
-                Container(width: 12, height: 12, decoration: BoxDecoration(border: Border.all(color: QColors.cyan, width: 2), borderRadius: BorderRadius.circular(3))),
+                const Icon(Icons.crop_free, size: 14, color: QColors.cyan), // a viewfinder, for the scan
                 const SizedBox(width: 9),
               ],
               Flexible(
@@ -262,7 +263,7 @@ class _ProviderButton extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: QColors.borderSoft),
           backgroundColor: QColors.cardDeep,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(QRadii.control)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -66,7 +66,7 @@ class DishCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep], begin: Alignment.topLeft, end: Alignment.bottomRight),
         border: Border.all(color: QColors.green.withValues(alpha: 0.4)),
-        borderRadius: BorderRadius.circular(QRadii.xl),
+        borderRadius: BorderRadius.circular(QRadii.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

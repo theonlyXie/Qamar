@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../services/photos.dart';
 import '../models/problem.dart';
 import '../state/app_state.dart';
+import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
@@ -87,14 +88,14 @@ class _ScanScreenState extends State<ScanScreen> {
                 alignment: Alignment.center,
                 children: [
                   Container(
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), color: QColors.cardNavy),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(QRadii.card), color: QColors.cardNavy),
                   ),
                   // Once a shot is taken, show it in the frame so the user can
                   // see what Qamar is reading.
                   if (photo != null && !kIsWeb)
                     Positioned.fill(
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(QRadii.card),
                         child: Image.file(File(photo), fit: BoxFit.cover),
                       ),
                     ),
@@ -106,7 +107,7 @@ class _ScanScreenState extends State<ScanScreen> {
                         padding: const EdgeInsets.all(26),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(QRadii.control),
                             border: Border.all(color: QColors.violet.withValues(alpha: 0.55), width: 2),
                           ),
                         ),
@@ -142,7 +143,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     ),
                   if (state.scanReading)
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(22),
+                      borderRadius: BorderRadius.circular(QRadii.card),
                       child: Container(
                         color: QColors.scrim,
                         alignment: Alignment.center,

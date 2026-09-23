@@ -1,16 +1,26 @@
 import 'package:flutter/material.dart';
 import 'colors.dart';
 
+/// Four corners and the pill (the scorecard counted thirteen radii, 3 to
+/// 28): each shape takes the corner of what it is, not of the screen it is
+/// on (radii_test.dart).
 class QRadii {
   QRadii._();
+
+  /// Anything round-ended: chips, pills, toggles, the composer.
   static const pill = 999.0;
-  static const sm = 12.0;
-  static const md = 14.0;
-  static const lg = 16.0;
-  static const xl = 18.0;
-  static const xxl = 20.0;
-  static const xxxl = 22.0;
-  static const sheet = 26.0;
+
+  /// A small shape inside another: a bar, a thumbnail, a hover wash.
+  static const inset = 10.0;
+
+  /// A control or a field: buttons, inputs, the wheels, a notice.
+  static const control = 16.0;
+
+  /// A card: anything that holds content, a bubble included.
+  static const card = 20.0;
+
+  /// The top corners of a sheet rising from the bottom.
+  static const sheet = 28.0;
 }
 
 class QSpace {
@@ -63,7 +73,7 @@ class QDecor {
     Color color = QColors.cardDeep,
     Gradient? gradient,
     Color border = QColors.borderSoft,
-    double radius = QRadii.lg,
+    double radius = QRadii.card,
     List<BoxShadow>? shadow,
   }) =>
       BoxDecoration(
@@ -89,7 +99,7 @@ class QDecor {
   /// button's square bounds, which drew dark slabs at the rounded corners.
   /// The gradient is already the brightest thing on the screen; that is the
   /// elevation.
-  static BoxDecoration gradientButton({Gradient gradient = QColors.brandGradient, double radius = QRadii.lg}) =>
+  static BoxDecoration gradientButton({Gradient gradient = QColors.brandGradient, double radius = QRadii.control}) =>
       BoxDecoration(
         gradient: gradient,
         borderRadius: BorderRadius.circular(radius),

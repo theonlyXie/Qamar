@@ -58,7 +58,7 @@ class YouScreen extends StatelessWidget {
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), border: QColors.borderStrong, radius: QRadii.xl),
+          decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), border: QColors.borderStrong, radius: QRadii.card),
           child: Row(children: [
             const QamarMoon(size: 48),
             const SizedBox(width: 14),
@@ -75,7 +75,7 @@ class YouScreen extends StatelessWidget {
         if (!state.hasAccount) ...[
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: QColors.violet.withOpacity(0.1), border: Border.all(color: QColors.violet.withOpacity(0.4)), borderRadius: BorderRadius.circular(QRadii.xl)),
+            decoration: BoxDecoration(color: QColors.violet.withOpacity(0.1), border: Border.all(color: QColors.violet.withOpacity(0.4)), borderRadius: BorderRadius.circular(QRadii.card)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -95,14 +95,14 @@ class YouScreen extends StatelessWidget {
         Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(QRadii.xl),
+            borderRadius: BorderRadius.circular(QRadii.card),
             onTap: state.openSubscription,
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
                 border: Border.all(color: QColors.violet.withValues(alpha: 0.45)),
-                borderRadius: BorderRadius.circular(QRadii.xl),
+                borderRadius: BorderRadius.circular(QRadii.card),
               ),
               child: Row(children: [
                 const QamarMoon(size: 34),
@@ -161,7 +161,7 @@ class YouScreen extends StatelessWidget {
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.card),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -189,7 +189,7 @@ class YouScreen extends StatelessWidget {
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: QColors.gold.withOpacity(0.08), border: Border.all(color: QColors.gold.withOpacity(0.32)), borderRadius: BorderRadius.circular(QRadii.xl)),
+          decoration: BoxDecoration(color: QColors.gold.withOpacity(0.08), border: Border.all(color: QColors.gold.withOpacity(0.32)), borderRadius: BorderRadius.circular(QRadii.card)),
           child: Row(children: [
             const SuCoinIcon(size: 30),
             const SizedBox(width: 14),
@@ -219,11 +219,11 @@ class YouScreen extends StatelessWidget {
             color: Colors.transparent,
             child: InkWell(
               key: YouScreen.scoreRowKey,
-              borderRadius: BorderRadius.circular(QRadii.lg),
+              borderRadius: BorderRadius.circular(QRadii.control),
               onTap: () => state.setShowScore(!state.showScore),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+                decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.control),
                 child: Row(children: [
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -251,7 +251,7 @@ class YouScreen extends StatelessWidget {
           Container(
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.control),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(r.$1, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
               Text(r.$2, style: QText.body(size: 13, color: QColors.textMuted)),
@@ -263,7 +263,7 @@ class YouScreen extends StatelessWidget {
         Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.control),
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text(isAr ? 'سياسة الخصوصية والشروط' : 'Privacy policy and terms',
                 style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
@@ -277,7 +277,7 @@ class YouScreen extends StatelessWidget {
         Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.control),
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Flexible(
               child: Text(isAr ? 'تصدير أو حذف بياناتي' : 'Export or delete my data',
@@ -289,7 +289,7 @@ class YouScreen extends StatelessWidget {
         Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.control),
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text(isAr ? 'اللغة' : 'Language', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
             QLangToggle(lang: state.lang, onChanged: state.setLang),
@@ -300,7 +300,7 @@ class YouScreen extends StatelessWidget {
         Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.control),
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -321,7 +321,7 @@ class YouScreen extends StatelessWidget {
         Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.control),
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -345,7 +345,7 @@ class YouScreen extends StatelessWidget {
           Container(
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.control),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('الأرقام', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
@@ -360,7 +360,7 @@ class YouScreen extends StatelessWidget {
         Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.control),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Expanded(
@@ -383,7 +383,7 @@ class YouScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: state.nudgesPerDay == n ? QColors.violetDeep : Colors.transparent,
                         border: Border.all(color: state.nudgesPerDay == n ? QColors.violetDeep : QColors.borderSoft),
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(QRadii.pill),
                       ),
                       child: Text(state.iso('$n'),
                           style: QText.number(size: 13, weight: FontWeight.w600, color: state.nudgesPerDay == n ? QColors.onAccent : QColors.textMuted)),
@@ -404,7 +404,7 @@ class YouScreen extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(colors: [QColors.cyan.withOpacity(0.12), QColors.violet.withOpacity(0.14)]),
             border: Border.all(color: QColors.cyan.withOpacity(0.35)),
-            borderRadius: BorderRadius.circular(QRadii.xl),
+            borderRadius: BorderRadius.circular(QRadii.card),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,11 +418,11 @@ class YouScreen extends StatelessWidget {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(QRadii.pill),
                     onTap: state.openSubscription,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
-                      decoration: BoxDecoration(color: QColors.textPrimary, borderRadius: BorderRadius.circular(999)),
+                      decoration: BoxDecoration(color: QColors.textPrimary, borderRadius: BorderRadius.circular(QRadii.pill)),
                       child: Text(t.plusCta, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.cardNavy)),
                     ),
                   ),
@@ -480,7 +480,7 @@ class _InvitationsCardState extends State<_InvitationsCard> {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -549,7 +549,7 @@ class _InvitationsCardState extends State<_InvitationsCard> {
                       hintStyle: QText.body(size: 14, color: QColors.textMuted),
                       filled: true,
                       fillColor: QColors.cardMid,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: BorderSide.none),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
                   ),
@@ -618,7 +618,7 @@ class _ProCodeCardState extends State<_ProCodeCard> {
     return Container(
       key: const ValueKey('pro-code-card'),
       padding: const EdgeInsets.all(16),
-      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -653,7 +653,7 @@ class _ProCodeCardState extends State<_ProCodeCard> {
                     hintStyle: QText.body(size: 14, color: QColors.textMuted),
                     filled: true,
                     fillColor: QColors.cardMid,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: BorderSide.none),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   ),
                 ),
@@ -695,7 +695,7 @@ class _AffiliateCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -779,7 +779,7 @@ class _ClientsCard extends StatelessWidget {
     final clients = state.proClients;
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

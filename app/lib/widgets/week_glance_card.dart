@@ -24,7 +24,7 @@ class WeekGlanceCard extends StatelessWidget {
       decoration: QDecor.card(
         gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
         border: QColors.violet.withValues(alpha: 0.35),
-        radius: QRadii.xl,
+        radius: QRadii.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

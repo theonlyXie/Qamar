@@ -40,7 +40,7 @@ class WalletScreen extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardSlate]),
             border: Border.all(color: QColors.gold.withOpacity(0.32)),
-            borderRadius: BorderRadius.circular(QRadii.xxxl),
+            borderRadius: BorderRadius.circular(QRadii.card),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -74,7 +74,7 @@ class WalletScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 ClipRRect(
                   key: WalletScreen.levelKey,
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(QRadii.pill),
                   child: LinearProgressIndicator(value: state.levelPct() / 100, minHeight: 6, backgroundColor: QColors.borderFaint, valueColor: const AlwaysStoppedAnimation(QColors.gold)),
                 ),
                 const SizedBox(height: 6),
@@ -93,7 +93,7 @@ class WalletScreen extends StatelessWidget {
         Container(
           // The tabs take the whole height as their touch (O11); the gold
           // pill is drawn inside, as before.
-          decoration: BoxDecoration(color: QColors.cardSlate, border: Border.all(color: QColors.borderFaint), borderRadius: BorderRadius.circular(999)),
+          decoration: BoxDecoration(color: QColors.cardSlate, border: Border.all(color: QColors.borderFaint), borderRadius: BorderRadius.circular(QRadii.pill)),
           child: Row(children: [
             Expanded(child: _WalletTab(label: t.spendTab, active: state.walletTab == WalletTab.spend, onTap: state.showSpend)),
             Expanded(child: _WalletTab(label: t.historyTab, active: state.walletTab == WalletTab.history, onTap: state.showHistory)),
@@ -108,7 +108,7 @@ class WalletScreen extends StatelessWidget {
         else if (state.ledger().isEmpty)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.control),
             child: Text(
               state.isAr
                   ? 'مفيش حركات لسه. كل نقطة بتتكسب هتظهر هنا بسببها.'
@@ -121,7 +121,7 @@ class WalletScreen extends StatelessWidget {
             Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+              decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.control),
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(entry.label, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textHigh)),
@@ -134,7 +134,7 @@ class WalletScreen extends StatelessWidget {
         const SizedBox(height: 4),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: QDecor.card(color: QColors.cardSlate, border: QColors.borderFaint, radius: QRadii.lg),
+          decoration: QDecor.card(color: QColors.cardSlate, border: QColors.borderFaint, radius: QRadii.control),
           child: Text(t.walletTerms, style: QText.body(size: 12, height: 19, color: QColors.textMuted)),
         ),
       ],
@@ -184,7 +184,7 @@ class _SpendCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

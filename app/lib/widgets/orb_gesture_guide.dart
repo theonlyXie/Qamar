@@ -49,7 +49,7 @@ class OrbGestureGuide extends StatelessWidget {
       decoration: BoxDecoration(
         color: QColors.violet.withValues(alpha: 0.08),
         border: Border.all(color: QColors.violet.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(QRadii.xl),
+        borderRadius: BorderRadius.circular(QRadii.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,7 +67,7 @@ class OrbGestureGuide extends StatelessWidget {
                 Semantics(
                   button: true,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(QRadii.md),
+                    borderRadius: BorderRadius.circular(QRadii.control),
                     onTap: state.dismissOrbTutorial,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(minWidth: 48, minHeight: 48),

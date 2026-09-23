@@ -61,7 +61,7 @@ class RamadanScreen extends StatelessWidget {
         // The switch.
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.card),
           child: Row(children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -91,7 +91,7 @@ class RamadanScreen extends StatelessWidget {
         // The sun's two times, and the water between them.
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.card),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(child: _TimeCell(label: isAr ? 'الإفطار' : 'Iftar', time: state.iso(SunTimes.clock(h.iftarMin)), sub: isAr ? 'المغرب، القاهرة' : 'Sunset, Cairo')),
@@ -125,7 +125,7 @@ class RamadanScreen extends StatelessWidget {
         if (phase != SeasonPhase.before)
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: QColors.gold.withValues(alpha: 0.08), border: Border.all(color: QColors.gold.withValues(alpha: 0.32)), borderRadius: BorderRadius.circular(QRadii.xl)),
+            decoration: BoxDecoration(color: QColors.gold.withValues(alpha: 0.08), border: Border.all(color: QColors.gold.withValues(alpha: 0.32)), borderRadius: BorderRadius.circular(QRadii.card)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(
                 isAr
@@ -140,7 +140,7 @@ class RamadanScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               ClipRRect(
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: BorderRadius.circular(QRadii.pill),
                 child: LinearProgressIndicator(
                   value: (state.seasonDaysLogged / season.days).clamp(0, 1).toDouble(),
                   minHeight: 6,
@@ -190,7 +190,7 @@ class _EidCard extends StatelessWidget {
     final report = state.eidReport();
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), border: QColors.borderStrong, radius: QRadii.xl),
+      decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), border: QColors.borderStrong, radius: QRadii.card),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(isAr ? 'تقرير العيد: إيه اللي اتغيّر في الشهر' : 'Eid report: what changed this month',
             style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),

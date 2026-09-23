@@ -40,7 +40,7 @@ class WelcomeDishes extends StatefulWidget {
         context: context,
         isScrollControlled: true,
         backgroundColor: QColors.cardDeep,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.xl))),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet))),
         builder: (_) => WelcomeDishes(state: state),
       );
 

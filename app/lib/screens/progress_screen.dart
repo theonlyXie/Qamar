@@ -73,7 +73,7 @@ class ProgressScreen extends StatelessWidget {
                 // One edge for every card on the screen: state is said by the
                 // eyebrow's colour, not by a third border colour.
                 border: QColors.borderSoft,
-                radius: QRadii.xl,
+                radius: QRadii.card,
               ),
               child: Row(
                 children: [
@@ -125,7 +125,7 @@ class ProgressScreen extends StatelessWidget {
           decoration: QDecor.card(
             color: QColors.cardDeep,
             border: QColors.borderSoft,
-            radius: QRadii.xl,
+            radius: QRadii.card,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -146,7 +146,7 @@ class ProgressScreen extends StatelessWidget {
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), radius: QRadii.xl),
+          decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), radius: QRadii.card),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -177,7 +177,7 @@ class ProgressScreen extends StatelessWidget {
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), radius: QRadii.xl),
+          decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), radius: QRadii.card),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -211,7 +211,7 @@ class ProgressScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: QColors.blue.withValues(alpha: 0.1),
             border: Border.all(color: QColors.blue.withValues(alpha: 0.4)),
-            borderRadius: BorderRadius.circular(QRadii.xl),
+            borderRadius: BorderRadius.circular(QRadii.card),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,7 +284,7 @@ class _DayBar extends StatelessWidget {
               widthFactor: 1,
               child: Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(QRadii.inset),
                   gradient: empty ? null : const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [QColors.cyan, QColors.blue]),
                   color: empty ? QColors.borderSoft : null,
                 ),

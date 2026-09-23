@@ -28,7 +28,7 @@ class QuestCard extends StatelessWidget {
       id: 'quest',
       child: Container(
         padding: const EdgeInsetsDirectional.fromSTEB(16, 6, 8, 10),
-        decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.xl),
+        decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.card),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,

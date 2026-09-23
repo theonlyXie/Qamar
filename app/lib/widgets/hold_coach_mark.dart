@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../state/app_state.dart';
+import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 
@@ -51,7 +52,7 @@ class HoldCoachMark extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(QRadii.control),
           onTap: state.dismissHoldCoach,
           child: Container(
             width: width,
@@ -61,7 +62,7 @@ class HoldCoachMark extends StatelessWidget {
               border: Border.all(color: _edge),
               // It floats by its lighter fill and edge; a black shadow has
               // nothing to darken on this ground.
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(QRadii.control),
             ),
             child: Row(
               children: [

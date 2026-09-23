@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/profile.dart';
 import '../state/app_state.dart';
+import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
@@ -43,13 +44,13 @@ class WhySheet extends StatelessWidget {
               decoration: const BoxDecoration(
                 color: QColors.cardSlate,
                 border: Border(top: BorderSide(color: QColors.borderStrong)),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(child: Container(width: 38, height: 4, decoration: BoxDecoration(color: QColors.borderStrong, borderRadius: BorderRadius.circular(999)))),
+                  Center(child: Container(width: 38, height: 4, decoration: BoxDecoration(color: QColors.borderStrong, borderRadius: BorderRadius.circular(QRadii.pill)))),
                   const SizedBox(height: 12),
                   Text(t.whyTitle, style: QText.display(size: 24, ar: QText.arabic(t.whyTitle), color: QColors.textPrimary)),
                   for (final r in rows) ...[

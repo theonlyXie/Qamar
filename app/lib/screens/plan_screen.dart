@@ -134,7 +134,7 @@ class _DayChanged extends StatelessWidget {
       decoration: BoxDecoration(
         color: QColors.violet.withValues(alpha: 0.1),
         border: Border.all(color: QColors.violet.withValues(alpha: 0.4)),
-        borderRadius: BorderRadius.circular(QRadii.xl),
+        borderRadius: BorderRadius.circular(QRadii.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,7 +184,7 @@ class _PlanEmpty extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
         border: Border.all(color: QColors.borderSoft),
-        borderRadius: BorderRadius.circular(QRadii.xl),
+        borderRadius: BorderRadius.circular(QRadii.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -223,7 +223,7 @@ class _DayTotal extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: QDecor.card(color: QColors.cardNavy, border: QColors.borderFaint, radius: QRadii.lg),
+      decoration: QDecor.card(color: QColors.cardNavy, border: QColors.borderFaint, radius: QRadii.control),
       child: Row(
         children: [
           Text(label, style: QText.body(size: 12, color: QColors.textMuted)),
@@ -254,7 +254,7 @@ class _MealCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
-      decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), radius: QRadii.xl),
+      decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), radius: QRadii.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -272,7 +272,7 @@ class _MealCard extends StatelessWidget {
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: QDecor.card(color: QColors.cardNavy, border: QColors.borderFaint, radius: QRadii.md),
+            decoration: QDecor.card(color: QColors.cardNavy, border: QColors.borderFaint, radius: QRadii.control),
             child: Column(
               children: [
                 Row(
@@ -340,7 +340,7 @@ class _NudgePrompt extends StatelessWidget {
       decoration: BoxDecoration(
         color: QColors.violet.withValues(alpha: 0.10),
         border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
-        borderRadius: BorderRadius.circular(QRadii.xl),
+        borderRadius: BorderRadius.circular(QRadii.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,7 +393,7 @@ class _ShopCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: QColors.green.withValues(alpha: 0.07),
         border: Border.all(color: QColors.green.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(QRadii.xl),
+        borderRadius: BorderRadius.circular(QRadii.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

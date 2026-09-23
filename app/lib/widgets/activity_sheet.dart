@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../models/activity.dart';
 import '../state/app_state.dart';
+import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
@@ -40,7 +41,7 @@ class ActivitySheet extends StatelessWidget {
                   decoration: const BoxDecoration(
                     gradient: QColors.sheet,
                     border: Border(top: BorderSide(color: QColors.borderStrong)),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,

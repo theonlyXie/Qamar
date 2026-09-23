@@ -273,7 +273,7 @@ class _ExplainableState extends State<Explainable> {
       duration: const Duration(milliseconds: 160),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(QRadii.inset),
         color: hovered ? QColors.violet.withValues(alpha: 0.16) : Colors.transparent,
         border: Border.all(
           color: hovered ? QColors.violet.withValues(alpha: 0.85) : Colors.transparent,
@@ -352,7 +352,7 @@ class ExplainSheet extends StatelessWidget {
               decoration: const BoxDecoration(
                 color: QColors.cardSlate,
                 border: Border(top: BorderSide(color: QColors.borderStrong)),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -362,7 +362,7 @@ class ExplainSheet extends StatelessWidget {
                     child: Container(
                       width: 38,
                       height: 4,
-                      decoration: BoxDecoration(color: QColors.borderStrong, borderRadius: BorderRadius.circular(999)),
+                      decoration: BoxDecoration(color: QColors.borderStrong, borderRadius: BorderRadius.circular(QRadii.pill)),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -391,7 +391,7 @@ class ExplainSheet extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: QColors.violet.withValues(alpha: 0.10),
                       border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
-                      borderRadius: BorderRadius.circular(QRadii.lg),
+                      borderRadius: BorderRadius.circular(QRadii.control),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,

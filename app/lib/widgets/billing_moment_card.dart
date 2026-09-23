@@ -43,14 +43,14 @@ class BillingMomentCard extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(QRadii.xl),
+          borderRadius: BorderRadius.circular(QRadii.card),
           onTap: state.openBillingMoment,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
               color: QColors.gold.withValues(alpha: 0.08),
               border: Border.all(color: QColors.gold.withValues(alpha: 0.35)),
-              borderRadius: BorderRadius.circular(QRadii.xl),
+              borderRadius: BorderRadius.circular(QRadii.card),
             ),
             child: Row(
               children: [

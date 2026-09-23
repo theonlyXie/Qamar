@@ -322,7 +322,7 @@ class _TypingBubble extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: QDecor.card(color: QColors.cardMid, radius: 18),
+        decoration: QDecor.card(color: QColors.cardMid, radius: QRadii.card),
         child: Row(mainAxisSize: MainAxisSize.min, children: const [_Dot(0), SizedBox(width: 5), _Dot(1), SizedBox(width: 5), _Dot(2)]),
       ),
     );
@@ -374,7 +374,7 @@ class _MessageBubble extends StatelessWidget {
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.86),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: QDecor.card(color: QColors.cardMid, radius: 18),
+              decoration: QDecor.card(color: QColors.cardMid, radius: QRadii.card),
               child: Text(msg.text(isAr), style: QText.body(size: 15, height: 23, color: QColors.textPrimary)),
             ),
           ),
@@ -386,7 +386,7 @@ class _MessageBubble extends StatelessWidget {
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.86),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.circular(18)),
+              decoration: BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.circular(QRadii.card)),
               child: Text(msg.text(isAr), style: QText.body(size: 15, height: 23, color: QColors.onAccent)),
             ),
           ),
@@ -442,7 +442,7 @@ class _TargetCard extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep], begin: Alignment.topLeft, end: Alignment.bottomRight),
           border: Border.all(color: QColors.borderStrong),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(QRadii.card),
           boxShadow: [BoxShadow(color: QColors.blue.withOpacity(0.18), blurRadius: 34)],
         ),
         child: Column(
@@ -492,7 +492,7 @@ class _MacroBox extends StatelessWidget {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: QDecor.card(color: QColors.cardNavy, border: QColors.borderFaint, radius: 14),
+        decoration: QDecor.card(color: QColors.cardNavy, border: QColors.borderFaint, radius: QRadii.control),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -522,7 +522,7 @@ class _TrialOfferCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: QColors.gold.withValues(alpha: 0.08),
           border: Border.all(color: QColors.gold.withValues(alpha: 0.4)),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(QRadii.card),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,11 +544,11 @@ class _TrialOfferCard extends StatelessWidget {
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(QRadii.pill),
                     onTap: () => state.acceptTrialOffer(),
                     child: Ink(
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                      decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(999))),
+                      decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),
                       child: Text(isAr ? 'ابدأ' : 'Start', style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onAccent)),
                     ),
                   ),
@@ -581,7 +581,7 @@ class _SaveCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: QColors.violet.withOpacity(0.1),
           border: Border.all(color: QColors.violet.withOpacity(0.4)),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(QRadii.card),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -595,11 +595,11 @@ class _SaveCard extends StatelessWidget {
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(QRadii.pill),
                     onTap: state.dismissSave,
                     child: Ink(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(999))),
+                      decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),
                       child: Text(t.saveNow, style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.onAccent)),
                     ),
                   ),

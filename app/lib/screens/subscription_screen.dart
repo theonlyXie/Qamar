@@ -106,7 +106,7 @@ class SubscriptionScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: QColors.green.withValues(alpha: 0.14),
                   border: Border.all(color: QColors.green.withValues(alpha: 0.5)),
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(QRadii.pill),
                 ),
                 child: Text(isAr ? 'مفعّل' : 'Active',
                     style: QText.body(size: 11, weight: FontWeight.w600, color: QColors.green)),
@@ -147,7 +147,7 @@ class SubscriptionScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: QColors.violet.withValues(alpha: 0.10),
             border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
-            borderRadius: BorderRadius.circular(QRadii.xl),
+            borderRadius: BorderRadius.circular(QRadii.card),
           ),
           child: Text(
             priceBanner(state, quote),
@@ -221,7 +221,7 @@ class SubscriptionScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: QColors.amber.withValues(alpha: 0.10),
               border: Border.all(color: QColors.amber.withValues(alpha: 0.4)),
-              borderRadius: BorderRadius.circular(QRadii.lg),
+              borderRadius: BorderRadius.circular(QRadii.control),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -333,9 +333,9 @@ class _PromoFieldState extends State<_PromoField> {
         filled: true,
         fillColor: QColors.cardNavy,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: QColors.borderSoft)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: QColors.borderSoft)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: QColors.violet)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.borderSoft)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.borderSoft)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.violet)),
       ),
     );
   }
@@ -374,7 +374,7 @@ class _TierCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
         border: Border.all(color: QColors.violet, width: 1.6),
-        borderRadius: BorderRadius.circular(QRadii.xl),
+        borderRadius: BorderRadius.circular(QRadii.card),
         boxShadow: [BoxShadow(color: QColors.violet.withValues(alpha: 0.22), blurRadius: 26)],
       ),
       // One plan, so no radio: a single option is not a choice.
@@ -439,7 +439,7 @@ class _FeatureTable extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: QDecor.card(color: QColors.cardNavy, border: QColors.borderFaint, radius: QRadii.xl),
+      decoration: QDecor.card(color: QColors.cardNavy, border: QColors.borderFaint, radius: QRadii.card),
       child: Column(
         children: [
           Row(
