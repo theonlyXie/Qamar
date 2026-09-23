@@ -67,8 +67,29 @@ class HomeShell extends StatelessWidget {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) state.systemBack();
       },
-      child: _shell(state),
+      child: _Strips(state: state, child: _shell(state)),
     );
+  }
+
+  /// The strips above and below the safe area: the status bar's and the
+  /// home indicator's.
+  static const topStripKey = ValueKey('shell-top-strip');
+  static const bottomStripKey = ValueKey('shell-bottom-strip');
+
+  /// What covers the screen, seen where the strips are: the scan's black,
+  /// the tree's veil, the conversation's ground, a sheet's dimming, in the
+  /// order they stack. Null when only the page's own sky is there.
+  static Color? coverAt(AppState state, {required bool top}) {
+    Color? c;
+    void add(Color layer) => c = c == null ? layer : Color.alphaBlend(layer, c!);
+    if (state.screen == AppScreen.scan) add(QColors.bgScan);
+    if (state.treeOpen) add(QColors.bgBottom.withValues(alpha: 0.86));
+    if (state.chatOpen) add(top ? AskQamarOverlay.groundTop : AskQamarOverlay.groundBottom);
+    final sheet = state.whyOpen || state.authOpen || state.pendingActivity != null || state.explainOpen != null;
+    // A sheet dims what is above it; at the bottom it is the sheet itself,
+    // which settles into the page's darkest ground.
+    if (sheet) add(top ? QColors.scrim : QColors.bgBottom);
+    return c;
   }
 
   Widget _shell(AppState state) {
@@ -111,6 +132,36 @@ class HomeShell extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Nothing inside the safe area reaches the status bar or the home
+/// indicator, so without these the scan's black, the conversation's ground
+/// and a sheet's dimming all stopped short of the screen's edges, under a
+/// strip of the page's sky.
+class _Strips extends StatelessWidget {
+  final AppState state;
+  final Widget child;
+  const _Strips({required this.state, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final pad = MediaQuery.paddingOf(context);
+    final still = MediaQuery.of(context).disableAnimations;
+    Widget strip(Key key, Color? color) => IgnorePointer(
+          child: AnimatedContainer(
+            key: key,
+            duration: still ? Duration.zero : const Duration(milliseconds: 180),
+            color: color ?? Colors.transparent,
+          ),
+        );
+    return Stack(
+      children: [
+        Positioned.fill(child: child),
+        Positioned(top: 0, left: 0, right: 0, height: pad.top, child: strip(HomeShell.topStripKey, HomeShell.coverAt(state, top: true))),
+        Positioned(bottom: 0, left: 0, right: 0, height: pad.bottom, child: strip(HomeShell.bottomStripKey, HomeShell.coverAt(state, top: false))),
+      ],
     );
   }
 }

@@ -51,6 +51,11 @@ class AskQamarOverlay extends StatefulWidget {
 
   /// The suggestion row's end fade.
   static const suggestionFadeKey = ValueKey('chat-suggestion-fade');
+
+  /// The conversation's ground at its top and bottom edges, for the shell
+  /// to carry into the status bar and the home indicator's strips.
+  static Color get groundTop => _scrimTop;
+  static Color get groundBottom => _scrimBottom;
   @override
   State<AskQamarOverlay> createState() => _AskQamarOverlayState();
 }

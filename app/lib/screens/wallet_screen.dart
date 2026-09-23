@@ -17,6 +17,8 @@ class WalletScreen extends StatelessWidget {
   /// is shown (O4).
   static const levelKey = ValueKey('wallet-level');
   static const lifetimeKey = ValueKey('wallet-lifetime');
+  static const availableLabelKey = ValueKey('wallet-available-label');
+  static const lifetimeLabelKey = ValueKey('wallet-lifetime-label');
 
   @override
   Widget build(BuildContext context) {
@@ -43,12 +45,17 @@ class WalletScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(children: [
-                const SuCoinIcon(size: 40),
-                const SizedBox(width: 14),
+              // The two labels share a baseline, and the coin sits with the
+              // number it counts: the labels used to stagger by 35px because
+              // the coin and the balance were centred against each other.
+              Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(t.suAvailable, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
-                  Text('${state.formatSu(state.suAvailable)}', style: QText.number(size: 34, weight: FontWeight.w600, color: QColors.goldPale)),
+                  Text(t.suAvailable, key: WalletScreen.availableLabelKey, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
+                  Row(children: [
+                    const SuCoinIcon(size: 30),
+                    const SizedBox(width: 10),
+                    Text('${state.formatSu(state.suAvailable)}', style: QText.number(size: 34, weight: FontWeight.w600, color: QColors.goldPale)),
+                  ]),
                 ]),
                 const Spacer(),
                 // Lifetime earned is the number Level is made of and a
@@ -57,7 +64,7 @@ class WalletScreen extends StatelessWidget {
                 // spending needs it.
                 if (state.showScore)
                   Column(key: WalletScreen.lifetimeKey, crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Text(t.suLifetime, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
+                    Text(t.suLifetime, key: WalletScreen.lifetimeLabelKey, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
                     Text('${state.formatSu(state.suLifetime)}', style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.textMid)),
                   ]),
               ]),

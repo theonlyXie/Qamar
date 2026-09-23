@@ -70,7 +70,9 @@ class ProgressScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               decoration: QDecor.card(
                 gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
-                border: streak.current > 0 ? QColors.violet.withValues(alpha: 0.4) : QColors.borderSoft,
+                // One edge for every card on the screen: state is said by the
+                // eyebrow's colour, not by a third border colour.
+                border: QColors.borderSoft,
                 radius: QRadii.xl,
               ),
               child: Row(
@@ -122,7 +124,7 @@ class ProgressScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: QDecor.card(
             color: QColors.cardDeep,
-            border: active > 0 ? QColors.green.withValues(alpha: 0.4) : QColors.borderSoft,
+            border: QColors.borderSoft,
             radius: QRadii.xl,
           ),
           child: Column(
