@@ -59,7 +59,12 @@ void main() {
       expect(find.byType(AvoidEditor), findsNothing);
       expect(find.text(s.avoidNotice!), findsOneWidget, reason: 'what the change did is said on Me');
       final readOut = find.byKey(YouScreen.readOutKey);
-      expect(find.descendant(of: readOut, matching: find.text(s.iso('2'))), findsOneWidget, reason: 'the read-out counts both');
+      String name(String value) {
+        final o = AppState.avoidStep.options.firstWhere((o) => o.value == value);
+        return isAr ? o.ar : o.en;
+      }
+      expect(find.descendant(of: readOut, matching: find.text('${name('nuts')} · ${name('meat')}')), findsOneWidget,
+          reason: 'the read-out names both (seat 2: a bare "2" said nothing)');
       if (isAr) expectNoLatinDigits(tester, within: readOut);
     });
   }

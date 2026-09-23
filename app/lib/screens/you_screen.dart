@@ -36,6 +36,26 @@ class YouScreen extends StatelessWidget {
   /// rule ([Counted]).
   static String itemsLine(int n, {required bool isAr, required String Function(String) iso}) => Counted.item.of(n, ar: isAr, iso: iso);
 
+  /// What to avoid, in the consultation's own names for its choices and
+  /// in their order: "No red meat · Lactose", "مش باكل لحوم · لاكتوز", and
+  /// its "Nothing" / "مفيش" when there is none, where the read-out said a
+  /// bare count ("2") and "None". A value the choices do not name is said
+  /// as it is stored, after them.
+  static String avoidLine(List<String> prefs, {required bool isAr}) {
+    final options = AppState.avoidStep.options;
+    if (prefs.isEmpty) {
+      final none = options.firstWhere((o) => o.value == 'none');
+      return isAr ? none.ar : none.en;
+    }
+    final known = {for (final o in options) o.value};
+    return [
+      for (final o in options)
+        if (o.value != 'none' && prefs.contains(o.value)) isAr ? o.ar : o.en,
+      for (final p in prefs)
+        if (!known.contains(p)) p,
+    ].join(' · ');
+  }
+
   /// The read-out of what Qamar holds, and the wallet card.
   static const readOutKey = ValueKey('you-read-out');
 
@@ -64,7 +84,7 @@ class YouScreen extends StatelessWidget {
         : (isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح' : '${state.formatSu(state.suAvailable)} available');
     final rows = <(String, String)>[
       (isAr ? 'الهدف والسعرات' : 'Target and calories', isAr ? '${state.iso('${tg.kcal}')} سعر' : '${tg.kcal} kcal'),
-      (isAr ? 'ما يجب تجنبه' : 'What to avoid', state.profile.prefs.isNotEmpty ? state.iso('${state.profile.prefs.length}') : (isAr ? 'مفيش' : 'None')),
+      (isAr ? 'ما يجب تجنبه' : 'What to avoid', YouScreen.avoidLine(state.profile.prefs, isAr: isAr)),
       (
         isAr ? 'ذاكرة قمر' : 'Qamar memory',
         remembered == 0 ? (isAr ? 'فاضية' : 'Empty') : YouScreen.itemsLine(remembered, isAr: isAr, iso: state.iso)
@@ -307,9 +327,18 @@ class YouScreen extends StatelessWidget {
               if (i > 0) const Divider(color: QColors.borderSoft, height: 1),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                // The name whole, the value in what it leaves, on one line:
+                // a long list of things to avoid ends on an ellipsis.
+                child: Row(children: [
                   Text(rows[i].$1, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
-                  Text(rows[i].$2, style: QText.body(size: 13, color: QColors.textMuted)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(rows[i].$2,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: QText.body(size: 13, color: QColors.textMuted)),
+                  ),
                 ]),
               ),
             ],

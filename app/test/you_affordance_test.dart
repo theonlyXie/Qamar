@@ -7,11 +7,12 @@
 // chevron, where it was a small "Spend" that named one of the wallet's
 // tabs (seat 2). The rows left (target, what to avoid, memory, consents)
 // are a read-out, one card with a line each, not four bordered rows
-// dressed as controls that do nothing when touched.
-
-import 'dart:ui' show SemanticsAction;
+// dressed as controls that do nothing when touched. What to avoid reads
+// out what is avoided, by the consultation's own names for its choices, on
+// one line, where it said a bare "2" (seat 2).
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -23,6 +24,7 @@ import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/common.dart';
 
 import 'support/app_fonts.dart';
+import 'support/arabic_digits.dart';
 
 void main() {
   setUpAll(() async {
@@ -86,6 +88,66 @@ void main() {
       await tester.pump();
       expect(s.screen, AppScreen.wallet, reason: 'and that one way in goes to the wallet');
       handle.dispose();
+    });
+  }
+
+  for (final lang in AppLang.values) {
+    testWidgets('What to avoid names what is avoided, on one line, and the way to change it stays under it (${lang.name})', (tester) async {
+      final ar = lang == AppLang.ar;
+      tester.view.devicePixelRatio = 3;
+      tester.view.physicalSize = const Size(390, 2600) * 3;
+      addTearDown(tester.view.reset);
+      final s = AppState()..setLang(lang);
+      s.dismissOrbTutorial();
+      s.go(AppScreen.today);
+      s.go(AppScreen.you);
+      String name(String value) {
+        final o = AppState.avoidStep.options.firstWhere((o) => o.value == value);
+        return ar ? o.ar : o.en;
+      }
+
+      final readOut = find.byKey(YouScreen.readOutKey);
+      Finder line() => find.descendant(
+            of: find.ancestor(of: find.text(ar ? 'ما يجب تجنبه' : 'What to avoid'), matching: find.byType(Row)).first,
+            matching: find.byType(Text),
+          ).last;
+
+      // Nothing avoided: the consultation's own "Nothing".
+      await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(tester.widget<Text>(line()).data, ar ? 'مفيش' : 'Nothing');
+      expect(name('none'), ar ? 'مفيش' : 'Nothing', reason: 'the choice of that name');
+
+      // Two things, named, in the choices' own order, not counted.
+      s.profile = s.profile.copyWith(prefs: ['lactose', 'meat']);
+      s.setLang(lang);
+      await tester.pump();
+      expect(tester.widget<Text>(line()).data, '${name('meat')} · ${name('lactose')}');
+      expect(find.descendant(of: readOut, matching: find.text(s.iso('2'))), findsNothing, reason: 'not a bare count');
+      if (ar) expectNoLatinDigits(tester, within: readOut);
+
+      // All four: still one line, cut with an ellipsis, inside the card.
+      s.profile = s.profile.copyWith(prefs: ['nuts', 'meat', 'lactose', 'budget']);
+      s.setLang(lang);
+      await tester.pump();
+      final text = tester.widget<Text>(line());
+      expect(text.data, [for (final v in const ['nuts', 'meat', 'lactose', 'budget']) name(v)].join(' · '));
+      expect(text.maxLines, 1);
+      expect(text.overflow, TextOverflow.ellipsis);
+      final paragraph = tester.renderObject<RenderParagraph>(find.descendant(of: line(), matching: find.byType(RichText)));
+      expect(paragraph.didExceedMaxLines, isTrue, reason: 'four names do not fit beside the label at 390');
+      final card = tester.getRect(readOut);
+      final r = tester.getRect(line());
+      expect(r.left, greaterThanOrEqualTo(card.left));
+      expect(r.right, lessThanOrEqualTo(card.right));
+      final label = tester.getRect(find.text(ar ? 'ما يجب تجنبه' : 'What to avoid'));
+      expect(ar ? r.right <= label.left : r.left >= label.right, isTrue, reason: 'beside its label, never over it');
+
+      // Seat 1's way to change it is still right under the read-out.
+      final entry = tester.getRect(find.byKey(YouScreen.avoidEntryKey));
+      expect(entry.top, greaterThanOrEqualTo(card.bottom));
+      expect(entry.top - card.bottom, lessThan(16));
     });
   }
 }
