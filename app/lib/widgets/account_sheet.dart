@@ -205,9 +205,7 @@ class _AccountSheetState extends State<AccountSheet> {
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
           child: GestureDetector(
             onTap: state.closeAuth,
-            child: Container(
-              color: QColors.scrim,
-              alignment: Alignment.bottomCenter,
+            child: QSheetScrim(
               child: GestureDetector(
                 onTap: () {},
                 child: Container(

@@ -240,147 +240,152 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
             child: Container(
               color: QColors.bgBottom.withValues(alpha: 0.86),
               alignment: Alignment.center,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: () {}, // absorb taps inside the ring
-                    child: SizedBox(
-                      width: _canvas,
-                      height: _canvas,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Positioned.fill(
-                            child: AnimatedBuilder(
-                              animation: _c,
-                              builder: (context, _) => CustomPaint(painter: _BeamPainter(_c.value, beamAngles)),
-                            ),
-                          ),
-                          Positioned(
-                            left: _canvas / 2 - 58,
-                            top: _canvas / 2 - 58,
-                            child: SizedBox(
-                              width: 116,
-                              height: 116,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: RadialGradient(colors: [QColors.violet.withValues(alpha: 0.5), Colors.transparent], stops: const [0.0, 0.68]),
-                                ),
+              child: QSpringIn(
+                // The ring arrives on the settle spring, from a little smaller
+                // and clear, where it used to be simply there.
+                arrive: QArrive.grow,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                      onTap: () {}, // absorb taps inside the ring
+                      child: SizedBox(
+                        width: _canvas,
+                        height: _canvas,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Positioned.fill(
+                              child: AnimatedBuilder(
+                                animation: _c,
+                                builder: (context, _) => CustomPaint(painter: _BeamPainter(_c.value, beamAngles)),
                               ),
                             ),
-                          ),
-                          // The moon in the middle is the same one as the
-                          // floating orb, and answers the same way: hold it
-                          // and the conversation opens listening — which is
-                          // what the hint below says — or tap it, the route
-                          // for anyone who cannot hold, to type. Its label
-                          // says so, like every other circle on the ring.
-                          Positioned(
-                            left: _orbLeft,
-                            top: _orbLeft,
-                            child: _CentreMoon(state: state),
-                          ),
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            top: _canvas / 2 + _orbSize / 2 + 4,
-                            child: IgnorePointer(
-                              child: Text(
-                                t.ask,
-                                key: TreeOverlay.centreLabelKey,
-                                textAlign: TextAlign.center,
-                                style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMid),
+                            Positioned(
+                              left: _canvas / 2 - 58,
+                              top: _canvas / 2 - 58,
+                              child: SizedBox(
+                                width: 116,
+                                height: 116,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: RadialGradient(colors: [QColors.violet.withValues(alpha: 0.5), Colors.transparent], stops: const [0.0, 0.68]),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                          if (!state.treeExpanded)
-                            for (var i = 0; i < nodes.length; i++)
-                              Positioned(
-                                left: nodes[i].center.dx - _slotWidth / 2,
-                                top: nodes[i].topLeft.dy,
-                                child: _RingButton(
-                                  icon: nodes[i].icon,
-                                  label: nodes[i].label(isAr),
-                                  color: nodes[i].color,
-                                  bob: true,
-                                  onTap: () => _activate(state, nodes[i], i),
+                            // The moon in the middle is the same one as the
+                            // floating orb, and answers the same way: hold it
+                            // and the conversation opens listening — which is
+                            // what the hint below says — or tap it, the route
+                            // for anyone who cannot hold, to type. Its label
+                            // says so, like every other circle on the ring.
+                            Positioned(
+                              left: _orbLeft,
+                              top: _orbLeft,
+                              child: _CentreMoon(state: state),
+                            ),
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              top: _canvas / 2 + _orbSize / 2 + 4,
+                              child: IgnorePointer(
+                                child: Text(
+                                  t.ask,
+                                  key: TreeOverlay.centreLabelKey,
+                                  textAlign: TextAlign.center,
+                                  style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMid),
                                 ),
                               ),
-                          if (state.treeLogExpanded && state.treeLogSub == null)
-                            for (var i = 0; i < kLogMethods.length; i++)
-                              _placeSub(
-                                i,
-                                kLogMethods.length,
-                                _RingButton(
-                                  icon: kLogMethods[i].icon,
-                                  label: kLogMethods[i].label(isAr),
-                                  color: QColors.moonlight,
-                                  locked: kLogMethods[i].kind == QuickLog.photo && state.photoQuota.exhausted,
-                                  onTap: () => _runMethod(context, state, kLogMethods[i].kind),
+                            ),
+                            if (!state.treeExpanded)
+                              for (var i = 0; i < nodes.length; i++)
+                                Positioned(
+                                  left: nodes[i].center.dx - _slotWidth / 2,
+                                  top: nodes[i].topLeft.dy,
+                                  child: _RingButton(
+                                    icon: nodes[i].icon,
+                                    label: nodes[i].label(isAr),
+                                    color: nodes[i].color,
+                                    bob: true,
+                                    onTap: () => _activate(state, nodes[i], i),
+                                  ),
                                 ),
-                              ),
-                          if (state.treeLogSub == TreeSub.activity)
-                            for (var i = 0; i < kActivityChoices.length; i++)
-                              _placeSub(
-                                i,
-                                kActivityChoices.length,
-                                _RingButton(
-                                  icon: kActivityChoices[i].icon,
-                                  label: kActivityChoices[i].label(isAr),
-                                  color: QColors.green,
-                                  onTap: () => state.chooseActivity(kActivityChoices[i].kind),
+                            if (state.treeLogExpanded && state.treeLogSub == null)
+                              for (var i = 0; i < kLogMethods.length; i++)
+                                _placeSub(
+                                  i,
+                                  kLogMethods.length,
+                                  _RingButton(
+                                    icon: kLogMethods[i].icon,
+                                    label: kLogMethods[i].label(isAr),
+                                    color: QColors.moonlight,
+                                    locked: kLogMethods[i].kind == QuickLog.photo && state.photoQuota.exhausted,
+                                    onTap: () => _runMethod(context, state, kLogMethods[i].kind),
+                                  ),
                                 ),
-                              ),
-                          if (state.treeLogSub == TreeSub.repeat)
-                            for (var i = 0; i < repeatChoices.length; i++)
-                              _placeSub(
-                                i,
-                                repeatChoices.length,
-                                _RingButton(
-                                  icon: Icons.restaurant,
-                                  label: _short(repeatChoices[i].name),
-                                  color: QColors.moonlight,
-                                  onTap: () => state.repeatMeal(repeatChoices[i]),
+                            if (state.treeLogSub == TreeSub.activity)
+                              for (var i = 0; i < kActivityChoices.length; i++)
+                                _placeSub(
+                                  i,
+                                  kActivityChoices.length,
+                                  _RingButton(
+                                    icon: kActivityChoices[i].icon,
+                                    label: kActivityChoices[i].label(isAr),
+                                    color: QColors.green,
+                                    onTap: () => state.chooseActivity(kActivityChoices[i].kind),
+                                  ),
                                 ),
-                              ),
-                          if (state.treeWaterExpanded)
-                            for (var i = 0; i < kWaterChoices.length; i++)
-                              _placeSub(
-                                i,
-                                kWaterChoices.length,
-                                _RingButton(
-                                  icon: kWaterChoices[i].icon,
-                                  label: kWaterChoices[i].label(isAr),
-                                  color: QColors.cyan,
-                                  onTap: () => state.quickWater(kWaterChoices[i].unit),
+                            if (state.treeLogSub == TreeSub.repeat)
+                              for (var i = 0; i < repeatChoices.length; i++)
+                                _placeSub(
+                                  i,
+                                  repeatChoices.length,
+                                  _RingButton(
+                                    icon: Icons.restaurant,
+                                    label: _short(repeatChoices[i].name),
+                                    color: QColors.moonlight,
+                                    onTap: () => state.repeatMeal(repeatChoices[i]),
+                                  ),
                                 ),
-                              ),
-                        ],
+                            if (state.treeWaterExpanded)
+                              for (var i = 0; i < kWaterChoices.length; i++)
+                                _placeSub(
+                                  i,
+                                  kWaterChoices.length,
+                                  _RingButton(
+                                    icon: kWaterChoices[i].icon,
+                                    label: kWaterChoices[i].label(isAr),
+                                    color: QColors.cyan,
+                                    onTap: () => state.quickWater(kWaterChoices[i].unit),
+                                  ),
+                                ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 40),
-                  // Opened by Today's "Log a meal" button, the tree names
-                  // where it lives, until the moon has been tapped once.
-                  if (state.treeOpenedFromButton && !state.gesturesLearned.contains(OrbGesture.tap)) ...[
+                    const SizedBox(height: 40),
+                    // Opened by Today's "Log a meal" button, the tree names
+                    // where it lives, until the moon has been tapped once.
+                    if (state.treeOpenedFromButton && !state.gesturesLearned.contains(OrbGesture.tap)) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 30),
+                        child: Text(
+                          isAr ? 'المرة الجاية، دوس على القمر وهتلاقي ده.' : 'Next time, tap the moon to find this.',
+                          textAlign: TextAlign.center,
+                          style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMid),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 30),
-                      child: Text(
-                        isAr ? 'المرة الجاية، دوس على القمر وهتلاقي ده.' : 'Next time, tap the moon to find this.',
-                        textAlign: TextAlign.center,
-                        style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMid),
-                      ),
+                      child: Text(hint, textAlign: TextAlign.center, style: QText.body(size: 12, color: QColors.textMuted)),
                     ),
-                    const SizedBox(height: 8),
                   ],
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 30),
-                    child: Text(hint, textAlign: TextAlign.center, style: QText.body(size: 12, color: QColors.textMuted)),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

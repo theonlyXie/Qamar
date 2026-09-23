@@ -33,9 +33,7 @@ class WhySheet extends StatelessWidget {
     return Positioned.fill(
       child: GestureDetector(
         onTap: state.closeWhy,
-        child: Container(
-          color: QColors.scrim,
-          alignment: Alignment.bottomCenter,
+        child: QSheetScrim(
           child: GestureDetector(
             onTap: () {},
             child: Container(

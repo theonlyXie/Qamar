@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,6 +10,7 @@ import '../models/problem.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/layout.dart';
+import '../theme/motion.dart';
 import '../theme/text_styles.dart';
 
 /// The touch rule every control here keeps (O11).
@@ -209,6 +211,91 @@ class QPillButton extends StatelessWidget {
             child: Center(widthFactor: 1, child: Text(label, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onAccent))),
           ),
         ),
+      );
+}
+
+/// How a [QSpringIn] arrives.
+enum QArrive { fade, rise, grow }
+
+/// An entrance on a spring rather than a curve over a set time: the settle
+/// spring (damping 1.0, response 0.35s; QSpring), so it arrives quickly and
+/// comes to rest without a bounce. [QArrive.rise] comes up from below its
+/// own height (a sheet), [QArrive.grow] from a little smaller and clear (the
+/// tree's ring), [QArrive.fade] only fades. With the platform's reduce-motion
+/// on, every one of them is a plain 150ms cross-fade: nothing moves.
+class QSpringIn extends StatefulWidget {
+  final Widget child;
+  final QArrive arrive;
+  const QSpringIn({super.key, required this.arrive, required this.child});
+
+  /// Where the entrance is at [v] (0 → 1): the offset as a fraction of the
+  /// child's height, the scale, the opacity. Clamped: a critically damped
+  /// spring does not pass 1, and nothing may.
+  static ({double dy, double scale, double opacity}) at(QArrive arrive, double v, {required bool still}) {
+    final t = v.clamp(0.0, 1.0);
+    if (still) return (dy: 0, scale: 1, opacity: t);
+    return switch (arrive) {
+      QArrive.rise => (dy: 1 - t, scale: 1, opacity: 1),
+      QArrive.grow => (dy: 0, scale: 0.94 + 0.06 * t, opacity: math.min(1, t * 1.6)),
+      QArrive.fade => (dy: 0, scale: 1, opacity: t),
+    };
+  }
+
+  @override
+  State<QSpringIn> createState() => _QSpringInState();
+}
+
+class _QSpringInState extends State<QSpringIn> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController.unbounded(vsync: this);
+  bool _started = false, _still = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    _still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (_still) {
+      _c.animateTo(1, duration: const Duration(milliseconds: 150));
+    } else {
+      _c.animateWith(SpringSimulation(QSpring.settle, 0, 1, 0));
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        child: widget.child,
+        builder: (context, child) {
+          final m = QSpringIn.at(widget.arrive, _c.value, still: _still);
+          Widget out = child!;
+          if (m.dy != 0) out = FractionalTranslation(translation: Offset(0, m.dy), child: out);
+          if (m.scale != 1) out = Transform.scale(scale: m.scale, child: out);
+          if (m.opacity < 1) out = Opacity(opacity: m.opacity, child: out);
+          return out;
+        },
+      );
+}
+
+/// A sheet's ground: the scrim fades in on the settle spring while the
+/// sheet ([child]) rises from below its own height on it.
+class QSheetScrim extends StatelessWidget {
+  final Widget child;
+  const QSheetScrim({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) => Stack(
+        fit: StackFit.expand,
+        children: [
+          const QSpringIn(arrive: QArrive.fade, child: ColoredBox(color: QColors.scrim)),
+          Align(alignment: Alignment.bottomCenter, child: QSpringIn(arrive: QArrive.rise, child: child)),
+        ],
       );
 }
 
