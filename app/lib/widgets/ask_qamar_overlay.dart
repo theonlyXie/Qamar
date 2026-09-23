@@ -164,7 +164,13 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                               // written until it is.
                               if (state.hasProposal) const _ProposalCard(),
                               if (state.chatState == ChatState.thinking) const _Thinking(),
-                              for (final (i, c) in state.chat.reversed.indexed) _ChatTurn(turn: c, latest: i == 0),
+                              // Keyed by place in the conversation, oldest
+                              // first, so a new message is a new child that
+                              // arrives, and the ones above keep their state
+                              // (unkeyed, the newest slot took the new words
+                              // and nothing animated in).
+                              for (final (i, c) in state.chat.reversed.indexed)
+                                _ChatTurn(key: ValueKey('turn-${state.chat.length - 1 - i}'), turn: c, latest: i == 0),
                             ],
                           ),
                         ),
@@ -344,7 +350,7 @@ class _ChatTurn extends StatelessWidget {
 
   /// The newest turn: a reply here carries the copy action under it.
   final bool latest;
-  const _ChatTurn({required this.turn, this.latest = false});
+  const _ChatTurn({super.key, required this.turn, this.latest = false});
 
   @override
   Widget build(BuildContext context) {

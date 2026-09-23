@@ -20,10 +20,7 @@ Iterable<File> _lib() => Directory('lib').listSync(recursive: true).whereType<Fi
 /// off this list the moment it is clean (the test below says so), and the
 /// list ends empty.
 const _owed = {
-  'lib/screens/onboarding_screen.dart',
-  'lib/screens/scan_screen.dart',
   'lib/screens/subscription_screen.dart',
-  'lib/screens/welcome_screen.dart',
   'lib/screens/you_screen.dart',
   'lib/widgets/account_sheet.dart',
 };
