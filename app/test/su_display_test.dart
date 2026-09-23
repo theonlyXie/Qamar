@@ -14,6 +14,7 @@ import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/screens/today_screen.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/common.dart';
+import 'package:qamar/widgets/explain.dart';
 import 'package:qamar/widgets/orb_nav.dart';
 
 import 'support/app_fonts.dart';
@@ -138,6 +139,63 @@ void main() {
         await tester.tap(find.byType(SuChip));
         await tester.pump();
         expect(s.screen, AppScreen.wallet);
+      });
+    }
+
+    for (final lang in AppLang.values) {
+      final ar = lang == AppLang.ar;
+      testWidgets('at a zero balance the chip is the coin alone, and still the wallet’s door (${lang.name})', (tester) async {
+        final semantics = tester.ensureSemantics();
+        final s = AppState()..setLang(lang);
+        expect(s.suAvailable, 0);
+        s.go(AppScreen.today);
+        await _pumpApp(tester, s);
+
+        final chip = find.byType(SuChip);
+        expect(chip, findsOneWidget);
+        expect(find.descendant(of: chip, matching: find.byType(SuCoinIcon)), findsOneWidget);
+        expect(find.byKey(SuChip.amountKey), findsNothing, reason: 'no numeral at zero: the Arabic ٠ over the dotted mark read as ":"');
+        // Still explainable, so still marked (every explainable value is):
+        // the dots sit under the coin, where there is no ٠ for them to join.
+        final coinMark = find.byKey(SuChip.coinMarkKey);
+        expect(coinMark, findsOneWidget);
+        expect(find.descendant(of: coinMark, matching: find.byType(SuCoinIcon)), findsOneWidget);
+        expect(find.descendant(of: chip, matching: find.byType(ExplainMark)), findsOneWidget);
+        final coin = tester.getRect(find.descendant(of: coinMark, matching: find.byType(SuCoinIcon)));
+        expect(tester.getRect(coinMark).bottom - coin.bottom, greaterThanOrEqualTo(3), reason: 'the dots under the coin, not through it');
+        expect(_texts(tester, chip).where((t) => t.trim().isNotEmpty), isEmpty, reason: 'nothing written in the chip at all');
+        expect(find.descendant(of: chip, matching: find.byWidgetPredicate((w) => w is Explainable && w.id == 'su_points')), findsOneWidget,
+            reason: 'still explainable');
+        // A screen reader still hears the balance, in the app's digits.
+        expect(tester.getSemantics(chip), matchesSemantics(label: ar ? 'نقاط Su: ٠' : 'Su Points: 0', isButton: true, hasTapAction: true));
+
+        await tester.tap(chip);
+        await tester.pump();
+        expect(s.screen, AppScreen.wallet, reason: 'still opens the wallet');
+
+        // The first credit brings the number back.
+        s.go(AppScreen.today);
+        await _earn(s);
+        await tester.pump();
+        final amount = find.byKey(SuChip.amountKey);
+        expect(amount, findsOneWidget);
+        expect(tester.widget<Text>(amount).data, ar ? '٥٠' : '${SuEconomy.activityLogged}');
+        expect(find.byKey(SuChip.coinMarkKey), findsNothing, reason: 'with a number, the mark is under the number');
+        expect(find.descendant(of: chip, matching: find.byType(ExplainMark)), findsOneWidget);
+        expect(tester.getSemantics(chip), matchesSemantics(label: ar ? 'نقاط Su: ٥٠' : 'Su Points: 50', isButton: true, hasTapAction: true));
+        semantics.dispose();
+      });
+
+      testWidgets('with "Points and streaks" off there is no chip, at zero or not (${lang.name})', (tester) async {
+        final s = AppState()..setLang(lang);
+        s.setShowScore(false);
+        s.go(AppScreen.today);
+        await _pumpApp(tester, s);
+        expect(find.byType(SuChip), findsNothing);
+        await _earn(s);
+        await tester.pump();
+        expect(find.byType(SuChip), findsNothing);
+        expect(find.byKey(SuChip.amountKey), findsNothing);
       });
     }
 

@@ -421,8 +421,10 @@ void main() {
       expect(contrastRatio(colour, QColors.cardMid), greaterThanOrEqualTo(4.5));
     });
 
-    testWidgets('the Su chip’s number is 13pt, so the Arabic zero reads as a digit (${lang.name})', (tester) async {
-      final s = _state(lang);
+    // At zero the chip shows the coin alone (su_display_test.dart); with a
+    // balance its number is 13pt, where 11 read the Arabic digits as dots.
+    testWidgets('the Su chip’s number is 13pt (${lang.name})', (tester) async {
+      final s = _state(lang)..suAvailable = 100;
       await _pump(tester, s, _phone);
       expect(tester.widget<Text>(find.byKey(SuChip.amountKey)).style!.fontSize, 13);
     });

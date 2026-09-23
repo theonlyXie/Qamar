@@ -803,19 +803,34 @@ class _EarnedMonthCard extends StatelessWidget {
 
 
 /// Today's one Su display: a coin and the balance, which opens the wallet
-/// (O9). The chip draws small; its touch area is the full 48 points.
+/// (O9); at a zero balance the coin alone. The chip draws small; its touch
+/// area is the full 48 points.
 class SuChip extends StatelessWidget {
-  /// The balance's number, for tests.
+  /// The balance's number, and at zero the mark under the coin, for tests.
   static const amountKey = ValueKey('su-chip-amount');
+  static const coinMarkKey = ValueKey('su-chip-coin-mark');
 
   final AppState state;
   const SuChip({super.key, required this.state});
 
   @override
   Widget build(BuildContext context) {
+    // At zero the coin stands alone, with no numeral: the Arabic zero is a
+    // dot, and over the mark's dotted line it read as ":"; and a counter at
+    // zero is a deficit on the first screen. The chip still opens the wallet,
+    // can still be explained — so the dotted mark, which every explainable
+    // value carries (explain_mark_test), sits under the coin instead — and
+    // still says its balance to a screen reader. The first credit brings the
+    // number.
+    final zero = state.suAvailable <= 0;
+    // Its own node, with the wallet as its tap: without container it merged
+    // into the header ("Good morning, friend, Su Points: 0" as one button),
+    // and excludeSemantics dropped the InkWell's tap with the rest.
     return Semantics(
+      container: true,
       button: true,
       label: '${state.t.suName}: ${state.formatSu(state.suAvailable)}',
+      onTap: state.openWallet,
       excludeSemantics: true,
       child: Material(
         color: Colors.transparent,
@@ -832,10 +847,18 @@ class SuChip extends StatelessWidget {
                 child: Explainable(
                   id: 'su_points',
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    const SuCoinIcon(size: 16),
-                    const SizedBox(width: 6),
-                    // 13pt: at 11 the Arabic zero read as a dot.
-                    ExplainMark(child: Text(state.formatSu(state.suAvailable), key: SuChip.amountKey, style: QText.number(size: 13, weight: FontWeight.w600, color: QColors.gold))),
+                    if (zero)
+                      const ExplainMark(
+                        key: SuChip.coinMarkKey,
+                        child: Padding(padding: EdgeInsets.only(bottom: 4), child: SuCoinIcon(size: 16)),
+                      )
+                    else
+                      const SuCoinIcon(size: 16),
+                    if (!zero) ...[
+                      const SizedBox(width: 6),
+                      // 13pt: at 11 the Arabic zero read as a dot.
+                      ExplainMark(child: Text(state.formatSu(state.suAvailable), key: SuChip.amountKey, style: QText.number(size: 13, weight: FontWeight.w600, color: QColors.gold))),
+                    ],
                   ]),
                 ),
               ),
