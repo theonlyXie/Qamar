@@ -83,7 +83,7 @@ void main() {
     test('Today’s orb: unknown before the first log, under after, unknown on general guidance', () {
       final s = AppState();
       expect(s.orbState().day, OrbDay.unknown);
-      s.meals.add(LoggedMeal(name: 'فول', sub: '', kcal: 400, p: 20, c: 50, f: 10));
+      s.meals.add(const LoggedMeal(name: 'فول', sub: '', kcal: 400, p: 20, c: 50, f: 10));
       expect(s.orbState().day, OrbDay.under);
       s.profile = s.profile.copyWith(safety: SafetyAnswer.pregnant);
       expect(s.generalGuidance, isTrue);
