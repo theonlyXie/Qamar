@@ -5116,10 +5116,9 @@ class AppState extends ChangeNotifier {
         AppScreen.progress,
         AppScreen.you,
         AppScreen.wallet,
-        // The paywall keeps the orb, the way home from every in-app screen
-        // (way_back_test). It used to rest on the comparison table; in the
-        // band, with the page padded to clear it, it no longer can (O1).
-        AppScreen.subscription,
+        // Not the paywall (O1): its back control at the top is the way home
+        // (way_back_test), and a decision is made there without the orb over
+        // the comparison table or its tree offering ways out mid-choice.
         // Reached from the tree in season: without the orb, and with no back
         // control, it was the one screen with no way out.
         AppScreen.ramadan,

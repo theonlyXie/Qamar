@@ -17,6 +17,7 @@ import 'package:qamar/models/meal.dart';
 import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/layout.dart';
+import 'package:qamar/widgets/common.dart';
 import 'package:qamar/widgets/explain.dart';
 import 'package:qamar/widgets/living_orb.dart';
 import 'package:qamar/widgets/orb_nav.dart';
@@ -222,18 +223,24 @@ void main() {
   });
 
   group('the pages', () {
-    testWidgets('on the paywall the orb rests in the band, off the comparison table', (tester) async {
-      // It stays, the way home from every in-app screen (way_back_test);
-      // in the band it can no longer rest on the table, as it used to.
-      final s = AppState()..setLang(AppLang.en);
-      s.go(AppScreen.today);
-      s.openSubscription();
-      await tester.binding.setSurfaceSize(_area);
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
-      await tester.pump();
-      _expectInBand(_orb(tester), 'on the paywall');
-    });
+    for (final lang in AppLang.values) {
+      testWidgets('on the paywall there is no orb: its own back control is the way home (${lang.name})', (tester) async {
+        // Hidden as agreed (O1), as on the conversation, the tree and the
+        // scan: it used to rest on the comparison table, and its tree offered
+        // ways out in the middle of a decision.
+        final s = AppState()..setLang(lang);
+        s.go(AppScreen.today);
+        s.openSubscription();
+        expect(s.orbVisible, isFalse);
+        await tester.binding.setSurfaceSize(_area);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+        await tester.pump();
+        expect(find.byType(OrbNav), findsNothing);
+        expect(find.byKey(OrbNav.orbKey), findsNothing);
+        expect(find.byType(QBackButton), findsOneWidget, reason: 'the way home is its own');
+      });
+    }
 
     for (final lang in AppLang.values) {
       testWidgets('on every screen with the orb, the page scrolled to its end rests above the band (${lang.name})', (tester) async {

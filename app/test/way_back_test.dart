@@ -83,8 +83,14 @@ void main() {
         } else {
           expect(r.center.dx, lessThan(_phone.width / 3), reason: 'the start corner is the left in English');
         }
-        // In-app screens also show the orb, the way home.
-        if (from == AppScreen.today || from == AppScreen.you) expect(find.byType(OrbNav), findsOneWidget, reason: '$screen shows the orb');
+        // In-app screens also show the orb, the way home, except the
+        // paywall: its back control above is the way home there, and the
+        // orb is hidden as agreed (O1).
+        if (screen == AppScreen.subscription) {
+          expect(find.byType(OrbNav), findsNothing, reason: 'the paywall has its own way back, and no orb');
+        } else if (from == AppScreen.today || from == AppScreen.you) {
+          expect(find.byType(OrbNav), findsOneWidget, reason: '$screen shows the orb');
+        }
 
         await tester.tap(back);
         await tester.pump();
