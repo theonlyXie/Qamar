@@ -14,8 +14,10 @@
 // speak", "What's on your mind?"), with the camera-and-mic note that the
 // permission problems now say where it happens (seat 2). And the wallet's
 // old subtitle, "Never purchased, never cash", whose cue the wallet's terms
-// now carry, where it is drawn (seat 4). The table still holds 5 other
-// strings nothing reads; they are listed here by name, owed
+// now carry, where it is drawn (seat 4), with the wallet's "earned" (its
+// Lifetime earned and History's signed rows say it) and the spend card's
+// "Price" and "Limit" labels (the card shows "400 Su" and its own limit
+// line). The table still holds 2 other strings nothing reads; they are listed here by name, owed
 // to the seats whose screens they came from, so that this test holds the
 // line: a string that stops being read is either used again or deleted,
 // not kept.
@@ -26,7 +28,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Unread before this test, left for their owners to use or retire.
 const _owed = {
-  'restart', 'guestNote', 'priceLabel', 'limitLabel', 'suEarned',
+  'restart', 'guestNote',
 };
 
 void main() {
@@ -73,6 +75,15 @@ void main() {
   test('the wallet\'s old subtitle is gone from the table; its cue is in the terms the wallet draws', () {
     expect(fields, isNot(contains('walletSub')));
     for (final words in const ['Never purchased', 'Earned through useful actions', 'بتتكسب بالأفعال المفيدة']) {
+      expect(table, isNot(contains(words)), reason: words);
+    }
+  });
+
+  test('the wallet\'s "earned", "Price" and "Limit" are gone from the table', () {
+    for (final f in const ['suEarned', 'priceLabel', 'limitLabel']) {
+      expect(fields, isNot(contains(f)), reason: '$f is not read anywhere');
+    }
+    for (final words in const ["'earned'", "'اتكسبت'", "'Price'", "'السعر'", "'Limit'", "'الحد'"]) {
       expect(table, isNot(contains(words)), reason: words);
     }
   });
