@@ -3403,6 +3403,79 @@ void main() {
       expect(await prefs.getString('pending_invitation'), '');
       expect(state.invitationNotice, 'this invitation was already used');
     });
+
+    // The welcome draws a good notice in cyan and any other in amber. The
+    // tone is the notice's own, never who invited: an inviter who skipped
+    // the name step is still good news, and a refusal after a success is not.
+    test('each notice carries its own tone: redeemed or waiting is good news, anything that did not happen is not (both languages)', () async {
+      for (final lang in AppLang.values) {
+        final ar = lang == AppLang.ar;
+        final at = '(${lang.name})';
+
+        // Redeemed, from an inviter with no name, with days and without.
+        for (final days in const [14, 0]) {
+          final unnamed = FakeInvitationRepo()..redemption = InvitationRedemption(inviterName: '', inviteeName: 'Omar', trialDays: days);
+          final s = backed(invitations: unnamed)..setLang(lang);
+          await settle();
+          expect(await s.redeemInvitation('QMR-7F3A1'), isTrue);
+          expect(s.invitedBy, isNull);
+          expect(s.invitationNotice, startsWith(ar ? 'صاحبك عزمك.' : 'A friend invited you.'), reason: 'unnamed, $days days $at');
+          expect(s.invitationNoticeGood, isTrue, reason: 'an unnamed inviter is good news, $days days $at');
+        }
+
+        // A link opened before there is an account: it waits, and that is good news.
+        final waiting = AppState(prefs: MemoryDevicePrefs())..setLang(lang);
+        await waiting.acceptInvitationLink('QMR-LATER');
+        expect(waiting.invitationNotice, ar ? 'وصلتك دعوة. هتتفعّل أول ما تدخل.' : 'You have an invitation. It is redeemed the moment you are in.');
+        expect(waiting.invitationNoticeGood, isTrue, reason: 'the waiting link $at');
+
+        // A link opened with an account but no signal: the code is kept, the redeem did not happen.
+        final flaky = FakeInvitationRepo()..failWith = StateError('no signal');
+        final kept = backed(invitations: flaky, prefs: MemoryDevicePrefs())..setLang(lang);
+        await settle();
+        await kept.acceptInvitationLink('QMR-LIVE');
+        expect(kept.invitationNotice, contains(ar ? 'محفوظة على الموبايل' : 'kept on this phone'));
+        expect(kept.invitationNoticeGood, isFalse, reason: 'the kept code $at');
+
+        // A success, then a second code: refused, then unreachable, then empty.
+        final repo = FakeInvitationRepo();
+        final s = backed(invitations: repo)..setLang(lang);
+        await settle();
+        await s.redeemInvitation('QMR-7F3A1');
+        expect(s.invitedBy, 'Basel');
+        expect(s.invitationNoticeGood, isTrue, reason: 'named and redeemed $at');
+        repo.failWith = const InvitationException('this account already used an invitation', refused: true);
+        expect(await s.redeemInvitation('QMR-9Z9Z9'), isTrue, reason: 'a refusal is an answer');
+        expect(s.invitationNotice, 'this account already used an invitation');
+        expect(s.invitedBy, 'Basel', reason: 'still invited by Basel');
+        expect(s.invitationNoticeGood, isFalse, reason: 'a refusal after a success is not good news $at');
+        await s.redeemInvitation('QMR-7F3A1');
+        repo.failWith = StateError('no signal');
+        expect(await s.redeemInvitation('QMR-9Z9Z9'), isFalse);
+        expect(s.invitationNotice, ar ? 'مقدرتش أفعّل الدعوة دلوقتي. جرّب تاني بعد شوية.' : 'Could not redeem the invitation just now. Try again in a moment.');
+        expect(s.invitationNoticeGood, isFalse, reason: '"could not redeem" after a success $at');
+        repo.failWith = null;
+        await s.redeemInvitation('QMR-7F3A1');
+        await s.redeemInvitation('   ');
+        expect(s.invitationNotice, isNull);
+        expect(s.invitationNoticeGood, isFalse, reason: 'no notice, no tone $at');
+
+        // Not connected to an account.
+        final offline = AppState()..setLang(lang);
+        await offline.redeemInvitation('QMR-7F3A1');
+        expect(offline.invitationNotice, contains(ar ? 'متوصل بحسابك' : 'connected to your account'));
+        expect(offline.invitationNoticeGood, isFalse, reason: 'not connected $at');
+
+        // Me's notices are refusals, and a notice set by hand says nothing good.
+        await s.redeemInvitation('QMR-7F3A1');
+        await s.issueInvitation('Omar');
+        expect(s.invitationNotice, ar ? 'الدعوات لأعضاء قمر+.' : 'Invitations are for Qamar+ members.');
+        expect(s.invitationNoticeGood, isFalse, reason: 'Me, after a redeemed one $at');
+        await s.redeemInvitation('QMR-7F3A1');
+        s.invitationNotice = 'Basel invited you.';
+        expect(s.invitationNoticeGood, isFalse, reason: 'good news is said only by the redeem and the link $at');
+      }
+    });
   });
 
   // A nutritionist's code (O12, 0069): the fortnight, the professional on the

@@ -2991,8 +2991,28 @@ class AppState extends ChangeNotifier {
   // numbered so the loop runs on the sender's standing, never on a discount.
 
   InvitationBook invitations = InvitationBook.empty;
-  String? invitationNotice;
   bool invitationBusy = false;
+
+  /// What the invitation last said, on the welcome and on Me. Setting it
+  /// says something that did not happen: a refusal, a code kept for later,
+  /// no connection. Good news is said only through [_inviteSays], so every
+  /// notice carries its own tone and none inherits an earlier one's.
+  String? get invitationNotice => _invitationNotice;
+  set invitationNotice(String? text) => _inviteSays(text, good: false);
+  String? _invitationNotice;
+
+  /// Whether [invitationNotice] is good news: an invitation redeemed, the
+  /// inviter named or not, with its days or without, or one waiting on the
+  /// phone for an account. The welcome draws it in cyan. False for every
+  /// notice about something that did not happen, drawn in amber, and when
+  /// there is no notice. Me's notices are all of that kind.
+  bool get invitationNoticeGood => _invitationNoticeGood;
+  bool _invitationNoticeGood = false;
+
+  void _inviteSays(String? text, {required bool good}) {
+    _invitationNotice = text;
+    _invitationNoticeGood = text != null && good;
+  }
 
   /// Whoever invited this person, once their code is accepted.
   String? invitedBy;
@@ -3272,7 +3292,8 @@ class AppState extends ChangeNotifier {
       await _redeemPendingInvitation();
       return;
     }
-    invitationNotice = isAr ? 'وصلتك دعوة. هتتفعّل أول ما تدخل.' : 'You have an invitation. It is redeemed the moment you are in.';
+    // Good news: the invitation is here, and waits only for an account.
+    _inviteSays(isAr ? 'وصلتك دعوة. هتتفعّل أول ما تدخل.' : 'You have an invitation. It is redeemed the moment you are in.', good: true);
     _notify();
   }
 
@@ -3309,6 +3330,8 @@ class AppState extends ChangeNotifier {
   /// refused — and false when it could not be asked, so a waiting code can
   /// be kept for another try.
   Future<bool> redeemInvitation(String code) async {
+    // Whatever an earlier code said, and in whatever tone, this one speaks
+    // for itself: a refusal after a success is not good news.
     invitationNotice = null;
     final repo = _invitationRepo;
     final uid = _userId;
@@ -3328,11 +3351,15 @@ class AppState extends ChangeNotifier {
       answered = true;
       invitedBy = r.inviterName.trim().isEmpty ? null : r.inviterName.trim();
       final who = invitedBy ?? (isAr ? 'صاحبك' : 'A friend');
-      invitationNotice = r.trialDays > 0
-          ? (isAr
-              ? '$who عزمك. ${Counted.day.of(r.trialDays, ar: true, iso: iso)} قمر+ عليك من دلوقتي.'
-              : '$who invited you. ${Counted.day.of(r.trialDays, ar: false, iso: iso)} of Qamar+ ${r.trialDays == 1 ? 'is' : 'are'} yours from now.')
-          : (isAr ? '$who عزمك. أهلاً بيك.' : '$who invited you. Welcome.');
+      // Good news whoever sent it: an inviter who skipped their name is
+      // still "a friend", and an invitation without days still welcomes.
+      _inviteSays(
+          r.trialDays > 0
+              ? (isAr
+                  ? '$who عزمك. ${Counted.day.of(r.trialDays, ar: true, iso: iso)} قمر+ عليك من دلوقتي.'
+                  : '$who invited you. ${Counted.day.of(r.trialDays, ar: false, iso: iso)} of Qamar+ ${r.trialDays == 1 ? 'is' : 'are'} yours from now.')
+              : (isAr ? '$who عزمك. أهلاً بيك.' : '$who invited you. Welcome.'),
+          good: true);
       _track('invitation_redeemed', {'trial_days': r.trialDays});
       await _refreshPlus();
     } catch (e) {
