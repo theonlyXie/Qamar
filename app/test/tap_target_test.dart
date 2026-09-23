@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
+import 'package:qamar/screens/you_screen.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/colors.dart';
 import 'package:qamar/theme/layout.dart';
@@ -145,4 +146,35 @@ void main() {
     await tester.pump();
     expect(s.screen, AppScreen.plan, reason: 'the word under the circle opens what the circle opens');
   });
+
+  for (final lang in AppLang.values) {
+    testWidgets('on You, each count of Qamar’s questions is a whole touch, named for what it sets (${lang.name})', (tester) async {
+      tester.view.devicePixelRatio = 3;
+      tester.view.physicalSize = const Size(390, 844) * 3;
+      addTearDown(tester.view.reset);
+      final handle = tester.ensureSemantics();
+      final s = AppState()..setLang(lang);
+      s.dismissOrbTutorial();
+      s.go(AppScreen.today);
+      s.go(AppScreen.you);
+      await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+      await tester.pump();
+      await tester.dragUntilVisible(find.byKey(YouScreen.nudgeKey(2)), find.byType(ListView).first, const Offset(0, -200));
+      await tester.pump(const Duration(milliseconds: 400));
+      for (final n in [0, 1, 2]) {
+        final seg = find.byKey(YouScreen.nudgeKey(n));
+        final touch = find.descendant(of: seg, matching: find.byType(QTapArea));
+        expect(tester.getSize(touch).width, greaterThanOrEqualTo(QLayout.minTap), reason: '$n: 48 across');
+        expect(tester.getSize(touch).height, greaterThanOrEqualTo(QLayout.minTap), reason: '$n: 48 tall');
+        final label = tester.getSemantics(touch).label;
+        expect(label, lang == AppLang.ar ? contains('في اليوم') : '$n a day', reason: 'named for what it sets, not a bare digit');
+      }
+      await tester.tap(find.byKey(YouScreen.nudgeKey(1)));
+      await tester.pump();
+      expect(s.nudgesPerDay, 1);
+      final selected = tester.getSemantics(find.byKey(YouScreen.nudgeKey(1)));
+      expect(selected.flagsCollection.isSelected, Tristate.isTrue, reason: 'the chosen count says so');
+      handle.dispose();
+    });
+  }
 }

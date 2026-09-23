@@ -23,6 +23,9 @@ class YouScreen extends StatelessWidget {
   static const scoreRowKey = ValueKey('points-and-streaks-row');
   static const proCodeKey = ValueKey('affiliate-code');
 
+  /// The "Qamar's questions" count, [n] a day.
+  static ValueKey<String> nudgeKey(int n) => ValueKey('nudges-$n');
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -372,24 +375,33 @@ class YouScreen extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Row(mainAxisSize: MainAxisSize.min, children: [
-                for (final n in [0, 1, 2]) ...[
-                  GestureDetector(
-                    onTap: () { state.setNudgesPerDay(n); },
-                    child: Container(
-                      width: 36,
-                      height: 30,
-                      margin: const EdgeInsets.only(left: 6),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: state.nudgesPerDay == n ? QColors.violetDeep : Colors.transparent,
-                        border: Border.all(color: state.nudgesPerDay == n ? QColors.violetDeep : QColors.borderSoft),
-                        borderRadius: BorderRadius.circular(QRadii.pill),
+                // Drawn as a 36x30 pill, touched across 48 each way (O11),
+                // and named for what it sets, where it was a bare 36x30
+                // GestureDetector read out as "0", "1", "2".
+                for (final n in [0, 1, 2])
+                  Semantics(
+                    key: YouScreen.nudgeKey(n),
+                    selected: state.nudgesPerDay == n,
+                    child: QTapArea(
+                      onTap: () => state.setNudgesPerDay(n),
+                      label: isAr ? '${state.iso('$n')} في اليوم' : '$n a day',
+                      builder: (context, pressed) => Container(
+                        width: 36,
+                        height: 30,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: state.nudgesPerDay == n ? QColors.violetDeep : (pressed ? QColors.cardMid : Colors.transparent),
+                          border: Border.all(color: state.nudgesPerDay == n ? QColors.violetDeep : QColors.borderSoft),
+                          borderRadius: BorderRadius.circular(QRadii.pill),
+                        ),
+                        // The label says it; the digit is what is drawn.
+                        child: ExcludeSemantics(
+                          child: Text(state.iso('$n'),
+                              style: QText.number(size: 13, weight: FontWeight.w600, color: state.nudgesPerDay == n ? QColors.onAccent : QColors.textMuted)),
+                        ),
                       ),
-                      child: Text(state.iso('$n'),
-                          style: QText.number(size: 13, weight: FontWeight.w600, color: state.nudgesPerDay == n ? QColors.onAccent : QColors.textMuted)),
                     ),
                   ),
-                ],
               ]),
             ]),
             if (state.nudgesPerDay > 0 && state.nudgePromptDone && !state.nudgesAllowed) ...[
