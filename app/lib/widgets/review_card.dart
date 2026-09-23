@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/strings.dart';
+import '../l10n/words.dart';
 import '../models/review.dart';
 import '../models/streak.dart';
 import '../theme/app_theme.dart';
@@ -131,7 +132,8 @@ class ReviewCard extends StatelessWidget {
                 const Spacer(),
                 if (showStreak && review.streak.current >= 2)
                   Text(
-                    isAr ? '${iso('${review.streak.current}')} أيام ورا بعض' : '${review.streak.current} days in a row',
+                    // Counted as each language counts: يومين, not ٢ أيام.
+                    '${Counted.day.of(review.streak.current, ar: isAr, iso: iso)} ${isAr ? 'ورا بعض' : 'in a row'}',
                     style: QText.body(size: 11, color: QColors.cyan),
                   ),
               ],

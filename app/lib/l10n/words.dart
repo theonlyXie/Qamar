@@ -30,6 +30,7 @@ class Counted {
 
   static const day = Counted(en: 'day', enPlural: 'days', arOne: 'يوم واحد', arTwo: 'يومين', arFew: 'أيام', arMany: 'يوم');
   static const item = Counted(en: 'item', enPlural: 'items', arOne: 'عنصر واحد', arTwo: 'عنصرين', arFew: 'عناصر', arMany: 'عنصر');
+  static const meal = Counted(en: 'meal', enPlural: 'meals', arOne: 'وجبة واحدة', arTwo: 'وجبتين', arFew: 'وجبات', arMany: 'وجبة');
 
   /// [n] of this noun, in Arabic when [ar].
   String of(int n, {required bool ar, required String Function(String) iso}) {

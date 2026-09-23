@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/strings.dart';
+import '../l10n/words.dart';
 import '../models/days.dart';
 import '../services/repositories.dart';
 import '../state/app_state.dart';
@@ -43,6 +44,8 @@ class ProgressScreen extends StatelessWidget {
     final inRange = state.daysInRange();
     final weights = state.weightHistory;
     final streak = state.streak();
+    // The run's days, counted the way each language counts ([Counted]).
+    final run = Counted.day.of(streak.current, ar: isAr, iso: state.iso);
 
     // The tallest bar is the biggest day, or the target if every day is under
     // it — so a normal week fills the chart instead of hugging the floor.
@@ -86,12 +89,8 @@ class ProgressScreen extends StatelessWidget {
                           streak.current == 0
                               ? (isAr ? 'سجّل وجبة النهاردة وتبدأ سلسلتك.' : 'Log a meal today and your streak begins.')
                               : streak.atRisk
-                                  ? (isAr
-                                      ? '${state.iso('${streak.current}')} ${streak.current == 1 ? 'يوم' : 'أيام'} · وجبة واحدة قبل نص الليل تكمّلها'
-                                      : '${streak.current} ${streak.current == 1 ? 'day' : 'days'} · one meal before midnight keeps it')
-                                  : (isAr
-                                      ? '${state.iso('${streak.current}')} ${streak.current == 1 ? 'يوم' : 'أيام'} ورا بعض · النهاردة محسوب'
-                                      : '${streak.current} ${streak.current == 1 ? 'day' : 'days'} in a row · today counted'),
+                                  ? (isAr ? '$run · وجبة واحدة قبل نص الليل تكمّلها' : '$run · one meal before midnight keeps it')
+                                  : (isAr ? '$run ورا بعض · النهاردة محسوب' : '$run in a row · today counted'),
                           style: QText.body(size: 14, height: 22, color: QColors.textHigh),
                         ),
                         const SizedBox(height: 2),
@@ -135,7 +134,7 @@ class ProgressScreen extends StatelessWidget {
                 active == 0
                     ? (isAr ? 'لسه مفيش وجبات مسجلة الأسبوع ده. أول ما تسجّل، الأرقام تظهر هنا.' : 'Nothing logged this week yet. The numbers appear here as soon as you log.')
                     : (isAr
-                        ? '${state.iso('$active')} ${active == 1 ? 'يوم' : 'أيام'} نشاط · ${state.iso('$logged')} وجبة مسجلة${state.generalGuidance ? '' : ' · ${state.iso('$inRange')} من ${state.iso('$active')} داخل النطاق'}'
+                        ? '${Counted.day.of(active, ar: true, iso: state.iso)} نشاط · ${Counted.meal.of(logged, ar: true, iso: state.iso)} ${logged == 2 ? 'مسجلتين' : 'مسجلة'}${state.generalGuidance ? '' : ' · ${state.iso('$inRange')} من ${state.iso('$active')} داخل النطاق'}'
                         : '$active active ${active == 1 ? 'day' : 'days'} · $logged ${logged == 1 ? 'meal' : 'meals'} logged${state.generalGuidance ? '' : ' · $inRange of $active in target range'}'),
                 style: QText.body(size: 14, height: 22, color: QColors.textHigh),
               ),
@@ -197,7 +196,7 @@ class ProgressScreen extends StatelessWidget {
                 SizedBox(width: double.infinity, height: 90, child: CustomPaint(painter: _WeightTrendPainter(weights))),
                 const SizedBox(height: 10),
                 Text(
-                  _trendLine(isAr, weights),
+                  _trendLine(isAr, weights, state.iso),
                   style: QText.body(size: 13, color: QColors.textMuted),
                 ),
               ],
@@ -223,8 +222,8 @@ class ProgressScreen extends StatelessWidget {
               Text(
                 active < 3
                     ? (isAr
-                        ? 'رأي الأسبوع بيظهر بعد ٣ أيام مسجلة. لسه ${state.iso('${3 - active}')} ${3 - active == 1 ? 'يوم' : 'أيام'}.'
-                        : 'The weekly insight appears after 3 logged days — ${3 - active} to go.')
+                        ? 'رأي الأسبوع بيظهر بعد ${Counted.day.of(3, ar: true, iso: state.iso)} مسجلة. ${together('لسه ${Counted.day.of(3 - active, ar: true, iso: state.iso)}.')}'
+                        : 'The weekly insight appears after 3 logged days — ${together('${3 - active} to go.')}')
                     : (isAr
                         ? 'من ${state.iso('$active')} أيام مسجلة، ${state.iso('$inRange')} قربوا من هدفك. المتوسط ${state.iso('${_average(week)}')} سعرة في اليوم المسجّل.'
                         : 'Across $active logged days, $inRange landed near your target. Your average on a logged day is ${_average(week)} kcal.'),
@@ -243,17 +242,18 @@ class ProgressScreen extends StatelessWidget {
     return (logged.fold(0, (s, d) => s + d.kcal) / logged.length).round();
   }
 
-  static String _trendLine(bool isAr, List<WeightReading> w) {
+  static String _trendLine(bool isAr, List<WeightReading> w, String Function(String) iso) {
     final delta = w.last.kg - w.first.kg;
-    // Calendar days between the readings ([Days]), not 24-hour spans.
+    // Calendar days between the readings ([Days]), not 24-hour spans, counted
+    // as each language counts ([Counted]).
     final days = Days.between(w.first.at, w.last.at);
-    final span = isAr ? 'على مدى ${days} يوم' : 'over $days days';
+    final span = isAr ? 'على مدى ${Counted.day.of(days, ar: true, iso: iso)}' : 'over ${Counted.day.of(days, ar: false, iso: iso)}';
     if (delta.abs() < 0.3) {
       return isAr ? 'وزنك ثابت تقريباً $span. قياس واحد مش دليل.' : 'Essentially level $span. A single reading is not evidence.';
     }
     final amount = delta.abs().toStringAsFixed(1);
     if (isAr) {
-      return '${delta < 0 ? 'نزلت' : 'زدت'} $amount كجم $span. قياس واحد مش دليل.';
+      return '${delta < 0 ? 'نزلت' : 'زدت'} ${iso(amount)} كجم $span. قياس واحد مش دليل.';
     }
     return '${delta < 0 ? 'Down' : 'Up'} $amount kg $span. A single reading is not evidence.';
   }
