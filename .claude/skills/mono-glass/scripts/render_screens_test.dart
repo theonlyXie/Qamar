@@ -159,6 +159,23 @@ void main() {
       await _shoot(t, s, '11_chat_thread_$l');
     });
 
+    _scene('11b_chat_confirm_$l', (t) async {
+      final s = _today(lang)..chatOpen = true;
+      s.chat.add(ChatTurn(who: ChatWho.u, text: ar ? 'فطرت فول وعيش وبيضة' : 'Breakfast was foul, bread and an egg'));
+      s.proposal = MealAnalysis([
+        ConfirmItemDef(ar: 'فول مدمس', en: 'Foul medames', portionAr: 'طبق وسط', portionEn: 'a medium plate', conf: Confidence.high, kcal: 320, p: 18, c: 40, f: 9),
+        ConfirmItemDef(ar: 'عيش بلدي', en: 'Baladi bread', portionAr: 'رغيف', portionEn: 'one loaf', conf: Confidence.high, kcal: 250, p: 9, c: 50, f: 2),
+        ConfirmItemDef(ar: 'بيضة مسلوقة', en: 'Boiled egg', portionAr: 'واحدة', portionEn: 'one', conf: Confidence.med, kcal: 78, p: 6, c: 1, f: 5),
+      ]);
+      s.proposalQty = [1, 1, 1];
+      await _shoot(t, s, '11b_chat_confirm_$l');
+    });
+    _scene('11c_chat_listening_$l', (t) async {
+      final s = _today(lang)..chatOpen = true;
+      s.chatState = ChatState.listening;
+      await _shoot(t, s, '11c_chat_listening_$l');
+    });
+
     // The rest of the tree.
     _scene('12_plan_$l', (t) async => _shoot(t, _today(lang)..go(AppScreen.plan), '12_plan_$l'));
     _scene('13_progress_$l', (t) async => _shoot(t, _today(lang, logged: true)..go(AppScreen.progress), '13_progress_$l'));
