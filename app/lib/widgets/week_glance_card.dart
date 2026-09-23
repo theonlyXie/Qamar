@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
 
@@ -20,7 +21,7 @@ class WeekGlanceCard extends StatelessWidget {
     final isAr = state.isAr;
     final review = state.weekReview();
     return Container(
-      padding: const EdgeInsetsDirectional.fromSTEB(16, 6, 8, 12),
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 8, 12),
       decoration: QDecor.card(
         gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
         border: QColors.violet.withValues(alpha: 0.35),
@@ -30,8 +31,10 @@ class WeekGlanceCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            height: 36,
+          // At least as tall as the control's whole touch (48pt, O11), so the
+          // touch around its 34pt outline is never cut.
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: QLayout.minTap),
             child: Row(
               children: [
                 Text(isAr ? 'أسبوعك مع قمر' : 'Your week with Qamar', style: QText.body(size: 11, weight: FontWeight.w600, color: QColors.violetSoft)),

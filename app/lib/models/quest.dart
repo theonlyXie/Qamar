@@ -45,7 +45,7 @@ enum QuestKind {
   String why({required bool ar}) => switch (this) {
         QuestKind.lunchBy16 => ar ? 'لما تسجّل بدري بقدر أعدّل العشا قبل ما اليوم يخلص.' : 'Logged early, I can still adjust dinner.',
         QuestKind.proteinDinner => ar ? 'البروتين ناقص النهارده، وعشا واحد يكمّله.' : 'Protein is today’s gap so far; one dinner closes it.',
-        QuestKind.water6 => ar ? 'يعني لتر ونص، أساس كويس في حر مصر، والشاي بيتحسب.' : 'That is 1.5 litres, a steady base in Egyptian heat; tea counts.',
+        QuestKind.water6 => ar ? 'يعني لتر ونص، أساس كويس في حر مصر، والشاي بيتحسب.' : '1.5 litres, a good base in Egyptian heat; tea counts.',
       };
 }
 

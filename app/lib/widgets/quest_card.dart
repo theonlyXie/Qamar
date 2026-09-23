@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
 import 'explain.dart';
@@ -27,15 +28,18 @@ class QuestCard extends StatelessWidget {
     return Explainable(
       id: 'quest',
       child: Container(
-        padding: const EdgeInsetsDirectional.fromSTEB(16, 6, 8, 10),
+        padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 8, 10),
         decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.card),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // The label, the score, and the one control, on one line.
-            SizedBox(
-              height: 36,
+            // The label, the score, and the one control, on one line: at least
+            // as tall as the control's whole touch (48pt, O11), so the touch
+            // around its 34pt outline is never cut, and the same height when
+            // done, so the card does not change shape.
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: QLayout.minTap),
               child: Row(
                 children: [
                   Text(state.t.nextQuest, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),

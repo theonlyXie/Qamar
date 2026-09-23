@@ -123,5 +123,13 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(tester.getSize(find.byType(WeekGlanceCard)).height, lessThanOrEqualTo(120));
     });
+
+    testWidgets('"See the week" takes a whole touch, 48 by 48 at least (${lang.name})', (tester) async {
+      final s = _state(lang, now: _friday);
+      await pump(tester, s);
+      final touch = tester.getSize(find.byKey(WeekGlanceCard.openKey));
+      expect(touch.width, greaterThanOrEqualTo(48), reason: '$touch');
+      expect(touch.height, greaterThanOrEqualTo(48), reason: '$touch');
+    });
   }
 }

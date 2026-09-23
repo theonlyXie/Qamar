@@ -225,6 +225,16 @@ void main() {
           }
         }
       });
+
+      testWidgets('"Not today" takes a whole touch, 48 by 48 at least (${lang.name})', (tester) async {
+        for (final k in QuestKind.values) {
+          final s = _state(lang, quest: _q(k));
+          await pump(tester, s);
+          final touch = tester.getSize(find.byKey(QuestCard.notTodayKey));
+          expect(touch.width, greaterThanOrEqualTo(48), reason: '${k.wire}: $touch');
+          expect(touch.height, greaterThanOrEqualTo(48), reason: '${k.wire}: $touch');
+        }
+      });
     }
   });
 }
