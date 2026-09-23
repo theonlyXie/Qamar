@@ -495,7 +495,14 @@ class QBalancedText extends StatelessWidget {
 
   /// On the [Text] itself, for a finder that reads it.
   final Key? textKey;
-  const QBalancedText(this.text, {super.key, this.textKey, required this.style});
+
+  /// The widest its lines may run however wide the room is, a measure.
+  /// Held here rather than by a box around it, so that measuring the text
+  /// measures it at that width: a max-width box asks its child's height at
+  /// the full width, and a page that sizes itself from that came up a line
+  /// short.
+  final double maxWidth;
+  const QBalancedText(this.text, {super.key, this.textKey, required this.style, this.maxWidth = double.infinity});
 
   /// The width [text] balances to inside [maxWidth].
   static double balancedWidth(String text, TextStyle style, double maxWidth, TextDirection direction, TextScaler scaler) {
@@ -520,6 +527,7 @@ class QBalancedText extends StatelessWidget {
         style: DefaultTextStyle.of(context).style.merge(style),
         direction: Directionality.of(context),
         scaler: MediaQuery.textScalerOf(context),
+        measure: maxWidth,
         child: Text(text, key: textKey, textAlign: TextAlign.center, style: style),
       );
 }
@@ -533,10 +541,11 @@ class _Balance extends SingleChildRenderObjectWidget {
   final TextStyle style;
   final TextDirection direction;
   final TextScaler scaler;
-  const _Balance({required this.text, required this.style, required this.direction, required this.scaler, required super.child});
+  final double measure;
+  const _Balance({required this.text, required this.style, required this.direction, required this.scaler, required this.measure, required super.child});
 
   @override
-  RenderObject createRenderObject(BuildContext context) => _RenderBalance(text, style, direction, scaler);
+  RenderObject createRenderObject(BuildContext context) => _RenderBalance(text, style, direction, scaler, measure);
 
   @override
   void updateRenderObject(BuildContext context, _RenderBalance r) {
@@ -545,6 +554,7 @@ class _Balance extends SingleChildRenderObjectWidget {
       ..style = style
       ..direction = direction
       ..scaler = scaler
+      ..measure = measure
       ..markNeedsLayout();
   }
 }
@@ -554,15 +564,28 @@ class _RenderBalance extends RenderShiftedBox {
   TextStyle style;
   TextDirection direction;
   TextScaler scaler;
-  _RenderBalance(this.text, this.style, this.direction, this.scaler) : super(null);
+  double measure;
+  _RenderBalance(this.text, this.style, this.direction, this.scaler, this.measure) : super(null);
+
+  // Measured at the width it will be laid out in: the room, or the measure
+  // where that is narrower.
+  @override
+  double computeMinIntrinsicHeight(double width) => child?.getMinIntrinsicHeight(math.min(width, measure)) ?? 0;
+  @override
+  double computeMaxIntrinsicHeight(double width) => child?.getMaxIntrinsicHeight(math.min(width, measure)) ?? 0;
+  @override
+  double computeMinIntrinsicWidth(double height) => math.min(child?.getMinIntrinsicWidth(height) ?? 0, measure);
+  @override
+  double computeMaxIntrinsicWidth(double height) => math.min(child?.getMaxIntrinsicWidth(height) ?? 0, measure);
 
   @override
   void performLayout() {
     final c = child!;
-    final max = constraints.maxWidth;
+    final room = constraints.maxWidth;
+    final max = math.min(room, measure);
     final w = max.isFinite ? QBalancedText.balancedWidth(text, style, max, direction, scaler) : max;
     c.layout(constraints.copyWith(minWidth: 0, maxWidth: w), parentUsesSize: true);
-    size = constraints.constrain(Size(max.isFinite ? max : c.size.width, c.size.height));
+    size = constraints.constrain(Size(room.isFinite ? room : c.size.width, c.size.height));
     (c.parentData! as BoxParentData).offset = Offset((size.width - c.size.width) / 2, (size.height - c.size.height) / 2);
   }
 }

@@ -17,8 +17,10 @@
 // now carry, where it is drawn (seat 4), with the wallet's "earned" (its
 // Lifetime earned and History's signed rows say it) and the spend card's
 // "Price" and "Limit" labels (the card shows "400 Su" and its own limit
-// line). The table still holds 2 other strings nothing reads; they are listed here by name, owed
-// to the seats whose screens they came from, so that this test holds the
+// line). And the welcome's "or sign up with", which went with the three
+// providers under it; the guest line that took its place is read now. The
+// table still holds 1 other string nothing reads; it is listed here by name,
+// owed to the seat whose screen it came from, so that this test holds the
 // line: a string that stops being read is either used again or deleted,
 // not kept.
 
@@ -28,7 +30,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Unread before this test, left for their owners to use or retire.
 const _owed = {
-  'restart', 'guestNote',
+  'restart',
 };
 
 void main() {
@@ -88,6 +90,13 @@ void main() {
       expect(fields, isNot(contains(f)), reason: '$f is not read anywhere');
     }
     for (final words in const ["'earned'", "'اتكسبت'", "'Price'", "'السعر'", "'Limit'", "'الحد'"]) {
+      expect(table, isNot(contains(words)), reason: words);
+    }
+  });
+
+  test('the welcome\'s "or sign up with" is gone from the table, with the providers it led to', () {
+    expect(fields, isNot(contains('continueWith')));
+    for (final words in const ['or sign up with', 'أو سجّل بحساب']) {
       expect(table, isNot(contains(words)), reason: words);
     }
   });
