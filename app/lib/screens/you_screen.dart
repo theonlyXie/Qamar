@@ -26,6 +26,10 @@ class YouScreen extends StatelessWidget {
   /// The "Qamar's questions" count, [n] a day.
   static ValueKey<String> nudgeKey(int n) => ValueKey('nudges-$n');
 
+  /// The read-out of what Qamar holds, and the wallet card.
+  static const readOutKey = ValueKey('you-read-out');
+  static const walletCardKey = ValueKey('you-wallet');
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -46,7 +50,6 @@ class YouScreen extends StatelessWidget {
             ? (isAr ? 'فاضية' : 'Empty')
             : (isAr ? '${state.iso('$remembered')} عناصر' : '$remembered items')
       ),
-      (isAr ? 'محفظة نقاط Su' : 'Su Points wallet', state.iso(state.formatSu(state.suAvailable))),
       (isAr ? 'الموافقات' : 'Consents', isAr ? 'الإصدار ${state.digits(QamarConfig.consentVersion)}' : 'v${QamarConfig.consentVersion}'),
     ];
 
@@ -190,77 +193,96 @@ class YouScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
+        // The wallet, and under it, in the same card, what "Points and
+        // streaks" hides (O4): the switch is about the wallet's score, and
+        // the card's Spend is the one way to the wallet on this screen.
         Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: QColors.gold.withOpacity(0.08), border: Border.all(color: QColors.gold.withOpacity(0.32)), borderRadius: BorderRadius.circular(QRadii.card)),
-          child: Row(children: [
-            const SuCoinIcon(size: 30),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(t.walletTitle, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.goldPale)),
-                // Lifetime earned keeps score (it is what Level is made of),
-                // so with "Points and streaks" off only the balance is said.
-                Text(
-                  state.showScore
-                      ? (isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح · ${state.iso(state.formatSu(state.suLifetime))} مكتسب' : '${state.formatSu(state.suAvailable)} available · ${state.formatSu(state.suLifetime)} lifetime')
-                      : (isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح' : '${state.formatSu(state.suAvailable)} available'),
-                  style: QText.body(size: 12, color: QColors.goldMuted),
+          key: YouScreen.walletCardKey,
+          decoration: BoxDecoration(color: QColors.gold.withValues(alpha: 0.08), border: Border.all(color: QColors.gold.withValues(alpha: 0.32)), borderRadius: BorderRadius.circular(QRadii.card)),
+          child: Column(children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(children: [
+                const SuCoinIcon(size: 30),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(t.walletTitle, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.goldPale)),
+                    // Lifetime earned keeps score (it is what Level is made of),
+                    // so with "Points and streaks" off only the balance is said.
+                    Text(
+                      state.showScore
+                          ? (isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح · ${state.iso(state.formatSu(state.suLifetime))} مكتسب' : '${state.formatSu(state.suAvailable)} available · ${state.formatSu(state.suLifetime)} lifetime')
+                          : (isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح' : '${state.formatSu(state.suAvailable)} available'),
+                      style: QText.body(size: 12, color: QColors.goldMuted),
+                    ),
+                  ]),
                 ),
+                QOutlineButton(label: t.spendTab, onTap: state.openWallet, height: 36, color: QColors.gold),
               ]),
             ),
-            QOutlineButton(label: t.spendTab, onTap: state.openWallet, height: 36, color: QColors.gold),
-          ]),
-        ),
-        const SizedBox(height: 10),
-        // "Points and streaks" (O4): off hides everything on screen that keeps
-        // score, and only hides it. The wallet's balance stays, for whoever
-        // goes to look, and earning, freezes and photo purchases carry on.
-        // The whole row is the control, not only the switch.
-        MergeSemantics(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              key: YouScreen.scoreRowKey,
-              borderRadius: BorderRadius.circular(QRadii.control),
-              onTap: () => state.setShowScore(!state.showScore),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.control),
-                child: Row(children: [
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(isAr ? 'النقاط والسلسلة' : 'Points and streaks', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
-                      Text(
-                        isAr
-                            ? 'نقاط Su ومستواك والسلسلة ومهمة اليوم على شاشاتك. لو قفلتها بتستخبى بس: النقاط بتتحسب زي ما هي، ورصيدك فاضل في المحفظة.'
-                            : 'Su, your level, the streak and the day’s quest on your screens. Off only hides them: you still earn, and your balance stays in the wallet.',
-                        style: QText.body(size: 12, height: 16, color: QColors.textMuted),
+            Divider(color: QColors.gold.withValues(alpha: 0.2), height: 1),
+            // "Points and streaks" (O4): off hides everything on screen that
+            // keeps score, and only hides it. The wallet's balance stays, for
+            // whoever goes to look, and earning, freezes and photo purchases
+            // carry on. The whole row is the control, not only the switch.
+            MergeSemantics(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  key: YouScreen.scoreRowKey,
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(QRadii.card)),
+                  onTap: () => state.setShowScore(!state.showScore),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+                    child: Row(children: [
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(isAr ? 'النقاط والسلسلة' : 'Points and streaks', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+                          Text(
+                            isAr
+                                ? 'نقاط Su ومستواك والسلسلة ومهمة اليوم على شاشاتك. لو قفلتها بتستخبى بس: النقاط بتتحسب زي ما هي، ورصيدك فاضل في المحفظة.'
+                                : 'Su, your level, the streak and the day’s quest on your screens. Off only hides them: you still earn, and your balance stays in the wallet.',
+                            style: QText.body(size: 12, height: 16, color: QColors.textMuted),
+                          ),
+                        ]),
+                      ),
+                      Switch.adaptive(
+                        key: YouScreen.scoreSwitchKey,
+                        value: state.showScore,
+                        onChanged: state.setShowScore,
                       ),
                     ]),
                   ),
-                  Switch.adaptive(
-                    key: YouScreen.scoreSwitchKey,
-                    value: state.showScore,
-                    onChanged: state.setShowScore,
-                  ),
-                ]),
+                ),
               ),
             ),
-          ),
+          ]),
         ),
         const SizedBox(height: 14),
-        for (final r in rows) ...[
-          Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.control),
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(r.$1, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
-              Text(r.$2, style: QText.body(size: 13, color: QColors.textMuted)),
-            ]),
-          ),
-        ],
+        // What Qamar holds, read out: one card, a line each, under
+        // hairlines. They were four separate bordered rows, each dressed as
+        // a control that did nothing when touched, and a fifth, "Su Points
+        // wallet", was a second way to the wallet card just above it, whose
+        // Spend is the one way in.
+        Container(
+          key: YouScreen.readOutKey,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.card),
+          child: Column(children: [
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) const Divider(color: QColors.borderSoft, height: 1),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Text(rows[i].$1, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+                  Text(rows[i].$2, style: QText.body(size: 13, color: QColors.textMuted)),
+                ]),
+              ),
+            ],
+          ]),
+        ),
         // Both of these are store requirements, and the second is a legal
         // obligation — they cannot stay as decoration.
         Container(

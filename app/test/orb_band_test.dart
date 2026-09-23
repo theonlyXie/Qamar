@@ -263,8 +263,13 @@ void main() {
           await tester.pump(const Duration(milliseconds: 400));
           final list = find.byType(Scrollable).first;
           final position = tester.state<ScrollableState>(list).position;
-          position.jumpTo(position.maxScrollExtent);
-          await tester.pump();
+          // A lazily built list only knows its full length once its last
+          // children are laid out: jump to the end until the end holds.
+          for (var i = 0; i < 10; i++) {
+            position.jumpTo(position.maxScrollExtent);
+            await tester.pump();
+            if (position.pixels >= position.maxScrollExtent) break;
+          }
           final orbLayer = find.byType(OrbNav);
           final words = find.byType(RichText).evaluate().where((e) => find.descendant(of: orbLayer, matching: find.byWidget(e.widget)).evaluate().isEmpty);
           var lowest = 0.0;
