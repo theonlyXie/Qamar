@@ -5,13 +5,17 @@
 // that passes AA on the card; the run, when it is shown, takes the other
 // end. Both languages. And the crescent is lit on the side the seven day
 // moons are, the right in both languages, where the glyph was lit on the
-// left and read as their mirror (seat 3).
+// left and read as their mirror (seat 3). The crescent is the app's one
+// icon family's moon (QIcons, Cupertino), so its font is loaded to see it.
 
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qamar/models/review.dart';
@@ -32,8 +36,29 @@ WeekReview _review(Streak streak) {
   return WeekReview.build(week: week, lastWeek: const [], targetKcal: 2000, streak: streak, iso: (x) => x, hasTarget: true);
 }
 
+/// The Cupertino icon font the app's glyphs are drawn from, where the
+/// package config says the package in use is; null when it is not there.
+File? _iconFont() {
+  final config = File('.dart_tool/package_config.json').absolute;
+  if (!config.existsSync()) return null;
+  final packages = (jsonDecode(config.readAsStringSync()) as Map)['packages'] as List;
+  for (final p in packages.cast<Map>()) {
+    if (p['name'] != 'cupertino_icons') continue;
+    final root = config.uri.resolve('${p['rootUri']}/');
+    final font = File.fromUri(root.resolve('assets/CupertinoIcons.ttf'));
+    return font.existsSync() ? font : null;
+  }
+  return null;
+}
+
 void main() {
-  setUpAll(loadAppFonts);
+  final iconFont = _iconFont();
+  setUpAll(() async {
+    await loadAppFonts();
+    if (iconFont != null) {
+      await (FontLoader('packages/${CupertinoIcons.iconFontPackage}/${CupertinoIcons.iconFont}')..addFont(Future.value(iconFont.readAsBytesSync().buffer.asByteData()))).load();
+    }
+  });
 
   for (final ar in [false, true]) {
     for (final run in [0, 4]) {
@@ -73,7 +98,6 @@ void main() {
 
   // The glyph is drawn from the icon font; without it there is nothing to
   // measure.
-  final iconFont = File('/opt/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf').existsSync();
   for (final ar in [false, true]) {
     testWidgets('the crescent is lit on the side the day moons are (${ar ? 'ar' : 'en'})', (tester) async {
       final monday = DateTime(2026, 9, 21);
@@ -112,6 +136,6 @@ void main() {
       expect(moons, everyElement(greaterThan(0.03)), reason: 'the day moons are lit on the right: $moons');
       final mark = litSide(tester.getRect(find.byKey(ReviewCard.markKey)));
       expect(mark, greaterThan(0.03), reason: 'the crescent is lit on the right too, not their mirror ($mark)');
-    }, skip: !iconFont);
+    }, skip: iconFont == null);
   }
 }

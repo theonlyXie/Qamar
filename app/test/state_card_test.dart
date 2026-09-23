@@ -88,13 +88,15 @@ void main() {
         s.go(AppScreen.plan);
         await _pumpApp(tester, s);
         final card = tester.getRect(find.byType(QStateCard));
-        final subtitle = tester.getRect(find.text(s.t.planSub));
-        final dayCard = tester.getRect(find.text(s.t.dayChanged));
-        final spaceTop = subtitle.bottom;
-        final spaceBottom = dayCard.top - 16; // the day card's own padding
+        // The header is the title's row, the back button in it; the space
+        // ends at the "Day changed?" row under it.
+        final header = tester.getRect(find.ancestor(of: find.byType(QBackButton), matching: find.byType(Row)).first);
+        final dayRow = tester.getRect(find.ancestor(of: find.text(s.t.dayChanged), matching: find.byType(Row)).first);
+        final spaceTop = header.bottom;
+        final spaceBottom = dayRow.top;
         final at = (card.center.dy - spaceTop) / (spaceBottom - spaceTop);
         expect(at, inInclusiveRange(0.33, 0.5), reason: 'at the optical centre of the free space, not stuck under the header ($at)');
-        expect(card.top - subtitle.bottom, greaterThan(40));
+        expect(card.top - header.bottom, greaterThan(40));
       });
     }
 
