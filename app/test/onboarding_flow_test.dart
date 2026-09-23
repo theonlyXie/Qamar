@@ -240,7 +240,8 @@ void main() {
       expect(find.text('Your free week is waiting: 7 days, no card, nothing renews.'), findsOneWidget);
       s.setLang(AppLang.ar);
       await tester.pump();
-      expect(find.text('أسبوعك المجاني مستنيك: \u2066٧\u2069 أيام، من غير بطاقة، ومفيش تجديد.'), findsOneWidget);
+      // The onboarding card's own words: "ومفيش حاجة بتتجدد لوحدها".
+      expect(find.text('أسبوعك المجاني مستنيك: \u2066٧\u2069 أيام، من غير بطاقة، ومفيش حاجة بتتجدد لوحدها.'), findsOneWidget);
     });
 
     testWidgets('while an invitation code waits, the Me tile does not offer the free week, in either language', (tester) async {

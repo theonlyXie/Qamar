@@ -132,7 +132,7 @@ class YouScreen extends StatelessWidget {
                           : state.trialWaiting
                               // "Not now" at the reveal leaves the free week here.
                               ? (isAr
-                                  ? 'أسبوعك المجاني مستنيك: ${state.iso('${AppState.trialOfferDays}')} أيام، من غير بطاقة، ومفيش تجديد.'
+                                  ? 'أسبوعك المجاني مستنيك: ${state.iso('${AppState.trialOfferDays}')} أيام، من غير بطاقة، ومفيش حاجة بتتجدد لوحدها.'
                                   : 'Your free week is waiting: ${AppState.trialOfferDays} days, no card, nothing renews.')
                               : (isAr ? 'خطة بكرة، وصور وأسئلة أكتر' : 'Tomorrow’s plan, more photos and questions'),
                       style: QText.body(size: 12, height: 18, color: QColors.textMuted),

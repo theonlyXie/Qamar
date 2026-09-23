@@ -199,11 +199,18 @@ class QamarCard extends StatelessWidget {
   /// The "Log a meal" button, for tests.
   static const logKey = ValueKey('today-log-a-meal');
 
+  /// The lock card's free-week offer, for tests.
+  static const lockOfferKey = ValueKey('today-lock-offer');
+
   @override
   Widget build(BuildContext context) {
     final isAr = state.isAr;
     final line = todaySentenceFor(state);
     final locked = state.nightPlanLocked;
+    // The first locked card offers the free week once more (O12). It is
+    // counted once it has been drawn, not when it is merely possible.
+    final offerWeek = locked && line.fromNight && state.lockCardTrialOffer;
+    if (offerWeek) WidgetsBinding.instance.addPostFrameCallback((_) => state.recordLockCardOffer());
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), radius: QRadii.xl),
@@ -226,18 +233,27 @@ class QamarCard extends StatelessWidget {
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: InkWell(
+                key: offerWeek ? lockOfferKey : null,
                 borderRadius: BorderRadius.circular(QRadii.md),
-                onTap: state.openNightNote,
+                onTap: offerWeek ? state.acceptLockCardTrial : state.openNightNote,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(minHeight: 48),
                   child: Padding(
                     padding: const EdgeInsetsDirectional.only(start: 52, end: 8),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(locked ? Icons.lock_outline : Icons.arrow_outward, size: 14, color: locked ? QColors.gold : QColors.textMuted),
+                      Icon(offerWeek ? Icons.card_giftcard : (locked ? Icons.lock_outline : Icons.arrow_outward), size: 14, color: locked ? QColors.gold : QColors.textMuted),
                       const SizedBox(width: 6),
-                      Text(
-                        locked ? (isAr ? 'الخطة الكاملة في قمر+' : 'The full plan is Qamar+') : (isAr ? 'افتح خطة النهارده' : 'Open today’s plan'),
-                        style: QText.body(size: 12, color: locked ? QColors.gold : QColors.textMuted),
+                      Flexible(
+                        child: Text(
+                          offerWeek
+                              ? (isAr
+                                  ? 'افتح الخطة بأسبوعك المجاني: ${state.iso('${AppState.trialOfferDays}')} أيام، من غير بطاقة'
+                                  : 'Open the plan with your free week: ${AppState.trialOfferDays} days, no card')
+                              : locked
+                                  ? (isAr ? 'الخطة الكاملة في قمر+' : 'The full plan is Qamar+')
+                                  : (isAr ? 'افتح خطة النهارده' : 'Open today’s plan'),
+                          style: QText.body(size: 12, color: locked ? QColors.gold : QColors.textMuted),
+                        ),
                       ),
                     ]),
                   ),

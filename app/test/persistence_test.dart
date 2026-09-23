@@ -1613,7 +1613,7 @@ void main() {
     expect(state.plusActive, isTrue);
     expect(state.plusIsTrial, isTrue);
     expect(state.plusTrialEligible, isFalse);
-    expect(state.plusNotice, contains('seven days'));
+    expect(state.plusNotice, 'Your week of the full Qamar has started: 7 days, no card, and nothing renews on its own.');
 
     // A second ask never reaches the server: the phone already knows.
     await state.startPlusTrial();
@@ -2460,10 +2460,76 @@ void main() {
 
       state.declineTrialOffer();
       expect(state.msgs.any((m) => m.kind == ObKind.trialOffer), isFalse);
-      expect(state.msgs.last.text(false), 'It’s waiting in Me whenever you want it.');
+      // The consultation's one price line, against a nutritionist (O12/O14).
+      expect(state.msgs.last.text(false), 'It’s waiting in Me whenever you want it. After it, Qamar+ is EGP 500 a month — about one nutritionist visit.');
+      expect(state.msgs.last.text(true), contains('في حدود تمن كشف واحد عند أخصائي تغذية'));
+      expect(state.msgs.last.text(false), isNot(contains('less than')), reason: 'a visit costs EGP 350–800; 500 is in that range, not below it');
       expect(billing.trialStarts, 0);
       expect(state.trialWaiting, isTrue, reason: 'the You tile says so while it waits');
       expect(a.named('trial_offer_declined').single['placement'], 'onboarding');
+    });
+
+    test('the first locked tomorrow card offers the week once more, for that day only, and it is counted once', () async {
+      var now = DateTime(2026, 9, 23, 9);
+      final a = MemoryAnalytics();
+      final prefs = MemoryDevicePrefs();
+      final billing = FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: true);
+      final state = backed(billing: billing, analytics: a, prefs: prefs, clock: () => now);
+      await settle();
+      await state.setImprove(true);
+      expect(state.lockCardTrialOffer, isFalse, reason: 'no night note, no locked card');
+      state.nightNote = NightNote(day: DateTime(2026, 9, 23), ar: 'بكرة', en: 'Tomorrow', planKcal: 1900, todayKcal: 1500);
+      expect(state.nightPlanLocked, isTrue);
+      expect(state.lockCardTrialOffer, isTrue);
+
+      state.recordLockCardOffer();
+      state.recordLockCardOffer();
+      expect(a.named('trial_offer_shown').where((e) => e['placement'] == 'lock_card'), hasLength(1), reason: 'counted once');
+      expect(await prefs.getString('trial_lock_offer_day'), '2026-09-23');
+      expect(state.lockCardTrialOffer, isTrue, reason: 'the whole of that day');
+
+      now = DateTime(2026, 9, 24, 9);
+      expect(state.lockCardTrialOffer, isFalse, reason: 'the first locked card only: the next day the link is the wall again');
+      expect(state.trialWaiting, isTrue, reason: 'and the week still waits in Me');
+
+      final later = backed(billing: billing, prefs: prefs, clock: () => now);
+      await settle();
+      later.nightNote = state.nightNote;
+      expect(later.lockCardTrialOffer, isFalse, reason: 'a restart does not bring it back');
+    });
+
+    test('Start on the lock card begins the week, counted there, and shows the plan it opened', () async {
+      final a = MemoryAnalytics();
+      final billing = FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: true);
+      final state = backed(billing: billing, analytics: a);
+      await settle();
+      await state.setImprove(true);
+      state.nightNote = NightNote(day: DateTime.now(), ar: 'بكرة', en: 'Tomorrow', planKcal: 1900, todayKcal: 1500);
+      await state.acceptLockCardTrial();
+      await settle();
+      expect(billing.trialStarts, 1);
+      expect(state.plusIsTrial, isTrue);
+      expect(state.screen, AppScreen.plan);
+      expect(a.named('trial_started').single['placement'], 'lock_card');
+      expect(state.lockCardTrialOffer, isFalse, reason: 'the plan is open now');
+    });
+
+    test('the lock card never offers a week that cannot start: used, waiting on a code, or a member', () async {
+      final used = backed(billing: FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: false));
+      await settle();
+      used.nightNote = NightNote(day: DateTime.now(), ar: 'بكرة', en: 'Tomorrow', planKcal: 1900, todayKcal: 1500);
+      expect(used.lockCardTrialOffer, isFalse);
+
+      final prefs = MemoryDevicePrefs();
+      await prefs.setString('pending_pro_code', 'QMRSARA1');
+      final waiting = backed(
+        billing: FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: true),
+        invitations: FakeInvitationRepo()..proFailWith = StateError('no signal'),
+        prefs: prefs,
+      );
+      await settle();
+      waiting.nightNote = used.nightNote;
+      expect(waiting.lockCardTrialOffer, isFalse, reason: 'Start would spend the code\'s fortnight on seven days');
     });
 
     test('while an invitation code waits, no free week is offered: Start would spend the one trial its fortnight needs', () async {

@@ -156,14 +156,16 @@ class SubscriptionScreen extends StatelessWidget {
 
         if (!state.plusActive && state.plusTrialEligible) ...[
           QPrimaryButton(
-            label: isAr ? 'جرّب قمر+ سبعة أيام ببلاش' : 'Try Qamar+ free for seven days',
-            onTap: () { state.startPlusTrial(); },
+            label: isAr
+                ? 'ابدأ أسبوعك المجاني: ${state.iso('${AppState.trialOfferDays}')} أيام من قمر كامل'
+                : 'Start your free week: ${AppState.trialOfferDays} days of the full Qamar',
+            onTap: () { state.startPlusTrial(placement: 'paywall'); },
           ),
           const SizedBox(height: 6),
           Text(
             isAr
-                ? 'من غير بطاقة. بعد السبعة أيام بترجع Lite لوحدك — مفيش تجديد تلقائي.'
-                : 'No card. After seven days you are simply back on Lite — nothing renews on its own.',
+                ? 'من غير بطاقة، ومفيش حاجة بتتجدد لوحدها: بعد ${state.iso('${AppState.trialOfferDays}')} أيام بترجع لقمر المجاني.'
+                : 'No card, and nothing renews on its own: after ${AppState.trialOfferDays} days you are simply back on the free Qamar.',
             textAlign: TextAlign.center,
             style: QText.body(size: 11, height: 17, color: QColors.textFaint),
           ),

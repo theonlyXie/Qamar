@@ -194,11 +194,13 @@ class AppState extends ChangeNotifier {
       final invite = await p.getString(_kPendingInvite);
       final proCode = await p.getString(_kPendingProCode);
       final proWho = await p.getString(_kProName);
+      final lockDay = await p.getString(_kLockOfferDay);
       if (_disposed) return;
       // A code from an earlier launch is still waiting to be redeemed.
       if (invite != null && invite.trim().isNotEmpty) pendingInvitationCode ??= invite.trim();
       if (proCode != null && proCode.trim().isNotEmpty) pendingProCode ??= proCode.trim();
       if (proWho != null && proWho.trim().isNotEmpty) proName ??= proWho.trim();
+      if (lockDay != null && lockDay.trim().isNotEmpty) _lockOfferDay = lockDay.trim();
       if (asked != null) ramadanAskedFor = asked;
       if (weekSeen != null) _weekCardSeenDay = weekSeen;
       if (reviewNumbers != null) reviewShowNumbers = reviewNumbers;
@@ -2298,7 +2300,7 @@ class AppState extends ChangeNotifier {
   Future<void> acceptTrialOffer() async {
     msgs.removeWhere((m) => m.kind == ObKind.trialOffer);
     _notify();
-    await startPlusTrial();
+    await startPlusTrial(placement: 'onboarding');
     if (_disposed) return;
     _pushQ(
       plusIsTrial
@@ -2313,7 +2315,55 @@ class AppState extends ChangeNotifier {
   void declineTrialOffer() {
     msgs.removeWhere((m) => m.kind == ObKind.trialOffer);
     _track('trial_offer_declined', {'placement': 'onboarding'});
-    _pushQ('موجود في «حسابي» وقت ما تحب.', 'It’s waiting in Me whenever you want it.');
+    // The price appears once in the consultation, here, as the blueprint
+    // places it — against a nutritionist, not against apps. "About one
+    // visit", not "less than one": a visit costs EGP 350–800 and a video
+    // consultation starts at 300, so 500 is in their range, not below it.
+    final price = displayPlusQuote.listPounds;
+    _pushQ(
+      'موجود في «حسابي» وقت ما تحب. وبعده، قمر+ بـ${formatEgp(price, ar: true, eastern: easternDigits)} في الشهر — في حدود تمن كشف واحد عند أخصائي تغذية.',
+      'It’s waiting in Me whenever you want it. After it, Qamar+ is ${formatEgp(price, ar: false)} a month — about one nutritionist visit.',
+    );
+  }
+
+  // ---- the free week, offered once more on the lock card (O12) --------------
+  //
+  // Not now leaves the week waiting in Me. The first time the night's plan is
+  // locked on Today — the blueprint's fourth wall, where the person can see
+  // the sentence about tomorrow and not the plan behind it — the link under
+  // it offers the week once more, for that day only. After that day it is the
+  // wall's own link again, and the week still waits in Me.
+
+  static const _kLockOfferDay = 'trial_lock_offer_day';
+
+  /// The Cairo day the lock card offered the week, or null before it has.
+  String? _lockOfferDay;
+
+  /// The lock card carries the week today: the plan behind the night note is
+  /// locked, the week can actually start, and the card has not offered it on
+  /// an earlier day.
+  bool get lockCardTrialOffer =>
+      nightPlanLocked &&
+      (nightNote?.planKcal ?? 0) > 0 &&
+      _canOfferTrial &&
+      (_lockOfferDay == null || _lockOfferDay == _dayKey());
+
+  /// Called once the lock card has been drawn with the offer on it: the day
+  /// is kept, so the offer is the first locked card's only, and it is counted
+  /// once.
+  void recordLockCardOffer() {
+    if (!lockCardTrialOffer || _lockOfferDay != null) return;
+    _lockOfferDay = _dayKey();
+    _prefs?.setString(_kLockOfferDay, _lockOfferDay!).catchError((_) {});
+    _track('trial_offer_shown', {'placement': 'lock_card'});
+  }
+
+  /// Start pressed on the lock card: the week begins, and the plan it opened
+  /// is shown.
+  Future<void> acceptLockCardTrial() async {
+    await startPlusTrial(placement: 'lock_card');
+    if (_disposed) return;
+    if (plusIsTrial) go(AppScreen.plan);
   }
 
   Target target() {
@@ -3514,7 +3564,7 @@ class AppState extends ChangeNotifier {
 
   /// Seven days of Qamar+, free, once. The server grants it — the phone only
   /// asks and reads back what it was given.
-  Future<void> startPlusTrial() async {
+  Future<void> startPlusTrial({String? placement}) async {
     final billing = _billing;
     if (!isBacked || billing == null) {
       plusNotice = isAr
@@ -3530,9 +3580,11 @@ class AppState extends ChangeNotifier {
     }
     try {
       _absorbEntitlement(await billing.startTrial());
-      if (plusActive) _track('trial_started');
+      if (plusActive) _track('trial_started', {if (placement != null) 'placement': placement});
       plusNotice = plusActive
-          ? (isAr ? 'قمر+ شغال لسبعة أيام. مفيش بطاقة ومفيش تجديد لوحده.' : 'Qamar+ is on for seven days. No card, and nothing renews by itself.')
+          ? (isAr
+              ? 'أسبوعك مع قمر كامل بدأ: ${iso('$trialOfferDays')} أيام، من غير بطاقة، ومفيش حاجة بتتجدد لوحدها.'
+              : 'Your week of the full Qamar has started: $trialOfferDays days, no card, and nothing renews on its own.')
           : (isAr ? 'مقدرتش أبدأ الأسبوع المجاني دلوقتي.' : 'Could not start the free week just now.');
       _notify();
       await _refreshQuota();
