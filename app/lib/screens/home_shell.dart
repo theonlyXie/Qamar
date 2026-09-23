@@ -6,6 +6,7 @@ import '../theme/colors.dart';
 import '../theme/layout.dart';
 import '../widgets/account_sheet.dart';
 import '../widgets/ask_qamar_overlay.dart';
+import '../widgets/common.dart';
 import '../widgets/explain.dart';
 import '../widgets/orb_nav.dart';
 import '../widgets/tree_overlay.dart';
@@ -124,10 +125,11 @@ class HomeShell extends StatelessWidget {
                   ),
                 ),
               ),
-              if (state.whyOpen) const WhySheet(),
-              if (state.authOpen) const AccountSheet(),
-              if (state.pendingActivity != null) const ActivitySheet(),
-              if (state.explainOpen != null) const ExplainSheet(),
+              // Each sheet stays until it has left the way it came.
+              QSheetSlot(open: state.whyOpen, child: const WhySheet()),
+              QSheetSlot(open: state.authOpen, child: const AccountSheet()),
+              QSheetSlot(open: state.pendingActivity != null, child: const ActivitySheet()),
+              QSheetSlot(open: state.explainOpen != null, child: const ExplainSheet()),
             ],
           ),
         ),

@@ -33,8 +33,8 @@ Future<void> _pump(WidgetTester tester, AppState s, {bool still = false}) async 
   await tester.pump(const Duration(milliseconds: 400));
 }
 
-/// The sheet's panel: the rising child of the Why sheet's scrim.
-Finder _panel() => find.descendant(of: find.byType(WhySheet), matching: find.byWidgetPredicate((w) => w is QSpringIn && w.arrive == QArrive.rise));
+/// The sheet's panel, in the Why sheet's scrim.
+Finder _panel() => find.descendant(of: find.byType(WhySheet), matching: find.byKey(QSheetScrim.panelKey));
 
 /// Where the sheet's title is drawn (a translation moves what is inside it,
 /// not the box that does the moving).
@@ -122,7 +122,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 16));
     final r = _title(tester, s);
     expect(tester.getRect(_panel()).bottom, moreOrLessEquals(_phone.height, epsilon: 0.5));
-    final fading = tester.widget<Opacity>(find.descendant(of: _panel(), matching: find.byType(Opacity)).first);
+    final fading = tester.widget<Opacity>(find.ancestor(of: _panel(), matching: find.byType(Opacity)).first);
     expect(fading.opacity, lessThan(1), reason: 'it fades in');
     await tester.pump(const Duration(milliseconds: 200));
     expect(_title(tester, s), r, reason: 'nothing moved');

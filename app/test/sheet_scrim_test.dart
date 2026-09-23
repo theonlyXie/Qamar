@@ -63,7 +63,7 @@ void main() {
 
         // Inside the sheet: its own surface, away from any control and clear
         // of its rounded corner (outside the curve is the scrim).
-        final panel = tester.getRect(find.descendant(of: find.byType(QSheetScrim), matching: find.byType(QSpringIn)).last);
+        final panel = tester.getRect(find.byKey(QSheetScrim.panelKey));
         await tester.tapAt(Offset(panel.left + 40, panel.top + 10));
         await tester.pump();
         expect(sheet.isOpen(s), isTrue, reason: 'a tap on the sheet itself does not close it');

@@ -327,13 +327,23 @@ class _DottedUnderline extends CustomPainter {
 }
 
 /// The sheet the orb opens when it is dropped on a value.
-class ExplainSheet extends StatelessWidget {
+class ExplainSheet extends StatefulWidget {
   const ExplainSheet({super.key});
+
+  @override
+  State<ExplainSheet> createState() => _ExplainSheetState();
+}
+
+class _ExplainSheetState extends State<ExplainSheet> {
+  /// What it explained, held while it leaves (QSheetSlot): by then the
+  /// state has closed.
+  Explanation? _last;
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final ex = state.explainOpen;
+    final ex = state.explainOpen ?? _last;
+    _last = ex;
     if (ex == null) return const SizedBox.shrink();
 
     final isAr = state.isAr;

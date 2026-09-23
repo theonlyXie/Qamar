@@ -1,7 +1,7 @@
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/physics.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -255,11 +255,7 @@ class _QSpringInState extends State<QSpringIn> with SingleTickerProviderStateMix
     if (_started) return;
     _started = true;
     _still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    if (_still) {
-      _c.animateTo(1, duration: const Duration(milliseconds: 150));
-    } else {
-      _c.animateWith(SpringSimulation(QSpring.settle, 0, 1, 0));
-    }
+    QSpring.drive(_c, 1, still: _still);
   }
 
   @override
@@ -283,41 +279,209 @@ class _QSpringInState extends State<QSpringIn> with SingleTickerProviderStateMix
       );
 }
 
-/// A sheet's ground: the scrim fades in on the settle spring while the
-/// sheet ([child]) rises from below its own height on it. A tap on the
-/// scrim, anywhere outside the sheet, is [onDismiss]; a screen reader hears
-/// that layer as a button named "Close" (إغلاق), where it used to be an
-/// unnamed button the size of the screen. The sheet takes its own touches:
-/// it sits above the scrim, so nothing inside it needs to swallow taps.
-class QSheetScrim extends StatelessWidget {
+/// Holds a sheet on screen while it leaves, so it can go the way it came
+/// (down, on the settle spring) instead of vanishing on the frame its state
+/// closed. [open] is the sheet's state; [child] stays built until its
+/// [QSheetScrim] has finished leaving, whatever closed it: the scrim, a
+/// drag, its own button or the phone's back. Opened again while leaving, it
+/// turns round from where it is.
+class QSheetSlot extends StatefulWidget {
+  final bool open;
+  final Widget child;
+  const QSheetSlot({super.key, required this.open, required this.child});
+
+  @override
+  State<QSheetSlot> createState() => _QSheetSlotState();
+}
+
+class _QSheetSlotState extends State<QSheetSlot> {
+  late bool _shown = widget.open;
+
+  @override
+  void didUpdateWidget(QSheetSlot old) {
+    super.didUpdateWidget(old);
+    if (widget.open) _shown = true;
+  }
+
+  void _gone() {
+    if (mounted && !widget.open && _shown) setState(() => _shown = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Positioned, like the sheets it holds: a bare box in the shell's Stack
+    // would give the Stack a size of its own, and shrink it to nothing.
+    if (!_shown) return const Positioned(left: 0, top: 0, child: SizedBox.shrink());
+    return _SheetExit(closing: !widget.open, onGone: _gone, child: widget.child);
+  }
+}
+
+class _SheetExit extends InheritedWidget {
+  final bool closing;
+  final VoidCallback onGone;
+  const _SheetExit({required this.closing, required this.onGone, required super.child});
+
+  static _SheetExit? maybeOf(BuildContext context) => context.dependOnInheritedWidgetOfExactType<_SheetExit>();
+
+  @override
+  bool updateShouldNotify(_SheetExit old) => old.closing != closing;
+}
+
+/// A sheet's ground, and the sheet on it. The scrim fades in on the settle
+/// spring while the sheet ([child]) rises from below its own height on it;
+/// it leaves the same way, down and out. It can be dragged: it follows the
+/// finger down, and on release goes where the release was heading — Apple's
+/// projection of the velocity, as the orb's snap uses — either away or back
+/// up, carrying the finger's speed into the spring. With reduce-motion on,
+/// arriving and leaving are a plain fade; a drag still moves it, since the
+/// finger is moving it.
+///
+/// A tap on the scrim, anywhere outside the sheet, is [onDismiss]; a screen
+/// reader hears that layer as a button named "Close" (إغلاق), where it used
+/// to be an unnamed button the size of the screen. The sheet takes its own
+/// touches: it sits above the scrim, so nothing inside it needs to swallow
+/// taps. [blur] blurs the page behind, in step with the scrim.
+class QSheetScrim extends StatefulWidget {
   final Widget child;
   final VoidCallback onDismiss;
-  const QSheetScrim({super.key, required this.onDismiss, required this.child});
+  final double blur;
+  const QSheetScrim({super.key, required this.onDismiss, this.blur = 0, required this.child});
 
-  /// The dismiss layer, for tests.
+  /// The dismiss layer and the sheet itself, for tests.
   static const dismissKey = ValueKey('sheet-dismiss');
+  static const panelKey = ValueKey('sheet-panel');
 
   static String closeLabel(BuildContext context) => Directionality.of(context) == TextDirection.rtl ? 'إغلاق' : 'Close';
 
+  /// Whether a release at [value] (1 at rest, 0 gone), moving at
+  /// [velocity] points a second (down positive) on a sheet [height] tall,
+  /// sends the sheet away: its projected rest is past half-way down, or it
+  /// was thrown down faster than a flick.
+  static bool releaseDismisses(double value, double velocity, double height) =>
+      velocity > QSpring.flickSpeed || value - QSpring.project(velocity) / height < 0.5;
+
   @override
-  Widget build(BuildContext context) => Stack(
-        fit: StackFit.expand,
-        children: [
-          Semantics(
-            key: dismissKey,
-            container: true,
-            button: true,
-            label: closeLabel(context),
-            onTap: onDismiss,
-            child: GestureDetector(
-              onTap: onDismiss,
-              excludeFromSemantics: true,
-              child: const QSpringIn(arrive: QArrive.fade, child: ColoredBox(color: QColors.scrim)),
-            ),
+  State<QSheetScrim> createState() => _QSheetScrimState();
+}
+
+class _QSheetScrimState extends State<QSheetScrim> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController.unbounded(vsync: this);
+  final _panel = GlobalKey();
+  bool _started = false, _still = false, _leaving = false, _dragged = false;
+
+  double get _height => (_panel.currentContext?.findRenderObject() as RenderBox?)?.size.height ?? 400;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (!_started) {
+      _started = true;
+      QSpring.drive(_c, 1, still: _still);
+    }
+    final exit = _SheetExit.maybeOf(context);
+    if (exit == null) return;
+    if (exit.closing && !_leaving) {
+      _leave(0);
+    } else if (!exit.closing && _leaving) {
+      // Opened again on its way out: it turns round from where it is.
+      _leaving = false;
+      QSpring.drive(_c, 1, still: _still);
+    }
+  }
+
+  void _leave(double velocity) {
+    _leaving = true;
+    QSpring.drive(_c, 0, still: _still && !_dragged, velocity: velocity).whenCompleteOrCancel(() {
+      if (mounted && _leaving && _c.value <= 0.001) _SheetExit.maybeOf(context)?.onGone();
+    });
+  }
+
+  void _dismiss([double velocity = 0]) {
+    if (_leaving) return;
+    _leave(velocity);
+    widget.onDismiss();
+  }
+
+  void _dragStart(DragStartDetails _) {
+    if (_leaving) return;
+    _c.stop();
+    _dragged = true;
+  }
+
+  void _dragUpdate(DragUpdateDetails d) {
+    if (_leaving) return;
+    _c.value = (_c.value - d.delta.dy / _height).clamp(0.0, 1.0);
+  }
+
+  void _dragEnd(DragEndDetails d) {
+    if (_leaving) return;
+    final h = _height;
+    final down = d.velocity.pixelsPerSecond.dy;
+    // The spring runs in sheet heights: the finger's speed, handed over.
+    final v = -down / h;
+    if (QSheetScrim.releaseDismisses(_c.value, down, h)) {
+      _dismiss(v);
+    } else {
+      QSpring.drive(_c, 1, still: false, velocity: v);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      excluding: _leaving,
+      child: IgnorePointer(
+        ignoring: _leaving,
+        child: AnimatedBuilder(
+          animation: _c,
+          child: GestureDetector(
+            excludeFromSemantics: true,
+            onVerticalDragStart: _dragStart,
+            onVerticalDragUpdate: _dragUpdate,
+            onVerticalDragEnd: _dragEnd,
+            child: SizedBox(key: QSheetScrim.panelKey, child: KeyedSubtree(key: _panel, child: widget.child)),
           ),
-          Align(alignment: Alignment.bottomCenter, child: QSpringIn(arrive: QArrive.rise, child: child)),
-        ],
-      );
+          builder: (context, panel) {
+            final v = _c.value.clamp(0.0, 1.0);
+            // Under reduce-motion, what the finger did not move only fades.
+            final fadeOnly = _still && !_dragged;
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                if (widget.blur > 0)
+                  ClipRect(child: BackdropFilter(filter: ImageFilter.blur(sigmaX: widget.blur * v, sigmaY: widget.blur * v), child: const SizedBox.expand())),
+                Semantics(
+                  key: QSheetScrim.dismissKey,
+                  container: true,
+                  button: true,
+                  label: QSheetScrim.closeLabel(context),
+                  onTap: _dismiss,
+                  child: GestureDetector(
+                    onTap: _dismiss,
+                    excludeFromSemantics: true,
+                    child: ColoredBox(color: QColors.scrim.withValues(alpha: QColors.scrim.a * v)),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: fadeOnly
+                      ? Opacity(opacity: v, child: panel)
+                      : FractionalTranslation(translation: Offset(0, 1 - v), child: panel),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
 }
 
 /// Centred text wrapped to even lines, the way CSS's `text-wrap: balance`

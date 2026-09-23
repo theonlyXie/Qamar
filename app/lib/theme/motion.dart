@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/animation.dart';
 import 'package:flutter/physics.dart';
 
 /// Animation timings ported from the prototype's @keyframes (qbreath, qhalo,
@@ -67,6 +68,12 @@ abstract final class QSpring {
     final c = 4 * math.pi * damping / response;
     return SpringDescription(mass: 1, stiffness: stiffness, damping: c);
   }
+
+  /// Drives [c] (an unbounded controller) to [to] on [settle] from where it
+  /// is, carrying [velocity] (units a second) — or, with reduce-motion on,
+  /// over a plain 150ms, which the caller draws as a fade.
+  static TickerFuture drive(AnimationController c, double to, {required bool still, double velocity = 0}) =>
+      still ? c.animateTo(to, duration: const Duration(milliseconds: 150)) : c.animateWith(SpringSimulation(settle, c.value, to, velocity));
 
   /// Where a release at [velocity] (points a second) would come to rest if
   /// it simply slowed down, as a scrolled list does: Apple's projection, with

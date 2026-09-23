@@ -47,7 +47,8 @@ void main() {
           home: const Scaffold(body: AskQamarOverlay()),
         ),
       ));
-      await tester.pump(const Duration(milliseconds: 400));
+      // At rest: the conversation's entrance (a spring) has settled.
+      await tester.pump(const Duration(milliseconds: 800));
       final name = find.text(s.t.brand);
       final quiet = tester.getRect(name);
       final lineBox = tester.getRect(find.byKey(ChatHeader.lineKey));

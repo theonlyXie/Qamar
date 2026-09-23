@@ -13,6 +13,7 @@ import '../models/problem.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/motion.dart';
 import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
@@ -37,8 +38,8 @@ final _scrimBottom = QColors.bgBottom.withValues(alpha: 0.98);
 final _raised = QColors.cardSlate.withValues(alpha: 0.9);
 const _userBubble = QColors.glassHigh;
 
-/// How long anything in this overlay is allowed to take.
-const _enter = Duration(milliseconds: 240);
+/// How long a press takes to show. Arrivals are on the settle spring
+/// (QSpring): past half-way in 100ms, at rest in about 400.
 const _press = Duration(milliseconds: 90);
 
 bool _stillness(BuildContext context) => MediaQuery.disableAnimationsOf(context);
@@ -63,7 +64,19 @@ class AskQamarOverlay extends StatefulWidget {
 class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProviderStateMixin {
   final _chat = ChatScroller();
   final _ctrl = TextEditingController();
-  late final AnimationController _in = AnimationController(vsync: this, duration: _enter)..forward();
+  /// The entrance, on the settle spring (QSpring): quick, and at rest
+  /// without passing its mark. Under reduce-motion a plain fade.
+  late final AnimationController _in = AnimationController.unbounded(vsync: this);
+  late final Animation<double> _shown = _in.drive(_Clamp01());
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    QSpring.drive(_in, 1, still: _stillness(context));
+  }
 
   @override
   void dispose() {
@@ -95,7 +108,7 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
           // material over the app, not a new screen the app jumped to.
           filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: FadeTransition(
-            opacity: CurvedAnimation(parent: _in, curve: Curves.easeOut),
+            opacity: _shown,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [_scrimTop, _scrimBottom]),
@@ -104,8 +117,7 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                 animation: _in,
                 builder: (context, child) {
                   if (still) return child!;
-                  final v = Curves.easeOutCubic.transform(_in.value);
-                  return Transform.translate(offset: Offset(0, 10 * (1 - v)), child: child);
+                  return Transform.translate(offset: Offset(0, 10 * (1 - _shown.value)), child: child);
                 },
                 child: Column(
                   children: [
@@ -407,7 +419,17 @@ class _Appear extends StatefulWidget {
 }
 
 class _AppearState extends State<_Appear> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: _enter)..forward();
+  late final AnimationController _c = AnimationController.unbounded(vsync: this);
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    QSpring.drive(_c, 1, still: _stillness(context));
+  }
+
   @override
   void dispose() {
     _c.dispose();
@@ -420,7 +442,7 @@ class _AppearState extends State<_Appear> with SingleTickerProviderStateMixin {
     return AnimatedBuilder(
       animation: _c,
       builder: (context, child) {
-        final v = Curves.easeOutCubic.transform(_c.value);
+        final v = _c.value.clamp(0.0, 1.0);
         final faded = Opacity(opacity: v, child: child);
         return still ? faded : Transform.translate(offset: Offset(0, 8 * (1 - v)), child: faded);
       },
@@ -813,4 +835,10 @@ class _ProposalCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 0 to 1, whatever the spring's last digits do.
+class _Clamp01 extends Animatable<double> {
+  @override
+  double transform(double t) => t.clamp(0.0, 1.0);
 }

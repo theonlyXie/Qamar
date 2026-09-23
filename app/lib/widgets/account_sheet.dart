@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -200,25 +198,21 @@ class _AccountSheetState extends State<AccountSheet> {
     final isAr = state.isAr;
 
     return Positioned.fill(
-      child: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: QSheetScrim(
-            onDismiss: state.closeAuth,
-            child: Container(
-              width: double.infinity,
-              padding: EdgeInsets.fromLTRB(20, 18, 20, 24 + MediaQuery.of(context).viewInsets.bottom),
-              decoration: const BoxDecoration(
-                gradient: QColors.sheet,
-                border: Border(top: BorderSide(color: QColors.borderStrong)),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: _body(context, state, isAr),
-              ),
-            ),
+      child: QSheetScrim(
+        onDismiss: state.closeAuth,
+        blur: 8,
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.fromLTRB(20, 18, 20, 24 + MediaQuery.of(context).viewInsets.bottom),
+          decoration: const BoxDecoration(
+            gradient: QColors.sheet,
+            border: Border(top: BorderSide(color: QColors.borderStrong)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: _body(context, state, isAr),
           ),
         ),
       ),
