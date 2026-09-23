@@ -81,8 +81,9 @@ const kTreeNodes = [
   TreeNode('سجّل', 'Log', QIcons.log, 0, QColors.ink, null, action: TreeAction.log),
   TreeNode('الخطة', 'Plan', QIcons.plan, 72, QColors.ink, AppScreen.plan),
   TreeNode('الماء', 'Water', QIcons.water, 144, QColors.ink, null, action: TreeAction.water),
-  TreeNode('المراجعة', 'Review', QIcons.review, 216, QColors.ink, AppScreen.progress),
-  TreeNode('أنا', 'Me', QIcons.me, 288, QColors.ink, AppScreen.you),
+  // Each name is the title of the screen it opens, in both languages.
+  TreeNode('التقدم', 'Progress', QIcons.review, 216, QColors.ink, AppScreen.progress),
+  TreeNode('حسابي', 'Me', QIcons.me, 288, QColors.ink, AppScreen.you),
 ];
 
 /// "Modes (Ramadan) appear as a seventh node only when active" — the sixth

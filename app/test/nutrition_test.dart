@@ -778,8 +778,8 @@ void secondRound() {
       expect(waters.single.screen, isNull, reason: 'water must not open a page');
     });
 
-    test('the five nodes are Log, Plan, Water, Review and Me, evenly spaced; Today is the background', () {
-      expect(kTreeNodes.map((n) => n.labelEn).toList(), ['Log', 'Plan', 'Water', 'Review', 'Me']);
+    test('the five nodes are Log, Plan, Water, Progress and Me, evenly spaced; Today is the background', () {
+      expect(kTreeNodes.map((n) => n.labelEn).toList(), ['Log', 'Plan', 'Water', 'Progress', 'Me']);
       expect(kTreeNodes.any((n) => n.screen == AppScreen.today), isFalse, reason: 'today is what the orb floats over');
       expect(kTreeNodes.any((n) => n.screen == AppScreen.wallet), isFalse, reason: 'the wallet lives under Me');
       for (var i = 0; i < kTreeNodes.length; i++) {

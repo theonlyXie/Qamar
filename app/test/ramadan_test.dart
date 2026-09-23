@@ -97,7 +97,7 @@ void main() {
   group('the tree in season', () {
     test('a sixth node, Ramadan, evenly spaced; five otherwise', () {
       final six = treeNodesFor(ramadan: true);
-      expect(six.map((n) => n.labelEn).toList(), ['Log', 'Plan', 'Water', 'Review', 'Me', 'Ramadan']);
+      expect(six.map((n) => n.labelEn).toList(), ['Log', 'Plan', 'Water', 'Progress', 'Me', 'Ramadan']);
       for (var i = 0; i < six.length; i++) {
         expect(six[i].angle, closeTo(i * 60, 0.01));
       }
