@@ -1,14 +1,14 @@
-// Mono-glass render harness for Qamar: draws every screen, in English and
+// Liquid-glass render harness for Qamar: draws every screen, in English and
 // Arabic, at phone size, to PNG files you can look at.
 //
 // This is a temporary test file and is never committed. To use it:
 //
-//   cp .claude/skills/mono-glass/scripts/render_screens_test.dart app/test/zz_render_tmp_test.dart
+//   cp .claude/skills/liquid-glass/scripts/render_screens_test.dart app/test/zz_render_tmp_test.dart
 //   cd app && flutter test --update-goldens test/zz_render_tmp_test.dart \
 //       --dart-define=OUT=/abs/path/for/pngs --dart-define=SHOT=after [--dart-define=ONLY=today]
 //   rm -f test/zz_render_tmp_test.dart; rm -rf test/failures
 //
-// OUT is where the PNGs go (default /tmp/mono-glass-renders). SHOT names a
+// OUT is where the PNGs go (default /tmp/liquid-glass-renders). SHOT names a
 // sub-folder, so you can compare `before` with `after`. ONLY keeps just the
 // scenes whose name contains that text.
 //
@@ -38,7 +38,7 @@ import 'package:qamar/widgets/explain.dart';
 
 const _tag = String.fromEnvironment('SHOT', defaultValue: 'after');
 const _only = String.fromEnvironment('ONLY', defaultValue: '');
-const _out = String.fromEnvironment('OUT', defaultValue: '/tmp/mono-glass-renders');
+const _out = String.fromEnvironment('OUT', defaultValue: '/tmp/liquid-glass-renders');
 
 class _Ai implements AiGateway {
   @override

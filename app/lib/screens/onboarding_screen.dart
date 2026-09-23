@@ -18,11 +18,11 @@ import '../theme/motion.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/dish_card.dart';
-import '../widgets/dot_number.dart';
+import '../widgets/hero_number.dart';
 import '../widgets/glass.dart';
 
 /// The consultation (S06–S14), drawn the way a conversation with an
-/// assistant already looks on the phone: the mono-glass chat pattern, as Ask
+/// assistant already looks on the phone: the liquid-glass chat pattern, as Ask
 /// Qamar draws it (widgets/ask_qamar_overlay.dart).
 ///
 /// A black page. At the top, the way back (a glass circle), Qamar's name and
@@ -30,7 +30,7 @@ import '../widgets/glass.dart';
 /// across the page; the person's answers sit in a grey bubble on their side.
 /// Each question's answers (chips, wheels, Continue) wait under it, and under
 /// them one glass field for typing an answer instead. The last question is
-/// the reveal: a dish, the day's target (the screen's one figure in dots),
+/// the reveal: a dish, the day's target (the screen's one large figure),
 /// and "Let's start".
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -592,7 +592,7 @@ class _AgeReadout extends StatelessWidget {
   }
 }
 
-/// The day's target, the consultation's one hero: the figure in dots, the
+/// The day's target, the consultation's one hero: the large figure, the
 /// three macros under it, and what it was worked out from, in words.
 class _TargetCard extends StatelessWidget {
   final AppState state;
@@ -635,7 +635,7 @@ class _TargetCard extends StatelessWidget {
         children: [
           Text(QText.eyebrowText(t.dailyTarget, ar: isAr), style: QText.eyebrow(ar: isAr)),
           const SizedBox(height: QSpace.md),
-          DotNumber(kcal, height: 48, semanticsLabel: '$kcal ${t.kcalDay}'),
+          HeroNumber(kcal, semanticsLabel: '$kcal ${t.kcalDay}'),
           const SizedBox(height: 10),
           Text(t.kcalDay, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkSecondary)),
           const SizedBox(height: QSpace.xl),
@@ -806,7 +806,7 @@ class _Composer extends StatelessWidget {
               textInputAction: TextInputAction.send,
               onChanged: state.onDraftChanged,
               onSubmitted: (_) => state.sendDraft(),
-              cursorColor: QColors.ink,
+              cursorColor: QColors.accentInk,
               style: QText.body(size: 17, height: 22),
               decoration: InputDecoration(
                 hintText: placeholder,
@@ -824,7 +824,8 @@ class _Composer extends StatelessWidget {
   }
 }
 
-/// The composer's one filled button: a white circle and a black arrow.
+/// The composer's one filled button: a circle of burgundy glass and a white
+/// arrow.
 class _Send extends StatelessWidget {
   final VoidCallback? onTap;
   final String label;
@@ -845,13 +846,21 @@ class _Send extends StatelessWidget {
       builder: (context, pressed) => qPressed(
         context,
         pressed: pressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: enabled ? QColors.ink : QDisabled.fill),
-          child: Icon(QIcons.send, size: 18, color: enabled ? QColors.onInk : QDisabled.label),
-        ),
+        child: enabled
+            ? QGlass(
+                shape: QGlassShape.circle,
+                tint: QColors.accent,
+                pressed: pressed,
+                width: 36,
+                height: 36,
+                child: const Center(child: Icon(QIcons.send, size: 18, color: QColors.onAccent)),
+              )
+            : Container(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(shape: BoxShape.circle, color: QDisabled.fill),
+                child: const Icon(QIcons.send, size: 18, color: QDisabled.label),
+              ),
       ),
     );
   }

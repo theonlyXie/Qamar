@@ -10,7 +10,7 @@
 - **Screens name glyphs by meaning** (`QIcons.send`), defined once in `app/lib/theme/icons.dart`. A call site never writes `CupertinoIcons.x` or `Icons.x`. `icons_test.dart` fails the build on any `Icons.` (Material) glyph in `lib/`.
 - **Outline at rest, filled only for selected or "on"** (`water` → `waterFull`, `moon` → `moonFull`). Never fill for emphasis alone.
 - **Sizes:** 20 in rows and inline, 22–24 in controls, 28 for a hero glyph in a state card. The size matches the neighbouring text's optical weight.
-- **Colour:** the ink of the adjacent text. On white fills, `onInk`. Never a colour of its own.
+- **Colour:** the ink of the adjacent text (`accentInk` beside a way on), and `onAccent` on burgundy. Never a colour of its own.
 - **Labels:** every icon-only control has a spoken label. If people might misread the glyph, show a visible word too; a word is always better than a clever glyph.
 - **One glyph, one meaning.** Don't reuse a glyph for two different actions on one screen, and don't use two glyphs for one action across screens.
 

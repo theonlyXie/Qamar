@@ -1,6 +1,6 @@
 # Sources and reasoning
 
-This file explains why the rules are what they are, so you can defend or adapt them. The full research notes were distilled from Apple's HIG (as of September 2026) and from Nothing's official developer kits and design press. They lived in the session scratchpad and aren't in the repo; this is their distilled evidence.
+This file explains why the rules are what they are, so you can defend or adapt them. The research notes were distilled from Apple's Human Interface Guidelines (as of September 2026). They lived in the session scratchpad and aren't in the repo; this is their distilled evidence, plus the owner's own direction.
 
 ## Apple Human Interface Guidelines
 
@@ -13,8 +13,14 @@ This file explains why the rules are what they are, so you can defend or adapt t
 - Scroll edge effects replace dividers under floating controls. "Scroll edge effects aren't decorative."
 - Accessibility: Reduced Transparency makes it frostier, Increased Contrast makes it black or white with a border, and Reduced Motion disables its elastic properties. Custom glass must copy all three by hand.
 
+**Where we depart, and why.** Apple keeps glass out of the content layer; we make cards and sheets glass panels, because the owner asked for glass as the material. We keep what Apple's caution protects:
+- cards don't blur, so they cost no frames and their words never depend on what scrolls behind them;
+- glass never stacks, except as an inset;
+- tint stays on the primary action, as Apple asks, and on what is chosen.
+
 **Colour** ([color], [dark-mode], [accessibility])
-- A monochrome brand accent is endorsed "in apps with primarily monochromatic content".
+- One tint colour for what's interactive is the platform's own model: controls take the app's accent colour. Burgundy is ours.
+- Don't use one colour for two meanings. That's why burgundy means "act" or "chosen" and never status.
 - Contrast: 4.5:1 for text up to 17 pt, 3:1 for larger or bold text.
 - "Never rely on color alone."
 
@@ -24,6 +30,7 @@ This file explains why the rules are what they are, so you can defend or adapt t
 - Minimise typefaces.
 - Tracking is size-specific; there is no tracking for SF Arabic.
 - Support at least 200% text.
+- SF's licence covers Apple platforms only, and we ship on Android too. So Latin is Inter, the open face closest to SF, and Arabic is Noto Sans Arabic, which has true tabular Arabic-Indic digits. The hero numeral uses the same faces, so it reads the same in both languages.
 
 **Icons** ([icons], [sf-symbols])
 - One family, at a consistent weight and detail level.
@@ -53,36 +60,13 @@ This file explains why the rules are what they are, so you can defend or adapt t
 
 **Design principles** (June 2026): Purpose, Agency, Responsibility, Familiarity, Flexibility, Simplicity ("isn't minimalism"), Craft, and Delight ("don't mistake delight for decoration").
 
-## Nothing
-
-Evidence comes from the Glyph Matrix and Glyph developer kits (spec art measured), support pages, and press coverage of Nothing OS 1–4. The Figma community file "Nothing UI" by Zognest is a third-party concept from before Nothing OS existed, not Nothing's system, and it couldn't be opened from our environment.
-
-**Palette:**
-- The official matrix preview uses background `#000`, lit `#FFF` and unlit `#1C1C1C`.
-- Measured pixel share: about 75% near-black, 20% grey, 5% white.
-- Hierarchy comes from grey and size only.
-
-**Dot type:** NDot is for clocks, widgets and hero numbers. Nothing **removed dot type from reading text in OS 3.0 "for improved readability"**, which is why ours is for hero numerals only.
-
-**Fonts:**
-- Nothing's own faces are proprietary, and none covers Arabic.
-- Every popular "Nothing-look" open face (Doto, Space Mono, Space Grotesk, Geist Mono and others) has zero Arabic letters and digits.
-- So we hand-drew our 5×7 dot digits, including Arabic-Indic, and use Inter plus Noto Sans Arabic for text. Noto Sans Arabic has true tabular ٠–٩.
-
-**Light as status:** steady means on, a slow breath (Nothing's SDK sample is 3 s) means active, and a pulse-then-drain means a timer. Progress is quantised into dots or segments and paired with a number.
-
-**Motion:** "light, not travel": short, decelerating, no bounce. Dots move in waves and breaths.
-
-**What we didn't borrow:**
-- the red accent and every status hue;
-- proprietary fonts;
-- dot type for reading or for Arabic words;
-- tracking or uppercasing Arabic;
-- low-contrast decorative greys for text;
-- hardware light features;
-- "[BRACKET]" text, which mirrors in RTL;
-- the "no blur ever" dogma, because glass is our floating layer.
-
 ## Our own rule
 
-The user's direction for our products: "black and white as our colors only, liquid glass, icons… make sure of the animation… chat should look like ChatGPT with simple icons… keep the orb, remove out of scope colors and make it simple to use, no extra steps, no more tech complication, the faster the simpler always the better." Laws 1, 2, 3, 4 and 5 in `SKILL.md` are that sentence, made operational.
+The owner's first direction for our products: "black and white as our colors only, liquid glass, icons… make sure of the animation… chat should look like ChatGPT with simple icons… keep the orb, remove out of scope colors and make it simple to use, no extra steps, no more tech complication, the faster the simpler always the better."
+
+The second changed the palette and the material: "add Burgundy to the colors because black and white alone doesn't feel good, use Liquid Glass".
+
+The six laws in `SKILL.md` are those two directions, made operational:
+- burgundy is the one colour added, and it goes where it helps most, on what you can do;
+- glass is the material;
+- the rest (the icons, the animation, the ChatGPT-like chat, the orb, and "the faster the simpler") is unchanged.

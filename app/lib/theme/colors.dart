@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
-/// Qamar's palette: black and white, and nothing else (the mono-glass skill,
-/// .claude/skills/mono-glass).
+/// Qamar's palette: black, white, the greys between them, and one colour of
+/// ours, burgundy (the liquid-glass skill, .claude/skills/liquid-glass).
 ///
-/// Black is the ground and white is the ink. Every grey in between is white
-/// laid over black at some strength — written here as the solid grey it makes,
-/// so a contrast ratio can be checked exactly — and every token is achromatic
-/// (colors_test.dart): no hue anywhere in the interface. What a hue used to
-/// say (good news, a warning, an error, something selected), the app now says
-/// with a glyph, a word, a weight or an inverted fill, which also reaches the
-/// people a colour never did.
+/// Black is the ground and white is the ink. Every grey is white laid over
+/// black at some strength, written here as the solid grey it makes so a
+/// contrast ratio can be checked exactly. Burgundy marks what a finger can do
+/// and what has been chosen: the primary button, the send button, a chosen
+/// answer, a switch that is on, a bar filling. It never says how something
+/// went: there are no success, warning or error colours, and state is said
+/// with a glyph, a word or a weight (colors_test.dart holds all of it).
 ///
 /// No hex is written outside lib/theme (the moon's own greys in
 /// widgets/moon.dart aside), and no token is kept that nothing draws.
@@ -44,14 +44,58 @@ class QColors {
   /// AA, on purpose, and still at least 3:1 so it is there to see.
   static const inkDisabled = Color(0xFF666666);
 
-  /// Words and glyphs on a white fill (the primary button, a selected chip,
-  /// the send button): black.
+  /// Words and glyphs on a white fill (the camera's shutter): black.
   static const onInk = black;
+
+  /// Burgundy, the fill of what a finger does: the primary button, the send
+  /// button, a chosen chip, a switch that is on. White on it reads at 8.9:1.
+  /// One burgundy fill to a screen at most, so the one thing to do is the
+  /// warmest thing there.
+  static const accent = Color(0xFF8E1B34);
+
+  /// The fill while it is pressed: a step deeper, as a lit button gives.
+  static const accentPressed = Color(0xFF751529);
+
+  /// Burgundy as a line or a mark on the dark: a bar filling, the streak's
+  /// ring, a text action, a chosen radio. Lighter than the fill so it reads
+  /// against black and glass (at least 4.8:1 on every panel), and never the
+  /// colour of reading text.
+  static const accentInk = Color(0xFFE8768D);
+
+  /// Burgundy washed into a surface: a chosen row, a tinted panel.
+  static const accentWash = Color(0x478E1B34);
+
+  /// Words and glyphs on burgundy.
+  static const onAccent = white;
+
+  /// A sheet's frosted ground: the surface at 78%, over the blurred page, so
+  /// its words never depend on what is behind it.
+  static const glassSheet = Color(0xC7121212);
+
+  /// The page's light: a burgundy glow from above the top of the screen,
+  /// fading to black by about the middle (QDecor.ambient). The glass panels
+  /// scroll over it, so glass has something to show. Dim enough that the
+  /// third ink still passes AA on the brightest panel in it.
+  static const ambient = Color(0xFF2A0912);
 
   /// Two edges: the hairline every card, row and field draws, and a strong one
   /// for what must read as a boundary (a selected control, a focused field).
   static const hairline = Color(0x24FFFFFF);
   static const hairlineStrong = Color(0x47FFFFFF);
+
+  /// Liquid Glass, as panels (QDecor.card, sheets): a card, a grouped list,
+  /// a sheet. White over the page's light, brighter at the top as light
+  /// caught in a curved surface is, with a rim bright along the top that
+  /// fades to the hairline down the sides (QGlassRim). A shape inside a panel
+  /// takes the inset step over it.
+  static const glassPanel = Color(0x12FFFFFF);
+  static const glassPanelTop = Color(0x1AFFFFFF);
+  static const glassInset = Color(0x0DFFFFFF);
+  static const glassRim = Color(0x47FFFFFF);
+
+  /// A pane raised: pressed, or a pane standing inside another. Flat, a step
+  /// over the plain pane's top.
+  static const glassRaised = Color(0x24FFFFFF);
 
   /// Liquid Glass, the floating control layer (QGlass): the orb, the tree's
   /// buttons, the composer, a floating back button, a sheet's grabber bar.
@@ -62,6 +106,9 @@ class QColors {
   static const glassFillPressed = Color(0x2EFFFFFF);
   static const glassFillClear = Color(0x0FFFFFFF);
   static const glassEdgeTop = Color(0x66FFFFFF);
+
+  /// The rim of burgundy glass, catching more of the light.
+  static const glassRimTinted = Color(0x8CFFFFFF);
   static const glassEdgeBottom = Color(0x14FFFFFF);
   static const glassSolid = surfaceRaised;
 
@@ -70,11 +117,6 @@ class QColors {
   /// surface is.
   static const glassLens = Color(0x14FFFFFF);
 
-  /// A dot that is not lit, in a ring or a matrix: white at 11%, Nothing's
-  /// own "0% brightness" (#1C1C1C on black). Faint, but there, so the shape
-  /// of the whole is always seen and the lit dots read as a count of it.
-  static const dotOff = Color(0x1CFFFFFF);
-
   /// What a sheet or an overlay dims the page with: black at 64%. One
   /// strength for every modal, so opening one always reads the same.
   static const scrim = Color(0xA3000000);
@@ -82,9 +124,9 @@ class QColors {
 
 /// Other people's marks, drawn the way their owners require. Google's sign-in
 /// branding asks for the "G" in its four colours; a grey G reads as a letter,
-/// not as "sign in with Google". This is the only colour in the app, it is
-/// not ours, and it appears on the account sheet's Google button and nowhere
-/// else (colors_test.dart holds both).
+/// not as "sign in with Google". These are the only colours in the app that
+/// are not ours, and they appear on the account sheet's Google button and
+/// nowhere else (colors_test.dart holds both).
 class QBrandMarks {
   QBrandMarks._();
 

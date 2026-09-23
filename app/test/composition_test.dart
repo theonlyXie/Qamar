@@ -5,7 +5,7 @@
 // plan has no radio, and "included" is one mark in one colour in both
 // columns.
 //
-// The welcome in mono-glass: the moon sitting on the name, the promise, then
+// The welcome in liquid-glass: the moon sitting on the name, the promise, then
 // the one white button ("Chat with Qamar") and the report as an outline under
 // it, the width of the page; no sign-up block (the three providers and
 // "Continue with email" are in the account sheet that "Sign in" opens,

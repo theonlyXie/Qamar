@@ -21,7 +21,7 @@ import 'common.dart';
 import 'glass.dart';
 
 /// S18 — Ask Qamar, the way a conversation with an assistant already looks
-/// on the phone (the mono-glass skill's chat pattern).
+/// on the phone (the liquid-glass skill's chat pattern).
 ///
 /// A black page. The assistant's words are plain text across the page; the
 /// person's own sit in a grey bubble on their side. At the foot, one glass
@@ -613,7 +613,7 @@ class _Composer extends StatelessWidget {
               textInputAction: TextInputAction.send,
               onChanged: state.onChatDraftChanged,
               onSubmitted: (_) => state.sendChat(),
-              cursorColor: QColors.ink,
+              cursorColor: QColors.accentInk,
               style: QText.body(size: 17, height: 22, color: QColors.ink),
               decoration: InputDecoration(
                 // Listening, the field says so where the words will appear.
@@ -626,7 +626,7 @@ class _Composer extends StatelessWidget {
             ),
           ),
           if (ready)
-            _InkCircle(icon: QIcons.send, onTap: state.sendChat, label: isAr ? 'ابعت' : 'Send')
+            _InkCircle(icon: QIcons.send, onTap: state.sendChat, label: isAr ? 'ابعت' : 'Send', accent: true)
           else
             _InkCircle(
               icon: listening ? QIcons.stop : QIcons.mic,
@@ -682,7 +682,12 @@ class _InkCircle extends StatefulWidget {
   final IconData icon;
   final VoidCallback? onTap;
   final String label;
-  const _InkCircle({required this.icon, required this.onTap, required this.label});
+
+  /// Burgundy: the composer's one action, sending what is written. The
+  /// microphone beside an empty field is clear glass, so the screen's one
+  /// burgundy thing stays the thing to do.
+  final bool accent;
+  const _InkCircle({required this.icon, required this.onTap, required this.label, this.accent = false});
   @override
   State<_InkCircle> createState() => _InkCircleState();
 }
@@ -719,13 +724,25 @@ class _InkCircleState extends State<_InkCircle> {
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 160),
                 transitionBuilder: (child, a) => ScaleTransition(scale: Tween(begin: 0.8, end: 1.0).animate(a), child: FadeTransition(opacity: a, child: child)),
-                child: Container(
-                  key: ValueKey(widget.icon),
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: enabled ? QColors.ink : QDisabled.fill),
-                  child: Icon(widget.icon, size: 18, color: enabled ? QColors.onInk : QDisabled.label),
-                ),
+                // Burgundy glass to send; clear glass to speak.
+                child: enabled
+                    ? QGlass(
+                        key: ValueKey(widget.icon),
+                        shape: QGlassShape.circle,
+                        tint: widget.accent ? QColors.accent : null,
+                        pressed: _down,
+                        blur: 0,
+                        width: 36,
+                        height: 36,
+                        child: Center(child: Icon(widget.icon, size: 18, color: widget.accent ? QColors.onAccent : QColors.ink)),
+                      )
+                    : Container(
+                        key: ValueKey(widget.icon),
+                        width: 36,
+                        height: 36,
+                        decoration: const BoxDecoration(shape: BoxShape.circle, color: QDisabled.fill),
+                        child: Icon(widget.icon, size: 18, color: QDisabled.label),
+                      ),
               ),
             ),
           ),
@@ -761,9 +778,11 @@ class _GlassIcon extends StatelessWidget {
 }
 
 /// One chip for the conversation: the suggestions over the field, a turn's
-/// action, and a problem's ways on (O10). A capsule drawn about 36 points
-/// tall that takes a whole touch ([QLayout.minTap]) (O11). The emphasised
-/// one is inverted: white, black words.
+/// action, and a problem's ways on (O10). A capsule of clear glass drawn
+/// about 36 points tall that takes a whole touch ([QLayout.minTap]) (O11).
+/// The emphasised one, a turn's next step, says it in burgundy words: an
+/// action, but not the screen's one burgundy fill, which a conversation
+/// keeps for sending (and a reading's "Confirm and log").
 class _Chip extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
@@ -782,13 +801,11 @@ class _Chip extends StatelessWidget {
         child: qPressed(
           context,
           pressed: pressed,
-          child: Container(
+          child: QGlass(
+            pressed: pressed,
+            blur: 0,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-            decoration: QDecor.capsule(
-              edge: emphasis ? QColors.ink : QColors.hairline,
-              fill: emphasis ? QColors.ink : (pressed ? QColors.surfaceRaised : QColors.surface),
-            ),
-            child: Text(label, style: QText.body(size: 15, weight: FontWeight.w500, color: emphasis ? QColors.onInk : QColors.ink)),
+            child: Text(label, style: QText.body(size: 15, weight: emphasis ? FontWeight.w600 : FontWeight.w500, color: emphasis ? QColors.accentInk : QColors.ink)),
           ),
         ),
       ),

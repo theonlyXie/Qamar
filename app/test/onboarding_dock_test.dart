@@ -5,7 +5,7 @@
 // the next, so the conversation does not drop and come back; the inputs'
 // entrance starts on the frame their question paints; one radius across the
 // answer stack; wheel labels at 12pt. And it reads as the conversation does
-// (the mono-glass chat pattern, as Ask Qamar draws it): Qamar's words plain
+// (the liquid-glass chat pattern, as Ask Qamar draws it): Qamar's words plain
 // across the page, the person's in a grey bubble on their side, and one
 // glass composer with its white send.
 
@@ -124,7 +124,7 @@ void main() {
     expect(_inputsOpacity(tester, find.byType(QPillChip).first), 1);
   });
 
-  testWidgets('the wheel cards take the control corner; Continue is a capsule, the composer one glass capsule; the wheels’ labels at 12pt', (tester) async {
+  testWidgets('the wheel cards take the control corner; Continue is a capsule of burgundy glass, the composer one glass capsule; the wheels’ labels at 12pt', (tester) async {
     final s = AppState()..setLang(AppLang.en);
     s.startOnboarding();
     s.step = kOnboardingSteps.indexWhere((x) => x.id == 'dob');
@@ -145,13 +145,9 @@ void main() {
       final label = tester.widget<Text>(find.descendant(of: find.byWidget(w), matching: find.text(w.unit)));
       expect(label.style!.fontSize, 12);
     }
-    final continueBox = tester
-        .widgetList<DecoratedBox>(find.descendant(of: find.byType(QPrimaryButton), matching: find.byType(DecoratedBox)))
-        .map((d) => d.decoration)
-        .whereType<BoxDecoration>()
-        .firstWhere((d) => d.color != null);
-    expect(continueBox.gradient, isNull, reason: 'white, not a gradient');
-    expect(continueBox.borderRadius, const BorderRadius.all(Radius.circular(QRadii.pill)), reason: 'Continue is pressed, so it is a capsule, as every button is');
+    final continueGlass = tester.widget<QGlass>(find.descendant(of: find.byType(QPrimaryButton), matching: find.byType(QGlass)));
+    expect(continueGlass.tint, QColors.accent, reason: 'burgundy glass: the one thing to do');
+    expect(continueGlass.shape, QGlassShape.capsule, reason: 'Continue is pressed, so it is a capsule, as every button is');
 
     // The composer: one piece of glass round the field and its send, a
     // capsule while it holds one line, as the conversation's is.

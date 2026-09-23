@@ -23,7 +23,7 @@ import '../widgets/living_orb.dart';
 /// The language switch is the first thing on the page, so someone who does
 /// not read Arabic can switch before anything is asked.
 ///
-/// Centred, as only the welcome and an empty state are (the mono-glass
+/// Centred, as only the welcome and an empty state are (the liquid-glass
 /// skill). The moon takes what height the rest leaves; nothing else is ever
 /// scaled, and a page that cannot fit even without the moon scrolls.
 class WelcomeScreen extends StatelessWidget {
@@ -240,7 +240,8 @@ Future<void> _askInvitationCode(BuildContext context, AppState state) async {
   final code = await showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: QColors.surface,
+    // The sheet draws its own frosted glass (QSheetGlass).
+    backgroundColor: Colors.transparent,
     barrierColor: QColors.scrim,
     elevation: 0,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet))),
@@ -272,59 +273,60 @@ class _InvitationSheetState extends State<_InvitationSheet> {
   @override
   Widget build(BuildContext context) {
     final ar = widget.isAr;
-    OutlineInputBorder edge(Color c, [double w = 1]) =>
-        OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: BorderSide(color: c, width: w));
+    OutlineInputBorder edge(Color c, [double w = 1]) => OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: BorderSide(color: c, width: w));
     return Padding(
       // Above the keyboard, which the field opens with.
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(QSpace.page, QSpace.md, QSpace.page, QSpace.xl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 5,
-                  decoration: BoxDecoration(color: QColors.hairlineStrong, borderRadius: BorderRadius.circular(QRadii.pill)),
+      child: QSheetGlass(
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(QSpace.page, QSpace.md, QSpace.page, QSpace.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 5,
+                    decoration: BoxDecoration(color: QColors.hairlineStrong, borderRadius: BorderRadius.circular(QRadii.pill)),
+                  ),
                 ),
-              ),
-              const SizedBox(height: QSpace.sm),
-              Row(
-                children: [
-                  QRoundIconButton(icon: QIcons.close, onTap: () => Navigator.of(context).pop(), label: ar ? 'اقفل' : 'Close'),
-                  const SizedBox(width: QSpace.xs),
-                  Expanded(child: Text(ar ? 'كود الدعوة' : 'Invitation code', style: QText.display(size: 22, ar: ar))),
-                ],
-              ),
-              const SizedBox(height: QSpace.lg),
-              TextField(
-                controller: _ctrl,
-                autofocus: true,
-                textCapitalization: TextCapitalization.characters,
-                textDirection: TextDirection.ltr,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _use(),
-                cursorColor: QColors.ink,
-                style: QText.number(size: 17),
-                decoration: InputDecoration(
-                  hintText: 'QMR-XXXXX',
-                  hintTextDirection: TextDirection.ltr,
-                  hintStyle: QText.number(size: 17, color: QColors.inkTertiary),
-                  filled: true,
-                  fillColor: QColors.surfaceRaised,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: QSpace.lg, vertical: 15),
-                  border: edge(QColors.hairline),
-                  enabledBorder: edge(QColors.hairline),
-                  focusedBorder: edge(QColors.hairlineStrong, 1.5),
+                const SizedBox(height: QSpace.sm),
+                Row(
+                  children: [
+                    QRoundIconButton(icon: QIcons.close, onTap: () => Navigator.of(context).pop(), label: ar ? 'اقفل' : 'Close'),
+                    const SizedBox(width: QSpace.xs),
+                    Expanded(child: Text(ar ? 'كود الدعوة' : 'Invitation code', style: QText.display(size: 22, ar: ar))),
+                  ],
                 ),
-              ),
-              const SizedBox(height: QSpace.lg),
-              QPrimaryButton(label: ar ? 'استخدم الكود' : 'Use code', onTap: _use),
-            ],
+                const SizedBox(height: QSpace.lg),
+                TextField(
+                  controller: _ctrl,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.characters,
+                  textDirection: TextDirection.ltr,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _use(),
+                  cursorColor: QColors.accentInk,
+                  style: QText.number(size: 17),
+                  decoration: InputDecoration(
+                    hintText: 'QMR-XXXXX',
+                    hintTextDirection: TextDirection.ltr,
+                    hintStyle: QText.number(size: 17, color: QColors.inkTertiary),
+                    filled: true,
+                    fillColor: QColors.surfaceRaised,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: QSpace.lg, vertical: 15),
+                    border: edge(QColors.hairline),
+                    enabledBorder: edge(QColors.hairline),
+                    focusedBorder: edge(QColors.hairlineStrong, 1.5),
+                  ),
+                ),
+                const SizedBox(height: QSpace.lg),
+                QPrimaryButton(label: ar ? 'استخدم الكود' : 'Use code', onTap: _use),
+              ],
+            ),
           ),
         ),
       ),

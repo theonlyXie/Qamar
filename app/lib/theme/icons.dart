@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Icons;
 
-/// Every glyph the app draws, by what it means (the mono-glass skill: one
+/// Every glyph the app draws, by what it means (the liquid-glass skill: one
 /// icon family). All of them are Cupertino icons — the open drawing of Apple's
 /// SF Symbols that ships with Flutter — at one weight, so a page never mixes
 /// a filled Material glyph with an outlined one again. Filled forms are used

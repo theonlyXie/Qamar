@@ -125,7 +125,7 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
 
   /// Alive, or still: under reduce motion the orb rests in its quiet pose
   /// (no breath, no swelling halo, no wander, rings at rest), as the
-  /// mono-glass skill has it; the state it shows stays, drawn still.
+  /// liquid-glass skill has it; the state it shows stays, drawn still.
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -403,12 +403,12 @@ class BehindMoonClipper extends CustomClipper<Path> {
   bool shouldReclip(BehindMoonClipper old) => old.radius != radius;
 }
 
-/// The streak as seven dots round the moon, lit one day at a time — the
-/// way Nothing's Glyph lights say a state without a screen. A dot per day of
-/// the current week of the run, from the top, clockwise; at seven every dot
-/// is lit, and the week starts over. Today's dot, while today is still
-/// waiting for its meal, is half lit. Young, three days, a full week: the
-/// dots grow with the run instead of changing colour.
+/// The streak as seven short arcs round the moon, lit one day at a time in
+/// burgundy: an arc per day of the current week of the run, from the top,
+/// clockwise in both languages; at seven the ring is whole, and the week
+/// starts over. Today's arc, while today is still waiting for its meal, is
+/// at half strength. Young, three days, a full week: the ring thickens with
+/// the run instead of changing colour.
 class StreakRingPainter extends CustomPainter {
   final Streak streak;
   const StreakRingPainter({required this.streak});
@@ -422,39 +422,46 @@ class StreakRingPainter extends CustomPainter {
     return inTurn == 0 ? 1 : inTurn / daysPerTurn;
   }
 
-  /// The ink of the dots: white, whatever the count. What the count says,
-  /// [dotScale] draws.
-  static Color colorFor(int count) => QColors.ink;
+  /// The colour of a lit day: burgundy, whatever the count. What the count
+  /// says, [weightScale] draws.
+  static Color colorFor(int count) => QColors.accentInk;
 
-  /// How large a lit dot is drawn for a run of [count] days: a little larger
-  /// from three days, and again from a full week.
-  static double dotScale(int count) => count >= daysPerTurn ? 1.25 : (count >= 3 ? 1.1 : 1.0);
+  /// How thick a lit day is drawn for a run of [count] days: a little
+  /// thicker from three days, and again from a full week.
+  static double weightScale(int count) => count >= daysPerTurn ? 1.25 : (count >= 3 ? 1.1 : 1.0);
 
-  /// Where dot [i] of seven sits on a ring of radius [r] about [c]: from the
-  /// top, clockwise.
-  static Offset dotAt(int i, Offset c, double r) {
-    final a = -math.pi / 2 + i * 2 * math.pi / daysPerTurn;
-    return c + Offset(math.cos(a) * r, math.sin(a) * r);
-  }
+  /// The gap between two days' arcs, in radians.
+  static const _gap = 0.22;
 
   @override
   void paint(Canvas canvas, Size size) {
     final r = size.width / 2;
     final c = Offset(r, r);
-    final dot = math.max(1.6, size.width * 0.032);
-    final ring = r - dot * 1.6;
+    final stroke = math.max(1.6, size.width * 0.03);
+    final ring = Rect.fromCircle(center: c, radius: r - stroke * 1.6);
     final lit = (fraction(streak.current) * daysPerTurn).round();
-    final scale = dotScale(streak.current);
+    final scale = weightScale(streak.current);
+    const step = 2 * math.pi / daysPerTurn;
     for (var i = 0; i < daysPerTurn; i++) {
-      final at = dotAt(i, c, ring);
+      final start = -math.pi / 2 + i * step + _gap / 2;
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
       if (i < lit) {
-        canvas.drawCircle(at, dot * scale, Paint()..color = QColors.ink);
+        paint
+          ..strokeWidth = stroke * scale
+          ..color = colorFor(streak.current);
       } else if (i == lit && streak.atRisk) {
-        // Today's dot, waiting for its meal.
-        canvas.drawCircle(at, dot, Paint()..color = QColors.ink.withValues(alpha: 0.5));
+        // Today's arc, waiting for its meal.
+        paint
+          ..strokeWidth = stroke
+          ..color = colorFor(streak.current).withValues(alpha: 0.5);
       } else {
-        canvas.drawCircle(at, dot * 0.8, Paint()..color = QColors.dotOff);
+        paint
+          ..strokeWidth = stroke * 0.8
+          ..color = QColors.hairline;
       }
+      canvas.drawArc(ring, start, step - _gap, false, paint);
     }
   }
 

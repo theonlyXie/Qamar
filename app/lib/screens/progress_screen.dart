@@ -17,13 +17,13 @@ import '../theme/icons.dart';
 import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
-import '../widgets/dot_number.dart';
+import '../widgets/hero_number.dart';
 import '../widgets/explain.dart';
 import '../widgets/review_card.dart';
 
 /// Progress: how the week is going, read at a glance, and the card to share.
 ///
-/// One figure, the days logged this week, in dots; the run, while the score
+/// One figure, the days logged this week, large; the run, while the score
 /// is shown; the week's card (a moon a day, the sentence the person did not
 /// expect, the one change) with the one way to send it; and the weight's
 /// direction once there are two readings to draw it from.
@@ -90,7 +90,8 @@ class ProgressScreen extends StatelessWidget {
 }
 
 /// The screen's one figure: how many of the last seven days have a meal
-/// logged, in dots, with the meals under it. A week with none says so.
+/// logged, as the screen's large figure, with the meals under it. A week
+/// with none says so.
 class _WeekFigure extends StatelessWidget {
   final AppState state;
   const _WeekFigure({required this.state});
@@ -118,9 +119,8 @@ class _WeekFigure extends StatelessWidget {
               style: QText.body(size: 17, color: QColors.ink),
             )
           else ...[
-            DotNumber(
+            HeroNumber(
               state.digits('$days'),
-              height: 48,
               semanticsLabel: isAr ? '${state.iso('$days')} $ofSeven' : '$days $ofSeven',
             ),
             const SizedBox(height: 12),

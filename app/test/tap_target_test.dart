@@ -27,10 +27,13 @@ Future<void> _pump(WidgetTester tester, Widget child) async {
 }
 
 /// The drawn box of a control: the decoration that carries its border.
+/// Where a control is drawn: its piece of glass, or the edged box of a
+/// control with nothing to do.
 Rect _drawn(WidgetTester tester, Finder control) {
   final boxes = find.descendant(
     of: control,
-    matching: find.byWidgetPredicate((w) => w is DecoratedBox && w.decoration is BoxDecoration && (w.decoration as BoxDecoration).border != null),
+    matching: find.byWidgetPredicate((w) =>
+        w is DecoratedBox && (w.key == QGlass.fillKey || (w.decoration is BoxDecoration && (w.decoration as BoxDecoration).border != null))),
   );
   return tester.getRect(boxes.first);
 }
@@ -123,10 +126,14 @@ void main() {
       expect(QDisabled.label, QColors.inkDisabled);
     });
 
-    testWidgets('enabled, the same controls draw their own edge and label', (tester) async {
+    testWidgets('enabled, the same controls are glass and draw their own label', (tester) async {
       await _pump(tester, QOutlineButton(label: 'Redeem', onTap: () {}));
-      expect((_decoration(tester, find.byType(QOutlineButton)).border! as Border).top.color, QColors.hairlineStrong);
+      final glass = tester.widget<QGlass>(find.descendant(of: find.byType(QOutlineButton), matching: find.byType(QGlass)));
+      expect(glass.tint, isNull, reason: 'clear glass: a secondary action is not burgundy');
       expect(tester.widget<Text>(find.text('Redeem')).style!.color, isNot(QDisabled.label));
+      await _pump(tester, QPrimaryButton(label: 'Log a meal', onTap: () {}));
+      expect(tester.widget<QGlass>(find.descendant(of: find.byType(QPrimaryButton), matching: find.byType(QGlass))).tint, QColors.accent, reason: 'the one thing to do is burgundy glass');
+      expect(tester.widget<Text>(find.text('Log a meal')).style!.color, QColors.onAccent);
     });
   });
 

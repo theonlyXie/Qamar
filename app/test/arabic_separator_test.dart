@@ -1,5 +1,5 @@
 // Beside Arabic-Indic digits a middle dot is a zero: "١٦ · وجبة" reads as
-// "١٦٠ وجبة", 160 meals, since ٠ is drawn as a dot (the mono-glass skill,
+// "١٦٠ وجبة", 160 meals, since ٠ is drawn as a dot (the liquid-glass skill,
 // references/arabic.md). Where English separates with " · ", Arabic copy
 // uses the Arabic comma. This holds every Arabic string in lib/ to it: no
 // "·" beside a number, written or computed.

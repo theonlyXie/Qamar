@@ -23,7 +23,7 @@ import 'package:qamar/screens/you_screen.dart';
 import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/icons.dart';
-import 'package:qamar/widgets/dot_number.dart';
+import 'package:qamar/widgets/hero_number.dart';
 import 'package:qamar/widgets/living_orb.dart';
 import 'package:qamar/widgets/orb_nav.dart';
 import 'package:qamar/widgets/quest_card.dart';
@@ -143,8 +143,8 @@ void main() {
 
       s.setShowScore(false);
       await tester.pump();
-      // The balance is the wallet's hero, drawn in dots.
-      expect(tester.widget<DotNumber>(find.byKey(WalletScreen.balanceKey)).text, s.formatSu(1250), reason: 'the balance stays: spending needs it');
+      // The balance is the wallet's hero, a large figure.
+      expect(tester.widget<HeroNumber>(find.byKey(WalletScreen.balanceKey)).text, s.formatSu(1250), reason: 'the balance stays: spending needs it');
       expect(find.byKey(WalletScreen.levelKey), findsNothing, reason: 'the Level bar keeps score');
       expect(find.text(level), findsNothing);
       expect(find.text(s.t.levelNote), findsNothing);

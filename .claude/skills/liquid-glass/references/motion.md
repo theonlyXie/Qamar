@@ -1,11 +1,11 @@
 # Motion
 
-Motion in mono-glass does three jobs:
+Motion in liquid-glass does three jobs:
 - it says **where things come from and go**;
 - it gives **instant feedback** under the finger;
-- it shows **that something is alive or waiting** by breathing light.
+- it shows **that something is alive or waiting**, with a slow breath.
 
-It never decorates. Nothing's motion is "light, not travel": brightness changes more than position does. Apple's is physics: springs that start from where a thing is and carry the finger's speed.
+It never decorates. Apple's model is physics: springs that start from where a thing is and carry the finger's speed.
 
 ## Tokens (Qamar: `app/lib/theme/motion.dart`)
 
@@ -21,7 +21,6 @@ It never decorates. Nothing's motion is "light, not travel": brightness changes 
 | Leave | about 200 ms, along the arrival path, faster than arrival |
 | Active breath | 2.4 s sine, opacity 1.0 ↔ 0.5 |
 | Idle breath (the orb) | `QMotion.breath` 4.6 s |
-| Dot stagger | 12–20 ms per dot, in reading order (rings clockwise) |
 
 ## Recipes
 
@@ -47,11 +46,6 @@ final alpha = 0.75 + 0.25 * math.cos(2 * math.pi * t); // 1.0 ↔ 0.5
 
 Under reduce motion: stop the controller and hold at 1.0.
 
-**Dot sweep (a ring filling, a completion):**
-- Light each dot in order with a 12–20 ms stagger.
-- Each dot goes 0 → 1 opacity over 120 ms, with an optional scale of 1 → 1.35 → 1 at completion.
-- Rings run clockwise from 12 o'clock in both languages. Linear sweeps follow reading direction.
-
 **Attention (once, never looping):** two dips to 30% brightness, 150 ms each, then words. Never flash more than three times a second.
 
 ## Rules
@@ -63,11 +57,11 @@ Under reduce motion: stop the controller and hold at 1.0.
 5. **Frequent means quiet.** Sending a message, ticking water or toggling a switch gets a press and a fade, no more.
 6. **One moving thing at a time.** Two simultaneous large motions read as chaos. Stagger them or choose one.
 7. **The orb is alive, but gently.** Its idle breath and float are slow (4.6 s, 9–11 s) and small in amplitude. Listening speeds the breath to 2.4 s. Under reduce motion, the orb is still.
-8. **A control never drifts.** Nothing a finger has to hit moves on its own: no bobbing buttons, no floating chips. On a ring of choices the circles hold still and only a light may run along the branches. A moving target is harder to hit, and an automated tap (a test, an accessibility tool) waits for it to stop.
+8. **A control never drifts.** Nothing a finger has to hit moves on its own: no bobbing buttons, no floating chips. On the tree, nothing on the ring moves on its own; the circles hold still. A moving target is harder to hit, and an automated tap (a test, an accessibility tool) waits for it to stop.
 
 ## Reduce Motion (`MediaQuery.disableAnimationsOf(context)`)
 
 - Every translate, scale or rotate becomes a fade of 150 ms or less.
-- There is no breathing, orbiting, float, parallax, dot stagger or blur animation. That includes the slow ones (a moon's phase drift, a light running along a branch): stop the controller in `didChangeDependencies` and draw the rest pose, so the screen settles and schedules no frames.
+- Every loop stops: no breathing, orbiting, float, parallax or blur animation. That includes the slow ones, the orb's breathing and the moon's phase drift: stop the controller in `didChangeDependencies` and draw the rest pose, so the screen settles and schedules no frames.
 - Springs become `QSpring.drive(…, still: true)`, a plain 150 ms tween that the caller draws as a fade.
 - Meaning must survive: if motion said "listening", the words must say it too.

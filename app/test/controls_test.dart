@@ -44,10 +44,10 @@ void main() {
     }
   });
 
-  test('switches are inverted, not coloured: on is a black thumb on a white track, off a white thumb on raised grey', () {
+  test('switches are Apple\'s: on is a white thumb on a burgundy track, off a white thumb on raised grey', () {
     final theme = buildQamarTheme().switchTheme;
-    expect(theme.thumbColor!.resolve({WidgetState.selected}), QColors.onInk);
-    expect(theme.trackColor!.resolve({WidgetState.selected}), QColors.ink);
+    expect(theme.thumbColor!.resolve({WidgetState.selected}), QColors.ink);
+    expect(theme.trackColor!.resolve({WidgetState.selected}), QColors.accent);
     expect(theme.thumbColor!.resolve({}), QColors.ink);
     expect(theme.trackColor!.resolve({}), QColors.surfaceHigh);
     expect(theme.trackOutlineColor!.resolve({}), QColors.hairlineStrong);
@@ -93,22 +93,22 @@ void main() {
       expect(find.textContaining(s.t.balanceAfter), findsWidgets);
     });
 
-    testWidgets('the wallet’s chosen tab is inverted: a white segment under black words, the other in the second ink (${lang.name})', (tester) async {
+    testWidgets('the wallet’s chosen tab is a raised pane of neutral glass under white words, the other in the second ink (${lang.name})', (tester) async {
       final s = AppState()..setLang(lang);
       s.go(AppScreen.today);
       s.go(AppScreen.wallet);
       await _pumpApp(tester, s);
       Color ink(String label) => tester.widget<RichText>(find.descendant(of: find.text(label), matching: find.byType(RichText))).text.style!.color!;
       final thumb = find.byKey(WalletScreen.thumbKey);
-      expect((tester.widget<DecoratedBox>(thumb).decoration as BoxDecoration).color, QColors.ink, reason: 'the chosen segment is white');
-      expect(ink(s.t.spendTab), QColors.onInk, reason: 'with black words');
+      expect(tester.widget<DecoratedBox>(thumb).decoration, QDecor.segmentThumb, reason: 'a mode, not an action: neutral glass, not burgundy');
+      expect(ink(s.t.spendTab), QColors.ink, reason: 'with white words');
       expect(ink(s.t.historyTab), QColors.inkSecondary);
       expect(tester.getRect(thumb).contains(tester.getCenter(find.text(s.t.spendTab))), isTrue, reason: 'under the chosen tab');
 
       s.showHistory();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(ink(s.t.historyTab), QColors.onInk);
+      expect(ink(s.t.historyTab), QColors.ink);
       expect(ink(s.t.spendTab), QColors.inkSecondary);
       expect(tester.getRect(thumb).contains(tester.getCenter(find.text(s.t.historyTab))), isTrue, reason: 'it moved to the other');
     });

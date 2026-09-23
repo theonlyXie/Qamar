@@ -1,6 +1,6 @@
 # The conversation: ChatGPT-style
 
-People already know how ChatGPT works. We copy its structure exactly, because familiarity is speed. We then make it ours with black and white, glass controls and the moon. Qamar's implementation is `app/lib/widgets/ask_qamar_overlay.dart`.
+People already know how ChatGPT works. We copy its structure exactly, because familiarity is speed. We then make it ours with black, white and one burgundy, glass controls and the moon. Qamar's implementation is `app/lib/widgets/ask_qamar_overlay.dart`.
 
 ## Layout, top to bottom
 
@@ -29,8 +29,14 @@ People already know how ChatGPT works. We copy its structure exactly, because fa
 ## Rules
 
 **The ground.**
-- A solid black page, no glass behind the transcript, and a spring fade-and-rise when the chat opens.
+- A black page: no glass behind the transcript, and none of the page's burgundy light. Qamar's words are plain text on black.
+- A spring fade-and-rise when the chat opens.
 - The transcript scrolls under the header and above the composer with a top edge fade. There are no dividers.
+
+**Burgundy in the conversation**, and nothing else:
+- The send circle is burgundy only when there is text. The microphone beside an empty field, and the stop, are clear glass.
+- A turn's suggested next step is a clear glass chip with `accentInk` words (600), not a burgundy fill.
+- "Confirm and log" on a reading is the primary button.
 
 **The header.**
 - Close on the leading side, as a 44 glass circle.
@@ -53,7 +59,7 @@ People already know how ChatGPT works. We copy its structure exactly, because fa
 - Supporting lines (a breakdown, a source) use 15/22 `inkSecondary`.
 - Numbers are tabular and follow the digits setting.
 - Under the last reply, small actions (20 pt glyphs, 48 targets): **copy** (`QIcons.copy`) and **retry** (`QIcons.repeat`), with spoken labels.
-- Optional action chips go under a reply when an action is likely ("Log it"). The likely one is white, the rest outline.
+- Optional action chips go under a reply when an action is likely ("Log it"). They are clear glass. The turn's suggested next step has `accentInk` words (600), not a burgundy fill; the others have `ink` words.
 
 **While waiting.**
 - A 14 pt white dot breathing on the 2.4 s cycle, where the reply will appear.
@@ -65,33 +71,34 @@ People already know how ChatGPT works. We copy its structure exactly, because fa
 - One glass rounded panel, radius 26, 20 from the sides, sitting above the keyboard.
 - **Leading:** a plain **+** glyph (attach). It offers "Take a photo" and "Choose a photo" in a small glass menu that grows from the +.
 - **Middle:** a multiline field, 17/22, up to 6 lines, placeholder "Ask Qamar anything" / "اسأل قمر أي حاجة" in `inkTertiary`.
-- **Trailing:** a 36 white circle with a black glyph. It changes with state:
+- **Trailing:** a 36 glass circle. It is burgundy, with a white glyph (`onAccent`), only when there is text to send. The mic beside an empty field and stop are clear glass with an `ink` glyph:
 
-  | State | Glyph | Tap does |
-  |---|---|---|
-  | Text in field | send `↑` | send |
-  | Empty field | mic | start listening |
-  | Listening | stop ■ | stop listening |
-  | Reply generating | stop ■ | stop the reply |
+  | State | Glyph | Glass | Tap does |
+  |---|---|---|---|
+  | Text in field | send `↑` | burgundy | send |
+  | Empty field | mic | clear | start listening |
+  | Listening | stop ■ | clear | stop listening |
+  | Reply generating | stop ■ | clear | stop the reply |
 
-- The glyph change is a 150 ms cross-fade and scale (0.8 → 1). The circle never jumps.
+- The change is a 150 ms cross-fade and scale (0.8 → 1), fill and glyph together. The circle never jumps.
 - Return inserts a newline on mobile. Send is the button.
+- **The onboarding composer** follows the same rule: its send is burgundy only while there is text.
 
 **Voice.** Holding the orb starts listening directly; that's the fastest path. Tapping the mic in the composer does the same. The transcript fills the field live, and the person sends it or lets it auto-send on a pause.
 
 **Acting on the person's behalf.**
 - When the assistant would change something (log a meal, set a goal), it shows a **proposal card** in the transcript:
-  - a `surface` card with a `hairlineStrong` edge;
+  - a glass panel with the strong rim;
   - the items, with − / + steppers;
   - the totals;
-  - one primary "Confirm and log", and "Cancel" as a text button.
+  - "Confirm and log" as the primary button, and "Cancel" as a quiet text button (`inkSecondary`).
 - Nothing is written until the person confirms.
 - After confirming, the card collapses to a one-line receipt ("Logged · 540 kcal") with **Undo**.
 
 **Honesty.**
 - **Disclosure:** show one quiet line under the empty state the first time ("Qamar can make mistakes. Check anything medical with your doctor."), and keep it reachable from the header.
 - **Health:** never assert medical facts beyond nutrition. Allergies and conditions always win over a suggestion.
-- **Limits and errors:** a state line in the transcript, in plain words, with one action ("You've used today's 3 questions. Qamar+ has no limit." plus "See Qamar+"). Don't use a modal wall.
+- **Limits and errors:** a state line in the transcript, in plain words, with one way on in `accentInk` words ("You've used today's 3 questions. Qamar+ has no limit." plus "See Qamar+"). Don't use a modal wall.
 - **Offline:** the composer stays usable. Messages queue, and a state line says so.
 
 **Motion.**

@@ -15,6 +15,7 @@ import 'package:qamar/models/meal.dart';
 import 'package:qamar/screens/home_shell.dart';
 import 'package:qamar/screens/wallet_screen.dart';
 import 'package:qamar/state/app_state.dart';
+import 'package:qamar/theme/app_theme.dart';
 import 'package:qamar/theme/colors.dart';
 import 'package:qamar/widgets/ask_qamar_overlay.dart';
 
@@ -104,11 +105,10 @@ void main() {
             .map((c) => c.decoration)
             .whereType<BoxDecoration>()
             .map((d) => d.border)
-            .whereType<Border>()
-            .map((b) => b.top.color)
+            .whereType<QGlassRim>()
             .toList();
         expect(edges, isNotEmpty, reason: eyebrow);
-        expect(edges.first, QColors.hairline, reason: '$eyebrow’s card: the one edge, the hairline');
+        expect(edges.first, QGlassRim.soft, reason: '$eyebrow’s card: the one edge, a pane\'s rim');
       }
     });
   }

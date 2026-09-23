@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/app_state.dart';
+import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/layout.dart';
 import '../widgets/account_sheet.dart';
@@ -96,8 +97,10 @@ class HomeShell extends StatelessWidget {
   Widget _shell(AppState state) {
     return Scaffold(
       backgroundColor: QColors.canvas,
+      // The page's light (QDecor.ambient), fixed behind every screen: the
+      // glass panels scroll over it.
       body: DecoratedBox(
-        decoration: const BoxDecoration(color: QColors.canvas),
+        decoration: QDecor.ambient,
         child: SafeArea(
           child: Stack(
             children: [

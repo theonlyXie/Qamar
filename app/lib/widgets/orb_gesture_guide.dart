@@ -164,7 +164,7 @@ class OrbGestureGuide extends StatelessWidget {
                         // to the card with its tick. No edge: an edge would
                         // take its width from the words.
                         decoration: BoxDecoration(
-                          color: learned.contains(gestures[i].$1) ? QColors.surface : QColors.surfaceRaised,
+                          color: learned.contains(gestures[i].$1) ? Colors.transparent : QColors.glassInset,
                           borderRadius: BorderRadius.circular(QRadii.inset),
                         ),
                         child: Text.rich(words[i]),

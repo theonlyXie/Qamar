@@ -1,4 +1,4 @@
-// The welcome's way in, made one tap (the mono-glass skill: no step that is
+// The welcome's way in, made one tap (the liquid-glass skill: no step that is
 // not a real decision). "Chat with Qamar" used to open a sheet of three
 // dishes and a second button before the first question (O5); it now goes
 // straight to the first question, and the first moment of value is the

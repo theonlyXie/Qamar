@@ -10,10 +10,10 @@ import '../theme/icons.dart';
 import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
-import '../widgets/dot_number.dart';
+import '../widgets/hero_number.dart';
 import '../widgets/explain.dart';
 
-/// The Su Points wallet: the balance is the page's one hero, drawn in dots;
+/// The Su Points wallet: the balance is the page's one hero, a large figure;
 /// under it the two tabs, Spend and History, and under them plain rows.
 class WalletScreen extends StatelessWidget {
   const WalletScreen({super.key});
@@ -55,7 +55,7 @@ class WalletScreen extends StatelessWidget {
         ]),
         const SizedBox(height: QSpace.xxl),
 
-        // The hero: what there is to spend, in dots, with the coin as its
+        // The hero: what there is to spend, large, with the coin as its
         // unit. Lifetime earned and Level keep score, so they go with "Points
         // and streaks" (O4); the balance stays, because spending needs it.
         Container(
@@ -93,7 +93,7 @@ class WalletScreen extends StatelessWidget {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: AlignmentDirectional.centerStart,
-                    child: DotNumber(balance, key: WalletScreen.balanceKey, height: 48, semanticsLabel: '$balance ${t.suName}, ${t.suAvailable}'),
+                    child: HeroNumber(balance, key: WalletScreen.balanceKey, semanticsLabel: '$balance ${t.suName}, ${t.suAvailable}'),
                   ),
                 ),
               ]),
@@ -167,7 +167,7 @@ class _Tabs extends StatelessWidget {
       child: Stack(children: [
         Positioned.fill(
           child: Center(
-            child: Container(height: track, decoration: QDecor.capsule(edge: QColors.hairline, fill: QColors.surface)),
+            child: Container(height: track, decoration: QDecor.capsule(edge: QColors.hairline, fill: QColors.glassPanel)),
           ),
         ),
         Positioned.fill(
@@ -183,7 +183,7 @@ class _Tabs extends StatelessWidget {
                   child: FractionallySizedBox(
                     widthFactor: 1 / tabs.length,
                     heightFactor: 1,
-                    child: const DecoratedBox(key: WalletScreen.thumbKey, decoration: QDecor.inkButton),
+                    child: const DecoratedBox(key: WalletScreen.thumbKey, decoration: QDecor.segmentThumb),
                   ),
                 ),
               ),
@@ -206,7 +206,7 @@ class _Tabs extends StatelessWidget {
                     child: AnimatedDefaultTextStyle(
                       duration: still ? Duration.zero : const Duration(milliseconds: 220),
                       curve: Curves.easeOutCubic,
-                      style: QText.body(size: 15, weight: FontWeight.w600, color: tab == chosen ? QColors.onInk : (pressed ? QColors.ink : QColors.inkSecondary)),
+                      style: QText.body(size: 15, weight: FontWeight.w600, color: tab == chosen || pressed ? QColors.ink : QColors.inkSecondary),
                       child: Text(label),
                     ),
                   ),

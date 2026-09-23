@@ -159,8 +159,9 @@ Widget qPressed(BuildContext context, {required bool pressed, required Widget ch
   return AnimatedScale(scale: pressed ? 0.97 : 1, duration: const Duration(milliseconds: 120), curve: Curves.easeOut, child: child);
 }
 
-/// The one thing to do on a screen: a white capsule with black words (the
-/// mono-glass skill). One per screen; everything else is secondary.
+/// The one thing to do on a screen: a capsule of burgundy glass with white
+/// words (the liquid-glass skill). One per screen; everything else is
+/// secondary, and nothing else on the screen is filled burgundy.
 class QPrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
@@ -171,6 +172,19 @@ class QPrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
+    final ink = enabled ? QColors.onAccent : QDisabled.label;
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 18, color: ink),
+          const SizedBox(width: 8),
+        ],
+        Flexible(
+          child: Text(label, textAlign: TextAlign.center, style: QText.body(size: 17, weight: FontWeight.w600, color: ink)),
+        ),
+      ],
+    );
     return QTapArea(
       onTap: enabled
           ? () {
@@ -181,34 +195,29 @@ class QPrimaryButton extends StatelessWidget {
       builder: (context, pressed) => qPressed(
         context,
         pressed: pressed,
-        child: Container(
-          height: height,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: enabled ? QDecor.inkButton : QDecor.capsule(edge: QDisabled.edge, fill: QDisabled.fill),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 18, color: enabled ? QColors.onInk : QDisabled.label),
-                const SizedBox(width: 8),
-              ],
-              Flexible(
-                child: Text(label,
-                    textAlign: TextAlign.center,
-                    style: QText.body(size: 17, weight: FontWeight.w600, color: enabled ? QColors.onInk : QDisabled.label)),
+        child: enabled
+            ? QGlass(
+                tint: QColors.accent,
+                pressed: pressed,
+                height: height,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Center(child: content),
+              )
+            : Container(
+                height: height,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                decoration: QDecor.capsule(edge: QDisabled.edge, fill: QDisabled.fill),
+                child: content,
               ),
-            ],
-          ),
-        ),
       ),
     );
   }
 }
 
-/// A compact call to action inside a card: a white capsule drawn 40 points
-/// tall, touched across 48 (O11). Where [QPrimaryButton] would be too much,
-/// and a text link too little.
+/// A compact call to action inside a card: a capsule of burgundy glass drawn
+/// 40 points tall, touched across 48 (O11). Where [QPrimaryButton] would be
+/// too much, and a text link too little.
 class QPillButton extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
@@ -220,13 +229,14 @@ class QPillButton extends StatelessWidget {
         builder: (context, pressed) => qPressed(
           context,
           pressed: pressed,
-          // As wide as its label: a Container with an alignment would fill
+          // As wide as its label: a Center with no width factor would fill
           // the row.
-          child: Container(
+          child: QGlass(
+            tint: QColors.accent,
+            pressed: pressed,
             height: 40,
             padding: const EdgeInsets.symmetric(horizontal: 18),
-            decoration: QDecor.inkButton,
-            child: Center(widthFactor: 1, child: Text(label, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.onInk))),
+            child: Center(widthFactor: 1, child: Text(label, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.onAccent))),
           ),
         ),
       );
@@ -345,30 +355,55 @@ class _SheetExit extends InheritedWidget {
   bool updateShouldNotify(_SheetExit old) => old.closing != closing;
 }
 
-/// A sheet's panel (the mono-glass skill): the surface, its 32-point top
-/// corners over a strong hairline, and the grabber that says it can be pulled
-/// down. Every sheet is one of these inside a [QSheetScrim], so they all
-/// arrive, look and leave the same way.
+/// A sheet's panel (the liquid-glass skill): [QSheetGlass] with its padding
+/// and the grabber that says it can be pulled down. Every sheet is one of
+/// these inside a [QSheetScrim], so they all arrive, look and leave the same
+/// way.
 class QSheetPanel extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   const QSheetPanel({super.key, required this.child, this.padding = const EdgeInsets.fromLTRB(20, 10, 20, 28)});
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
+  Widget build(BuildContext context) => QSheetGlass(
         padding: padding,
-        decoration: const BoxDecoration(
-          color: QColors.surface,
-          border: Border(top: BorderSide(color: QColors.hairlineStrong)),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
-        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [const Center(child: QSheetGrabber()), const SizedBox(height: 14), child],
         ),
       );
+}
+
+/// What every sheet is made of: frosted Liquid Glass rising from the bottom.
+/// The page behind is blurred; a frosted ground over it keeps the sheet's
+/// words off whatever is behind; over that, a pane's lens and a rim bright
+/// along the 32-point top corners. With Increase Contrast it is solid.
+class QSheetGlass extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  const QSheetGlass({super.key, required this.child, this.padding = EdgeInsets.zero});
+
+  static const corners = BorderRadius.vertical(top: Radius.circular(QRadii.sheet));
+
+  @override
+  Widget build(BuildContext context) {
+    final solid = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final panel = DecoratedBox(
+      decoration: BoxDecoration(color: solid ? QColors.surfaceRaised : QColors.glassSheet, borderRadius: corners),
+      child: Container(
+        width: double.infinity,
+        padding: padding,
+        decoration: QDecor.card(border: QColors.hairlineStrong, radius: QRadii.sheet).copyWith(borderRadius: corners),
+        child: child,
+      ),
+    );
+    if (solid) return panel;
+    return ClipRRect(
+      borderRadius: corners,
+      child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24), child: panel),
+    );
+  }
 }
 
 /// The small bar at the top of a sheet: 36 by 5, the strong hairline.
@@ -756,12 +791,13 @@ class QStateLine extends StatelessWidget {
               padding: const EdgeInsetsDirectional.only(start: 10),
               child: TextButton(
                 onPressed: a.onTap,
+                // The way on is something to do: burgundy, as every action is.
                 style: TextButton.styleFrom(
                   minimumSize: const Size(48, 48),
                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                  foregroundColor: accent,
+                  foregroundColor: QColors.accentInk,
                 ),
-                child: Text(a.label, style: QText.body(size: 15, weight: FontWeight.w600, color: accent)),
+                child: Text(a.label, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.accentInk)),
               ),
             ),
         ],
@@ -770,8 +806,8 @@ class QStateLine extends StatelessWidget {
   }
 }
 
-/// The secondary action: a capsule outlined in the strong hairline, white
-/// words, no fill until pressed.
+/// The secondary action: a capsule of clear glass, white words; a step
+/// brighter while pressed.
 class QOutlineButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
@@ -795,13 +831,11 @@ class QOutlineButton extends StatelessWidget {
         pressed: pressed,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 64),
-          child: Container(
+          child: _GlassOrQuiet(
+            enabled: enabled,
+            pressed: pressed,
             height: height,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: QDecor.capsule(
-              edge: enabled ? QColors.hairlineStrong : QDisabled.edge,
-              fill: pressed ? QColors.surfaceRaised : Colors.transparent,
-            ),
             child: Center(
               widthFactor: 1,
               child: Row(
@@ -837,27 +871,36 @@ class QPillChip extends StatelessWidget {
         HapticFeedback.selectionClick();
         onTap();
       },
-      // Selected is inverted — a white capsule with black words — so it
-      // reads as chosen without a colour.
+      // Chosen is burgundy glass with white words; the rest clear glass.
       builder: (context, pressed) => qPressed(
         context,
         pressed: pressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
+        child: QGlass(
+          tint: selected ? QColors.accent : null,
+          pressed: pressed,
+          blur: 0,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-          decoration: QDecor.capsule(
-            edge: selected ? QColors.ink : QColors.hairline,
-            fill: selected
-                ? QColors.ink
-                : pressed
-                    ? QColors.surfaceRaised
-                    : QColors.surface,
-          ),
-          child: Text(label, style: QText.body(size: 15, weight: FontWeight.w500, color: selected ? QColors.onInk : QColors.ink)),
+          child: Text(label, style: QText.body(size: 15, weight: FontWeight.w500, color: selected ? QColors.onAccent : QColors.ink)),
         ),
       ),
     );
   }
+}
+
+/// A secondary control's body: clear glass while it can be used, the quiet
+/// disabled capsule while it cannot.
+class _GlassOrQuiet extends StatelessWidget {
+  final bool enabled;
+  final bool pressed;
+  final double height;
+  final EdgeInsetsGeometry padding;
+  final Widget child;
+  const _GlassOrQuiet({required this.enabled, required this.pressed, required this.height, required this.padding, required this.child});
+
+  @override
+  Widget build(BuildContext context) => enabled
+      ? QGlass(pressed: pressed, blur: 0, height: height, padding: padding, child: child)
+      : Container(height: height, padding: padding, decoration: QDecor.capsule(edge: QDisabled.edge, fill: QDisabled.fill), child: child);
 }
 
 /// Su Points' coin, drawn in the palette: a white ring with a crescent in
@@ -963,16 +1006,21 @@ class QRoundIconButton extends StatelessWidget {
       builder: (context, pressed) => qPressed(
         context,
         pressed: pressed,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: pressed ? QColors.surfaceHigh : QColors.surfaceRaised,
-            border: Border.all(color: enabled ? QColors.hairline : QDisabled.edge),
-          ),
-          child: Icon(icon, size: size * 0.5, color: enabled ? QColors.ink : QDisabled.label),
-        ),
+        child: enabled
+            ? QGlass(
+                shape: QGlassShape.circle,
+                pressed: pressed,
+                blur: 0,
+                width: size,
+                height: size,
+                child: Center(child: Icon(icon, size: size * 0.5, color: QColors.ink)),
+              )
+            : Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: QDisabled.fill, border: Border.all(color: QDisabled.edge)),
+                child: Icon(icon, size: size * 0.5, color: QDisabled.label),
+              ),
       ),
     );
   }
@@ -1090,7 +1138,7 @@ class _QWheelFieldState extends State<QWheelField> {
                     child: Container(
                       height: 32,
                       decoration: const BoxDecoration(
-                        color: QColors.surfaceHigh,
+                        color: QColors.glassRaised,
                         borderRadius: BorderRadius.all(Radius.circular(QRadii.inset)),
                       ),
                     ),
@@ -1197,17 +1245,16 @@ class _Segment extends StatelessWidget {
         constraints: const BoxConstraints(minWidth: QLayout.minTap),
         padding: EdgeInsets.symmetric(horizontal: large ? 14 : 11),
         alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? QColors.ink : Colors.transparent,
-          borderRadius: const BorderRadius.all(Radius.circular(QRadii.pill)),
-        ),
+        // The chosen segment is a raised pane of neutral glass: a mode, not
+        // an action, so not burgundy.
+        decoration: selected ? QDecor.segmentThumb : QDecor.segmentRest,
         child: ExcludeSemantics(
           child: Text(
             label,
             style: QText.body(
               size: large ? 13 : 12,
               weight: FontWeight.w600,
-              color: selected ? QColors.onInk : QColors.inkSecondary,
+              color: selected ? QColors.ink : QColors.inkSecondary,
             ),
           ),
         ),
@@ -1340,8 +1387,9 @@ class QLegalLink extends StatelessWidget {
   }
 }
 
-/// A thin bar of progress: white along a raised grey track, round-ended, 4
-/// points tall. How far along something is, said by length, not by colour.
+/// A thin bar of progress: burgundy along a faint track, round-ended, 4
+/// points tall. How far along something is, said by length; the burgundy is
+/// the app's own colour, never a verdict.
 class QBar extends StatelessWidget {
   final double value;
   final double height;
@@ -1356,12 +1404,12 @@ class QBar extends StatelessWidget {
         height: height,
         child: Stack(
           children: [
-            const Positioned.fill(child: ColoredBox(color: QColors.surfaceHigh)),
+            const Positioned.fill(child: ColoredBox(color: QColors.hairline)),
             FractionallySizedBox(
               alignment: AlignmentDirectional.centerStart,
               widthFactor: v,
               heightFactor: 1,
-              child: const ColoredBox(color: QColors.ink),
+              child: const ColoredBox(color: QColors.accentInk),
             ),
           ],
         ),

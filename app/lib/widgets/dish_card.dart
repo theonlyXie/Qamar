@@ -13,7 +13,7 @@ import '../theme/text_styles.dart';
 /// and its numbers alone. Always said to be an estimate: the portions are
 /// household sizes.
 ///
-/// A card on the page (the mono-glass skill): the flat surface, a hairline,
+/// A card on the page (the liquid-glass skill): the flat surface, a hairline,
 /// the card corner; an eyebrow for the meal, the dish as the lead line, its
 /// numbers under it in two steps of ink.
 class DishCard extends StatelessWidget {

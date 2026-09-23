@@ -1,4 +1,4 @@
-// One icon family (the mono-glass skill, .claude/skills/mono-glass): every
+// One icon family (the liquid-glass skill, .claude/skills/liquid-glass): every
 // glyph the app draws is named by what it means in QIcons (lib/theme/icons.dart)
 // and drawn from the Cupertino family. No screen reaches for a Material glyph
 // (Icons.*), or for a Cupertino one by its own name, so the family can change

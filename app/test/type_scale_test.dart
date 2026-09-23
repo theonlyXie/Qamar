@@ -1,4 +1,4 @@
-// The type scale (the mono-glass skill): text is set at a size on Apple's
+// The type scale (the liquid-glass skill): text is set at a size on Apple's
 // scale and nowhere between (six steps for reading and controls, nothing
 // under 11; four display sizes, each with its own line height; four for
 // figures); tracking is set by size, none at reading sizes and tighter as

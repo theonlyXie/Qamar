@@ -1,4 +1,4 @@
-// Corners (the mono-glass skill): four radii and the pill, each shape taking
+// Corners (the liquid-glass skill): four radii and the pill, each shape taking
 // the corner of what it is: an inset (12), a control or field (18), a card or
 // a message bubble (24), a sheet's top (32), and the pill for anything a
 // finger presses. No corner is written as a number outside the theme, and a

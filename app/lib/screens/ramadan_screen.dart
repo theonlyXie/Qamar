@@ -13,7 +13,7 @@ import '../theme/icons.dart';
 import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
-import '../widgets/dot_number.dart';
+import '../widgets/hero_number.dart';
 
 /// Glasses counted as each language counts them: كوباية واحدة، كوبايتين،
 /// ٣ كوبايات، ١١ كوباية.
@@ -123,7 +123,7 @@ class _NextTime extends StatelessWidget {
           Text(QText.eyebrowText(label, ar: isAr), style: QText.eyebrow(ar: isAr)),
           const SizedBox(height: 12),
           // A clock reads hours first in both languages.
-          DotNumber(time, height: 48, semanticsLabel: '$label $time'),
+          HeroNumber(time, semanticsLabel: '$label $time'),
           const SizedBox(height: 12),
           Text(isAr ? '$where، $other' : '$where · $other', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkSecondary)),
         ],

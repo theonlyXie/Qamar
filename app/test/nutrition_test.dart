@@ -525,11 +525,11 @@ void streakAndOrb() {
       expect(StreakRingPainter.fraction(14), 1);
     });
 
-    test('the dots grow with the run, in the one ink (no colour warms)', () {
-      expect({for (final n in [1, 3, 7, 30]) StreakRingPainter.colorFor(n)}, {QColors.ink});
-      expect(StreakRingPainter.dotScale(1), lessThan(StreakRingPainter.dotScale(3)));
-      expect(StreakRingPainter.dotScale(3), lessThan(StreakRingPainter.dotScale(7)));
-      expect(StreakRingPainter.dotScale(7), StreakRingPainter.dotScale(30));
+    test('the ring thickens with the run, in the one burgundy (no colour warms)', () {
+      expect({for (final n in [1, 3, 7, 30]) StreakRingPainter.colorFor(n)}, {QColors.accentInk});
+      expect(StreakRingPainter.weightScale(1), lessThan(StreakRingPainter.weightScale(3)));
+      expect(StreakRingPainter.weightScale(3), lessThan(StreakRingPainter.weightScale(7)));
+      expect(StreakRingPainter.weightScale(7), StreakRingPainter.weightScale(30));
     });
   });
 }

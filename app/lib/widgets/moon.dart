@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 
 /// The Qamar moon, drawn rather than photographed — in greys only (the
-/// mono-glass skill): every shade below is achromatic.
+/// liquid-glass skill): every shade below is achromatic.
 ///
 /// This replaces the flat `qamar_orb.png` that used to sit inside [LivingOrb].
 /// A picture of a moon always reads as a picture — it has fixed lighting, a

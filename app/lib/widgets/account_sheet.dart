@@ -13,7 +13,7 @@ import '../theme/motion.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
 
-/// A sheet's panel, drawn the one way every sheet from Me is (the mono-glass
+/// A sheet's panel, drawn the one way every sheet from Me is (the liquid-glass
 /// sheet): the surface with 32-point top corners under a strong top edge, a
 /// grabber, the close on the leading side beside the title, what the sheet
 /// holds — scrolling when it is taller than the room — and at most one
@@ -57,12 +57,7 @@ class SheetPanel extends StatelessWidget {
       type: MaterialType.transparency,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: math.max(0, mq.size.height - mq.padding.top - QSpace.xxl)),
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            color: QColors.surface,
-            border: Border(top: BorderSide(color: QColors.hairlineStrong)),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
-          ),
+        child: QSheetGlass(
           child: Padding(
             padding: EdgeInsets.fromLTRB(QSpace.page, QSpace.sm, QSpace.page, QSpace.lg + bottom),
             child: Column(

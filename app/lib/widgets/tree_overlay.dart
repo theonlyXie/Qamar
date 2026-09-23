@@ -172,27 +172,7 @@ class TreeOverlay extends StatefulWidget {
   State<TreeOverlay> createState() => _TreeOverlayState();
 }
 
-class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 3400));
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Under reduce motion the branches are drawn and nothing runs along
-    // them.
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _c.stop();
-    } else if (!_c.isAnimating) {
-      _c.repeat();
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
+class _TreeOverlayState extends State<TreeOverlay> {
   /// The centre moon's name, under it.
   static final _centreLabelStyle = QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkSecondary);
   static const _labelTop = _canvas / 2 + _orbSize / 2 + 4;
@@ -203,26 +183,8 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
     final t = state.t;
     final isAr = state.isAr;
 
-    final still = MediaQuery.disableAnimationsOf(context);
-    // The centre's name, measured as it is set, so no dot of a branch is
-    // drawn over its words.
-    final measure = TextPainter(
-      text: TextSpan(text: t.ask, style: _centreLabelStyle),
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-    )..layout();
-    final labelBox = Rect.fromLTWH(_canvas / 2 - measure.width / 2, _labelTop, measure.width, measure.height).inflate(6);
-    measure.dispose();
-
     final photosLeft = state.photoQuota.remaining;
     final repeatChoices = state.repeatChoices;
-    final int fanCount = state.treeLogSub == TreeSub.activity
-        ? kActivityChoices.length
-        : state.treeLogSub == TreeSub.repeat
-            ? repeatChoices.length
-            : state.treeLogExpanded
-                ? kLogMethods.length
-                : kWaterChoices.length;
     final hint = state.treeLogSub == TreeSub.activity
         ? (isAr ? 'اختار نوع الحركة، وبعدين قد إيه.' : 'Pick the movement, then how long.')
         : state.treeLogSub == TreeSub.repeat
@@ -238,7 +200,6 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
             : t.treeHint;
 
     final nodes = treeNodesFor(ramadan: state.seasonVisible);
-    final beamAngles = state.treeExpanded ? subAnglesFor(fanCount) : [for (final n in nodes) n.angle];
 
     // Photo was chosen and the camera would not open: the problem takes the
     // ring's place. A tap outside still closes.
@@ -286,22 +247,19 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                         child: Stack(
                           clipBehavior: Clip.none,
                           children: [
-                            Positioned.fill(
-                              child: AnimatedBuilder(
-                                animation: _c,
-                                builder: (context, _) => CustomPaint(painter: _BeamPainter(still ? null : _c.value, beamAngles, labelBox)),
-                              ),
-                            ),
+                            // A soft burgundy light behind the moon, the
+                            // page's own light gathered where the ring is.
+                            // No lines: the circles are the menu.
                             Positioned(
-                              left: _canvas / 2 - 58,
-                              top: _canvas / 2 - 58,
+                              left: _canvas / 2 - 90,
+                              top: _canvas / 2 - 90,
                               child: SizedBox(
-                                width: 116,
-                                height: 116,
+                                width: 180,
+                                height: 180,
                                 child: DecoratedBox(
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: RadialGradient(colors: [QColors.ink.withValues(alpha: 0.18), Colors.transparent], stops: const [0.0, 0.68]),
+                                    gradient: RadialGradient(colors: [QColors.accent.withValues(alpha: 0.35), QColors.accent.withValues(alpha: 0)], stops: const [0.0, 1.0]),
                                   ),
                                 ),
                               ),
@@ -509,7 +467,7 @@ class _CentreMoon extends StatelessWidget {
 /// than being squeezed inside and clipped.
 /// A circle on the ring and its name. It holds still: a control that drifts
 /// is harder to hit, and on the ring the only thing that moves is the light
-/// running out along the branches (the mono-glass skill: one moving thing).
+/// running out along the branches (the liquid-glass skill: one moving thing).
 class _RingButton extends StatefulWidget {
   final IconData icon;
   final String label;
@@ -592,50 +550,3 @@ class _RingButtonState extends State<_RingButton> {
   }
 }
 
-/// Branches drawn as a line of dots from the moon to each destination —
-/// Nothing's dot, in white — with one brighter dot travelling out along it,
-/// so the ring reads as thrown off the moon rather than laid round it.
-class _BeamPainter extends CustomPainter {
-  /// Where the travelling light is along each branch, or null when nothing
-  /// runs (reduce motion).
-  final double? t;
-
-  /// Which ring positions to light. When a node is fanned out only its
-  /// choices exist, so only those get a line.
-  final List<double> angles;
-
-  /// The centre moon's name: no dot is drawn over it.
-  final Rect keepOut;
-  _BeamPainter(this.t, this.angles, this.keepOut);
-
-  static const double _innerGap = 46;
-  static const double _pitch = 8;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (var i = 0; i < angles.length; i++) {
-      final target = _onRing(angles[i]);
-      final dir = (target - _center) / (target - _center).distance;
-      final start = _center + dir * _innerGap;
-      final end = _center + dir * ((target - _center).distance - _nodeSize / 2 - 6);
-      final length = (end - start).distance;
-      final n = (length / _pitch).floor();
-      for (var k = 0; k <= n; k++) {
-        final f = n == 0 ? 0.0 : k / n;
-        final dot = start + dir * (k * _pitch);
-        if (keepOut.contains(dot)) continue;
-        canvas.drawCircle(dot, 1.3, Paint()..color = QColors.ink.withValues(alpha: 0.5 - 0.38 * f));
-      }
-      final at = t;
-      if (at == null) continue;
-      final travel = (at + i * 0.14) % 1.0;
-      final head = Offset.lerp(start, end, Curves.easeInOut.transform(travel))!;
-      if (keepOut.contains(head)) continue;
-      canvas.drawCircle(head, 2.4, Paint()..color = QColors.ink.withValues(alpha: 0.85 * (1 - travel)));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _BeamPainter oldDelegate) =>
-      oldDelegate.t != t || oldDelegate.angles.length != angles.length || oldDelegate.keepOut != keepOut;
-}

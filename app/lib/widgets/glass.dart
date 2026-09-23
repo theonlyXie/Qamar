@@ -9,13 +9,14 @@ import '../theme/colors.dart';
 /// is, concentric with what holds it.
 enum QGlassShape { capsule, circle, rounded }
 
-/// Liquid Glass, in black and white (the mono-glass skill).
+/// Liquid Glass, the floating layer (the liquid-glass skill).
 ///
-/// The floating control layer — never content. The orb, the tree's buttons,
-/// the conversation's composer, a floating back button, a sheet's handle: the
-/// things that float above the page and act on it. Content (a card, a row, a
-/// message) sits on the canvas's solid surfaces instead, where its words
-/// always have the contrast they were checked for.
+/// The things that float above the page and act on it: the orb, the tree's
+/// buttons, the conversation's composer, a floating back button, the Su chip.
+/// Cards and sheets are glass too, as panes (QDecor.card, QSheetPanel); this
+/// is the control. With a [tint] it is burgundy glass: the primary button,
+/// the send button, a chosen chip — the colour of the one thing to do, with
+/// the same lens and a brighter rim.
 ///
 /// What it is made of, from the back:
 ///  * the page behind, blurred ([blur]) so the words over it stay legible and
@@ -39,9 +40,16 @@ class QGlass extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final bool clear;
   final bool pressed;
+
+  /// How much of what is behind is blurred. None for glass that does not
+  /// float over moving content (a button on a card), and none for tinted
+  /// glass, which nothing shows through.
   final double blur;
   final double? width;
   final double? height;
+
+  /// Burgundy glass ([QColors.accent]), or null for clear.
+  final Color? tint;
 
   const QGlass({
     super.key,
@@ -54,6 +62,7 @@ class QGlass extends StatelessWidget {
     this.blur = 20,
     this.width,
     this.height,
+    this.tint,
   });
 
   /// The glass's own layers, for tests: the blur, the fill, the edge.
@@ -68,7 +77,8 @@ class QGlass extends StatelessWidget {
       };
 
   /// The fill a piece of glass has in its state.
-  static Color fillFor({required bool solid, required bool pressed, required bool clear}) {
+  static Color fillFor({required bool solid, required bool pressed, required bool clear, Color? tint}) {
+    if (tint != null) return pressed && tint == QColors.accent ? QColors.accentPressed : tint;
     if (solid) return pressed ? QColors.surfaceHigh : QColors.glassSolid;
     if (pressed) return QColors.glassFillPressed;
     return clear ? QColors.glassFillClear : QColors.glassFill;
@@ -80,15 +90,15 @@ class QGlass extends StatelessWidget {
     final border = _border;
     Widget body = DecoratedBox(
       key: fillKey,
-      decoration: ShapeDecoration(color: fillFor(solid: solid, pressed: pressed, clear: clear), shape: border),
+      decoration: ShapeDecoration(color: fillFor(solid: solid, pressed: pressed, clear: clear, tint: tint), shape: border),
       child: CustomPaint(
         key: edgeKey,
-        foregroundPainter: _GlassEdge(border, solid: solid),
+        foregroundPainter: _GlassEdge(border, solid: solid, tinted: tint != null),
         child: Padding(padding: padding, child: child),
       ),
     );
     if (width != null || height != null) body = SizedBox(width: width, height: height, child: body);
-    if (solid) return body;
+    if (solid || tint != null || blur <= 0) return body;
     return ClipPath(
       clipper: ShapeBorderClipper(shape: border, textDirection: Directionality.maybeOf(context)),
       child: BackdropFilter(
@@ -100,11 +110,14 @@ class QGlass extends StatelessWidget {
   }
 }
 
-/// The lens and the specular edge, drawn over the glass's fill.
+/// The lens and the specular edge, drawn over the glass's fill. Tinted glass
+/// catches more light: its lens and its rim are a step brighter, as a
+/// coloured glass lit from above is.
 class _GlassEdge extends CustomPainter {
   final ShapeBorder border;
   final bool solid;
-  const _GlassEdge(this.border, {required this.solid});
+  final bool tinted;
+  const _GlassEdge(this.border, {required this.solid, this.tinted = false});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -129,7 +142,7 @@ class _GlassEdge extends CustomPainter {
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [QColors.glassLens, QColors.glassLens.withAlpha(0)],
+          colors: [tinted ? QColors.glassFill : QColors.glassLens, QColors.glassLens.withAlpha(0)],
           stops: const [0, 0.55],
         ).createShader(rect),
     );
@@ -141,15 +154,15 @@ class _GlassEdge extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [QColors.glassEdgeTop, QColors.glassEdgeBottom, QColors.glassEdgeBottom],
-          stops: [0, 0.5, 1],
+          colors: [tinted ? QColors.glassRimTinted : QColors.glassEdgeTop, QColors.glassEdgeBottom, QColors.glassEdgeBottom],
+          stops: const [0, 0.5, 1],
         ).createShader(rect),
     );
   }
 
   @override
-  bool shouldRepaint(_GlassEdge old) => old.border != border || old.solid != solid;
+  bool shouldRepaint(_GlassEdge old) => old.border != border || old.solid != solid || old.tinted != tinted;
 }

@@ -18,7 +18,7 @@ import '../theme/icons.dart';
 import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
-import '../widgets/dot_number.dart';
+import '../widgets/hero_number.dart';
 import '../widgets/glass.dart';
 import '../widgets/explain.dart';
 import '../widgets/general_guidance_card.dart';
@@ -303,16 +303,14 @@ class _NumbersCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // The screen's one hero: the day's figure in dots (Nothing's
-          // numerals, in either digit set), and its words under it across the
-          // card. The explainable region is the figure and its words; its mark
-          // is on the words, where a dotted line under a dotted figure read as
-          // more dots.
+          // The screen's one hero: the day's figure, large, in either digit
+          // set, and its words under it across the card. The explainable
+          // region is the figure and its words; its mark is on the words.
           Explainable(
             id: 'kcal_remaining',
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                DotNumber(state.digits('$remaining'), height: 48, semanticsLabel: '${state.digits('$remaining')} ${t.kcalRemaining}'),
+                HeroNumber(state.digits('$remaining'), semanticsLabel: '${state.digits('$remaining')} ${t.kcalRemaining}'),
                 const Spacer(),
                 // Beside the figure it explains: one short word, "Why?".
                 QOutlineButton(label: t.whyCta, onTap: state.openWhy, height: 32),

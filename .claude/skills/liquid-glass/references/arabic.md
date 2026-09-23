@@ -19,7 +19,7 @@ Our products are designed in Arabic and checked in English, not the other way ro
 - **Never track Arabic, and never uppercase-transform it.** Arabic has no case, and spacing breaks the joins. `QText.display(ar: true)` and `QText.eyebrow(ar: true)` handle this, so pass `ar` honestly. For text that isn't the interface's own (a person's name), use `QText.arabic(text)`.
 - **Line heights are explicit on every style.** Arabic fonts default to 1.9–2.1 em, which breaks rhythm. The kit sets Apple's leading, and chat uses 26 for 17.
 - **Size:** Arabic next to uppercase Latin can look small. At the same size, give an Arabic eyebrow weight 600 rather than a bigger size, so the scale stays fixed.
-- **No dot type for Arabic words.** Dot numerals (`DotNumber`) have Arabic-Indic digits, and that's all. Arabic sentences are always in Noto Sans Arabic.
+- **The hero numeral is set in the UI face.** Its Arabic-Indic digits come from Noto Sans Arabic, as everywhere else, so there is no separate display face to check.
 
 ## Digits
 
@@ -29,7 +29,7 @@ Our products are designed in Arabic and checked in English, not the other way ro
 - **Separators:** Arabic uses ٫ for decimals and ٬ for thousands, and ٪ for percent. Check that the font has the glyph; Noto Sans Arabic does.
 - **Live values are tabular** (`QText.number`), so a changing count doesn't jiggle.
 - **No middle dot beside Arabic-Indic digits.** "١٦ · وجبة" reads as "١٦٠ وجبة": the dot is the shape of ٠. Where English separates with " · ", Arabic uses "، " (or words). Between Arabic words the dot is harmless, but "،" is still more natural. This holds for lines put together from parts too: a `parts.join(' · ')` over "٢٩ سنة" and "١٧٢ سم" is the same mistake, so join Arabic with `'، '`. (Qamar's `arabic_separator_test` reads every screen's rendered text, direction isolates included, as well as the source.)
-- **Arabic-Indic zero:** ٠ is a small dot-like diamond. In dot numerals, set a bare "٠" large (hero only), or write the state in words ("لسه ما شربتش") rather than showing a lonely zero.
+- **Arabic-Indic zero:** ٠ is a small diamond, so a bare "٠" reads as a speck. Write the state in words ("لسه ما شربتش") rather than showing a lonely zero; only the hero may show it, large.
 
 ## Words
 

@@ -4,7 +4,7 @@
 // week's gate wrote its "٣" in Eastern digits whatever the setting, and the
 // weight trend's span and amount ignored it, with "over 1 days" in English.
 //
-// Since mono-glass, the week's days are one figure in dots with "of 7 days"
+// The week's days are the screen's one large figure, with "of 7 days"
 // beside it (the noun agrees with the seven, whatever the figure), its meals
 // counted in words under it; the gate is the shared card's own sentence.
 
@@ -20,7 +20,7 @@ import 'package:qamar/models/meal.dart';
 import 'package:qamar/screens/progress_screen.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
-import 'package:qamar/widgets/dot_number.dart';
+import 'package:qamar/widgets/hero_number.dart';
 import 'package:qamar/widgets/review_card.dart';
 
 import 'support/app_fonts.dart';
@@ -73,7 +73,7 @@ List<String> _streak(WidgetTester tester) => _within(find.byKey(ProgressScreen.s
 
 /// The week's figure as drawn, and as a screen reader hears it.
 ({String drawn, String heard}) _figure(WidgetTester tester) {
-  final dots = tester.widget<DotNumber>(find.descendant(of: find.byKey(ProgressScreen.weekKey), matching: find.byType(DotNumber)));
+  final dots = tester.widget<HeroNumber>(find.descendant(of: find.byKey(ProgressScreen.weekKey), matching: find.byType(HeroNumber)));
   return (drawn: dots.text, heard: _plain(dots.semanticsLabel!));
 }
 
@@ -131,7 +131,7 @@ void main() {
     expect(lines, contains('of 7 days logged · 5 meals'));
     // Nothing logged: the week says so in words, with no lonely zero.
     lines = await _progress(tester, _state(AppLang.ar));
-    expect(find.descendant(of: find.byKey(ProgressScreen.weekKey), matching: find.byType(DotNumber)), findsNothing);
+    expect(find.descendant(of: find.byKey(ProgressScreen.weekKey), matching: find.byType(HeroNumber)), findsNothing);
     expect(lines, contains('لسه مفيش أكل متسجّل الأسبوع ده. أول وجبة تسجّلها هتبان هنا.'));
   });
 

@@ -4,7 +4,7 @@ import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'colors.dart';
 
-/// Type, the mono-glass way (.claude/skills/mono-glass): one grotesk, sized
+/// Type, the liquid-glass way (.claude/skills/liquid-glass): one grotesk, sized
 /// on Apple's text styles, with Arabic in its own face.
 ///
 /// Latin is set in Inter, the open face closest to Apple's San Francisco;
@@ -25,9 +25,9 @@ import 'colors.dart';
 ///    conversation, rows, buttons. Nothing under 11.
 ///  * titles, [displaySizes], each with its line height: 20 title 3, 22 title
 ///    2, 28 title 1, 34 large title (a page's name).
-///  * figures, [figureSizes]: 20, 28, 34, 48 — tabular, so a changing number
-///    does not shuffle its neighbours. The hero figure on Today is drawn in
-///    dots instead (DotNumber).
+///  * figures, [figureSizes]: 20, 28, 34, 48, and 56 for a screen's one hero
+///    figure (HeroNumber) — tabular, so a changing number does not shuffle
+///    its neighbours.
 ///
 /// ## Tracking
 ///
@@ -46,7 +46,7 @@ class QText {
   static final _leading = <double, double>{11: 13, 12: 16, 13: 18, 15: 20, 16: 21, 17: 22};
 
   static final displaySizes = <double, double>{20: 25, 22: 28, 28: 34, 34: 41};
-  static const figureSizes = <double>[20, 28, 34, 48];
+  static const figureSizes = <double>[20, 28, 34, 48, 56];
 
   /// Tracking for Latin type at [size], in points: 0 under 20, then
   /// size × (−0.0223 + 0.185·e^(−0.1745·size)), about −1.7% at 20 and
@@ -128,8 +128,8 @@ class QText {
     );
   }
 
-  /// A small label over a group or a figure — Nothing's eyebrow: 12, medium,
-  /// in the third ink. Latin eyebrows are set in capitals with a little
+  /// A small label over a group or a figure, the eyebrow: 12, semibold, in
+  /// the third ink. Latin eyebrows are set in capitals with a little
   /// tracking so short words read as a label; Arabic has no capitals and is
   /// never tracked, so it is left as it is.
   static TextStyle eyebrow({required bool ar, Color color = QColors.inkTertiary}) => TextStyle(

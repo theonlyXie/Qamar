@@ -11,7 +11,6 @@ import 'package:qamar/models/dishes.dart';
 import 'package:qamar/models/nudge.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/theme/app_theme.dart';
-import 'package:qamar/theme/colors.dart';
 import 'package:qamar/theme/text_styles.dart';
 import 'package:qamar/widgets/dish_card.dart';
 
@@ -171,14 +170,13 @@ void main() {
       expect(text, isNot(contains('database')), reason: 'what the numbers are, not the machinery behind them');
     });
 
-    testWidgets('is a card on the page: the flat surface, the hairline and the card corner, no gradient', (tester) async {
+    testWidgets('is a card on the page: a pane of glass, its rim and the card corner, no shadow', (tester) async {
       final d = _dish('koshary');
       await pump(tester, DishCard(dish: d, facts: d.facts(), targetKcal: 2180, slot: MealSlot.lunch, isAr: false, iso: (s) => s), ar: false);
       final box = tester.widget<Container>(find.descendant(of: find.byType(DishCard), matching: find.byType(Container)).first);
       final decoration = box.decoration! as BoxDecoration;
-      expect(decoration.gradient, isNull);
-      expect(decoration.color, QColors.surface);
-      expect((decoration.border! as Border).top.color, QColors.hairline);
+      expect(decoration, QDecor.card(), reason: 'the one card the app draws');
+      expect(decoration.border, QGlassRim.soft);
       expect(decoration.borderRadius, BorderRadius.circular(QRadii.card));
       expect(decoration.boxShadow, isNull);
     });
