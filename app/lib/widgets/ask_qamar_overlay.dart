@@ -603,6 +603,7 @@ class _ProblemActions extends StatelessWidget {
       children: [
         _TallChip(action: problem.action, emphasis: true),
         if (problem.secondary != null) _TallChip(action: problem.secondary!),
+        if (problem.also != null) _TallChip(action: problem.also!),
       ],
     );
   }

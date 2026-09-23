@@ -22,7 +22,10 @@ Deno.test("each wall names its own way out", () => {
   const chat = quotaExceededMessage("en", "chat");
   assertEquals(chat.includes("Qamar+"), true);
   assertEquals(chat.includes("third question"), true);
-  assertEquals(chat.includes("Su Points"), false, "questions have no Su path");
+  // The words name Qamar+ only. The question bought with Su (O13, 0066) is a
+  // button under the wall, offered only when the balance covers it, so the
+  // message itself never promises it to someone who cannot afford it.
+  assertEquals(chat.includes("Su Points"), false, "the wall's words never promise the Su question");
 
   for (const b of ["photo", "chat", "plan"] as const) {
     assertEquals(quotaExceededMessage("ar", b).length > 20, true);

@@ -6,6 +6,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:qamar/models/su_economy.dart';
 
 /// The latest definition of [name] across every migration.
 String latestFunction(String name) {
@@ -29,6 +30,22 @@ void main() {
       final taken = body.substring(body.lastIndexOf('update public.ai_usage_days'));
       expect(taken, contains("'allowed', true"),
           reason: 'bucket_json says used < cap after the use, which is false for the third of three; the gateway refuses on it');
+    });
+  });
+
+  group('the fourth question, bought with Su (0066)', () {
+    test('the chat bucket counts the questions bought today, not a hardcoded 0', () {
+      for (final name in ['qamar_ai_try_consume', 'qamar_ai_quota_snapshot']) {
+        expect(latestFunction(name), contains('chat_extra'), reason: '$name reads the bought questions');
+      }
+      expect(latestFunction('qamar_ai_try_consume'), contains("when 'chat' then chat_extra"));
+    });
+
+    test('the price is charged from config, and the phone’s first guess is the price the server seeds', () {
+      expect(latestFunction('qamar_wallet_redeem'), contains('qamar_su_value(v_price_key)'));
+      final seed = File('supabase/migrations/0066_question_with_su.sql').readAsStringSync();
+      expect(seed, contains("('question_extra', ${SuEconomy.extraQuestion})"));
+      expect(seed, contains("('question_extra_daily', 1)"), reason: 'at most once a Cairo day');
     });
   });
 }

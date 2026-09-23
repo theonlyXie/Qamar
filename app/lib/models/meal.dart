@@ -179,9 +179,25 @@ class SpendItemDef {
   });
 }
 
-/// Su Points redemptions. Extra photos are how the three-a-day wall flexes;
-/// questions have no Su path — the fourth is Qamar+. Cosmetics are the
-/// prestige sink for a later leaderboard.
+/// Su Points redemptions. Extra photos are how the three-a-day wall flexes.
+/// A question is not sold here: it is bought only at the wall, as that one
+/// question ([kQuestionExtra]). Cosmetics are the prestige sink for a later
+/// leaderboard.
+/// The fourth question, bought with Su at the wall (O13, 0066): never listed
+/// in the wallet, only offered under the Qamar+ wall, once a Cairo day, when
+/// the balance covers it. Its price is the server's (AppState.questionPrice).
+const SpendItemDef kQuestionExtra = SpendItemDef(
+  id: 'chat_extra',
+  price: SuEconomy.extraQuestion,
+  once: false,
+  nameAr: 'سؤال زيادة النهارده',
+  nameEn: 'One more question today',
+  whatAr: 'السؤال اللي وقف عند الحد، بنقاط Su.',
+  whatEn: 'The question that met the limit, asked with Su.',
+  limitAr: 'مرة في اليوم',
+  limitEn: 'Once a day',
+);
+
 const List<SpendItemDef> kSpendCatalog = [
   SpendItemDef(
     id: 'ai_extra',

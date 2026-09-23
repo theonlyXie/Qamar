@@ -45,7 +45,9 @@ export function asQuota(raw: unknown, fallback: Bucket = "chat"): Quota | null {
 /**
  * What the person is told at the wall. Each bucket has a different way out,
  * and the copy names it: another photo is earned with Su, another question is
- * Qamar+, and the plan simply waits for tomorrow.
+ * Qamar+, and the plan simply waits for tomorrow. Once a day the app also
+ * offers the question itself for Su under the chat wall (O13, 0066), as a
+ * button shown only when the balance covers it; the words stay Qamar+'s.
  */
 export function quotaExceededMessage(lang: "ar" | "en", bucket: Bucket): string {
   const ar: Record<Bucket, string> = {

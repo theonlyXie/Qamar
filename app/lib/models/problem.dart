@@ -18,9 +18,13 @@ class Problem {
   /// the person was trying to do ("Type it instead").
   final ProblemAction? secondary;
 
+  /// A third, rarely: at the question wall, with [secondary] the question
+  /// bought with Su, this keeps "Log it as a meal" (O13).
+  final ProblemAction? also;
+
   final ProblemKind kind;
 
-  const Problem({required this.what, this.why, required this.action, this.secondary, this.kind = ProblemKind.error});
+  const Problem({required this.what, this.why, required this.action, this.secondary, this.also, this.kind = ProblemKind.error});
 }
 
 /// A button's words and what it does.

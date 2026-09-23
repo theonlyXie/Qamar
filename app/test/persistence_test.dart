@@ -16,6 +16,7 @@ import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/nudge.dart';
 import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/models/plan.dart';
+import 'package:qamar/models/problem.dart';
 import 'package:qamar/models/dishes.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/quest.dart';
@@ -247,10 +248,29 @@ class FakeWalletRepo implements WalletRepository {
     throw UnsupportedError('server-side only');
   }
 
+  /// What one more question costs, as the server's config has it (0066).
+  int? questionPriceValue = SuEconomy.extraQuestion;
+
+  /// The keys each redemption was sent with.
+  final List<String> redeemKeys = [];
+
+  /// While set, a redemption is refused with it, and nothing is spent.
+  Object? redeemFails;
+
+  /// Called when a redemption goes through, as the server would grant it.
+  void Function(String itemId)? onRedeem;
+
   @override
   Future<void> redeem(String userId, {required SpendItemDef item, required String idempotencyKey}) async {
+    final refused = redeemFails;
+    if (refused != null) throw refused;
     redemptions.add(item.id);
+    redeemKeys.add(idempotencyKey);
+    onRedeem?.call(item.id);
   }
+
+  @override
+  Future<int?> questionPrice() async => questionPriceValue;
 
   @override
   Future<List<LedgerEntry>> ledger(String userId) async => [];
@@ -3260,6 +3280,111 @@ void main() {
       expect(state.pendingInvitationCode, isNull);
       expect(await prefs.getString('pending_invitation'), '');
       expect(state.invitationNotice, 'this invitation was already used');
+    });
+  });
+
+  // The fourth question, bought with Su (O13, 0066): the Qamar+ wall first,
+  // every time; under it, once a Cairo day and only when the balance covers
+  // it, this one question for Su, asked again once the server has taken it.
+  group('the fourth question, bought with Su', () {
+    const exhausted = AiQuotas(
+      chat: AiQuota(bucket: 'chat', used: 3, limit: 3, extra: 0, remaining: 0),
+      photo: AiQuota.emptyPhoto,
+      plan: AiQuota(bucket: 'plan', used: 0, limit: 3, extra: 0, remaining: 3),
+    );
+
+    /// A free-tier account at the day's question limit, with [balance] Su.
+    Future<({AppState s, FakeWalletRepo wallet, FakeGateway ai})> atTheWall({int balance = 2000, int? price, AppLang lang = AppLang.en}) async {
+      final wallet = FakeWalletRepo()
+        ..stored = (available: balance, lifetime: balance)
+        ..questionPriceValue = price ?? SuEconomy.extraQuestion;
+      final ai = FakeGateway()..quotas = exhausted;
+      // As the server grants it: one more question today.
+      wallet.onRedeem = (id) {
+        if (id == 'chat_extra') ai.quotas = ai.quotas.replacing(ai.quotas.chat.withExtra(1));
+      };
+      final s = backed(wallet: wallet, ai: ai)..setLang(lang);
+      await settle();
+      s.openChat();
+      await s.sendChatMsg('is feteer ok before the gym?');
+      return (s: s, wallet: wallet, ai: ai);
+    }
+
+    test('under Qamar+, second, with "Log it as a meal" kept; buying it asks the same words once more', () async {
+      final (:s, :wallet, :ai) = await atTheWall();
+      final wall = s.chat.last;
+      expect(wall.openPlus, isTrue);
+      expect(wall.problem!.action.label, 'See Qamar+', reason: 'the Qamar+ wall first, every time');
+      expect(wall.problem!.secondary!.label, 'Ask it for 800 Su');
+      expect(wall.problem!.also!.label, 'Log it as a meal', reason: 'the way that keeps what they were doing stays');
+      final asked = s.chat.where((t) => t.who == ChatWho.u).length;
+
+      wall.problem!.secondary!.onTap();
+      await settle();
+      expect(wallet.redemptions, ['chat_extra']);
+      expect(wallet.redeemKeys.single, contains('chat_extra'), reason: 'one key a day, so a retry never buys twice');
+      expect(ai.chatMessages, ['is feteer ok before the gym?', 'is feteer ok before the gym?'], reason: 'the same question, asked again');
+      expect(s.chat.where((t) => t.who == ChatWho.u).length, asked, reason: 'the question is not shown twice');
+      expect(s.chat.last.text, 'grounded answer', reason: 'and answered');
+      expect(s.suAvailable, 2000 - SuEconomy.extraQuestion);
+
+      final after = s.chat.firstWhere((t) => t.problem?.kind == ProblemKind.limit);
+      expect(after.problem!.action.label, 'See Qamar+');
+      expect(after.problem!.secondary!.label, 'Log it as a meal', reason: 'the used offer leaves the wall');
+      expect(after.problem!.also, isNull);
+      expect(s.suQuestionOffered, isFalse, reason: 'once a day');
+    });
+
+    test('the price is the one the server charges', () async {
+      final (:s, wallet: _, ai: _) = await atTheWall(price: 900);
+      expect(s.chat.last.problem!.secondary!.label, 'Ask it for 900 Su');
+    });
+
+    test('not offered when the balance does not cover it', () async {
+      for (final (balance, price) in [(500, 800), (850, 900)]) {
+        final (:s, wallet: _, ai: _) = await atTheWall(balance: balance, price: price);
+        final wall = s.chat.last;
+        expect(wall.problem!.secondary!.label, 'Log it as a meal', reason: '$balance Su against $price');
+        expect(wall.problem!.also, isNull);
+      }
+    });
+
+    test('not offered to a member, or once today’s is bought, or without an account', () async {
+      final member = await atTheWall();
+      member.s.plusActive = true;
+      expect(member.s.suQuestionOffered, isFalse, reason: 'a member’s limit is not the free wall');
+
+      final bought = await atTheWall();
+      // The server says one was bought today: the chat bucket holds it.
+      bought.s.aiQuota = const AiQuota(bucket: 'chat', used: 4, limit: 3, extra: 1, remaining: 0);
+      expect(bought.s.suQuestionOffered, isFalse, reason: 'at most once a Cairo day');
+
+      final guest = AppState(ai: FakeGateway()..quotas = exhausted)
+        ..setLang(AppLang.en)
+        ..suAvailable = 5000;
+      guest.openChat();
+      await guest.sendChatMsg('is feteer ok before the gym?');
+      expect(guest.chat.last.problem!.secondary!.label, 'Log it as a meal', reason: 'no account, nothing on the server to sell it');
+    });
+
+    test('a purchase the server refuses spends nothing, says so, and asks nothing', () async {
+      final (:s, :wallet, :ai) = await atTheWall();
+      wallet.redeemFails = Exception('daily question cap reached');
+      s.chat.last.problem!.secondary!.onTap();
+      await settle();
+      expect(s.suAvailable, 2000, reason: 'nothing spent');
+      expect(ai.chatMessages, ['is feteer ok before the gym?'], reason: 'the question was not asked again');
+      expect(s.chat.last.text, 'I could not buy the question just now, and no points were spent.');
+      expect(s.chat.last.problem!.action.label, 'See Qamar+');
+      expect(s.chat.last.problem!.secondary!.label, 'Log it as a meal');
+    });
+
+    test('in Arabic, in the app’s digits and the one name for Su', () async {
+      final (:s, wallet: _, ai: _) = await atTheWall(lang: AppLang.ar);
+      final label = s.chat.last.problem!.secondary!.label;
+      expect(label.replaceAll(RegExp('[\u2066-\u2069]'), ''), 'اسأله بـ٨٠٠ نقطة Su');
+      expect(RegExp('[0-9]').hasMatch(label), isFalse);
+      expect(s.chat.last.problem!.also!.label, 'سجّلها كوجبة');
     });
   });
 }

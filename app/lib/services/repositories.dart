@@ -152,6 +152,10 @@ abstract class WalletRepository {
   Future<void> grantOnboarding(String userId);
   Future<void> redeem(String userId, {required SpendItemDef item, required String idempotencyKey});
   Future<List<LedgerEntry>> ledger(String userId);
+
+  /// What one more question costs today, as the server charges it
+  /// (su_economy_config 'question_extra', 0066), or null if it has no row.
+  Future<int?> questionPrice();
 }
 
 /// A day's logged intake, as recorded — never estimated or back-filled.

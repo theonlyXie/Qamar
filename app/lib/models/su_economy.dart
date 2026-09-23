@@ -8,15 +8,17 @@ class SuEconomy {
   SuEconomy._();
 
   /// The blueprint's walls, per Cairo day. Lite: three meal photos (a body
-  /// scan counts as one) and three questions to Qamar. The fourth question is
-  /// Qamar+. Typing or speaking a meal is never counted.
+  /// scan counts as one) and three questions to Qamar. The fourth question
+  /// meets Qamar+ first; under it, once a Cairo day, that one question can
+  /// be bought with Su ([extraQuestion]). Typing or speaking a meal is never
+  /// counted.
   static const int litePhotoDaily = 3;
   static const int liteChatDaily = 3;
   static const int plusPhotoDaily = 30;
   static const int plusChatDaily = 50;
 
   /// How many extra photos Su can buy in one Cairo day, so a stolen session
-  /// cannot drain the wallet overnight. Questions have no Su path.
+  /// cannot drain the wallet overnight.
   static const int extraAiDailyCap = 10;
 
   /// What each action pays. The server's su_economy_config (migration 0046)
@@ -50,6 +52,13 @@ class SuEconomy {
 
   /// One more meal photo today, after the free three.
   static const int extraAiUse = 400;
+
+  /// One question past the free three, bought at the wall, at most once a
+  /// Cairo day (O13, 0066): twice a photo. The price charged is the server's
+  /// su_economy_config 'question_extra', which can be tuned without a
+  /// release; the app reads it on each wallet refresh and shows that. This is
+  /// only the number shown before the first read.
+  static const int extraQuestion = 800;
 
   static const int weeklyInsight = 600;
   /// One freeze a month covers one empty day in a streak: the day it is

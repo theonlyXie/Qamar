@@ -446,6 +446,14 @@ class AppState extends ChangeNotifier {
     serverLedger
       ..clear()
       ..addAll(entries);
+    // What one more question costs, as the server will charge it (0066).
+    try {
+      final price = await repo.questionPrice();
+      if (_disposed) return;
+      if (price != null && price > 0) questionPrice = price;
+    } catch (_) {
+      // The last price read stands; the server charges its own anyway.
+    }
     // The write that earned may also have met the day's quest.
     await _refreshQuest(uid);
   }
@@ -3512,7 +3520,8 @@ class AppState extends ChangeNotifier {
 
   /// The wall, in the conversation. Each bucket has its own way out and the
   /// button goes there: another photo is bought with Su in the wallet; the
-  /// fourth question is Qamar+.
+  /// fourth question is Qamar+ first and, once a day when the balance covers
+  /// it, that one question for Su (O13).
   ///
   /// Each wall also offers the way that keeps what the person was doing
   /// (O10): a meal photo past the limit can be typed instead, and words
@@ -3523,15 +3532,28 @@ class AppState extends ChangeNotifier {
     _track('quota_hit', {'bucket': e.quota.bucket});
     _absorb(e.quota);
     chatState = ChatState.idle;
+    final words = asked?.trim() ?? '';
+    final offerSu = e.quota.bucket != 'photo' && words.isNotEmpty && suQuestionOffered;
+    if (offerSu) _track('question_wall_su_offered', {'price': questionPrice});
+    final turn = _wallTurn(e, words: words, mealLog: mealLog, offerSu: offerSu);
+    chat.add(turn);
+    _questionWall = offerSu ? (turn: turn, e: e, words: words) : null;
+    _notify();
+  }
+
+  /// The wall's turn in the conversation. Qamar+ comes first, every time
+  /// (O13); under it, when [offerSu], this one question for Su; and the way
+  /// that keeps what the person was doing ("Log it as a meal", O10).
+  ChatTurn _wallTurn(AiQuotaException e, {required String words, required bool mealLog, required bool offerSu}) {
     final photo = e.quota.bucket == 'photo';
     // In Arabic the Latin brand is isolated, or its trailing "+" is drawn on
     // the wrong side of the word ("+Qamar").
     final label = photo ? (isAr ? 'افتح المحفظة' : 'Open the wallet') : (isAr ? 'شوف \u2066Qamar+\u2069' : 'See Qamar+');
-    final words = asked?.trim() ?? '';
     final ProblemAction? instead = photo
         ? (mealLog ? ProblemAction(isAr ? 'اكتبها بدل كده' : 'Type it instead', () => quickLog(QuickLog.text)) : null)
         : (words.isEmpty ? null : ProblemAction(isAr ? 'سجّلها كوجبة' : 'Log it as a meal', () => logTextAsMeal(words)));
-    chat.add(ChatTurn(
+    final ProblemAction? su = offerSu ? ProblemAction(suQuestionLabel, () => askWithSu(words)) : null;
+    return ChatTurn(
       who: ChatWho.q,
       text: e.message,
       action: label,
@@ -3540,11 +3562,99 @@ class AppState extends ChangeNotifier {
       problem: Problem(
         what: e.message,
         action: ProblemAction(label, () => _leaveChatForWall(photo: photo)),
-        secondary: instead,
+        secondary: su ?? instead,
+        also: su == null ? null : instead,
         kind: ProblemKind.limit,
       ),
-    ));
+    );
+  }
+
+  // ---- the fourth question, bought with Su (O13) ----------------------------
+  //
+  // The fourth question meets the Qamar+ wall first, every time. Under it,
+  // once a Cairo day and only when the balance covers it, this one question
+  // can be bought with Su. The server holds the price (su_economy_config,
+  // 0066), the day's allowance and the balance; the phone offers, and asks the
+  // question again once the purchase is in.
+
+  /// What one more question costs, as the server last said (0066).
+  int questionPrice = SuEconomy.extraQuestion;
+
+  /// The day a question was bought here, so the offer goes at once.
+  String? _questionBoughtDay;
+  bool _buyingQuestion = false;
+
+  /// The wall that offered the question, to take the offer off it once used.
+  ({ChatTurn turn, AiQuotaException e, String words})? _questionWall;
+
+  /// Whether the question wall offers this one question for Su: the free
+  /// tier's question limit, not already bought today, the balance covering
+  /// the price, and an account on the server that sells it.
+  bool get suQuestionOffered =>
+      isBacked &&
+      _walletRepo != null &&
+      !plusActive &&
+      aiQuota.bucket == 'chat' &&
+      aiQuota.exhausted &&
+      aiQuota.extra == 0 &&
+      _questionBoughtDay != _dayKey() &&
+      suAvailable >= questionPrice;
+
+  /// The offer's words, with the price the server charges.
+  String get suQuestionLabel => isAr ? 'اسأله بـ${suAmount(questionPrice)}' : 'Ask it for ${suAmount(questionPrice)}';
+
+  /// Buys this one question with Su, then asks it again. Nothing is spent
+  /// unless the server takes it; if it does not, Qamar says so and the wall
+  /// stays as it was.
+  Future<void> askWithSu(String words) async {
+    final repo = _walletRepo;
+    final uid = _userId;
+    final text = words.trim();
+    if (text.isEmpty || repo == null || uid == null || _buyingQuestion || !suQuestionOffered) return;
+    _buyingQuestion = true;
+    final price = questionPrice;
+    chatState = ChatState.thinking;
     _notify();
+    try {
+      // One key per day: a retry can never buy the day's question twice.
+      await repo.redeem(uid, item: kQuestionExtra, idempotencyKey: '${uid}_redeem_chat_extra_${_dayKey()}');
+    } catch (e) {
+      _buyingQuestion = false;
+      if (_disposed) return;
+      chatState = ChatState.idle;
+      final what = isAr ? 'مقدرتش أشتري السؤال دلوقتي، ومفيش نقاط اتصرفت.' : 'I could not buy the question just now, and no points were spent.';
+      chat.add(ChatTurn(
+        who: ChatWho.q,
+        text: what,
+        sub: _failedWhy(e),
+        problem: Problem(
+          what: what,
+          why: _failedWhy(e),
+          action: ProblemAction(isAr ? 'شوف \u2066Qamar+\u2069' : 'See Qamar+', () => _leaveChatForWall(photo: false)),
+          secondary: ProblemAction(isAr ? 'سجّلها كوجبة' : 'Log it as a meal', () => logTextAsMeal(text)),
+          kind: failureOf(e) == Failure.ours ? ProblemKind.error : ProblemKind.offline,
+        ),
+      ));
+      _notify();
+      return;
+    }
+    _buyingQuestion = false;
+    if (_disposed) return;
+    _track('question_bought', {'price': price});
+    _questionBoughtDay = _dayKey();
+    suAvailable -= price;
+    ledgerExtra.insert(0, LedgerEntry(label: isAr ? kQuestionExtra.nameAr : kQuestionExtra.nameEn, amount: -price, when: isAr ? 'دلوقتي' : 'Just now'));
+    aiQuota = aiQuota.withExtra(1);
+    // The offer has been taken: the wall keeps Qamar+ and "Log it as a
+    // meal", and loses the button that would now do nothing.
+    final wall = _questionWall;
+    _questionWall = null;
+    if (wall != null) {
+      final at = chat.indexOf(wall.turn);
+      if (at >= 0) chat[at] = _wallTurn(wall.e, words: wall.words, mealLog: false, offerSu: false);
+    }
+    _notify();
+    await sendChatMsg(text, again: true);
   }
 
   /// A wall's way out from the conversation: the wallet sells another photo;
@@ -4500,15 +4610,18 @@ class AppState extends ChangeNotifier {
   /// There is no scripted fallback. If the gateway is not configured or the
   /// call fails, Qamar says so — a health app inventing a plausible-sounding
   /// reply is worse than one admitting it is not connected.
-  Future<void> sendChatMsg(String text) async {
-    final photo = chatPhotoPath;
-    chatPhotoPath = null;
+  ///
+  /// [again] asks a question already in the conversation once more (the one
+  /// bought with Su at the wall), so it is not shown a second time.
+  Future<void> sendChatMsg(String text, {bool again = false}) async {
+    final photo = again ? null : chatPhotoPath;
+    if (!again) chatPhotoPath = null;
     if (text.trim().isEmpty && photo != null) text = menuPhotoQuestion;
     // A meal only in answer to a meal question still on screen. Whatever is
     // said, that question has now been answered or passed over.
-    final asMeal = _loggingMeal;
+    final asMeal = !again && _loggingMeal;
     _mealAskAt = null;
-    chat.add(ChatTurn(who: ChatWho.u, text: text, photoPath: photo));
+    if (!again) chat.add(ChatTurn(who: ChatWho.u, text: text, photoPath: photo));
     lastUser = text;
     chatDraft = '';
     chatState = ChatState.thinking;
@@ -4522,7 +4635,7 @@ class AppState extends ChangeNotifier {
       await _analyseMeal(inputType: photo != null ? 'photo' : proposalInput, text: text, imagePath: photo);
       return;
     }
-    _track('question_asked', photo != null ? {'photo': true} : const {});
+    _track('question_asked', {if (photo != null) 'photo': true, if (again) 'bought': true});
 
     final gateway = _ai;
     if (gateway == null) {

@@ -77,6 +77,10 @@ class QStateCard extends StatelessWidget {
             const SizedBox(height: 8),
             QOutlineButton(label: p.secondary!.label, onTap: p.secondary!.onTap, height: 48, color: QColors.textMid),
           ],
+          if (p.also != null) ...[
+            const SizedBox(height: 8),
+            QOutlineButton(label: p.also!.label, onTap: p.also!.onTap, height: 48, color: QColors.textMid),
+          ],
         ],
       ),
     );

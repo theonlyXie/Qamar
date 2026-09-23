@@ -576,6 +576,13 @@ class SupabaseWalletRepository implements WalletRepository {
   }
 
   @override
+  Future<int?> questionPrice() async {
+    final row = await _client.from('su_economy_config').select('value').eq('key', 'question_extra').maybeSingle();
+    final v = row?['value'];
+    return v is num ? v.round() : null;
+  }
+
+  @override
   Future<List<LedgerEntry>> ledger(String userId) async {
     final rows = await _client.from('su_point_ledger').select().eq('user_id', userId).order('created_at', ascending: false).limit(50);
     return (rows as List)
