@@ -5049,12 +5049,16 @@ class AppState extends ChangeNotifier {
       ? (isAr ? 'مقدرتش ألاقي الأكل ده. جرّب اسم أوضح، أو صوّر الطبق.' : 'I could not match that food. Try a clearer name, or photograph the plate.')
       : (isAr ? 'مقدرتش ألاقي الأكل ده. جرّب اسم أوضح، أو قوللي فيه إيه وقد إيه.' : 'I could not match that food. Try a clearer name, or tell me what’s in it and how much.');
 
-  void openChat() {
+  /// Opens the conversation. An empty one starts with Qamar's greeting,
+  /// unless a question of its own follows at once ([greet] false): one line
+  /// from Qamar, not two.
+  void openChat({bool greet = true}) {
+    if (!chatOpen) composerFocusAtOpen = composerFocus;
     chatOpen = true;
     _collapseTree();
     // Reopened while a meal is still being read: Qamar is still reading it.
     chatState = _mealReads > 0 ? ChatState.thinking : ChatState.idle;
-    if (chat.isEmpty) {
+    if (greet && chat.isEmpty) {
       chat.add(ChatTurn(
         who: ChatWho.q,
         text: isAr ? 'أنا معاك. قوللي اللي حصل وأنا أعدّل باقي اليوم.' : 'I’m here. Tell me what happened and I’ll adjust the rest of your day.',
@@ -5108,6 +5112,9 @@ class AppState extends ChangeNotifier {
   /// What a photo asks when nothing was typed with it.
   String get menuPhotoQuestion => isAr ? 'أطلب إيه من هنا؟' : 'What should I order here?';
 
+  /// What a meal's photo says when nothing was typed with it.
+  String get mealPhotoLine => isAr ? 'صوّرت الوجبة دي' : 'I photographed this meal';
+
   /// Sends a message and answers it with the real assistant.
   ///
   /// There is no scripted fallback. If the gateway is not configured or the
@@ -5119,10 +5126,14 @@ class AppState extends ChangeNotifier {
   Future<void> sendChatMsg(String text, {bool again = false}) async {
     final photo = again ? null : chatPhotoPath;
     if (!again) chatPhotoPath = null;
-    if (text.trim().isEmpty && photo != null) text = menuPhotoQuestion;
     // A meal only in answer to a meal question still on screen. Whatever is
     // said, that question has now been answered or passed over.
     final asMeal = !again && _loggingMeal;
+    // A photo with no words asks the question it implies: a menu's, what to
+    // order; in answer to the meal question, it is the meal, with nothing
+    // typed for the reader to go by.
+    final words = text.trim().isEmpty ? null : text;
+    if (words == null && photo != null) text = asMeal ? mealPhotoLine : menuPhotoQuestion;
     _mealAskAt = null;
     if (!again) chat.add(ChatTurn(who: ChatWho.u, text: text, photoPath: photo));
     lastUser = text;
@@ -5135,7 +5146,7 @@ class AppState extends ChangeNotifier {
     // to confirm instead of something to read. A photo taken meanwhile is the
     // meal's photo.
     if (asMeal) {
-      await _analyseMeal(inputType: photo != null ? 'photo' : proposalInput, text: text, imagePath: photo);
+      await _analyseMeal(inputType: photo != null ? 'photo' : proposalInput, text: photo != null ? words : text, imagePath: photo);
       return;
     }
     _track('question_asked', {if (photo != null) 'photo': true, if (again) 'bought': true});
@@ -5196,7 +5207,7 @@ class AppState extends ChangeNotifier {
       turn += 1;
       final action = result.action ??
           (menuMoved ? (isAr ? 'شوفي الخطة' : 'See the plan') : null);
-      chat.add(ChatTurn(who: ChatWho.q, text: result.reply, action: action));
+      chat.add(ChatTurn(who: ChatWho.q, text: result.reply, action: action, answer: true));
     } on AiQuotaException catch (e) {
       if (_disposed) return;
       _onQuotaHit(e, asked: photo == null ? text : null);
@@ -5241,6 +5252,10 @@ class AppState extends ChangeNotifier {
   /// Asked each time the composer should take the keyboard, as "Type it
   /// instead" does; the conversation's field follows it.
   int composerFocus = 0;
+
+  /// The count when the conversation last opened: a request made after it,
+  /// in the same breath as the opening (Type), is honoured as it appears.
+  int composerFocusAtOpen = 0;
 
   void focusComposer() {
     composerFocus++;
@@ -5660,7 +5675,9 @@ class AppState extends ChangeNotifier {
   void quickLog(QuickLog kind) {
     _logStart = _logStartNow();
     _collapseTree();
-    openChat();
+    // Asked in words, the meal question is Qamar's first line; a photo is
+    // on its way from the camera, and a cancelled camera leaves the greeting.
+    openChat(greet: kind == QuickLog.photo);
 
     if (kind == QuickLog.photo) return; // the caller hands the shot back
 
@@ -5676,7 +5693,12 @@ class AppState extends ChangeNotifier {
     _listeningLine = kind == QuickLog.voice ? ask : null;
     // Whatever they say or type next, in answer, is a meal, not a question.
     _armMealLog();
-    if (kind == QuickLog.voice) tapOrbListen();
+    if (kind == QuickLog.voice) {
+      tapOrbListen();
+    } else {
+      // Typed: the keyboard is up, since the question is already asked.
+      focusComposer();
+    }
   }
 
   /// Most recent meal photo, shown inside the conversation.
@@ -5691,7 +5713,7 @@ class AppState extends ChangeNotifier {
     lastMealPhotoPath = path;
     _mealAskAt = null;
     proposalInput = 'photo';
-    chat.add(ChatTurn(who: ChatWho.u, text: isAr ? 'صوّرت الوجبة دي' : 'I photographed this meal'));
+    chat.add(ChatTurn(who: ChatWho.u, text: mealPhotoLine));
     _notify();
     _analyseMeal(inputType: 'photo', imagePath: path);
   }
@@ -5705,19 +5727,14 @@ class AppState extends ChangeNotifier {
     _notify();
   }
 
-  /// The tree was opened by Today's "Log a meal" button rather than the moon.
-  bool treeOpenedFromButton = false;
-
-  /// Today's "Log a meal" button (O15): the tree, already open on Log, with
-  /// its ways to log fanned out. It opens the moon's own menu rather than
-  /// going round it, so using the button shows where logging lives; until
-  /// the moon has been tapped, the tree says "next time, tap the moon".
-  void openTreeOnLog() {
-    treeOpen = true;
-    treeOpenedFromButton = true;
+  /// Today's "Log a meal" button: straight into the conversation, asking
+  /// what was eaten, with the keyboard up. One tap to the question, where it
+  /// used to open the moon's menu and ask again how; the composer has the
+  /// camera and the microphone beside the field, and the moon keeps the
+  /// other ways (repeat, activity).
+  void logFromToday() {
     _track('log_button_tapped', const {});
-    // Log is the first node on the ring.
-    expandTreeLog(0);
+    quickLog(QuickLog.text);
   }
 
   void closeTree() {
@@ -5734,7 +5751,6 @@ class AppState extends ChangeNotifier {
     treeLogSub = null;
     treeWaterIndex = null;
     treeProblem = null;
-    treeOpenedFromButton = false;
     treeOpen = false;
   }
 }

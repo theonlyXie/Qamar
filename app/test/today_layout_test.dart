@@ -39,6 +39,7 @@ import 'package:qamar/state/app_state.dart';
 import 'package:qamar/state/today_focus.dart';
 import 'package:qamar/theme/colors.dart';
 import 'package:qamar/theme/layout.dart';
+import 'package:qamar/widgets/ask_qamar_overlay.dart';
 import 'package:qamar/widgets/common.dart';
 import 'package:qamar/widgets/living_orb.dart';
 import 'package:qamar/widgets/orb_nav.dart';
@@ -433,24 +434,18 @@ void main() {
   }
 
   group('Qamar’s card', () {
-    testWidgets('"Log a meal" opens the tree already on Log, and the tree names the moon', (tester) async {
+    testWidgets('"Log a meal" opens the conversation on the meal question, with the keyboard up', (tester) async {
       final s = _state(AppLang.en);
       await _pump(tester, s, _phone);
       await tester.tap(find.byKey(QamarCard.logKey));
       await tester.pump();
-      expect(s.treeOpen, isTrue);
-      expect(s.treeLogExpanded, isTrue, reason: 'the ways to log, already fanned out');
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('Next time, tap the moon to find this.'), findsOneWidget);
-
-      // Once the moon has been tapped, the tree no longer needs to say it.
-      s.closeTree();
-      s.orbTap();
-      s.closeTree();
-      s.openTreeOnLog();
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('Next time, tap the moon to find this.'), findsNothing);
+      expect(s.treeOpen, isFalse, reason: 'straight to the question: no menu asking how first');
+      expect(s.chatOpen, isTrue);
+      expect(s.chat.last.text, 'Tell me what you ate.');
+      expect(s.loggingMeal, isTrue, reason: 'what is typed next is the meal, and spends no question');
+      await tester.pump(const Duration(milliseconds: 400));
+      final field = tester.widget<TextField>(find.descendant(of: find.byType(AskQamarOverlay), matching: find.byType(TextField)));
+      expect(field.focusNode!.hasFocus, isTrue, reason: 'the keyboard is up: the question is already asked');
     });
 
     testWidgets('in the morning the night note is the sentence, with its link; there is no second card', (tester) async {

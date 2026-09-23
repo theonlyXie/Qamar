@@ -274,7 +274,7 @@ class QamarCard extends StatelessWidget {
             )
           else
             const SizedBox(height: 12),
-          QPrimaryButton(key: logKey, label: state.t.logMeal, onTap: state.openTreeOnLog, height: 48),
+          QPrimaryButton(key: logKey, label: state.t.logMeal, onTap: state.logFromToday, height: 48),
         ],
       ),
     );

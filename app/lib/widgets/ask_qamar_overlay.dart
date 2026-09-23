@@ -106,16 +106,18 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
     if (_ctrl.text != state.chatDraft) {
       _ctrl.value = TextEditingValue(text: state.chatDraft, selection: TextSelection.collapsed(offset: state.chatDraft.length));
     }
-    // A request made while the conversation is open takes the keyboard; the
-    // count already there when it opened is not a request.
-    if (_focusAsked != null && _focusAsked != state.composerFocus) {
+    // A request made since the conversation opened takes the keyboard,
+    // including one made as it opened ("Log a meal", Type on the moon); the
+    // count already there before it opened is not a request.
+    if ((_focusAsked ?? state.composerFocusAtOpen) != state.composerFocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _focus.requestFocus();
       });
     }
     _focusAsked = state.composerFocus;
 
-    final showSuggestions = state.chatDraft.isEmpty && state.chatState != ChatState.thinking;
+    // Questions to ask are not offered while Qamar waits to hear a meal.
+    final showSuggestions = state.chatDraft.isEmpty && state.chatState != ChatState.thinking && !state.loggingMeal;
     final empty = state.chat.isEmpty && !state.hasProposal && state.chatState != ChatState.thinking;
 
     // Sized by the shell, not by a Stack: the overlay is handed a full-screen
@@ -381,8 +383,9 @@ class _ChatTurn extends StatelessWidget {
         ),
       );
     }
-    // The newest answer's copy row is its own space below it.
-    final copy = latest && turn.problem == null;
+    // The newest answer's copy row is its own space below it. Qamar's own
+    // lines (a greeting, a question, a notice) are not answers to copy.
+    final copy = latest && turn.answer && turn.problem == null;
     return _Appear(
       child: Padding(
         padding: EdgeInsets.only(bottom: copy ? 8 : 24),

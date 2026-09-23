@@ -54,5 +54,9 @@ class ChatTurn {
   /// one, another way on (O10). The turn's [text] is the problem's "what";
   /// its actions are drawn under it as buttons.
   final Problem? problem;
-  const ChatTurn({required this.who, required this.text, this.sub, this.action, this.openWallet = false, this.openPlus = false, this.photoPath, this.problem});
+
+  /// The assistant's answer to something asked, as against Qamar's own
+  /// lines (a greeting, a question, a notice): only an answer can be copied.
+  final bool answer;
+  const ChatTurn({required this.who, required this.text, this.sub, this.action, this.openWallet = false, this.openPlus = false, this.photoPath, this.problem, this.answer = false});
 }

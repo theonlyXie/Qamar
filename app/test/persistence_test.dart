@@ -2926,6 +2926,24 @@ void main() {
       expect(a.named('question_asked').single['photo'], true);
     });
 
+    test('a photo with no words, in answer to the meal question, is the meal', () async {
+      final ai = FakeGateway();
+      final state = backed(ai: ai);
+      await settle();
+      state.setLang(AppLang.en);
+
+      state.quickLog(QuickLog.text);
+      state.attachChatPhoto('/tmp/plate.jpg');
+      state.sendChat();
+      await settle();
+
+      expect(ai.chatMessages, isEmpty, reason: 'read as the meal, not asked about as a menu');
+      expect(ai.imagePaths, ['/tmp/plate.jpg']);
+      expect(ai.mealTexts, [null], reason: 'nothing was typed for the reader to go by');
+      expect(state.chat.where((c) => c.who == ChatWho.u).single.text, 'I photographed this meal');
+      expect(state.hasProposal, isTrue);
+    });
+
     test('words typed with the photo are kept; a detached photo is not sent', () async {
       final ai = FakeGateway();
       final state = backed(ai: ai);
