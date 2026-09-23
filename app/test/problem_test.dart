@@ -793,7 +793,7 @@ void main() {
         final line = find.descendant(of: slot, matching: find.byType(QStateLine));
         expect(line, findsOneWidget, reason: 'the answer’s outcome is said where it was given');
         expect(find.descendant(of: line, matching: find.text(notYet)), findsOneWidget);
-        expect(find.textContaining(isAr ? 'صايم السنة دي؟' : 'Fasting this year?'), findsNothing, reason: 'the question is answered');
+        expect(find.textContaining(isAr ? 'هتصوم؟' : 'Fasting?'), findsNothing, reason: 'the question is answered');
         expect(find.byType(QStateCard), findsNothing, reason: 'a line in the slot, not a second card');
         final way = find.descendant(of: line, matching: find.text(isAr ? 'قول لقمر إيه اللي اتغيّر' : 'Tell Qamar what changed'));
         expect(way, findsOneWidget, reason: 'the Plan card’s own way on: a question is left');

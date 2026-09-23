@@ -26,6 +26,7 @@ import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/state/chat_replies.dart';
 import 'package:qamar/widgets/explain.dart';
+import 'package:qamar/theme/colors.dart';
 import 'package:qamar/widgets/living_orb.dart';
 import 'package:qamar/widgets/tree_overlay.dart';
 
@@ -524,10 +525,11 @@ void streakAndOrb() {
       expect(StreakRingPainter.fraction(14), 1);
     });
 
-    test('colour warms with the run', () {
-      expect(StreakRingPainter.colorFor(1), isNot(StreakRingPainter.colorFor(3)));
-      expect(StreakRingPainter.colorFor(3), isNot(StreakRingPainter.colorFor(7)));
-      expect(StreakRingPainter.colorFor(7), StreakRingPainter.colorFor(30));
+    test('the dots grow with the run, in the one ink (no colour warms)', () {
+      expect({for (final n in [1, 3, 7, 30]) StreakRingPainter.colorFor(n)}, {QColors.ink});
+      expect(StreakRingPainter.dotScale(1), lessThan(StreakRingPainter.dotScale(3)));
+      expect(StreakRingPainter.dotScale(3), lessThan(StreakRingPainter.dotScale(7)));
+      expect(StreakRingPainter.dotScale(7), StreakRingPainter.dotScale(30));
     });
   });
 }

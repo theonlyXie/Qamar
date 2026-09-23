@@ -15,11 +15,7 @@ Future<void> loadAppFonts() async {
   }
   final families = <String, FontLoader>{};
   for (final f in Directory('assets/fonts').listSync().whereType<File>()) {
-    final family = f.path.contains('Cormorant')
-        ? 'Cormorant Garamond'
-        : f.path.contains('Noto')
-            ? 'Noto Sans Arabic'
-            : 'Inter';
+    final family = f.path.contains('Noto') ? 'Noto Sans Arabic' : 'Inter';
     families.putIfAbsent(family, () => FontLoader(family)).addFont(Future.value(f.readAsBytesSync().buffer.asByteData()));
   }
   for (final loader in families.values) {

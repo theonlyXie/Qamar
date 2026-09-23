@@ -28,8 +28,8 @@ class GeneralGuidanceCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
-          color: QColors.cyan.withValues(alpha: 0.06),
-          border: Border.all(color: QColors.cyan.withValues(alpha: 0.3)),
+          color: QColors.ink.withValues(alpha: 0.06),
+          border: Border.all(color: QColors.ink.withValues(alpha: 0.3)),
           borderRadius: BorderRadius.circular(QRadii.card),
         ),
         child: Row(
@@ -37,7 +37,7 @@ class GeneralGuidanceCard extends StatelessWidget {
           children: [
             const Padding(
               padding: EdgeInsets.only(top: 2),
-              child: Icon(Icons.health_and_safety_outlined, size: 18, color: QColors.cyan),
+              child: Icon(Icons.health_and_safety_outlined, size: 18, color: QColors.ink),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -45,7 +45,7 @@ class GeneralGuidanceCard extends StatelessWidget {
                 TextSpan(children: [
                   TextSpan(
                     text: isAr ? 'إرشاد عام · ' : 'General guidance · ',
-                    style: QText.body(size: 14, height: 21, weight: FontWeight.w600, color: QColors.cyan),
+                    style: QText.body(size: 15, height: 21, weight: FontWeight.w600, color: QColors.ink),
                   ),
                   TextSpan(
                     text: isAr
@@ -55,7 +55,7 @@ class GeneralGuidanceCard extends StatelessWidget {
                 ]),
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
-                style: QText.body(size: 14, height: 21, color: QColors.textHigh),
+                style: QText.body(size: 15, height: 21, color: QColors.ink),
               ),
             ),
           ],

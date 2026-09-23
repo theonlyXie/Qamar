@@ -17,6 +17,7 @@ import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/colors.dart';
 import 'package:qamar/theme/layout.dart';
 import 'package:qamar/widgets/common.dart';
+import 'package:qamar/widgets/glass.dart';
 
 import 'support/app_fonts.dart';
 
@@ -86,13 +87,10 @@ void main() {
     expect(find.bySemanticsLabel('More'), findsOneWidget);
   });
 
-  testWidgets('the language switch: each side is a whole touch, drawn inside a pill as tall as before', (tester) async {
+  testWidgets('the language switch: each side is a whole touch, drawn inside a glass pill as tall as before', (tester) async {
     for (final large in [false, true]) {
       await _pump(tester, QLangToggle(lang: AppLang.ar, onChanged: (_) {}, large: large));
-      final pill = tester.getRect(find.descendant(
-        of: find.byType(QLangToggle),
-        matching: find.byWidgetPredicate((w) => w is DecoratedBox && (w.decoration as BoxDecoration).border != null),
-      ).first);
+      final pill = tester.getRect(find.descendant(of: find.byType(QLangToggle), matching: find.byType(QGlass)).first);
       expect(pill.height, large ? 34 : 28);
       for (final side in [find.bySemanticsLabel('العربية'), find.bySemanticsLabel('English')]) {
         final r = tester.getRect(side);
@@ -121,12 +119,12 @@ void main() {
       expect(d.gradient, isNull);
       expect(d.boxShadow, isNull);
       expect(tester.widget<Text>(find.text('One moment…')).style!.color, QDisabled.label);
-      expect(QDisabled.label, QColors.textDisabled);
+      expect(QDisabled.label, QColors.inkDisabled);
     });
 
     testWidgets('enabled, the same controls draw their own edge and label', (tester) async {
       await _pump(tester, QOutlineButton(label: 'Redeem', onTap: () {}));
-      expect((_decoration(tester, find.byType(QOutlineButton)).border! as Border).top.color, QColors.borderSoft);
+      expect((_decoration(tester, find.byType(QOutlineButton)).border! as Border).top.color, QColors.hairlineStrong);
       expect(tester.widget<Text>(find.text('Redeem')).style!.color, isNot(QDisabled.label));
     });
   });

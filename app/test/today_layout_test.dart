@@ -116,11 +116,12 @@ void expectAboveFold(WidgetTester tester, Finder what, String name) {
 }
 
 /// Seat 6's height budgets above the fold (O15): the header about 110,
-/// Qamar's card about 130 — up to 190 in the morning, when the night note
-/// carries its link to the plan and the header has no streak line yet — the
-/// calorie card at most 290, the slot 120, for every slot card. What they
-/// protect is the fold: whatever is in the slot is whole above the band.
-const budgets = (header: 110.0, qamar: 140.0, qamarMorning: 190.0, numbers: 290.0, slot: 120.0);
+/// Qamar's card about 130 — up to 200 in the morning, when the night note
+/// carries its link to the plan and the header has no streak line yet (190
+/// before the sentence took Apple's 17-point body) — the calorie card at
+/// most 290, the slot 120, for every slot card. What they protect is the
+/// fold: whatever is in the slot is whole above the band.
+const budgets = (header: 110.0, qamar: 140.0, qamarMorning: 200.0, numbers: 290.0, slot: 120.0);
 
 /// Each zone within its budget, and the slot's card, whole, above the orb's
 /// band and the orb.
@@ -418,15 +419,16 @@ void main() {
       expect(paragraph.didExceedMaxLines, isFalse, reason: 'the whole sentence, on one line');
       expect(tester.getSize(note).height, lessThanOrEqualTo(17));
       final colour = tester.widget<Text>(note).style!.color!;
-      expect(contrastRatio(colour, QColors.cardMid), greaterThanOrEqualTo(4.5));
+      expect(contrastRatio(colour, QColors.surface), greaterThanOrEqualTo(4.5));
     });
 
     // At zero the chip shows the coin alone (su_display_test.dart); with a
-    // balance its number is 13pt, where 11 read the Arabic digits as dots.
-    testWidgets('the Su chip’s number is 13pt (${lang.name})', (tester) async {
+    // balance its number is 15pt, a reading size, where 11 read the Arabic
+    // digits as dots.
+    testWidgets('the Su chip’s number is 15pt (${lang.name})', (tester) async {
       final s = _state(lang)..suAvailable = 100;
       await _pump(tester, s, _phone);
-      expect(tester.widget<Text>(find.byKey(SuChip.amountKey)).style!.fontSize, 13);
+      expect(tester.widget<Text>(find.byKey(SuChip.amountKey)).style!.fontSize, 15);
     });
   }
 

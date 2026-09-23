@@ -40,8 +40,8 @@ class _ActivitySheetState extends State<ActivitySheet> {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
           decoration: const BoxDecoration(
-            gradient: QColors.sheet,
-            border: Border(top: BorderSide(color: QColors.borderStrong)),
+            color: QColors.surface,
+            border: Border(top: BorderSide(color: QColors.hairlineStrong)),
             borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
           ),
           child: Column(
@@ -49,11 +49,11 @@ class _ActivitySheetState extends State<ActivitySheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(isAr ? '$name — قد إيه؟' : '$name — how long?',
-                  style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.textHigh)),
+                  style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
               const SizedBox(height: 4),
               Text(
                 isAr ? 'تقدير على وزنك. بيتسجّل جنب الأكل.' : 'An estimate from your weight. Logged beside the food.',
-                style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+                style: QText.body(size: 12, height: 18, color: QColors.inkTertiary),
               ),
               const SizedBox(height: 14),
               Wrap(
@@ -66,7 +66,7 @@ class _ActivitySheetState extends State<ActivitySheet> {
                           ? '${state.iso('$m')} د · ~${state.iso('${ActivityCatalog.kcalFor(kind, m, state.profile.weight)}')}'
                           : '$m min · ~${ActivityCatalog.kcalFor(kind, m, state.profile.weight)}',
                       height: 38,
-                      color: QColors.green,
+                      color: QColors.ink,
                       onTap: () => state.logActivity(m),
                     ),
                 ],
@@ -76,7 +76,7 @@ class _ActivitySheetState extends State<ActivitySheet> {
                 alignment: AlignmentDirectional.centerEnd,
                 child: TextButton(
                   onPressed: state.cancelActivity,
-                  child: Text(isAr ? 'إلغاء' : 'Cancel', style: QText.body(size: 13, color: QColors.textMuted)),
+                  child: Text(isAr ? 'إلغاء' : 'Cancel', style: QText.body(size: 13, color: QColors.inkTertiary)),
                 ),
               ),
             ],

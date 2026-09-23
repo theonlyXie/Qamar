@@ -83,21 +83,21 @@ class HomeShell extends StatelessWidget {
   static Color? coverAt(AppState state, {required bool top}) {
     Color? c;
     void add(Color layer) => c = c == null ? layer : Color.alphaBlend(layer, c!);
-    if (state.screen == AppScreen.scan) add(QColors.bgScan);
-    if (state.treeOpen) add(QColors.bgBottom.withValues(alpha: 0.86));
+    if (state.screen == AppScreen.scan) add(QColors.canvas);
+    if (state.treeOpen) add(QColors.canvas.withValues(alpha: 0.86));
     if (state.chatOpen) add(top ? AskQamarOverlay.groundTop : AskQamarOverlay.groundBottom);
     final sheet = state.whyOpen || state.authOpen || state.pendingActivity != null || state.explainOpen != null;
     // A sheet dims what is above it; at the bottom it is the sheet itself,
-    // which settles into the page's darkest ground.
-    if (sheet) add(top ? QColors.scrim : QColors.bgBottom);
+    // whose surface runs on under the home indicator.
+    if (sheet) add(top ? QColors.scrim : QColors.surface);
     return c;
   }
 
   Widget _shell(AppState state) {
     return Scaffold(
-      backgroundColor: QColors.bgBottom,
+      backgroundColor: QColors.canvas,
       body: DecoratedBox(
-        decoration: const BoxDecoration(gradient: QColors.deviceBg),
+        decoration: const BoxDecoration(color: QColors.canvas),
         child: SafeArea(
           child: Stack(
             children: [

@@ -71,7 +71,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         Container(
           padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
-          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: QColors.borderSoft))),
+          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: QColors.hairline))),
           child: Row(
             children: [
               // The way back to the welcome screen. The answers are kept:
@@ -87,9 +87,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(t.brand, style: QText.display(size: 20, ar: QText.arabic(t.brand), color: QColors.textPrimary)),
+                    Text(t.brand, style: QText.display(size: 20, ar: QText.arabic(t.brand), color: QColors.ink)),
                     Text('${t.obSub} · ${state.iso('${(state.step + 1).clamp(1, kOnboardingSteps.length)}/${kOnboardingSteps.length}')}',
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 11, color: QColors.textMuted)),
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 11, color: QColors.inkTertiary)),
                   ],
                 ),
               ),
@@ -122,7 +122,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         Container(
           key: OnboardingScreen.dockKey,
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 34),
-          decoration: const BoxDecoration(border: Border(top: BorderSide(color: QColors.borderSoft))),
+          decoration: const BoxDecoration(border: Border(top: BorderSide(color: QColors.hairline))),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -231,7 +231,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         controller: _draftCtrl,
                         onChanged: state.onDraftChanged,
                         onSubmitted: (_) => state.sendDraft(),
-                        style: QText.body(size: 15, color: QColors.textPrimary),
+                        style: QText.body(size: 15, color: QColors.ink),
                         decoration: InputDecoration(
                           // Until the question is on screen the box asks
                           // for nothing: what is typed waits for it (O7).
@@ -240,19 +240,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               : step != null
                                   ? (state.isAr ? 'اكتب ردك بكلامك…' : 'Or just type your answer…')
                                   : (state.isAr ? 'اسأل قمر أي حاجة…' : 'Ask Qamar anything…'),
-                          hintStyle: QText.body(size: 15, color: QColors.textMuted),
+                          hintStyle: QText.body(size: 15, color: QColors.inkTertiary),
                           filled: true,
-                          fillColor: QColors.cardDeep,
+                          fillColor: QColors.surface,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.pill), borderSide: const BorderSide(color: QColors.borderSoft)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.pill), borderSide: const BorderSide(color: QColors.borderSoft)),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.pill), borderSide: const BorderSide(color: QColors.violet)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.pill), borderSide: const BorderSide(color: QColors.hairline)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.pill), borderSide: const BorderSide(color: QColors.hairline)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.pill), borderSide: const BorderSide(color: QColors.ink)),
                         ),
                       ),
                     ),
                   ),
                   if (canSkip)
-                    TextButton(onPressed: state.skipStep, child: Text(t.skip, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textMuted))),
+                    TextButton(onPressed: state.skipStep, child: Text(t.skip, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkTertiary))),
                   const SizedBox(width: 8),
                   // Send waits for the question too.
                   Opacity(
@@ -263,12 +263,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: Material(
                         color: Colors.transparent,
                         child: Ink(
-                          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: QColors.brandGradient),
+                          decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.ink),
                           child: InkWell(
                             key: OnboardingScreen.sendKey,
                             customBorder: const CircleBorder(),
                             onTap: step != null && !asked ? null : state.sendDraft,
-                            child: const Icon(Icons.arrow_upward, color: QColors.onAccent, size: 20),
+                            child: const Icon(Icons.arrow_upward, color: QColors.onInk, size: 20),
                           ),
                         ),
                       ),
@@ -301,13 +301,13 @@ class _AgeReadout extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(adult ? Icons.cake_outlined : Icons.info_outline, size: 14, color: adult ? QColors.textMuted : QColors.amber),
+        Icon(adult ? Icons.cake_outlined : Icons.info_outline, size: 14, color: adult ? QColors.inkTertiary : QColors.inkSecondary),
         const SizedBox(width: 6),
         Flexible(
           child: Text(
             adult ? label : '$label · $warn',
             textAlign: TextAlign.center,
-            style: QText.body(size: 12, color: adult ? QColors.textMuted : QColors.amber),
+            style: QText.body(size: 12, color: adult ? QColors.inkTertiary : QColors.inkSecondary),
           ),
         ),
       ],
@@ -323,7 +323,7 @@ class _TypingBubble extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: QDecor.card(color: QColors.cardMid, radius: QRadii.card),
+        decoration: QDecor.card(color: QColors.surfaceRaised, radius: QRadii.card),
         child: Row(mainAxisSize: MainAxisSize.min, children: const [_Dot(0), SizedBox(width: 5), _Dot(1), SizedBox(width: 5), _Dot(2)]),
       ),
     );
@@ -352,7 +352,7 @@ class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
       builder: (context, _) {
         final phase = (_c.value + widget.i * 0.2) % 1.0;
         final opacity = 0.3 + 0.7 * (phase < 0.5 ? phase * 2 : (1 - phase) * 2);
-        return Opacity(opacity: opacity.clamp(0.3, 1.0), child: Container(width: 6, height: 6, decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.violet)));
+        return Opacity(opacity: opacity.clamp(0.3, 1.0), child: Container(width: 6, height: 6, decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.ink)));
       },
     );
   }
@@ -375,8 +375,8 @@ class _MessageBubble extends StatelessWidget {
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.86),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: QDecor.card(color: QColors.cardMid, radius: QRadii.card),
-              child: Text(msg.text(isAr), style: QText.body(size: 15, height: 23, color: QColors.textPrimary)),
+              decoration: QDecor.card(color: QColors.surfaceRaised, radius: QRadii.card),
+              child: Text(msg.text(isAr), style: QText.body(size: 15, height: 23, color: QColors.ink)),
             ),
           ),
         );
@@ -387,8 +387,8 @@ class _MessageBubble extends StatelessWidget {
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.86),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.circular(QRadii.card)),
-              child: Text(msg.text(isAr), style: QText.body(size: 15, height: 23, color: QColors.onAccent)),
+              decoration: BoxDecoration(color: QColors.surfaceRaised, borderRadius: BorderRadius.circular(QRadii.card)),
+              child: Text(msg.text(isAr), style: QText.body(size: 15, height: 23, color: QColors.ink)),
             ),
           ),
         );
@@ -441,26 +441,26 @@ class _TargetCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep], begin: Alignment.topLeft, end: Alignment.bottomRight),
-          border: Border.all(color: QColors.borderStrong),
+          gradient: const LinearGradient(colors: [QColors.surfaceRaised, QColors.surface], begin: Alignment.topLeft, end: Alignment.bottomRight),
+          border: Border.all(color: QColors.hairlineStrong),
           borderRadius: BorderRadius.circular(QRadii.card),
-          boxShadow: [BoxShadow(color: QColors.blue.withOpacity(0.18), blurRadius: 34)],
+          boxShadow: [BoxShadow(color: QColors.ink.withOpacity(0.18), blurRadius: 34)],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(t.dailyTarget, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
+            Text(t.dailyTarget, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.inkTertiary)),
             const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
                 ShaderMask(
-                  shaderCallback: (r) => QColors.blueCyanGradient.createShader(r),
-                  child: Text(state.digits('${tg.kcal}'), style: QText.number(size: 34, weight: FontWeight.w600, color: QColors.textPrimary)),
+                  shaderCallback: (r) => const LinearGradient(colors: [QColors.ink, QColors.ink]).createShader(r),
+                  child: Text(state.digits('${tg.kcal}'), style: QText.number(size: 34, weight: FontWeight.w600, color: QColors.ink)),
                 ),
                 const SizedBox(width: 8),
-                Text(t.kcalDay, style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
+                Text(t.kcalDay, style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkTertiary)),
               ],
             ),
             const SizedBox(height: 16),
@@ -474,9 +474,9 @@ class _TargetCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            Text(assumptions, style: QText.body(size: 12, height: 18, color: QColors.textMuted)),
+            Text(assumptions, style: QText.body(size: 12, height: 18, color: QColors.inkTertiary)),
             const SizedBox(height: 6),
-            Text(t.estimateNote, style: QText.body(size: 12, height: 18, color: QColors.amberSoft)),
+            Text(t.estimateNote, style: QText.body(size: 12, height: 18, color: QColors.inkSecondary)),
           ],
         ),
       ),
@@ -493,12 +493,12 @@ class _MacroBox extends StatelessWidget {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.control),
+        decoration: QDecor.card(color: QColors.surface, border: QColors.hairline, radius: QRadii.control),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: QText.body(size: 11, color: QColors.textMuted)),
-            Text(grams, style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.textPrimary)),
+            Text(label, style: QText.body(size: 11, color: QColors.inkTertiary)),
+            Text(grams, style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.ink)),
           ],
         ),
       ),
@@ -521,8 +521,8 @@ class _TrialOfferCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: QColors.gold.withValues(alpha: 0.08),
-          border: Border.all(color: QColors.gold.withValues(alpha: 0.4)),
+          color: QColors.ink.withValues(alpha: 0.08),
+          border: Border.all(color: QColors.ink.withValues(alpha: 0.4)),
           borderRadius: BorderRadius.circular(QRadii.card),
         ),
         child: Column(
@@ -530,14 +530,14 @@ class _TrialOfferCard extends StatelessWidget {
           children: [
             Text(
               TrialWords.offerTitle(days, ar: isAr, iso: state.iso),
-              style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh),
+              style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink),
             ),
             const SizedBox(height: 4),
             Text(
               isAr
                   ? 'من غير بطاقة، ومفيش حاجة بتتجدد لوحدها. خطة بكرة، وصور وأسئلة أكتر.'
                   : 'No card, nothing renews. Tomorrow’s plan, and more photos and questions.',
-              style: QText.body(size: 13, height: 20, color: QColors.textMid),
+              style: QText.body(size: 13, height: 20, color: QColors.inkSecondary),
             ),
             const SizedBox(height: 10),
             Row(
@@ -549,15 +549,15 @@ class _TrialOfferCard extends StatelessWidget {
                     onTap: () => state.acceptTrialOffer(),
                     child: Ink(
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                      decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),
-                      child: Text(isAr ? 'ابدأ' : 'Start', style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onAccent)),
+                      decoration: const BoxDecoration(color: QColors.ink, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),
+                      child: Text(isAr ? 'ابدأ' : 'Start', style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onInk)),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 TextButton(
                   onPressed: state.declineTrialOffer,
-                  child: Text(isAr ? 'مش دلوقتي' : 'Not now', style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
+                  child: Text(isAr ? 'مش دلوقتي' : 'Not now', style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkTertiary)),
                 ),
               ],
             ),
@@ -580,16 +580,16 @@ class _SaveCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: QColors.violet.withOpacity(0.1),
-          border: Border.all(color: QColors.violet.withOpacity(0.4)),
+          color: QColors.ink.withOpacity(0.1),
+          border: Border.all(color: QColors.ink.withOpacity(0.4)),
           borderRadius: BorderRadius.circular(QRadii.card),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(t.saveTitle, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+            Text(t.saveTitle, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink)),
             const SizedBox(height: 4),
-            Text(t.saveSub, style: QText.body(size: 13, height: 20, color: QColors.textMid)),
+            Text(t.saveSub, style: QText.body(size: 13, height: 20, color: QColors.inkSecondary)),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -601,13 +601,13 @@ class _SaveCard extends StatelessWidget {
                     onTap: state.linkFromSaveCard,
                     child: Ink(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),
-                      child: Text(t.saveNow, style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.onAccent)),
+                      decoration: const BoxDecoration(color: QColors.ink, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),
+                      child: Text(t.saveNow, style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.onInk)),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                TextButton(onPressed: state.dismissSave, child: Text(t.saveLater, style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMuted))),
+                TextButton(onPressed: state.dismissSave, child: Text(t.saveLater, style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.inkTertiary))),
               ],
             ),
           ],

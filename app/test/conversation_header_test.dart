@@ -145,7 +145,7 @@ void main() {
         await s.sendChatMsg(ar ? 'كشري' : 'koshary');
         await tester.pump(const Duration(milliseconds: 400));
         expect(s.loggingMeal, isFalse);
-        expect(hint(tester), ar ? 'اسأل قمر…' : 'Message Qamar…');
+        expect(hint(tester), ar ? 'اسأل قمر أي حاجة' : 'Ask Qamar anything');
       });
     }
 
@@ -153,7 +153,7 @@ void main() {
       final s = AppState()..setLang(AppLang.en);
       s.openChat();
       await _pumpChat(tester, s);
-      expect(hint(tester), 'Message Qamar…');
+      expect(hint(tester), 'Ask Qamar anything');
     });
   });
 

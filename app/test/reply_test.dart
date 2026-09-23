@@ -339,7 +339,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
       await tester.pump();
-      expect(find.text('The one thing today: log your first meal. I’ll handle the rest with you.'), findsOneWidget);
+      expect(find.text('One thing today: log your first meal. I’ll handle the rest.'), findsOneWidget);
 
       s.meals.add(LoggedMeal(name: 'Koshary', sub: '', kcal: 640, p: 20, c: 100, f: 18, at: now));
       s.go(AppScreen.today);

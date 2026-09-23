@@ -2,8 +2,10 @@
 // fonts do not draw (the Arabic greeting's 👋 rendered as a box at the start
 // of the first thing the app says); a trailing "..." is the ellipsis
 // character, one glyph with its own spacing, not three full stops; and every
-// character of copy is one a bundled face draws, with body text falling back
-// to Inter for what Noto Sans Arabic lacks (You's arrows drew as boxes).
+// character of copy is one a bundled face draws: every style names Inter
+// first and Noto Sans Arabic after it, so each script finds its face (You's
+// arrows once drew as boxes). The dot numerals' glyph grids are drawings, not
+// copy, and are left out.
 
 import 'dart:io';
 
@@ -17,7 +19,9 @@ final _emoji = RegExp('[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]', 
 final _literal = RegExp(r"'(?:[^'\\]|\\.)*'");
 
 Iterable<(String, String)> _copy() sync* {
-  for (final f in Directory('lib').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart'))) {
+  // The dot numerals' 5×7 grids ('.###.') are pictures of digits, not words.
+  bool grid(File f) => f.path.replaceAll(r'\', '/').endsWith('lib/widgets/dot_number.dart');
+  for (final f in Directory('lib').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart') && !grid(f))) {
     final lines = f.readAsLinesSync();
     for (var i = 0; i < lines.length; i++) {
       if (lines[i].trimLeft().startsWith('//')) continue;
@@ -44,8 +48,10 @@ void main() {
   test('every character of copy is drawn by a bundled face, and body text falls back to the one that has it', () {
     final noto = fontCharacters('assets/fonts/NotoSansArabic-400.ttf');
     final inter = fontCharacters('assets/fonts/Inter-400.ttf');
-    expect(QText.body(size: 14).fontFamilyFallback, contains('Inter'), reason: 'what Noto lacks is drawn by Inter');
-    expect(QText.number(size: 14).fontFamilyFallback, contains('Noto Sans Arabic'));
+    for (final style in [QText.body(size: 15), QText.number(size: 15), QText.display(size: 22, ar: true), QText.eyebrow(ar: true)]) {
+      expect(style.fontFamily, 'Inter', reason: 'Latin, and the arrows, in Inter');
+      expect(style.fontFamilyFallback, contains('Noto Sans Arabic'), reason: 'Arabic, and its digits, in Noto Sans Arabic');
+    }
     final escape = RegExp(r'\\u\{([0-9A-Fa-f]+)\}|\\u([0-9A-Fa-f]{4})');
     final found = <String>[];
     for (final (where, literal) in _copy()) {

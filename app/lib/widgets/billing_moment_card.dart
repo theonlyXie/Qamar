@@ -48,13 +48,13 @@ class BillingMomentCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
-              color: QColors.gold.withValues(alpha: 0.08),
-              border: Border.all(color: QColors.gold.withValues(alpha: 0.35)),
+              color: QColors.ink.withValues(alpha: 0.08),
+              border: Border.all(color: QColors.ink.withValues(alpha: 0.35)),
               borderRadius: BorderRadius.circular(QRadii.card),
             ),
             child: Row(
               children: [
-                const Icon(Icons.hourglass_bottom_rounded, size: 18, color: QColors.gold),
+                const Icon(Icons.hourglass_bottom_rounded, size: 18, color: QColors.ink),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -64,18 +64,18 @@ class BillingMomentCard extends StatelessWidget {
                       Text(line,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: QText.body(size: 14, height: 21, color: QColors.textHigh)),
+                          style: QText.body(size: 15, height: 21, color: QColors.ink)),
                       const SizedBox(height: 3),
                       Text(sub,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: QText.body(size: 12, color: QColors.textMuted)),
+                          style: QText.body(size: 12, color: QColors.inkTertiary)),
                     ],
                   ),
                 ),
                 const SizedBox(width: 6),
                 // Points the way the line reads: up and to the end.
-                Transform.flip(flipX: isAr, child: const Icon(Icons.arrow_outward, size: 14, color: QColors.textMuted)),
+                Transform.flip(flipX: isAr, child: const Icon(Icons.arrow_outward, size: 14, color: QColors.inkTertiary)),
               ],
             ),
           ),

@@ -177,7 +177,7 @@ void main() {
 
       final haveAccount = tester.widget<Text>(find.text(s.t.haveAccount));
       final invitation = tester.widget<Text>(find.text(lang == AppLang.ar ? 'عندك دعوة؟' : 'Have an invitation?'));
-      expect(haveAccount.style!.color, QColors.violetSoft, reason: 'a link looks like one');
+      expect(haveAccount.style!.color, QColors.inkSecondary, reason: 'a quiet action: the second ink, never a hue');
       expect(invitation.style!.color, haveAccount.style!.color);
       expect(invitation.style!.fontSize, haveAccount.style!.fontSize);
 
@@ -319,7 +319,7 @@ void main() {
         expect(text.data, contains(says[notice]!), reason: '${notice.name}: the notice the app says');
         if (notice == _Notice.refusedAfter) expect(s.invitedBy, 'Basel', reason: 'still invited by Basel, and the tone is not');
         if (notice == _Notice.unnamed) expect(s.invitedBy, isNull, reason: 'no name, and still good news');
-        expect(text.style!.color, notice.good ? QColors.cyan : QColors.amberSoft, reason: '${notice.name} ${notice.good ? 'is good news' : 'did not happen'}');
+        expect(text.style!.color, notice.good ? QColors.ink : QColors.inkSecondary, reason: '${notice.name} ${notice.good ? 'is good news' : 'did not happen'}');
         await tester.pumpWidget(const SizedBox());
       }
     });
@@ -364,7 +364,7 @@ void main() {
       expect(find.byIcon(Icons.radio_button_unchecked), findsNothing);
 
       final checks = tester.widgetList<Icon>(find.byIcon(Icons.check)).map((i) => i.color).toSet();
-      expect(checks, {QColors.violetSoft}, reason: 'included is one colour in both columns');
+      expect(checks, {QColors.inkSecondary}, reason: 'included is one ink in both columns');
     });
   }
 }

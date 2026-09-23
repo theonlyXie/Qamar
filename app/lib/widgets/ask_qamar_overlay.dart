@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -13,34 +13,29 @@ import '../models/problem.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/icons.dart';
 import '../theme/motion.dart';
 import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
+import 'glass.dart';
 
-/// S18 — Ask Qamar, read as a conversation and nothing else.
+/// S18 — Ask Qamar, the way a conversation with an assistant already looks
+/// on the phone (the mono-glass skill's chat pattern).
 ///
-/// The earlier version staged a performance around the words: a 78px orb docked
-/// to the side, a violet beam running down the page, a gradient on every line
-/// the user typed. It was the loudest surface in the app and the hardest to
-/// read. This is the same conversation with the staging removed — a translucent
-/// sheet over the page, the assistant as plain text, the user in one quiet
-/// bubble, controls small enough to stop competing with the answer.
+/// A black page. The assistant's words are plain text across the page; the
+/// person's own sit in a grey bubble on their side. At the foot, one glass
+/// field: a "+" for a photo, the words, and one white button that is the
+/// microphone while the field is empty and the send arrow once there is
+/// something to send. Nothing else: no orb docked to the side, no beam, no
+/// colour.
 ///
-/// Motion follows the same rule: short, critically damped, never decorative.
-/// Everything here honours the platform's reduce-motion setting by falling back
-/// to a plain cross-fade.
-final _scrimTop = QColors.cardDeep.withValues(alpha: 0.95);
-final _scrimBottom = QColors.bgBottom.withValues(alpha: 0.98);
+/// Motion is short and critically damped (QSpring), and falls back to a plain
+/// cross-fade under the platform's reduce-motion setting.
+const _ground = QColors.canvas;
 
-/// The composer and the user's own words sit on the one surface that is a step
-/// lighter than the sheet — enough to separate, not enough to shout.
-final _raised = QColors.cardDeep.withValues(alpha: 0.9);
-const _userBubble = QColors.glassHigh;
-
-/// How long a press takes to show. Arrivals are on the settle spring
-/// (QSpring): past half-way in 100ms, at rest in about 400.
-const _press = Duration(milliseconds: 90);
+/// The person's own words: the raised grey, a step above the page.
+const _userBubble = QColors.surfaceHigh;
 
 bool _stillness(BuildContext context) => MediaQuery.disableAnimationsOf(context);
 
@@ -53,10 +48,13 @@ class AskQamarOverlay extends StatefulWidget {
   /// The suggestion row's end fade.
   static const suggestionFadeKey = ValueKey('chat-suggestion-fade');
 
+  /// The empty conversation's one line, for tests.
+  static const emptyKey = ValueKey('chat-empty');
+
   /// The conversation's ground at its top and bottom edges, for the shell
   /// to carry into the status bar and the home indicator's strips.
-  static Color get groundTop => _scrimTop;
-  static Color get groundBottom => _scrimBottom;
+  static Color get groundTop => _ground;
+  static Color get groundBottom => _ground;
   @override
   State<AskQamarOverlay> createState() => _AskQamarOverlayState();
 }
@@ -64,9 +62,11 @@ class AskQamarOverlay extends StatefulWidget {
 class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProviderStateMixin {
   final _chat = ChatScroller();
   final _ctrl = TextEditingController();
+
   /// The composer's focus, taken when the state asks ("Type it instead").
   final _focus = FocusNode();
   int? _focusAsked;
+
   /// The entrance, on the settle spring (QSpring): quick, and at rest
   /// without passing its mark. Under reduce-motion a plain fade.
   late final AnimationController _in = AnimationController.unbounded(vsync: this);
@@ -110,109 +110,112 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
     _focusAsked = state.composerFocus;
 
     final showSuggestions = state.chatDraft.isEmpty && state.chatState != ChatState.thinking;
+    final empty = state.chat.isEmpty && !state.hasProposal && state.chatState != ChatState.thinking;
 
     // Sized by the shell, not by a Stack: the overlay is handed a full-screen
     // box so it can fade in and out inside a switcher.
     return SizedBox.expand(
-      child: ClipRect(
-        child: BackdropFilter(
-          // The page stays visible behind the conversation: the sheet is a
-          // material over the app, not a new screen the app jumped to.
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: FadeTransition(
-            opacity: _shown,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [_scrimTop, _scrimBottom]),
-              ),
-              child: AnimatedBuilder(
-                animation: _in,
-                builder: (context, child) {
-                  if (still) return child!;
-                  return Transform.translate(offset: Offset(0, 10 * (1 - _shown.value)), child: child);
-                },
-                child: Column(
-                  children: [
-                    _Header(state: state),
-                    // Drawn from the bottom up (O10): a fresh conversation's
-                    // first line sits on the field, where the eye is, and the
-                    // space above it is sky instead of a gap under it.
-                    Expanded(
-                      child: ListView(
-                        key: AskQamarOverlay.transcriptKey,
-                        controller: _chat.controller,
-                        reverse: true,
-                        // Dragging the conversation puts the keyboard away, the
-                        // way every messaging app on the phone already does.
-                        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
-                        children: [
-                          // Newest first.
-                          // What the assistant read off the meal, waiting to be
-                          // confirmed. Nothing is written until it is.
-                          if (state.hasProposal) const _ProposalCard(),
-                          if (state.chatState == ChatState.thinking) const _Thinking(),
-                          for (final c in state.chat.reversed) _ChatBubble(turn: c),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 22),
-                      // A fade where the conversation meets the composer, in
-                      // place of a rule across the screen.
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                            begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [QColors.bgBottom.withValues(alpha: 0), QColors.bgBottom.withValues(alpha: 0.9)]),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (showSuggestions) ...[
-                            SizedBox(
-                              height: QLayout.minTap,
-                              // The row fades out at its end, where it runs
-                              // on past the screen: a clipped chip read as
-                              // broken; a fading one reads as "more this way".
-                              child: _EndFade(
-                                child: ListView(
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.symmetric(horizontal: 2),
-                                children: [
-                                  for (final sug in state.chatSuggestions())
-                                    Padding(
-                                      padding: const EdgeInsetsDirectional.only(end: 8),
-                                      child: _Chip(label: sug, onTap: () => state.chatSuggestionTap(sug)),
-                                    ),
-                                ],
-                              ),
-                              ),
+      child: FadeTransition(
+        opacity: _shown,
+        child: ColoredBox(
+          color: _ground,
+          child: AnimatedBuilder(
+            animation: _in,
+            builder: (context, child) {
+              if (still) return child!;
+              return Transform.translate(offset: Offset(0, 8 * (1 - _shown.value)), child: child);
+            },
+            child: Column(
+              children: [
+                _Header(state: state),
+                Expanded(
+                  child: empty
+                      ? Center(
+                          key: AskQamarOverlay.emptyKey,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32),
+                            child: Text(
+                              state.isAr ? 'أساعدك في إيه؟' : 'What can I help with?',
+                              textAlign: TextAlign.center,
+                              style: QText.display(size: 28, ar: state.isAr, weight: FontWeight.w600),
                             ),
-                            const SizedBox(height: 4),
-                          ],
-                          // Proof the camera actually fired: the shot the user
-                          // just took, attached to the message about to be sent.
-                          if (state.lastMealPhotoPath != null && !kIsWeb)
-                            _Attachment(path: state.lastMealPhotoPath!, label: state.isAr ? 'صورة الوجبة' : 'Meal photo'),
-                          // A menu photographed at the table, waiting to go with
-                          // the next words — or with none: "what do I order
-                          // here?" is implied.
-                          if (state.chatPhotoPath != null && !kIsWeb)
-                            _Attachment(path: state.chatPhotoPath!, label: state.isAr ? 'صورة المنيو' : 'Menu photo', onRemove: state.detachChatPhoto),
-                          // The field's hint says what it takes now: a menu's
-                          // question, a meal being logged (an example, never a
-                          // question's words: a meal read spends none), or a
-                          // question for Qamar.
-                          _Composer(state: state, ctrl: _ctrl, focus: _focus, placeholder: state.chatPhotoPath != null
-                              ? (state.isAr ? 'اسأل عن المنيو، أو ابعت الصورة بس' : 'Ask about the menu, or just send the photo')
-                              : state.loggingMeal
-                                  ? t.mealPlaceholder
-                                  : t.chatPlaceholder),
-                        ],
-                      ),
-                    ),
-                  ],
+                          ),
+                        )
+                      // Drawn from the bottom up (O10): a fresh conversation's
+                      // first line sits on the field, where the eye is.
+                      : _TopFade(
+                          child: ListView(
+                            key: AskQamarOverlay.transcriptKey,
+                            controller: _chat.controller,
+                            reverse: true,
+                            // Dragging the conversation puts the keyboard away,
+                            // the way every messaging app on the phone does.
+                            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                            padding: const EdgeInsets.fromLTRB(QSpace.page, 16, QSpace.page, 16),
+                            children: [
+                              // Newest first. What the assistant read off the
+                              // meal, waiting to be confirmed: nothing is
+                              // written until it is.
+                              if (state.hasProposal) const _ProposalCard(),
+                              if (state.chatState == ChatState.thinking) const _Thinking(),
+                              for (final c in state.chat.reversed) _ChatTurn(turn: c),
+                            ],
+                          ),
+                        ),
                 ),
-              ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (showSuggestions) ...[
+                        SizedBox(
+                          height: QLayout.minTap,
+                          // The row fades out at its end, where it runs on
+                          // past the screen: "more this way", not "broken".
+                          child: _EndFade(
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              children: [
+                                for (final sug in state.chatSuggestions())
+                                  Padding(
+                                    padding: const EdgeInsetsDirectional.only(end: 8),
+                                    child: _Chip(label: sug, onTap: () => state.chatSuggestionTap(sug)),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                      // Proof the camera actually fired: the shot the user just
+                      // took, attached to the message about to be sent.
+                      if (state.lastMealPhotoPath != null && !kIsWeb)
+                        _Attachment(path: state.lastMealPhotoPath!, label: state.isAr ? 'صورة الوجبة' : 'Meal photo'),
+                      // A menu photographed at the table, waiting to go with
+                      // the next words — or with none: "what do I order here?"
+                      // is implied.
+                      if (state.chatPhotoPath != null && !kIsWeb)
+                        _Attachment(path: state.chatPhotoPath!, label: state.isAr ? 'صورة المنيو' : 'Menu photo', onRemove: state.detachChatPhoto),
+                      // The field's hint says what it takes now: a menu's
+                      // question, a meal being logged (an example, never a
+                      // question's words: a meal read spends none), or a
+                      // question for Qamar.
+                      _Composer(
+                        state: state,
+                        ctrl: _ctrl,
+                        focus: _focus,
+                        placeholder: state.chatPhotoPath != null
+                            ? (state.isAr ? 'اسأل عن المنيو، أو ابعت الصورة بس' : 'Ask about the menu, or just send the photo')
+                            : state.loggingMeal
+                                ? t.mealPlaceholder
+                                : t.chatPlaceholder,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -221,8 +224,6 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
   }
 }
 
-/// Name, one line of state, one way out. The quota takes the status line when
-/// there is no status to report, so the header never carries two pills at once.
 /// The conversation header's measures (O8), for the header and its tests.
 abstract final class ChatHeader {
   /// The status line's type size.
@@ -235,6 +236,9 @@ abstract final class ChatHeader {
   static const lineKey = ValueKey('chat-header-line');
 }
 
+/// One way out, the name, and one line of state. The quota takes the status
+/// line when there is no status to report, so the header never carries two
+/// things at once (O8).
 class _Header extends StatelessWidget {
   final AppState state;
   const _Header({required this.state});
@@ -251,29 +255,19 @@ class _Header extends StatelessWidget {
     // One thing at a time: a dictation error, then what was heard (or
     // Listening / Thinking), then the quota only near the limit, then
     // nothing (O8). The full count lives in Me.
-    final quota = state.quotaLine;
-    final line = heard.isNotEmpty ? heard : quota;
-    // The quota is read, not glanced past: textMuted passes AA on the
-    // conversation's ground where the old faint grey did not (O8).
-    final colour = state.dictationError != null
-        ? QColors.red
-        : heard.isNotEmpty
-            ? QColors.textMid
-            : QColors.textMuted;
+    final line = heard.isNotEmpty ? heard : state.quotaLine;
+    final colour = heard.isNotEmpty ? QColors.inkSecondary : QColors.inkTertiary;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 6),
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
       child: Row(
         children: [
-          // As wide as the close button, so the name is centred on the screen.
-          const SizedBox(width: QLayout.minTap),
+          _GlassIcon(icon: QIcons.close, onTap: state.closeChat, label: state.isAr ? 'اقفل المحادثة' : 'Close the conversation'),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Large text reads too loose at its default tracking; the brand
-                // is the one place in this overlay that needs tightening.
-                Text(t.brand, style: QText.display(size: 20, ar: QText.arabic(t.brand), weight: FontWeight.w400, color: QColors.textPrimary)),
+                Text(t.brand, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
                 // The line keeps its height when it has nothing to say, so
                 // the name never jumps as a status comes and goes (O8).
                 SizedBox(
@@ -297,19 +291,39 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          _IconButton(icon: Icons.close_rounded, onTap: state.closeChat, glyph: 19, label: state.isAr ? 'اقفل المحادثة' : 'Close the conversation'),
+          // As wide as the close button, so the name is centred on the screen.
+          const SizedBox(width: QLayout.minTap),
         ],
       ),
     );
   }
 }
 
-/// The assistant is plain text on the page; only the user gets a bubble. That
-/// is the whole reason this reads like a conversation rather than a feed of
-/// cards.
-class _ChatBubble extends StatelessWidget {
+/// The transcript's top edge fades under the header instead of stopping at
+/// a rule: what scrolls away goes behind, the way content does under a bar.
+class _TopFade extends StatelessWidget {
+  final Widget child;
+  const _TopFade({required this.child});
+
+  @override
+  Widget build(BuildContext context) => ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (r) => LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: const [Colors.transparent, QColors.canvas, QColors.canvas],
+          stops: [0, 24 / r.height.clamp(24, double.infinity), 1],
+        ).createShader(r),
+        child: child,
+      );
+}
+
+/// A turn of the conversation. The assistant is plain text on the page; only
+/// the person gets a bubble. That is the whole reason this reads like a
+/// conversation rather than a feed of cards.
+class _ChatTurn extends StatelessWidget {
   final ChatTurn turn;
-  const _ChatBubble({required this.turn});
+  const _ChatTurn({required this.turn});
 
   @override
   Widget build(BuildContext context) {
@@ -317,26 +331,22 @@ class _ChatBubble extends StatelessWidget {
     if (turn.who == ChatWho.u) {
       return _Appear(
         child: Padding(
-          padding: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.only(bottom: 20, top: 4),
           child: Align(
             alignment: AlignmentDirectional.centerEnd,
             child: Container(
-              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: _userBubble,
-                border: Border.all(color: QColors.borderSoft),
-                borderRadius: BorderRadius.circular(QRadii.card),
-              ),
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+              decoration: BoxDecoration(color: _userBubble, borderRadius: BorderRadius.circular(QRadii.card)),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (turn.photoPath != null && !kIsWeb) ...[
-                    ClipRRect(borderRadius: BorderRadius.circular(QRadii.control), child: _photoThumb(turn.photoPath!, 132)),
+                    ClipRRect(borderRadius: BorderRadius.circular(QRadii.inset), child: _photoThumb(turn.photoPath!, 140)),
                     const SizedBox(height: 8),
                   ],
-                  Text(turn.text, style: QText.body(size: 15, height: 23, color: QColors.textPrimary)),
+                  Text(turn.text, style: QText.body(size: 17, height: 24, color: QColors.ink)),
                 ],
               ),
             ),
@@ -346,19 +356,19 @@ class _ChatBubble extends StatelessWidget {
     }
     return _Appear(
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 18),
+        padding: const EdgeInsets.only(bottom: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(turn.text, style: QText.body(size: 15, height: 25, color: QColors.textHigh)),
+            Text(turn.text, style: QText.body(size: 17, height: 26, color: QColors.ink)),
             if (turn.sub != null && turn.sub!.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(turn.sub!, style: QText.body(size: 13, height: 21, color: QColors.textMuted)),
+              const SizedBox(height: 8),
+              Text(turn.sub!, style: QText.body(size: 15, height: 22, color: QColors.inkSecondary)),
             ],
             // A problem's next step, and another way on when there is one
-            // (O10); otherwise the turn's one action, as before.
+            // (O10); otherwise the turn's one action.
             if (turn.problem != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               _ProblemActions(problem: turn.problem!),
             ] else if (turn.action != null) ...[
               const SizedBox(height: 10),
@@ -374,37 +384,17 @@ class _ChatBubble extends StatelessWidget {
   }
 }
 
-/// Three dots, the size of a full stop, in the text colour. Under reduce-motion
-/// they stop moving and the word says it instead.
-class _Thinking extends StatelessWidget {
+/// Qamar is thinking: one white dot, breathing, where the answer will start.
+/// Under reduce-motion it holds still and the word says it instead.
+class _Thinking extends StatefulWidget {
   const _Thinking();
   @override
-  Widget build(BuildContext context) {
-    if (_stillness(context)) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 18),
-        child: Text(context.read<AppState>().t.sThinking, style: QText.body(size: 15, height: 25, color: QColors.textMuted)),
-      );
-    }
-    return const Padding(
-      padding: EdgeInsets.only(bottom: 18, top: 2),
-      child: Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: Row(mainAxisSize: MainAxisSize.min, children: [_TDot(0), SizedBox(width: 5), _TDot(1), SizedBox(width: 5), _TDot(2)]),
-      ),
-    );
-  }
+  State<_Thinking> createState() => _ThinkingState();
 }
 
-class _TDot extends StatefulWidget {
-  final int i;
-  const _TDot(this.i);
-  @override
-  State<_TDot> createState() => _TDotState();
-}
+class _ThinkingState extends State<_Thinking> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..repeat(reverse: true);
 
-class _TDotState extends State<_TDot> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat();
   @override
   void dispose() {
     _c.dispose();
@@ -413,22 +403,36 @@ class _TDotState extends State<_TDot> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, _) {
-        final phase = (_c.value + widget.i * 0.18) % 1.0;
-        final wave = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
-        return Opacity(
-          opacity: (0.25 + 0.6 * wave).clamp(0.25, 0.85),
-          child: Container(width: 5, height: 5, decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.textMid)),
-        );
-      },
+    if (_stillness(context)) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: Text(context.read<AppState>().t.sThinking, style: QText.body(size: 17, height: 26, color: QColors.inkTertiary)),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24, top: 6),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) {
+            final v = Curves.easeInOut.transform(_c.value);
+            return Transform.scale(
+              scale: 0.72 + 0.28 * v,
+              child: Opacity(
+                opacity: 0.55 + 0.45 * v,
+                child: Container(width: 14, height: 14, decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.ink)),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }
 
-/// One line of the conversation arriving: a short fade with 8px of travel, so
-/// the eye is told where the new text is without being pulled to it.
+/// One line of the conversation arriving: a short fade with 8 points of
+/// travel, so the eye is told where the new text is without being pulled.
 class _Appear extends StatefulWidget {
   final Widget child;
   const _Appear({required this.child});
@@ -469,9 +473,6 @@ class _AppearState extends State<_Appear> with SingleTickerProviderStateMixin {
   }
 }
 
-/// The composer: a field, and the three things you can do with it. The icons
-/// are bare glyphs at reading size inside a 40pt target — small on the screen,
-/// still a thumb's worth of tappable.
 /// Fades its child out towards the end edge (the right in English, the left
 /// in Arabic): a row that runs on past the screen says so.
 class _EndFade extends StatelessWidget {
@@ -490,7 +491,7 @@ class _EndFade extends StatelessWidget {
         begin: rtl ? Alignment.centerRight : Alignment.centerLeft,
         end: rtl ? Alignment.centerLeft : Alignment.centerRight,
         // Only a dstIn mask's alpha counts: whole, whole, gone.
-        colors: const [QColors.bgBottom, QColors.bgBottom, Colors.transparent],
+        colors: const [QColors.canvas, QColors.canvas, Colors.transparent],
         stops: [0, 1 - fade / r.width, 1],
       ).createShader(r),
       child: child,
@@ -498,6 +499,10 @@ class _EndFade extends StatelessWidget {
   }
 }
 
+/// The composer: one glass field, the way an assistant's is. A "+" for a
+/// photo at the start; the words; and at the end one white button that is
+/// the microphone while there is nothing to send and the send arrow once
+/// there is. While Qamar is listening the button is the stop square.
 class _Composer extends StatelessWidget {
   final AppState state;
   final TextEditingController ctrl;
@@ -508,85 +513,68 @@ class _Composer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ready = state.chatDraft.trim().isNotEmpty || state.chatPhotoPath != null;
-    return Container(
-      padding: const EdgeInsetsDirectional.only(start: 16, end: 4, top: 3, bottom: 3),
-      decoration: BoxDecoration(
-        color: _raised,
-        border: Border.all(color: QColors.borderSoft),
-        borderRadius: BorderRadius.circular(QRadii.card),
-      ),
+    final listening = state.chatState == ChatState.listening;
+    final isAr = state.isAr;
+    return QGlass(
+      shape: QGlassShape.rounded,
+      radius: 26,
+      padding: const EdgeInsetsDirectional.only(start: 4, end: 4, top: 2, bottom: 2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          if (!kIsWeb) _PlainIcon(icon: QIcons.attach, onTap: () => _photographMenu(context, state), label: isAr ? 'صوّر' : 'Take a photo'),
           Expanded(
-            // The field itself is the touch, [QLayout.minTap] tall (O11):
-            // the padding that used to sit around it is inside it now.
+            // The field itself is the touch, [QLayout.minTap] tall (O11).
             child: TextField(
-                controller: ctrl,
-                focusNode: focus,
-                minLines: 1,
-                maxLines: 5,
-                textInputAction: TextInputAction.send,
-                onChanged: state.onChatDraftChanged,
-                onSubmitted: (_) => state.sendChat(),
-                style: QText.body(size: 15, height: 21, color: QColors.textPrimary),
-                decoration: InputDecoration(
-                  hintText: placeholder,
-                  hintStyle: QText.body(size: 15, height: 21, color: QColors.textMuted),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: (QLayout.minTap - 21) / 2 + 0.5),
-                ),
+              controller: ctrl,
+              focusNode: focus,
+              minLines: 1,
+              maxLines: 6,
+              textInputAction: TextInputAction.send,
+              onChanged: state.onChatDraftChanged,
+              onSubmitted: (_) => state.sendChat(),
+              cursorColor: QColors.ink,
+              style: QText.body(size: 17, height: 22, color: QColors.ink),
+              decoration: InputDecoration(
+                hintText: placeholder,
+                hintStyle: QText.body(size: 17, height: 22, color: QColors.inkTertiary),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsetsDirectional.only(start: kIsWeb ? 12 : 2, end: 4, top: (QLayout.minTap - 22) / 2 + 0.5, bottom: (QLayout.minTap - 22) / 2 + 0.5),
               ),
+            ),
           ),
-          if (!kIsWeb) _IconButton(icon: Icons.photo_camera_outlined, onTap: () => _photographMenu(context, state), label: state.isAr ? 'صوّر' : 'Take a photo'),
-          _IconButton(
-            icon: Icons.mic_none_rounded,
-            onTap: state.tapOrbListen,
-            label: state.isAr ? 'اتكلم' : 'Speak',
-            tint: state.chatState == ChatState.listening ? QColors.violetSoft : null,
-          ),
-          _IconButton(icon: Icons.arrow_upward_rounded, onTap: ready ? state.sendChat : null, filled: true, glyph: 17, label: state.isAr ? 'ابعت' : 'Send'),
+          if (ready)
+            _InkCircle(icon: QIcons.send, onTap: state.sendChat, label: isAr ? 'ابعت' : 'Send')
+          else
+            _InkCircle(
+              icon: listening ? QIcons.stop : QIcons.mic,
+              onTap: state.tapOrbListen,
+              label: listening ? (isAr ? 'وقّف' : 'Stop') : (isAr ? 'اتكلم' : 'Speak'),
+            ),
         ],
       ),
     );
   }
 }
 
-/// A whole touch ([QLayout.minTap]) with an 18pt glyph in it, which answers
-/// on the press rather than on the release. With nothing to do ([onTap]
-/// null) it takes no touch and says so: the filled one dims, and a screen
-/// reader hears it as not enabled.
-class _IconButton extends StatefulWidget {
+/// A bare glyph in a whole touch ([QLayout.minTap]), answering on the press.
+class _PlainIcon extends StatefulWidget {
   final IconData icon;
   final VoidCallback? onTap;
-  final bool filled;
-  final double glyph;
-  final Color? tint;
-
-  /// What it does, for a screen reader: the glyph has no words.
   final String label;
-  const _IconButton({required this.icon, required this.onTap, required this.label, this.filled = false, this.glyph = 18, this.tint});
+  final double glyph;
+  const _PlainIcon({required this.icon, required this.onTap, required this.label, this.glyph = 22});
   @override
-  State<_IconButton> createState() => _IconButtonState();
+  State<_PlainIcon> createState() => _PlainIconState();
 }
 
-class _IconButtonState extends State<_IconButton> {
+class _PlainIconState extends State<_PlainIcon> {
   bool _down = false;
 
   @override
   Widget build(BuildContext context) {
-    final still = _stillness(context);
     final enabled = widget.onTap != null;
-    final Widget glyph = widget.filled
-        ? Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: enabled ? QColors.textMuted : QDisabled.edge),
-            child: Icon(widget.icon, size: widget.glyph, color: enabled ? QColors.cardDeep : QDisabled.label),
-          )
-        : Icon(widget.icon, size: widget.glyph, color: enabled ? (widget.tint ?? QColors.textMuted) : QDisabled.label);
-
     return Semantics(
       container: true,
       button: true,
@@ -601,15 +589,64 @@ class _IconButtonState extends State<_IconButton> {
         child: SizedBox(
           width: QLayout.minTap,
           height: QLayout.minTap,
+          child: Center(child: qPressed(context, pressed: _down, child: Icon(widget.icon, size: widget.glyph, color: enabled ? QColors.ink : QDisabled.label))),
+        ),
+      ),
+    );
+  }
+}
+
+/// The composer's one filled button: a white circle, a black glyph.
+class _InkCircle extends StatefulWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final String label;
+  const _InkCircle({required this.icon, required this.onTap, required this.label});
+  @override
+  State<_InkCircle> createState() => _InkCircleState();
+}
+
+class _InkCircleState extends State<_InkCircle> {
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onTap != null;
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: enabled,
+      label: widget.label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: enabled ? (_) => setState(() => _down = true) : null,
+        onTapUp: enabled ? (_) => setState(() => _down = false) : null,
+        onTapCancel: enabled ? () => setState(() => _down = false) : null,
+        onTap: enabled
+            ? () {
+                HapticFeedback.lightImpact();
+                widget.onTap!();
+              }
+            : null,
+        child: SizedBox(
+          width: QLayout.minTap,
+          height: QLayout.minTap,
           child: Center(
-            child: still
-                ? Opacity(opacity: _down ? 0.6 : 1, child: glyph)
-                : AnimatedScale(
-                    scale: _down ? 0.9 : 1,
-                    duration: _press,
-                    curve: Curves.easeOut,
-                    child: glyph,
-                  ),
+            child: qPressed(
+              context,
+              pressed: _down,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 160),
+                transitionBuilder: (child, a) => ScaleTransition(scale: Tween(begin: 0.8, end: 1.0).animate(a), child: FadeTransition(opacity: a, child: child)),
+                child: Container(
+                  key: ValueKey(widget.icon),
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: enabled ? QColors.ink : QDisabled.fill),
+                  child: Icon(widget.icon, size: 18, color: enabled ? QColors.onInk : QDisabled.label),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -617,9 +654,35 @@ class _IconButtonState extends State<_IconButton> {
   }
 }
 
-/// One chip for the conversation: the suggestions under the field, a
-/// turn's action, and a problem's ways on (O10). Drawn about 34 points tall,
-/// it takes a whole touch ([QLayout.minTap]) (O11).
+/// A floating glass circle with a glyph: the header's way out.
+class _GlassIcon extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final String label;
+  const _GlassIcon({required this.icon, required this.onTap, required this.label});
+
+  @override
+  Widget build(BuildContext context) => QTapArea(
+        onTap: onTap,
+        label: label,
+        builder: (context, pressed) => qPressed(
+          context,
+          pressed: pressed,
+          child: QGlass(
+            shape: QGlassShape.circle,
+            pressed: pressed,
+            width: 40,
+            height: 40,
+            child: Center(child: Icon(icon, size: 18, color: QColors.ink)),
+          ),
+        ),
+      );
+}
+
+/// One chip for the conversation: the suggestions over the field, a turn's
+/// action, and a problem's ways on (O10). A capsule drawn about 36 points
+/// tall that takes a whole touch ([QLayout.minTap]) (O11). The emphasised
+/// one is inverted: white, black words.
 class _Chip extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
@@ -635,15 +698,18 @@ class _Chip extends StatelessWidget {
       builder: (context, pressed) => Center(
         widthFactor: 1,
         heightFactor: 1,
-        child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: pressed ? QColors.cardMid : (emphasis ? QColors.violetSoft.withValues(alpha: 0.1) : _raised),
-          border: Border.all(color: emphasis ? QColors.violetSoft.withValues(alpha: 0.4) : QColors.borderSoft),
-          borderRadius: BorderRadius.circular(QRadii.pill),
+        child: qPressed(
+          context,
+          pressed: pressed,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            decoration: QDecor.capsule(
+              edge: emphasis ? QColors.ink : QColors.hairline,
+              fill: emphasis ? QColors.ink : (pressed ? QColors.surfaceRaised : QColors.surface),
+            ),
+            child: Text(label, style: QText.body(size: 15, weight: FontWeight.w500, color: emphasis ? QColors.onInk : QColors.ink)),
+          ),
         ),
-        child: Text(label, style: QText.body(size: 13, weight: emphasis ? FontWeight.w500 : FontWeight.w400, color: emphasis ? QColors.textHigh : QColors.textMid)),
-      ),
       ),
     );
   }
@@ -662,23 +728,16 @@ class _Attachment extends StatelessWidget {
     return Align(
       alignment: AlignmentDirectional.centerStart,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsetsDirectional.fromSTEB(4, 4, 10, 4),
-        decoration: BoxDecoration(
-          color: _raised,
-          border: Border.all(color: QColors.borderSoft),
-          borderRadius: BorderRadius.circular(QRadii.control),
-        ),
+        margin: const EdgeInsets.only(bottom: 8, left: 4, right: 4),
+        padding: const EdgeInsetsDirectional.fromSTEB(4, 4, 6, 4),
+        decoration: QDecor.card(color: QColors.surfaceRaised, radius: QRadii.control),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ClipRRect(borderRadius: BorderRadius.circular(QRadii.inset), child: _photoThumb(path, 36)),
+            ClipRRect(borderRadius: BorderRadius.circular(QRadii.inset), child: _photoThumb(path, 40)),
             const SizedBox(width: 10),
-            Text(label, style: QText.body(size: 12, color: QColors.textMuted)),
-            if (onRemove != null) ...[
-              const SizedBox(width: 2),
-              _IconButton(icon: Icons.close_rounded, onTap: onRemove!, glyph: 15, label: context.read<AppState>().isAr ? 'شيل الصورة' : 'Remove the photo'),
-            ],
+            Text(label, style: QText.body(size: 13, color: QColors.inkSecondary)),
+            if (onRemove != null) _PlainIcon(icon: QIcons.close, onTap: onRemove!, glyph: 15, label: context.read<AppState>().isAr ? 'شيل الصورة' : 'Remove the photo'),
           ],
         ),
       ),
@@ -717,8 +776,7 @@ Future<void> _chooseMenuPhoto(AppState state) async {
 }
 
 /// A problem's buttons under Qamar's line: the next step, and another way
-/// on when there is one. The chat's chip look, with a touch area of the full
-/// 48 points.
+/// on when there is one.
 class _ProblemActions extends StatelessWidget {
   final Problem problem;
   const _ProblemActions({required this.problem});
@@ -736,7 +794,6 @@ class _ProblemActions extends StatelessWidget {
   }
 }
 
-
 Widget _photoThumb(String path, double size) {
   return Image.file(
     File(path),
@@ -747,8 +804,8 @@ Widget _photoThumb(String path, double size) {
       width: size,
       height: size,
       child: const DecoratedBox(
-        decoration: BoxDecoration(color: QColors.cardMid),
-        child: Icon(Icons.photo_camera_outlined, size: 16, color: QColors.textMuted),
+        decoration: BoxDecoration(color: QColors.surfaceRaised),
+        child: Icon(QIcons.photo, size: 16, color: QColors.inkTertiary),
       ),
     ),
   );
@@ -776,25 +833,21 @@ class _ProposalCard extends StatelessWidget {
 
     return _Appear(
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-        decoration: BoxDecoration(
-          color: _raised,
-          border: Border.all(color: QColors.borderStrong),
-          borderRadius: BorderRadius.circular(QRadii.card),
-        ),
+        margin: const EdgeInsets.only(bottom: 20),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+        decoration: QDecor.card(border: QColors.hairlineStrong),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(t.nothingWrites, style: QText.body(size: 12, color: QColors.textMuted)),
-            const SizedBox(height: 10),
+            Text(t.nothingWrites, style: QText.body(size: 13, color: QColors.inkTertiary)),
+            const SizedBox(height: 12),
             for (var i = 0; i < items.length; i++) ...[
               Opacity(
                 // A dropped item stays visible: the reading is still what the
                 // assistant saw, it just is not going in the log.
                 opacity: items[i].q == 0 ? 0.4 : 1,
                 child: Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -805,10 +858,8 @@ class _ProposalCard extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(isAr ? items[i].def.ar : items[i].def.en,
-                                    style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textPrimary)),
-                                Text(isAr ? items[i].def.portionAr : items[i].def.portionEn,
-                                    style: QText.body(size: 12, color: QColors.textMuted)),
+                                Text(isAr ? items[i].def.ar : items[i].def.en, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
+                                Text(isAr ? items[i].def.portionAr : items[i].def.portionEn, style: QText.body(size: 13, color: QColors.inkTertiary)),
                               ],
                             ),
                           ),
@@ -818,12 +869,12 @@ class _ProposalCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          QRoundIconButton(icon: Icons.remove, onTap: () => state.decQty(i), size: 28, label: isAr ? 'أقل' : 'Fewer'),
-                          SizedBox(width: 40, child: Text(isAr ? state.iso('${items[i].q}×') : '${items[i].q}×', textAlign: TextAlign.center, style: QText.number(size: 14, weight: FontWeight.w600, color: QColors.textMid))),
-                          QRoundIconButton(icon: Icons.add, onTap: () => state.incQty(i), size: 28, label: isAr ? 'أكتر' : 'More'),
+                          QRoundIconButton(icon: QIcons.remove, onTap: () => state.decQty(i), size: 32, label: isAr ? 'أقل' : 'Fewer'),
+                          SizedBox(width: 40, child: Text(isAr ? state.iso('${items[i].q}×') : '${items[i].q}×', textAlign: TextAlign.center, style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink))),
+                          QRoundIconButton(icon: QIcons.add, onTap: () => state.incQty(i), size: 32, label: isAr ? 'أكتر' : 'More'),
                           const Spacer(),
                           Text(isAr ? '${state.iso('${items[i].def.kcal * items[i].q}')} سعر' : '${items[i].def.kcal * items[i].q} kcal',
-                              style: QText.number(size: 14, weight: FontWeight.w600, color: QColors.cyan)),
+                              style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink)),
                         ],
                       ),
                     ],
@@ -831,23 +882,25 @@ class _ProposalCard extends StatelessWidget {
                 ),
               ),
             ],
+            const Divider(height: 1, color: QColors.hairline),
+            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(t.approx, style: QText.number(size: 14, weight: FontWeight.w500, color: QColors.textMuted)),
+                Text(t.approx, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkTertiary)),
                 Flexible(
                   child: Text('${totals.kcal} kcal · P ${totals.p} · C ${totals.c} · F ${totals.f}',
-                      textAlign: TextAlign.end,
-                      style: QText.number(size: 14, weight: FontWeight.w600, color: QColors.textPrimary)),
+                      textAlign: TextAlign.end, style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink)),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            QPrimaryButton(label: t.confirmAndLog, onTap: state.confirmProposal, height: 48),
+            const SizedBox(height: 14),
+            QPrimaryButton(label: t.confirmAndLog, onTap: state.confirmProposal, height: 50),
             Center(
               child: TextButton(
                 onPressed: state.discardProposal,
-                child: Text(t.cancel, style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
+                style: TextButton.styleFrom(minimumSize: const Size(QLayout.minTap, QLayout.minTap), foregroundColor: QColors.inkSecondary),
+                child: Text(t.cancel, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkSecondary)),
               ),
             ),
           ],

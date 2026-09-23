@@ -39,7 +39,7 @@ class WelcomeDishes extends StatefulWidget {
   static Future<void> show(BuildContext context, AppState state) => showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
-        backgroundColor: QColors.cardDeep,
+        backgroundColor: QColors.surface,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet))),
         builder: (_) => WelcomeDishes(state: state),
       );
@@ -90,7 +90,7 @@ class _WelcomeDishesState extends State<WelcomeDishes> {
                       Expanded(
                         child: Text(
                           WelcomeDishes.intro(isAr),
-                          style: QText.body(size: 15, height: 22, color: QColors.textHigh),
+                          style: QText.body(size: 15, height: 22, color: QColors.ink),
                         ),
                       ),
                     ],
@@ -108,7 +108,7 @@ class _WelcomeDishesState extends State<WelcomeDishes> {
                     const SizedBox(height: 14),
                     DishCard(dish: chosen, facts: facts, isAr: isAr, iso: state.iso),
                     const SizedBox(height: 10),
-                    Text(dishSentence(facts, ar: isAr, iso: state.iso), style: QText.body(size: 14, height: 21, color: QColors.textMid)),
+                    Text(dishSentence(facts, ar: isAr, iso: state.iso), style: QText.body(size: 15, height: 21, color: QColors.inkSecondary)),
                   ],
                   const SizedBox(height: 16),
                   QPrimaryButton(

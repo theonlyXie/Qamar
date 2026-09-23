@@ -12,8 +12,10 @@ import '../models/water.dart';
 import '../models/activity.dart';
 import '../state/app_state.dart';
 import '../theme/colors.dart';
+import '../theme/icons.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
+import 'glass.dart';
 import 'living_orb.dart';
 
 /// The tree lives in a fixed 340x340 square; everything below is expressed in
@@ -76,11 +78,11 @@ Offset _onRing(double angle) => Offset(
 /// orb from anywhere else returns to it. Su is not a node either: holding the
 /// orb summons the conversation. The wallet lives under Me.
 const kTreeNodes = [
-  TreeNode('سجّل', 'Log', Icons.restaurant_menu, 0, QColors.moonlight, null, action: TreeAction.log),
-  TreeNode('الخطة', 'Plan', Icons.map_outlined, 72, QColors.moonlight, AppScreen.plan),
-  TreeNode('الماء', 'Water', Icons.water_drop_outlined, 144, QColors.moonlight, null, action: TreeAction.water),
-  TreeNode('المراجعة', 'Review', Icons.trending_up, 216, QColors.moonlight, AppScreen.progress),
-  TreeNode('أنا', 'Me', Icons.person_outline, 288, QColors.moonlight, AppScreen.you),
+  TreeNode('سجّل', 'Log', QIcons.log, 0, QColors.ink, null, action: TreeAction.log),
+  TreeNode('الخطة', 'Plan', QIcons.plan, 72, QColors.ink, AppScreen.plan),
+  TreeNode('الماء', 'Water', QIcons.water, 144, QColors.ink, null, action: TreeAction.water),
+  TreeNode('المراجعة', 'Review', QIcons.review, 216, QColors.ink, AppScreen.progress),
+  TreeNode('أنا', 'Me', QIcons.me, 288, QColors.ink, AppScreen.you),
 ];
 
 /// "Modes (Ramadan) appear as a seventh node only when active" — the sixth
@@ -90,7 +92,7 @@ List<TreeNode> treeNodesFor({required bool ramadan}) {
   if (!ramadan) return kTreeNodes;
   final all = [
     ...kTreeNodes,
-    const TreeNode('رمضان', 'Ramadan', Icons.nightlight_round, 300, QColors.gold, AppScreen.ramadan),
+    const TreeNode('رمضان', 'Ramadan', QIcons.moon, 300, QColors.ink, AppScreen.ramadan),
   ];
   return [
     for (var i = 0; i < all.length; i++)
@@ -108,11 +110,11 @@ class LogMethod {
 }
 
 const kLogMethods = [
-  LogMethod('اتكلم', 'Speak', Icons.mic_none, QuickLog.voice),
-  LogMethod('اكتب', 'Type', Icons.keyboard_outlined, QuickLog.text),
-  LogMethod('صوّر', 'Photo', Icons.photo_camera_outlined, QuickLog.photo),
-  LogMethod('كرّر', 'Repeat', Icons.replay, QuickLog.repeat),
-  LogMethod('حركة', 'Activity', Icons.directions_run, QuickLog.activity),
+  LogMethod('اتكلم', 'Speak', QIcons.mic, QuickLog.voice),
+  LogMethod('اكتب', 'Type', QIcons.keyboard, QuickLog.text),
+  LogMethod('صوّر', 'Photo', QIcons.camera, QuickLog.photo),
+  LogMethod('كرّر', 'Repeat', QIcons.repeat, QuickLog.repeat),
+  LogMethod('حركة', 'Activity', QIcons.run, QuickLog.activity),
 ];
 
 /// The kinds of movement people actually name, fanned out once Activity is
@@ -126,11 +128,11 @@ class ActivityChoice {
 }
 
 const kActivityChoices = [
-  ActivityChoice('كورة', 'Football', Icons.sports_soccer, ActivityKind.football),
-  ActivityChoice('مشي', 'Walk', Icons.directions_walk, ActivityKind.walk),
-  ActivityChoice('جيم', 'Gym', Icons.fitness_center, ActivityKind.gym),
-  ActivityChoice('جري', 'Run', Icons.directions_run, ActivityKind.run),
-  ActivityChoice('غيره', 'Other', Icons.accessibility_new, ActivityKind.other),
+  ActivityChoice('كورة', 'Football', QIcons.football, ActivityKind.football),
+  ActivityChoice('مشي', 'Walk', QIcons.walk, ActivityKind.walk),
+  ActivityChoice('جيم', 'Gym', QIcons.gym, ActivityKind.gym),
+  ActivityChoice('جري', 'Run', QIcons.run, ActivityKind.run),
+  ActivityChoice('غيره', 'Other', QIcons.other, ActivityKind.other),
 ];
 
 /// The three things people drink, fanned around the ring once Water is chosen.
@@ -144,9 +146,9 @@ class WaterChoice {
 }
 
 const kWaterChoices = [
-  WaterChoice('كوباية', 'Glass', Icons.local_drink_outlined, WaterUnit.glass),
-  WaterChoice('زجاجة', 'Bottle', Icons.water_drop, WaterUnit.bottle),
-  WaterChoice('شاي', 'Tea', Icons.emoji_food_beverage_outlined, WaterUnit.tea),
+  WaterChoice('كوباية', 'Glass', QIcons.glass, WaterUnit.glass),
+  WaterChoice('زجاجة', 'Bottle', QIcons.bottle, WaterUnit.bottle),
+  WaterChoice('شاي', 'Tea', QIcons.tea, WaterUnit.tea),
 ];
 
 /// Where fanned-out choices sit. They take over the whole ring rather than
@@ -219,9 +221,9 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
           onTap: state.closeTree,
           child: ClipRect(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
-                color: QColors.bgBottom.withValues(alpha: 0.86),
+                color: QColors.canvas.withValues(alpha: 0.72),
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: QStateArea(child: GestureDetector(onTap: () {}, child: QStateCard(problem: problem))),
               ),
@@ -236,9 +238,9 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
         onTap: state.closeTree,
         child: ClipRect(
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              color: QColors.bgBottom.withValues(alpha: 0.86),
+              color: QColors.canvas.withValues(alpha: 0.72),
               alignment: Alignment.center,
               child: QSpringIn(
                 // The ring arrives on the settle spring, from a little smaller
@@ -271,7 +273,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                                 child: DecoratedBox(
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: RadialGradient(colors: [QColors.violet.withValues(alpha: 0.5), Colors.transparent], stops: const [0.0, 0.68]),
+                                    gradient: RadialGradient(colors: [QColors.ink.withValues(alpha: 0.18), Colors.transparent], stops: const [0.0, 0.68]),
                                   ),
                                 ),
                               ),
@@ -296,7 +298,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                                   t.ask,
                                   key: TreeOverlay.centreLabelKey,
                                   textAlign: TextAlign.center,
-                                  style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMid),
+                                  style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkSecondary),
                                 ),
                               ),
                             ),
@@ -321,7 +323,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                                   _RingButton(
                                     icon: kLogMethods[i].icon,
                                     label: kLogMethods[i].label(isAr),
-                                    color: QColors.moonlight,
+                                    color: QColors.ink,
                                     locked: kLogMethods[i].kind == QuickLog.photo && state.photoQuota.exhausted,
                                     onTap: () => _runMethod(context, state, kLogMethods[i].kind),
                                   ),
@@ -334,7 +336,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                                   _RingButton(
                                     icon: kActivityChoices[i].icon,
                                     label: kActivityChoices[i].label(isAr),
-                                    color: QColors.green,
+                                    color: QColors.ink,
                                     onTap: () => state.chooseActivity(kActivityChoices[i].kind),
                                   ),
                                 ),
@@ -344,9 +346,9 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                                   i,
                                   repeatChoices.length,
                                   _RingButton(
-                                    icon: Icons.restaurant,
+                                    icon: QIcons.repeat,
                                     label: _short(repeatChoices[i].name),
-                                    color: QColors.moonlight,
+                                    color: QColors.ink,
                                     onTap: () => state.repeatMeal(repeatChoices[i]),
                                   ),
                                 ),
@@ -358,7 +360,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                                   _RingButton(
                                     icon: kWaterChoices[i].icon,
                                     label: kWaterChoices[i].label(isAr),
-                                    color: QColors.cyan,
+                                    color: QColors.ink,
                                     onTap: () => state.quickWater(kWaterChoices[i].unit),
                                   ),
                                 ),
@@ -375,14 +377,14 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                         child: Text(
                           isAr ? 'المرة الجاية، دوس على القمر وهتلاقي ده.' : 'Next time, tap the moon to find this.',
                           textAlign: TextAlign.center,
-                          style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMid),
+                          style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkSecondary),
                         ),
                       ),
                       const SizedBox(height: 8),
                     ],
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 30),
-                      child: Text(hint, textAlign: TextAlign.center, style: QText.body(size: 12, color: QColors.textMuted)),
+                      child: Text(hint, textAlign: TextAlign.center, style: QText.body(size: 12, color: QColors.inkTertiary)),
                     ),
                   ],
                 ),
@@ -548,22 +550,17 @@ class _RingButtonState extends State<_RingButton> with SingleTickerProviderState
                   AnimatedScale(
                     scale: _down && !MediaQuery.disableAnimationsOf(context) ? 0.94 : 1,
                     duration: const Duration(milliseconds: 90),
-                    child: Container(
+                    child: QGlass(
+                      shape: QGlassShape.circle,
+                      pressed: _down,
                       width: _nodeSize,
                       height: _nodeSize,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _down ? QColors.glassHigh : QColors.glass,
-                        border: Border.all(color: color.withValues(alpha: 0.55)),
-                        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.22), blurRadius: 22)],
-                      ),
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          Icon(widget.icon, size: 23, color: color),
+                          Icon(widget.icon, size: 24, color: color),
                           if (widget.locked)
-                            const Positioned(right: 8, bottom: 8, child: Icon(Icons.lock, size: 11, color: QColors.gold)),
+                            const Positioned(right: 9, bottom: 9, child: Icon(QIcons.locked, size: 12, color: QColors.ink)),
                         ],
                       ),
                     ),
@@ -575,7 +572,7 @@ class _RingButtonState extends State<_RingButton> with SingleTickerProviderState
                     softWrap: false,
                     overflow: TextOverflow.visible,
                     textAlign: TextAlign.center,
-                    style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMid),
+                    style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkSecondary),
                   ),
                 ],
               ),
@@ -593,74 +590,36 @@ class _RingButtonState extends State<_RingButton> with SingleTickerProviderState
   }
 }
 
-/// Branches drawn as light thrown off the moon rather than dotted lines.
-/// The mangata: the moon's road, thrown out to each destination as one cool
-/// white light rather than five competing colours.
+/// Branches drawn as a line of dots from the moon to each destination —
+/// Nothing's dot, in white — with one brighter dot travelling out along it,
+/// so the ring reads as thrown off the moon rather than laid round it.
 class _BeamPainter extends CustomPainter {
   final double t;
 
-  /// Which ring positions to light. When a node is fanned out only its three
-  /// choices exist, so only those get a beam.
+  /// Which ring positions to light. When a node is fanned out only its
+  /// choices exist, so only those get a line.
   final List<double> angles;
   _BeamPainter(this.t, this.angles);
 
-  static const double _innerGap = 44;
-  static const double _startHalfWidth = 2.5;
-  static const double _endHalfWidth = 21;
+  static const double _innerGap = 46;
+  static const double _pitch = 8;
 
   @override
   void paint(Canvas canvas, Size size) {
     for (var i = 0; i < angles.length; i++) {
       final target = _onRing(angles[i]);
       final dir = (target - _center) / (target - _center).distance;
-      final perp = Offset(-dir.dy, dir.dx);
       final start = _center + dir * _innerGap;
-      final end = _center + dir * ((target - _center).distance - _nodeSize / 2 - 2);
-
-      final wedge = Path()
-        ..moveTo((start + perp * _startHalfWidth).dx, (start + perp * _startHalfWidth).dy)
-        ..lineTo((end + perp * _endHalfWidth).dx, (end + perp * _endHalfWidth).dy)
-        ..lineTo((end - perp * _endHalfWidth).dx, (end - perp * _endHalfWidth).dy)
-        ..lineTo((start - perp * _startHalfWidth).dx, (start - perp * _startHalfWidth).dy)
-        ..close();
-
-      canvas.drawPath(
-        wedge,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              QColors.moonlight.withValues(alpha: 0.34),
-              QColors.moonbeam.withValues(alpha: 0.14),
-              QColors.moonbeam.withValues(alpha: 0.02),
-            ],
-            stops: const [0.0, 0.55, 1.0],
-          ).createShader(Rect.fromPoints(start, end))
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
-      );
-
-      canvas.drawLine(
-        start,
-        end,
-        Paint()
-          ..strokeWidth = 1.8
-          ..strokeCap = StrokeCap.round
-          ..shader = LinearGradient(
-            colors: [QColors.moonlight.withValues(alpha: 0.70), QColors.moonbeam.withValues(alpha: 0.05)],
-          ).createShader(Rect.fromPoints(start, end))
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.6),
-      );
-
+      final end = _center + dir * ((target - _center).distance - _nodeSize / 2 - 6);
+      final length = (end - start).distance;
+      final n = (length / _pitch).floor();
+      for (var k = 0; k <= n; k++) {
+        final f = n == 0 ? 0.0 : k / n;
+        canvas.drawCircle(start + dir * (k * _pitch), 1.3, Paint()..color = QColors.ink.withValues(alpha: 0.5 - 0.38 * f));
+      }
       final travel = (t + i * 0.14) % 1.0;
       final head = Offset.lerp(start, end, Curves.easeInOut.transform(travel))!;
-      canvas.drawCircle(
-        head,
-        3.4 * (1 - travel * 0.55),
-        Paint()
-          ..color = QColors.moonlight.withValues(alpha: 0.55 * (1 - travel))
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-      );
+      canvas.drawCircle(head, 2.4, Paint()..color = QColors.ink.withValues(alpha: 0.85 * (1 - travel)));
     }
   }
 

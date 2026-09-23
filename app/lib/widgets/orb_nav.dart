@@ -8,13 +8,13 @@ import 'package:provider/provider.dart';
 
 import '../models/su_economy.dart';
 import '../state/app_state.dart';
-import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/layout.dart';
 import '../theme/motion.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
 import 'explain.dart';
+import 'glass.dart';
 import 'hold_coach_mark.dart';
 import 'living_orb.dart';
 
@@ -381,7 +381,7 @@ class OrbBandFade extends StatelessWidget {
             // From clear, where the page's last line comes to rest, to near
             // solid across the band itself, so the orb always sits on a calm
             // ground and what scrolls under it reads as behind.
-            colors: [for (final a in const [0.0, 0.72, 0.92, 0.97]) QColors.bgBottom.withValues(alpha: a)],
+            colors: [for (final a in const [0.0, 0.72, 0.92, 0.97]) QColors.canvas.withValues(alpha: a)],
             stops: const [0.0, 0.3, 0.55, 1.0],
           ),
         ),
@@ -465,19 +465,14 @@ class _SuReceiptChipState extends State<SuReceiptChip> with SingleTickerProvider
           final m = SuReceiptChip.motionAt(v, still: still);
           return Transform.translate(offset: Offset(0, m.rise), child: Opacity(opacity: m.opacity, child: child));
         },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: QColors.glass,
-            border: Border.all(color: QColors.gold.withValues(alpha: 0.4)),
-            borderRadius: BorderRadius.circular(QRadii.pill),
-          ),
+        child: QGlass(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             const SuCoinIcon(size: 14),
             const SizedBox(width: 5),
             Text(
               state.isAr ? state.iso('+${state.formatSu(amount)}') : '+${state.formatSu(amount)}',
-              style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.gold),
+              style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.ink),
             ),
           ]),
         ),

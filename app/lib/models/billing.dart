@@ -241,18 +241,27 @@ class PlusEntitlement {
   static const free = PlusEntitlement(status: 'free');
 
   /// Qamar+ right now is the free week, not a payment.
-  bool get isTrial => provider == 'trial' && active;
+  bool get isTrial => trialAt(DateTime.now());
 
   /// Qamar+ right now is the earned month — the logged days the server asks
   /// for in the first 30 — running on its own after the paid month lapsed.
-  bool get isEarned => provider == 'earned' && active;
+  bool get isEarned => earnedAt(DateTime.now());
 
-  bool get active {
+  bool get active => activeAt(DateTime.now());
+
+  /// Whether Qamar+ runs at [now]. The app asks with its own clock
+  /// (AppState.clockNow), so what it reads is the same whatever the wall
+  /// clock says — where a test's free week "ended" the day its date passed.
+  bool activeAt(DateTime now) {
     if (status != 'active') return false;
     final end = periodEnd;
     if (end == null) return true;
-    return !end.isBefore(DateTime.now().toUtc());
+    return !end.isBefore(now.toUtc());
   }
+
+  /// [isTrial] and [isEarned], at [now].
+  bool trialAt(DateTime now) => provider == 'trial' && activeAt(now);
+  bool earnedAt(DateTime now) => provider == 'earned' && activeAt(now);
 
   factory PlusEntitlement.fromJson(Map<String, dynamic> json) {
     final endRaw = json['period_end'] ?? json['periodEnd'];

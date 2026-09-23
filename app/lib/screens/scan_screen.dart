@@ -61,7 +61,7 @@ class _ScanScreenState extends State<ScanScreen> {
     final photo = state.scanPhotoPath;
 
     return Container(
-      color: QColors.bgScan,
+      color: QColors.canvas,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -75,7 +75,7 @@ class _ScanScreenState extends State<ScanScreen> {
                   child: Text(t.scanTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+                      style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.ink)),
                 ),
                 QLangToggle(lang: state.lang, onChanged: state.setLang),
               ],
@@ -88,7 +88,7 @@ class _ScanScreenState extends State<ScanScreen> {
                 alignment: Alignment.center,
                 children: [
                   Container(
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(QRadii.card), color: QColors.cardDeep),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(QRadii.card), color: QColors.surface),
                   ),
                   // Once a shot is taken, show it in the frame so the user can
                   // see what Qamar is reading.
@@ -108,7 +108,7 @@ class _ScanScreenState extends State<ScanScreen> {
                         child: DecoratedBox(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(QRadii.control),
-                            border: Border.all(color: QColors.violet.withValues(alpha: 0.55), width: 2),
+                            border: Border.all(color: QColors.ink.withValues(alpha: 0.55), width: 2),
                           ),
                         ),
                       ),
@@ -120,14 +120,14 @@ class _ScanScreenState extends State<ScanScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(_busy ? Icons.hourglass_empty : Icons.photo_camera_outlined,
-                              size: 34, color: QColors.textMuted),
+                              size: 34, color: QColors.inkTertiary),
                           const SizedBox(height: 10),
                           // Before the camera opens, what a scan gives: the
                           // welcome's button names the scan and no more.
                           Text(
                             _busy ? (isAr ? 'بفتح الكاميرا…' : 'Opening the camera…') : t.scanInbodySub,
                             textAlign: TextAlign.center,
-                            style: QText.body(size: 13, height: 20, color: QColors.textMuted),
+                            style: QText.body(size: 13, height: 20, color: QColors.inkTertiary),
                           ),
                         ],
                       ),
@@ -152,7 +152,7 @@ class _ScanScreenState extends State<ScanScreen> {
                           children: [
                             const _PulseDots(),
                             const SizedBox(height: 14),
-                            Text(t.reading, style: QText.body(size: 14, color: QColors.textMid)),
+                            Text(t.reading, style: QText.body(size: 15, color: QColors.inkSecondary)),
                           ],
                         ),
                       ),
@@ -165,7 +165,7 @@ class _ScanScreenState extends State<ScanScreen> {
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
             child: Column(
               children: [
-                Text(t.scanHint, style: QText.body(size: 13, color: QColors.textMuted)),
+                Text(t.scanHint, style: QText.body(size: 13, color: QColors.inkTertiary)),
                 const SizedBox(height: 14),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -187,14 +187,14 @@ class _ScanScreenState extends State<ScanScreen> {
                         height: 72,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: QColors.brandGradient,
+                          color: QColors.ink,
                           // One ring, concentric with the fill. The offset glow
                           // it used to cast read as a second circle, off centre.
-                          border: Border.all(color: QColors.borderStrong, width: 3),
+                          border: Border.all(color: QColors.hairlineStrong, width: 3),
                         ),
                         child: Icon(
                           _busy ? Icons.more_horiz : Icons.photo_camera,
-                          color: QColors.onAccent.withValues(alpha: 0.92),
+                          color: QColors.onInk.withValues(alpha: 0.92),
                           size: 26,
                         ),
                       ),
@@ -211,7 +211,7 @@ class _ScanScreenState extends State<ScanScreen> {
                 // Typing instead is the keyboard beside the shutter; the line
                 // that repeated it under the row is gone.
                 const SizedBox(height: 18),
-                Text(t.scanPriv, textAlign: TextAlign.center, style: QText.body(size: 11, height: 16, color: QColors.textMuted)),
+                Text(t.scanPriv, textAlign: TextAlign.center, style: QText.body(size: 11, height: 16, color: QColors.inkTertiary)),
               ],
             ),
           ),
@@ -241,10 +241,10 @@ class _CircleAction extends StatelessWidget {
             height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: QColors.cardDeep,
-              border: Border.all(color: QColors.borderSoft),
+              color: QColors.surface,
+              border: Border.all(color: QColors.hairline),
             ),
-            child: Icon(icon, size: 20, color: onTap == null ? QColors.textDisabled : QColors.textMid),
+            child: Icon(icon, size: 20, color: onTap == null ? QColors.inkDisabled : QColors.inkSecondary),
           ),
         ),
       ),
@@ -281,7 +281,7 @@ class _PulseDotsState extends State<_PulseDots> with SingleTickerProviderStateMi
               padding: const EdgeInsets.symmetric(horizontal: 2.5),
               child: Opacity(
                 opacity: opacity.clamp(0.3, 1.0),
-                child: Container(width: 6, height: 6, decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.violet)),
+                child: Container(width: 6, height: 6, decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.ink)),
               ),
             );
           }),

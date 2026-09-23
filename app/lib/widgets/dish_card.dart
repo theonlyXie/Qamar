@@ -64,8 +64,8 @@ class DishCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        border: Border.all(color: QColors.green.withValues(alpha: 0.4)),
+        gradient: const LinearGradient(colors: [QColors.surfaceRaised, QColors.surface], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        border: Border.all(color: QColors.ink.withValues(alpha: 0.4)),
         borderRadius: BorderRadius.circular(QRadii.card),
       ),
       child: Column(
@@ -73,20 +73,20 @@ class DishCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (slot != null) ...[
-            Text(slotLine(slot!, isAr), style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.green)),
+            Text(slotLine(slot!, isAr), style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.ink)),
             const SizedBox(height: 6),
           ],
-          Text(isAr ? dish.nameAr : dish.nameEn, style: QText.body(size: 17, height: 24, weight: FontWeight.w600, color: QColors.textPrimary)),
+          Text(isAr ? dish.nameAr : dish.nameEn, style: QText.body(size: 17, height: 24, weight: FontWeight.w600, color: QColors.ink)),
           const SizedBox(height: 2),
-          Text(dish.portions(isAr), style: QText.body(size: 12, height: 18, color: QColors.textMuted)),
+          Text(dish.portions(isAr), style: QText.body(size: 12, height: 18, color: QColors.inkTertiary)),
           const SizedBox(height: 10),
-          Text(costLine(), style: QText.body(size: 15, height: 22, weight: FontWeight.w600, color: QColors.textHigh)),
+          Text(costLine(), style: QText.body(size: 15, height: 22, weight: FontWeight.w600, color: QColors.ink)),
           const SizedBox(height: 2),
-          Text(macroLine(), style: QText.body(size: 12, height: 18, color: QColors.textMid)),
+          Text(macroLine(), style: QText.body(size: 12, height: 18, color: QColors.inkSecondary)),
           const SizedBox(height: 8),
           Text(
             isAr ? 'تقدير — بحصص البيت، والأرقام من قاعدة بيانات الأكل.' : 'An estimate — household portions, numbers from the food database.',
-            style: QText.body(size: 11, height: 16, color: QColors.amberSoft),
+            style: QText.body(size: 11, height: 16, color: QColors.inkSecondary),
           ),
         ],
       ),

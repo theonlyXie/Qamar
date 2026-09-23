@@ -21,10 +21,12 @@ class LivingOrb extends StatefulWidget {
   /// The day, on the orb. Null is the decorative orb (welcome, subscription):
   /// waxing crescent, steady halo, no ring. With a state the moon brightens
   /// from that resting crescent toward today's target, the halo brightens
-  /// with the day's meals and warms only when the day is past the target by
-  /// more than an estimate can tell apart ([OrbDay.over]), and the streak
-  /// ring closes one day at a time. An [OrbDay.unknown] day (nothing logged,
-  /// or no target) is the moon at rest, never a dark one.
+  /// with the day's meals, and the streak's seven dots light one day at a
+  /// time. A day past the target by more than an estimate can tell apart
+  /// ([OrbDay.over]) is said by a shape, not a colour: the soft halo gives
+  /// way to a thin closed ring drawn close round the moon ([overRingKey]).
+  /// An [OrbDay.unknown] day (nothing logged, or no target) is the moon at
+  /// rest, never a dark one.
   final OrbState? state;
 
   /// Qamar has something to say (a meal's question is waiting and the hold
@@ -76,6 +78,9 @@ class LivingOrb extends StatefulWidget {
   /// The halo, for tests.
   static const haloKey = ValueKey('orb-halo');
 
+  /// The ring that circles the moon on a day that ran over, for tests.
+  static const overRingKey = ValueKey('orb-over-ring');
+
   /// The halo's glow at rest: the decorative orb's (welcome, subscription),
   /// and the orb on any day it does not read.
   static const restGlow = 0.32;
@@ -110,9 +115,8 @@ class LivingOrb extends StatefulWidget {
 }
 
 class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
-  /// The halo: cool on an ordinary day, warm (never red) on one that ran over.
-  static final _coolHalo = [QColors.violet.withValues(alpha: 0.55), QColors.blue.withValues(alpha: 0.12), Colors.transparent];
-  static final _warmHalo = [QColors.ember.withValues(alpha: 0.55), QColors.emberDeep.withValues(alpha: 0.12), Colors.transparent];
+  /// The halo: moonlight, white fading to nothing.
+  static final _haloColors = [QColors.ink.withValues(alpha: 0.30), QColors.ink.withValues(alpha: 0.06), Colors.transparent];
 
   late final AnimationController _breath =
       AnimationController(vsync: this, duration: widget.breathDuration)..repeat(reverse: true);
@@ -163,8 +167,9 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
         final haloScale = 1.0 + (widget.speaking ? 0.38 : 0.22) * haloT;
         final day = widget.state;
         final glowBase = LivingOrb.glowBaseFor(day);
-        final haloOpacity = (glowBase + 0.40 * haloT + (widget.speaking ? 0.2 : 0.0)).clamp(0.0, 1.0);
-        final haloColors = day?.over == true ? _warmHalo : _coolHalo;
+        final over = day?.over == true;
+        // Over: the glow gives way to a ring, so the halo is quiet.
+        final haloOpacity = over ? 0.0 : (glowBase + 0.40 * haloT + (widget.speaking ? 0.2 : 0.0)).clamp(0.0, 1.0);
         final offset = widget.wander ? Offset(_wanderOffset.value.dx * s * widget.reach, _wanderOffset.value.dy * s * widget.reach) : Offset.zero;
 
         return Transform.translate(
@@ -196,13 +201,20 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
-                          colors: haloColors,
+                          colors: _haloColors,
                           stops: const [0.0, 0.45, 0.7],
                         ),
                       ),
                     ),
                   ),
                 ),
+                if (over)
+                  Container(
+                    key: LivingOrb.overRingKey,
+                    width: s * 1.18,
+                    height: s * 1.18,
+                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: QColors.ink.withValues(alpha: 0.8), width: 1.5)),
+                  ),
                 if (widget.activeRings) ..._buildActiveRings(s),
                 if (day != null && day.streak.current > 0)
                   CustomPaint(
@@ -217,7 +229,7 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
-                        BoxShadow(color: QColors.violet.withOpacity(0.55), blurRadius: s * 0.5),
+                        BoxShadow(color: QColors.ink.withValues(alpha: 0.16), blurRadius: s * 0.45),
                       ],
                     ),
                     child: QamarMoon(size: s, phase: day?.moonPhase),
@@ -240,7 +252,9 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
     return core;
   }
 
-  static const _sparkColors = [QColors.cyan, QColors.violetSoft, QColors.textPrimary];
+  /// The sparks: white, at three strengths, so the three are told apart by
+  /// brightness and size rather than by hue.
+  static final _sparkColors = [QColors.ink, QColors.ink.withValues(alpha: 0.7), QColors.ink.withValues(alpha: 0.45)];
 
   List<Widget> _buildSparks(double s, {required double moonRadius}) {
     return [
@@ -270,7 +284,7 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
               child: Container(
                 width: s,
                 height: s,
-                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: QColors.violet, width: 1)),
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: QColors.ink.withValues(alpha: 0.8), width: 1)),
               ),
             ),
           );
@@ -287,7 +301,7 @@ class _LivingOrbState extends State<LivingOrb> with TickerProviderStateMixin {
               child: Container(
                 width: s,
                 height: s,
-                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: QColors.cyan, width: 1)),
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: QColors.ink.withValues(alpha: 0.45), width: 1)),
               ),
             ),
           );
@@ -374,10 +388,12 @@ class BehindMoonClipper extends CustomClipper<Path> {
   bool shouldReclip(BehindMoonClipper old) => old.radius != radius;
 }
 
-/// The streak as a ring: one arc segment per day of the current week of the
-/// run, closing at seven and starting over. Violet while young, cyan from
-/// three, gold from a full week. A gap in the arc at the top is today, still
-/// open, when today has not been counted yet.
+/// The streak as seven dots round the moon, lit one day at a time — the
+/// way Nothing's Glyph lights say a state without a screen. A dot per day of
+/// the current week of the run, from the top, clockwise; at seven every dot
+/// is lit, and the week starts over. Today's dot, while today is still
+/// waiting for its meal, is half lit. Young, three days, a full week: the
+/// dots grow with the run instead of changing colour.
 class StreakRingPainter extends CustomPainter {
   final Streak streak;
   const StreakRingPainter({required this.streak});
@@ -391,42 +407,39 @@ class StreakRingPainter extends CustomPainter {
     return inTurn == 0 ? 1 : inTurn / daysPerTurn;
   }
 
-  static Color colorFor(int count) {
-    if (count >= daysPerTurn) return QColors.gold;
-    if (count >= 3) return QColors.cyan;
-    return QColors.violet;
+  /// The ink of the dots: white, whatever the count. What the count says,
+  /// [dotScale] draws.
+  static Color colorFor(int count) => QColors.ink;
+
+  /// How large a lit dot is drawn for a run of [count] days: a little larger
+  /// from three days, and again from a full week.
+  static double dotScale(int count) => count >= daysPerTurn ? 1.25 : (count >= 3 ? 1.1 : 1.0);
+
+  /// Where dot [i] of seven sits on a ring of radius [r] about [c]: from the
+  /// top, clockwise.
+  static Offset dotAt(int i, Offset c, double r) {
+    final a = -math.pi / 2 + i * 2 * math.pi / daysPerTurn;
+    return c + Offset(math.cos(a) * r, math.sin(a) * r);
   }
 
   @override
   void paint(Canvas canvas, Size size) {
     final r = size.width / 2;
     final c = Offset(r, r);
-    final stroke = math.max(1.5, size.width * 0.035);
-    final rect = Rect.fromCircle(center: c, radius: r - stroke);
-    final color = colorFor(streak.current);
-
-    final track = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..color = color.withValues(alpha: 0.14);
-    canvas.drawArc(rect, 0, math.pi * 2, false, track);
-
-    const gap = 0.12; // radians left open between segments
-    const segment = math.pi * 2 / daysPerTurn;
+    final dot = math.max(1.6, size.width * 0.032);
+    final ring = r - dot * 1.6;
     final lit = (fraction(streak.current) * daysPerTurn).round();
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round
-      ..color = color;
-    for (var i = 0; i < lit; i++) {
-      final start = -math.pi / 2 + i * segment + gap / 2;
-      canvas.drawArc(rect, start, segment - gap, false, paint);
-    }
-    if (streak.atRisk) {
-      // Today's segment, waiting for its meal.
-      final start = -math.pi / 2 + lit * segment + gap / 2;
-      canvas.drawArc(rect, start, segment - gap, false, paint..color = color.withValues(alpha: 0.35));
+    final scale = dotScale(streak.current);
+    for (var i = 0; i < daysPerTurn; i++) {
+      final at = dotAt(i, c, ring);
+      if (i < lit) {
+        canvas.drawCircle(at, dot * scale, Paint()..color = QColors.ink);
+      } else if (i == lit && streak.atRisk) {
+        // Today's dot, waiting for its meal.
+        canvas.drawCircle(at, dot, Paint()..color = QColors.ink.withValues(alpha: 0.5));
+      } else {
+        canvas.drawCircle(at, dot * 0.8, Paint()..color = QColors.dotOff);
+      }
     }
   }
 

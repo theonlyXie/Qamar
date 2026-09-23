@@ -20,7 +20,7 @@ class AvoidEditor extends StatefulWidget {
   static Future<void> show(BuildContext context, AppState state) => showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
-        backgroundColor: QColors.cardDeep,
+        backgroundColor: QColors.surface,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet))),
         builder: (_) => AvoidEditor(state: state),
       );
@@ -72,7 +72,7 @@ class _AvoidEditorState extends State<AvoidEditor> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(step.ask(isAr), style: QText.body(size: 15, height: 22, color: QColors.textHigh)),
+                  Text(step.ask(isAr), style: QText.body(size: 15, height: 22, color: QColors.ink)),
                   const SizedBox(height: 14),
                   Wrap(
                     spacing: 8,
@@ -89,7 +89,7 @@ class _AvoidEditorState extends State<AvoidEditor> {
                   ),
                   if (_failed && !state.avoidBusy && state.avoidNotice != null) ...[
                     const SizedBox(height: 12),
-                    Text(state.avoidNotice!, style: QText.body(size: 13, height: 20, color: QColors.amberSoft)),
+                    Text(state.avoidNotice!, style: QText.body(size: 13, height: 20, color: QColors.inkSecondary)),
                   ],
                   const SizedBox(height: 16),
                   QPrimaryButton(

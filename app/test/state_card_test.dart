@@ -58,12 +58,11 @@ void main() {
   });
 
   group('the card', () {
-    test('each kind has its own glyph, and a daily limit is not drawn as a failure', () {
+    test('each kind has its own glyph, one ink for all of them, and a daily limit is not drawn as a failure', () {
       final looks = {for (final k in ProblemKind.values) k: QStateCard.look(k)};
       expect(looks.values.map((l) => l.icon).toSet().length, ProblemKind.values.length, reason: 'five kinds, five glyphs');
-      expect(looks[ProblemKind.limit]!.tint, isNot(looks[ProblemKind.error]!.tint));
-      expect(looks[ProblemKind.limit]!.icon, isNot(looks[ProblemKind.error]!.icon));
-      expect(looks[ProblemKind.error]!.tint, QColors.red);
+      expect(looks.values.map((l) => l.tint).toSet(), {QColors.ink}, reason: 'the glyph says which, never a colour');
+      expect(looks[ProblemKind.limit]!.icon, isNot(looks[ProblemKind.error]!.icon), reason: 'a limit is an hourglass, not a warning');
     });
 
     for (final kind in ProblemKind.values) {

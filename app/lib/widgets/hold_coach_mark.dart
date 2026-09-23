@@ -11,9 +11,10 @@ abstract final class HoldCopy {
   static const doAr = 'استمر ضاغط عليه';
   static const doEn = 'Hold it';
 
-  /// "تتكلم مع قمر" is held together by no-break spaces, so where the line
-  /// wraps (in the mark's two lines) it is never split from its verb.
-  static const whatAr = 'تتكلم\u00A0مع\u00A0قمر — بصوتك';
+  /// "تتكلم مع قمر بصوتك" is held together by no-break spaces, so where the
+  /// line wraps (in the mark's two lines) it is never split from its verb,
+  /// and "بصوتك" never ends a line alone.
+  static const whatAr = 'تتكلم\u00A0مع\u00A0قمر\u00A0بصوتك';
   static const whatEn = 'talk to Qamar — with your voice';
 
   static String line(bool isAr) => isAr ? '$doAr — $whatAr' : '$doEn — $whatEn';
@@ -32,8 +33,8 @@ class HoldCoachMark extends StatelessWidget {
   const HoldCoachMark({super.key, required this.state});
 
   static const double width = 230;
-  static const _fill = QColors.glass;
-  static final _edge = QColors.violet.withValues(alpha: 0.55);
+  static const _fill = QColors.surfaceRaised;
+  static final _edge = QColors.ink.withValues(alpha: 0.55);
 
   /// The small point between the mark and the moon, its tip toward the moon:
   /// [up] when the mark sits below the orb.
@@ -66,13 +67,13 @@ class HoldCoachMark extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.mic_none, size: 16, color: QColors.violetSoft),
+                const Icon(Icons.mic_none, size: 16, color: QColors.inkSecondary),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(HoldCopy.line(isAr), style: QText.body(size: 13, height: 18, color: QColors.textHigh)),
+                  child: Text(HoldCopy.line(isAr), style: QText.body(size: 13, height: 18, color: QColors.ink)),
                 ),
                 const SizedBox(width: 6),
-                const Icon(Icons.close, size: 14, color: QColors.textMuted),
+                const Icon(Icons.close, size: 14, color: QColors.inkTertiary),
               ],
             ),
           ),

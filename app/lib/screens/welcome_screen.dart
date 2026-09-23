@@ -50,7 +50,7 @@ class WelcomeScreen extends StatelessWidget {
     final state = context.watch<AppState>();
     final t = state.t;
     final isAr = state.isAr;
-    final link = QText.body(size: 14, weight: FontWeight.w500, color: QColors.violetSoft);
+    final link = QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkSecondary);
 
     // One page, top to bottom: the language, the two ways in around the
     // moon, the name and its promise, the guest line, the way back in, the
@@ -96,7 +96,7 @@ class WelcomeScreen extends StatelessWidget {
                                   key: WelcomeScreen.chatPillKey,
                                   label: t.chatDirect,
                                   sub: t.chatDirectSub,
-                                  dot: QColors.violet,
+                                  dot: QColors.ink,
                                   // Something real before the first question (O5):
                                   // a dish first. A consultation left part-way
                                   // carries on.
@@ -131,14 +131,14 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                   // One axis from here down: the name, the promise, the ways
                   // back in and the fine print all hang from the centre line.
-                  Text(t.brand, textAlign: TextAlign.center, style: QText.display(size: 40, ar: QText.arabic(t.brand), color: QColors.textPrimary)),
+                  Text(t.brand, textAlign: TextAlign.center, style: QText.display(size: 34, ar: QText.arabic(t.brand), color: QColors.ink)),
                   const SizedBox(height: 8),
-                  QBalancedText(t.promise, style: QText.body(size: 17, height: 25, color: QColors.textMid)),
+                  QBalancedText(t.promise, style: QText.body(size: 17, height: 25, color: QColors.inkSecondary)),
                   const SizedBox(height: 16),
                   // Where "or sign up with" and three providers stood: the
                   // conversation needs no account, and saving is offered once
                   // there is something to save.
-                  QBalancedText(t.guestNote, textKey: WelcomeScreen.guestNoteKey, style: QText.body(size: 13, height: 19, color: QColors.textMuted)),
+                  QBalancedText(t.guestNote, textKey: WelcomeScreen.guestNoteKey, style: QText.body(size: 13, height: 19, color: QColors.inkTertiary)),
                   const SizedBox(height: 4),
                   // The one way back in. The sheet it opens carries all four
                   // ways: Google, Apple, Facebook and email.
@@ -160,10 +160,10 @@ class WelcomeScreen extends StatelessWidget {
                     QBalancedText(state.invitationNotice!,
                         textKey: WelcomeScreen.noticeKey,
                         maxWidth: 320,
-                        style: QText.body(size: 12, height: 18, color: state.invitationNoticeGood ? QColors.cyan : QColors.amberSoft)),
+                        style: QText.body(size: 12, height: 18, color: state.invitationNoticeGood ? QColors.ink : QColors.inkSecondary)),
                     const SizedBox(height: 12),
                   ],
-                  QBalancedText(t.boundary, textKey: WelcomeScreen.boundaryKey, maxWidth: 320, style: QText.body(size: 11, height: 17, color: QColors.textMuted)),
+                  QBalancedText(t.boundary, textKey: WelcomeScreen.boundaryKey, maxWidth: 320, style: QText.body(size: 11, height: 17, color: QColors.inkTertiary)),
                 ],
               ),
             ),
@@ -217,20 +217,20 @@ Future<void> _askInvitationCode(BuildContext context, AppState state) async {
   final code = await showDialog<String>(
     context: context,
     builder: (ctx) => AlertDialog(
-      backgroundColor: QColors.cardDeep,
-      title: Text(isAr ? 'كود الدعوة' : 'Invitation code', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.textHigh)),
+      backgroundColor: QColors.surface,
+      title: Text(isAr ? 'كود الدعوة' : 'Invitation code', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
       content: TextField(
         controller: controller,
         autofocus: true,
         textCapitalization: TextCapitalization.characters,
         textDirection: TextDirection.ltr,
-        style: QText.number(size: 17, color: QColors.textHigh),
-        decoration: InputDecoration(hintText: 'QMR-XXXXX', hintStyle: QText.number(size: 17, color: QColors.textMuted)),
+        style: QText.number(size: 17, color: QColors.ink),
+        decoration: InputDecoration(hintText: 'QMR-XXXXX', hintStyle: QText.number(size: 17, color: QColors.inkTertiary)),
         onSubmitted: (v) => Navigator.of(ctx).pop(v),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(isAr ? 'إلغاء' : 'Cancel', style: QText.body(size: 14, color: QColors.textMuted))),
-        TextButton(onPressed: () => Navigator.of(ctx).pop(controller.text), child: Text(isAr ? 'تفعيل' : 'Redeem', style: QText.body(size: 14, weight: FontWeight.w600, color: QColors.violetSoft))),
+        TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(isAr ? 'إلغاء' : 'Cancel', style: QText.body(size: 15, color: QColors.inkTertiary))),
+        TextButton(onPressed: () => Navigator.of(ctx).pop(controller.text), child: Text(isAr ? 'تفعيل' : 'Redeem', style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.inkSecondary))),
       ],
     ),
   );
@@ -263,8 +263,8 @@ class _FloatingPill extends StatelessWidget {
           constraints: BoxConstraints(maxWidth: maxWidth),
           padding: const EdgeInsets.symmetric(horizontal: 18),
           decoration: BoxDecoration(
-            color: QColors.glass,
-            border: Border.all(color: emphasis ? QColors.violet.withOpacity(0.5) : QColors.borderSoft),
+            color: QColors.surfaceRaised,
+            border: Border.all(color: emphasis ? QColors.ink.withOpacity(0.5) : QColors.hairline),
             // Lifted by its lighter fill and edge, not by a shadow: a black
             // shadow on a near-black ground drew a hard slab under the pill.
             borderRadius: BorderRadius.circular(QRadii.pill),
@@ -276,7 +276,7 @@ class _FloatingPill extends StatelessWidget {
                 Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: dot)),
                 const SizedBox(width: 9),
               ] else ...[
-                const Icon(Icons.crop_free, size: 14, color: QColors.cyan), // a viewfinder, for the scan
+                const Icon(Icons.crop_free, size: 14, color: QColors.ink), // a viewfinder, for the scan
                 const SizedBox(width: 9),
               ],
               Flexible(
@@ -287,12 +287,12 @@ class _FloatingPill extends StatelessWidget {
                     Text(label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+                        style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink)),
                     if (sub != null)
                       Text(sub!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: QText.body(size: 12, height: 16, color: QColors.textMuted)),
+                          style: QText.body(size: 12, height: 16, color: QColors.inkTertiary)),
                   ],
                 ),
               ),

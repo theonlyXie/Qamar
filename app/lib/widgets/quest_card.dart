@@ -29,7 +29,7 @@ class QuestCard extends StatelessWidget {
       id: 'quest',
       child: Container(
         padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 8, 10),
-        decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.card),
+        decoration: QDecor.card(color: QColors.surface, radius: QRadii.card),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -42,29 +42,29 @@ class QuestCard extends StatelessWidget {
               constraints: const BoxConstraints(minHeight: QLayout.minTap),
               child: Row(
                 children: [
-                  Text(state.t.nextQuest, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
+                  Text(state.t.nextQuest, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.inkTertiary)),
                   if (state.showScore && q.amount > 0) ...[
                     const SizedBox(width: 8),
                     const SuCoinIcon(size: 14),
                     const SizedBox(width: 4),
-                    ExplainMark(child: Text('+${state.formatSu(q.amount)}', style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.gold))),
+                    ExplainMark(child: Text('+${state.formatSu(q.amount)}', style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.ink))),
                   ],
                   const Spacer(),
                   if (q.done)
                     const Padding(
                       padding: EdgeInsetsDirectional.only(end: 8),
-                      child: Icon(Icons.check_circle_outline, size: 22, color: QColors.green),
+                      child: Icon(Icons.check_circle_outline, size: 22, color: QColors.ink),
                     )
                   else
-                    QOutlineButton(key: notTodayKey, label: isAr ? 'مش النهارده' : 'Not today', onTap: state.skipQuest, height: 34, color: QColors.textMuted),
+                    QOutlineButton(key: notTodayKey, label: isAr ? 'مش النهارده' : 'Not today', onTap: state.skipQuest, height: 34, color: QColors.inkTertiary),
                 ],
               ),
             ),
-            Text(q.kind.title(ar: isAr, iso: state.iso), style: QText.body(size: 15, height: 22, weight: FontWeight.w600, color: QColors.textPrimary)),
+            Text(q.kind.title(ar: isAr, iso: state.iso), style: QText.body(size: 15, height: 22, weight: FontWeight.w600, color: QColors.ink)),
             const SizedBox(height: 2),
             Text(
               q.done ? (isAr ? 'خلصت النهارده، واتسجّلت.' : 'Done for today, and logged.') : q.kind.why(ar: isAr),
-              style: QText.body(size: 13, height: 18, color: q.done ? QColors.green : QColors.textMuted),
+              style: QText.body(size: 13, height: 18, color: q.done ? QColors.ink : QColors.inkTertiary),
             ),
           ],
         ),

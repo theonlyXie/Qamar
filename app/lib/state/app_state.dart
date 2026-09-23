@@ -3630,12 +3630,14 @@ class AppState extends ChangeNotifier {
   Future<void> restorePlusPurchases() => _refreshPlus(announce: true);
 
   void _absorbEntitlement(PlusEntitlement ent) {
-    plusActive = ent.active;
+    // Read on the app's clock, as everything else about the day is.
+    final now = clockNow();
+    plusActive = ent.activeAt(now);
     plusUntil = ent.periodEnd;
     plusFirstPurchase = ent.firstPurchase;
     plusTrialEligible = ent.trialEligible;
-    plusIsTrial = ent.isTrial;
-    plusIsEarned = ent.isEarned;
+    plusIsTrial = ent.trialAt(now);
+    plusIsEarned = ent.earnedAt(now);
     // The free week's reminder is scheduled the moment the trial starts and
     // withdrawn the moment it is over or paid for.
     _rescheduleNudges();
@@ -3786,7 +3788,7 @@ class AppState extends ChangeNotifier {
       final ent = await billing.entitlement();
       final was = plusActive;
       _absorbEntitlement(ent);
-      if (announce && !was && plusActive) _track('plus_activated', {'provider': ent.isTrial ? 'trial' : 'paymob'});
+      if (announce && !was && plusActive) _track('plus_activated', {'provider': ent.trialAt(clockNow()) ? 'trial' : 'paymob'});
       if (announce) {
         plusNotice = plusActive
             ? (isAr ? 'قمر+ اشتغل. شكراً.' : 'Qamar+ is on. Thank you.')

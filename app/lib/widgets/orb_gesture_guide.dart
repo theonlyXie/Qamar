@@ -116,8 +116,8 @@ class OrbGestureGuide extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
       decoration: BoxDecoration(
-        color: QColors.violet.withValues(alpha: 0.08),
-        border: Border.all(color: QColors.violet.withValues(alpha: 0.3)),
+        color: QColors.ink.withValues(alpha: 0.08),
+        border: Border.all(color: QColors.ink.withValues(alpha: 0.3)),
         borderRadius: BorderRadius.circular(QRadii.card),
       ),
       child: Column(
@@ -137,13 +137,13 @@ class OrbGestureGuide extends StatelessWidget {
                         child: Icon(
                           learned.contains(g) ? Icons.check_circle : icon,
                           size: 13,
-                          color: learned.contains(g) ? QColors.green : QColors.violetSoft,
+                          color: learned.contains(g) ? QColors.ink : QColors.inkSecondary,
                         ),
                       ),
                     ),
                     TextSpan(text: cellText(g, isAr)),
                   ],
-                  style: QText.body(size: 11, height: 15, color: learned.contains(g) ? QColors.textMuted : QColors.textMid),
+                  style: QText.body(size: 11, height: 15, color: learned.contains(g) ? QColors.inkTertiary : QColors.inkSecondary),
                 ),
             ];
             final letters = [for (final (g, _, _, _, _, _) in gestures) cellText(g, isAr).length];
@@ -163,7 +163,7 @@ class OrbGestureGuide extends StatelessWidget {
                         constraints: const BoxConstraints(minHeight: 48),
                         padding: const EdgeInsets.all(_cellPad),
                         decoration: BoxDecoration(
-                          color: QColors.violet.withValues(alpha: learned.contains(gestures[i].$1) ? 0.04 : 0.1),
+                          color: QColors.ink.withValues(alpha: learned.contains(gestures[i].$1) ? 0.04 : 0.1),
                           borderRadius: BorderRadius.circular(QRadii.inset),
                         ),
                         child: Text.rich(words[i]),
@@ -184,7 +184,7 @@ class OrbGestureGuide extends StatelessWidget {
           Expanded(
             child: Text(
               isAr ? 'القمر بيفهم تلات حركات' : 'The moon knows three gestures',
-              style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.violetSoft),
+              style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.inkSecondary),
             ),
           ),
           if (dismissible)
@@ -200,7 +200,7 @@ class OrbGestureGuide extends StatelessWidget {
                     widthFactor: 1,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Text(isAr ? 'عارف' : 'Got it', style: QText.body(size: 12, color: QColors.textMuted)),
+                      child: Text(isAr ? 'عارف' : 'Got it', style: QText.body(size: 12, color: QColors.inkTertiary)),
                     ),
                   ),
                 ),
@@ -217,8 +217,8 @@ class OrbGestureGuide extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 11),
       decoration: BoxDecoration(
-        color: QColors.violet.withValues(alpha: 0.08),
-        border: Border.all(color: QColors.violet.withValues(alpha: 0.3)),
+        color: QColors.ink.withValues(alpha: 0.08),
+        border: Border.all(color: QColors.ink.withValues(alpha: 0.3)),
         borderRadius: BorderRadius.circular(QRadii.card),
       ),
       child: Column(
@@ -235,13 +235,13 @@ class OrbGestureGuide extends StatelessWidget {
                   Icon(
                     learned.contains(g) ? Icons.check_circle : icon,
                     size: 16,
-                    color: learned.contains(g) ? QColors.green : QColors.violetSoft,
+                    color: learned.contains(g) ? QColors.ink : QColors.inkSecondary,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       '${isAr ? doAr : doEn} — ${isAr ? whatAr : whatEn}',
-                      style: QText.body(size: 12, height: 18, color: learned.contains(g) ? QColors.textMuted : QColors.textMid),
+                      style: QText.body(size: 12, height: 18, color: learned.contains(g) ? QColors.inkTertiary : QColors.inkSecondary),
                     ),
                   ),
                 ],
@@ -253,7 +253,7 @@ class OrbGestureGuide extends StatelessWidget {
             isAr
                 ? 'الكتابة والصوت ببلاش على طول. الصور ${state.iso('$photos')} في اليوم.'
                 : 'Typing and speaking are always free. Photos, $photos a day.',
-            style: QText.body(size: 11, height: 16, color: QColors.textMuted),
+            style: QText.body(size: 11, height: 16, color: QColors.inkTertiary),
           ),
         ],
       ),

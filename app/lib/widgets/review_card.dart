@@ -55,10 +55,10 @@ class ReviewCard extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [QColors.cardMid, QColors.cardDeep],
+            colors: [QColors.surfaceRaised, QColors.surface],
           ),
           borderRadius: BorderRadius.circular(QRadii.card),
-          border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
+          border: Border.all(color: QColors.ink.withValues(alpha: 0.35)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -66,7 +66,7 @@ class ReviewCard extends StatelessWidget {
           children: [
             Text(
               isAr ? 'أسبوعي مع قمر' : 'My week with Qamar',
-              style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.violetSoft),
+              style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.inkSecondary),
             ),
             const SizedBox(height: 16),
             Row(
@@ -88,7 +88,7 @@ class ReviewCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         letters[review.days[i].day.weekday - 1],
-                        style: QText.number(size: 11, color: fills[i] == null ? QColors.textMuted : QColors.textMid),
+                        style: QText.number(size: 11, color: fills[i] == null ? QColors.inkTertiary : QColors.inkSecondary),
                       ),
                     ],
                   ),
@@ -97,12 +97,12 @@ class ReviewCard extends StatelessWidget {
             const SizedBox(height: 18),
             Text(
               isAr ? review.insight.ar : review.insight.en,
-              style: QText.body(size: 15, height: 23, weight: FontWeight.w600, color: QColors.textPrimary),
+              style: QText.body(size: 15, height: 23, weight: FontWeight.w600, color: QColors.ink),
             ),
             const SizedBox(height: 8),
             Text(
               isAr ? review.change.ar : review.change.en,
-              style: QText.body(size: 13, height: 20, color: QColors.textMid),
+              style: QText.body(size: 13, height: 20, color: QColors.inkSecondary),
             ),
             if (showNumbers && review.avgKcal != null) ...[
               const SizedBox(height: 12),
@@ -110,7 +110,7 @@ class ReviewCard extends StatelessWidget {
                 isAr
                     ? 'متوسط ${iso('${review.avgKcal}')} سعرة في اليوم المسجّل · ${iso('${review.inRange}')} من ${iso('${review.loggedDays}')} داخل النطاق'
                     : 'Average ${review.avgKcal} kcal on a logged day · ${review.inRange} of ${review.loggedDays} in range',
-                style: QText.number(size: 11, color: QColors.textMuted),
+                style: QText.number(size: 11, color: QColors.inkTertiary),
               ),
             ],
             const SizedBox(height: 14),
@@ -119,7 +119,7 @@ class ReviewCard extends StatelessWidget {
             // stand alone at the far end of an empty row, which read as a
             // stray watermark rather than as where the card came from. The
             // run, when it is shown, takes the other end.
-            const Divider(color: QColors.borderSoft, height: 1),
+            const Divider(color: QColors.hairline, height: 1),
             const SizedBox(height: 12),
             Row(
               key: ReviewCard.signOffKey,
@@ -130,16 +130,16 @@ class ReviewCard extends StatelessWidget {
                 // are in both languages; the glyph itself is lit on the left.
                 Transform.flip(
                   flipX: true,
-                  child: const Icon(Icons.nightlight_round, key: ReviewCard.markKey, size: 14, color: QColors.moonbeam),
+                  child: const Icon(Icons.nightlight_round, key: ReviewCard.markKey, size: 14, color: QColors.inkSecondary),
                 ),
                 const SizedBox(width: 8),
-                Text(footer, key: ReviewCard.footerKey, textDirection: TextDirection.ltr, style: QText.number(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
+                Text(footer, key: ReviewCard.footerKey, textDirection: TextDirection.ltr, style: QText.number(size: 11, weight: FontWeight.w500, color: QColors.inkTertiary)),
                 const Spacer(),
                 if (showStreak && review.streak.current >= 2)
                   Text(
                     // Counted as each language counts: يومين, not ٢ أيام.
                     '${Counted.day.of(review.streak.current, ar: isAr, iso: iso)} ${isAr ? 'ورا بعض' : 'in a row'}',
-                    style: QText.body(size: 11, color: QColors.cyan),
+                    style: QText.body(size: 11, color: QColors.ink),
                   ),
               ],
             ),

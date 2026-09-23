@@ -54,8 +54,8 @@ class RamadanScreen extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(state.digits(season.name(isAr)), style: QText.display(size: 30, ar: isAr, color: QColors.textPrimary)),
-              Text(subtitle, style: QText.body(size: 14, height: 22, color: QColors.textMuted)),
+              Text(state.digits(season.name(isAr)), style: QText.display(size: 34, ar: isAr, color: QColors.ink)),
+              Text(subtitle, style: QText.body(size: 15, height: 22, color: QColors.inkTertiary)),
             ]),
           ),
         ]),
@@ -64,16 +64,16 @@ class RamadanScreen extends StatelessWidget {
         // The switch.
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.card),
+          decoration: QDecor.card(color: QColors.surface, border: QColors.hairline, radius: QRadii.card),
           child: Row(children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(isAr ? 'صايم' : 'Fasting', style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+                Text(isAr ? 'صايم' : 'Fasting', style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink)),
                 Text(
                   isAr
                       ? 'الخطة تبقى إفطار وسحور، والأسئلة على مواعيدهم، والمياه على نوافذ الليل.'
                       : 'The plan becomes iftar and suhoor, the questions move to their hours, and water to the night’s windows.',
-                  style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+                  style: QText.body(size: 12, height: 18, color: QColors.inkTertiary),
                 ),
               ]),
             ),
@@ -87,14 +87,14 @@ class RamadanScreen extends StatelessWidget {
         // said here, under the switch, with the Plan card's way on.
         if (state.fastingNotYet case final n?) ...[
           const SizedBox(height: 8),
-          QStateLine(line: n.line, action: n.action, accent: QColors.gold, icon: Icons.nightlight_round),
+          QStateLine(line: n.line, action: n.action, accent: QColors.ink, icon: Icons.nightlight_round),
         ],
         const SizedBox(height: 14),
 
         // The sun's two times, and the water between them.
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.card),
+          decoration: QDecor.card(color: QColors.surface, border: QColors.hairline, radius: QRadii.card),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(child: _TimeCell(label: isAr ? 'الإفطار' : 'Iftar', time: state.iso(SunTimes.clock(h.iftarMin)), sub: isAr ? 'المغرب، القاهرة' : 'Sunset, Cairo')),
@@ -102,22 +102,22 @@ class RamadanScreen extends StatelessWidget {
             ]),
             const SizedBox(height: 14),
             Text(isAr ? 'المياه: ${state.iso('8')} كوبايات بين الإفطار والفجر' : 'Water: 8 glasses between iftar and dawn',
-                style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.textHigh)),
+                style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.ink)),
             const SizedBox(height: 6),
             for (final w in h.windows)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Row(children: [
-                  Icon(open == w ? Icons.water_drop : Icons.water_drop_outlined, size: 14, color: open == w ? QColors.cyan : QColors.textMuted),
+                  Icon(open == w ? Icons.water_drop : Icons.water_drop_outlined, size: 14, color: open == w ? QColors.ink : QColors.inkTertiary),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(w.label(isAr), style: QText.body(size: 13, color: open == w ? QColors.textHigh : QColors.textMid))),
+                  Expanded(child: Text(w.label(isAr), style: QText.body(size: 13, color: open == w ? QColors.ink : QColors.inkSecondary))),
                   Text(
                     '${state.iso(SunTimes.clock(w.fromMin % (24 * 60)))}–${state.iso(SunTimes.clock(w.toMin % (24 * 60)))}',
                     textDirection: TextDirection.ltr,
-                    style: QText.number(size: 12, color: QColors.textMuted),
+                    style: QText.number(size: 12, color: QColors.inkTertiary),
                   ),
                   const SizedBox(width: 10),
-                  Text(isAr ? '${state.iso('${w.glasses}')} كوبايات' : '${w.glasses} glasses', style: QText.number(size: 12, color: QColors.cyan)),
+                  Text(isAr ? '${state.iso('${w.glasses}')} كوبايات' : '${w.glasses} glasses', style: QText.number(size: 12, color: QColors.ink)),
                 ]),
               ),
           ]),
@@ -128,7 +128,7 @@ class RamadanScreen extends StatelessWidget {
         if (phase != SeasonPhase.before)
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: QColors.gold.withValues(alpha: 0.08), border: Border.all(color: QColors.gold.withValues(alpha: 0.32)), borderRadius: BorderRadius.circular(QRadii.card)),
+            decoration: BoxDecoration(color: QColors.ink.withValues(alpha: 0.08), border: Border.all(color: QColors.ink.withValues(alpha: 0.32)), borderRadius: BorderRadius.circular(QRadii.card)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(
                 isAr
@@ -137,12 +137,12 @@ class RamadanScreen extends StatelessWidget {
                     // month's days take it.
                     ? 'سجّلت ${Counted.day.of(state.seasonDaysLogged, ar: true, iso: state.iso)} من ${state.iso('${season.days}')}'
                     : 'Logged ${state.seasonDaysLogged} of ${season.days} days',
-                style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.goldPale),
+                style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink),
               ),
               const SizedBox(height: 4),
               Text(
                 isAr ? 'وجبة واحدة كل يوم من الشهر — ${state.suAmount(500)} لما يكمّل.' : 'One meal logged every day of the month — ${state.suAmount(500)} when it is complete.',
-                style: QText.body(size: 12, height: 18, color: QColors.goldMuted),
+                style: QText.body(size: 12, height: 18, color: QColors.inkSecondary),
               ),
               const SizedBox(height: 10),
               ClipRRect(
@@ -150,8 +150,8 @@ class RamadanScreen extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: (state.seasonDaysLogged / season.days).clamp(0, 1).toDouble(),
                   minHeight: 6,
-                  backgroundColor: QColors.borderSoft,
-                  valueColor: const AlwaysStoppedAnimation(QColors.gold),
+                  backgroundColor: QColors.hairline,
+                  valueColor: const AlwaysStoppedAnimation(QColors.ink),
                 ),
               ),
             ]),
@@ -176,9 +176,9 @@ class _TimeCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: QText.body(size: 12, color: QColors.textMuted)),
-      Text(time, textDirection: TextDirection.ltr, style: QText.number(size: 28, weight: FontWeight.w600, color: QColors.textPrimary)),
-      Text(sub, style: QText.body(size: 11, color: QColors.textMuted)),
+      Text(label, style: QText.body(size: 12, color: QColors.inkTertiary)),
+      Text(time, textDirection: TextDirection.ltr, style: QText.number(size: 28, weight: FontWeight.w600, color: QColors.ink)),
+      Text(sub, style: QText.body(size: 11, color: QColors.inkTertiary)),
     ]);
   }
 }
@@ -196,15 +196,15 @@ class _EidCard extends StatelessWidget {
     final report = state.eidReport();
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: QDecor.card(gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]), border: QColors.borderStrong, radius: QRadii.card),
+      decoration: QDecor.card(border: QColors.hairlineStrong, radius: QRadii.card),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(isAr ? 'تقرير العيد: إيه اللي اتغيّر في الشهر' : 'Eid report: what changed this month',
-            style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+            style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink)),
         const SizedBox(height: 8),
         for (final l in report.lines)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Text(isAr ? l.ar : l.en, style: QText.body(size: 14, height: 21, color: QColors.textMid)),
+            child: Text(isAr ? l.ar : l.en, style: QText.body(size: 15, height: 21, color: QColors.inkSecondary)),
           ),
         const SizedBox(height: 10),
         Row(children: [
@@ -215,7 +215,7 @@ class _EidCard extends StatelessWidget {
               child: QOutlineButton(
                 label: isAr ? 'كمّل الخطة؟ ${state.iso('500')} ج.م/شهر' : 'Keep the plan going? EGP 500/mo',
                 height: 36,
-                color: QColors.gold,
+                color: QColors.ink,
                 onTap: () => state.go(AppScreen.subscription),
               ),
             ),

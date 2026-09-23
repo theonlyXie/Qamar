@@ -106,12 +106,12 @@ class SubscriptionScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: QColors.green.withValues(alpha: 0.14),
-                  border: Border.all(color: QColors.green.withValues(alpha: 0.5)),
+                  color: QColors.ink.withValues(alpha: 0.14),
+                  border: Border.all(color: QColors.ink.withValues(alpha: 0.5)),
                   borderRadius: BorderRadius.circular(QRadii.pill),
                 ),
                 child: Text(isAr ? 'مفعّل' : 'Active',
-                    style: QText.body(size: 11, weight: FontWeight.w600, color: QColors.green)),
+                    style: QText.body(size: 11, weight: FontWeight.w600, color: QColors.ink)),
               ),
           ],
         ),
@@ -120,8 +120,8 @@ class SubscriptionScreen extends StatelessWidget {
         const SizedBox(height: 14),
         Center(
           child: ShaderMask(
-            shaderCallback: (r) => QColors.brandGradient.createShader(r),
-            child: Text('Qamar+', textDirection: TextDirection.ltr, style: QText.display(size: 40, ar: false, color: QColors.textPrimary)),
+            shaderCallback: (r) => const LinearGradient(colors: [QColors.ink, QColors.ink]).createShader(r),
+            child: Text('Qamar+', textDirection: TextDirection.ltr, style: QText.display(size: 34, ar: false, color: QColors.ink)),
           ),
         ),
         const SizedBox(height: 6),
@@ -133,7 +133,7 @@ class SubscriptionScreen extends StatelessWidget {
         QBalancedText(
           isAr ? 'قمر+ بيقولك تاكل إيه بكرة: بيكتبلك الخطة بالليل، بأكل مصري.' : 'Qamar+ tells you what to eat tomorrow: it writes the plan at night, in Egyptian dishes.',
           textKey: SubscriptionScreen.leadKey,
-          style: QText.body(size: 15, height: 23, weight: FontWeight.w600, color: QColors.textHigh),
+          style: QText.body(size: 15, height: 23, weight: FontWeight.w600, color: QColors.ink),
         ),
         const SizedBox(height: 14),
         Text(
@@ -141,20 +141,20 @@ class SubscriptionScreen extends StatelessWidget {
               ? 'ومن غيره قمر شغال برضه: خطة النهارده، تلات صور وتلات أسئلة كل يوم، والكتابة والصوت بلا حد.'
               : 'Without it Qamar still works: today’s plan, three photos and three questions a day, and unlimited typing and speaking.',
           key: SubscriptionScreen.withoutKey,
-          style: QText.body(size: 14, height: 22, color: QColors.textMuted),
+          style: QText.body(size: 15, height: 22, color: QColors.inkTertiary),
         ),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: QColors.violet.withValues(alpha: 0.10),
-            border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
+            color: QColors.ink.withValues(alpha: 0.10),
+            border: Border.all(color: QColors.ink.withValues(alpha: 0.35)),
             borderRadius: BorderRadius.circular(QRadii.card),
           ),
           child: Text(
             priceBanner(state, quote),
             key: SubscriptionScreen.bannerKey,
-            style: QText.body(size: 13, height: 20, color: QColors.textHigh),
+            style: QText.body(size: 13, height: 20, color: QColors.ink),
           ),
         ),
         const SizedBox(height: 16),
@@ -165,7 +165,7 @@ class SubscriptionScreen extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           isAr ? 'كود الأخصائي أو المدرّب' : 'Your nutritionist’s or coach’s code',
-          style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.textMuted),
+          style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.inkTertiary),
         ),
         const SizedBox(height: 6),
         const _PromoField(),
@@ -183,11 +183,11 @@ class SubscriptionScreen extends StatelessWidget {
               : (isAr
                   ? 'لو أخصائي أو مدرّب بعتك، اكتب الكود هنا. السعر مش بيتغير — الكود بيربط خطتك بيه وبيديه نصيب من الاشتراك.'
                   : 'If a nutritionist or coach sent you, enter their code. The price does not change — the code links your plan to them and pays them a share.')),
-          style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+          style: QText.body(size: 12, height: 18, color: QColors.inkTertiary),
         ),
         if (quote.promoError != null) ...[
           const SizedBox(height: 8),
-          Text(quote.promoError!, style: QText.body(size: 12, color: QColors.amber)),
+          Text(quote.promoError!, style: QText.body(size: 12, color: QColors.inkSecondary)),
         ],
         // The code's second half: the client's yes to the professional seeing
         // the week as numbers. Off until turned on; also on Me.
@@ -199,7 +199,7 @@ class SubscriptionScreen extends StatelessWidget {
                 isAr
                     ? 'شاركه التزامي الأسبوعي (أيام التسجيل والمتوسط مقابل الهدف، بس)'
                     : 'Share my weekly adherence with them (days logged and the average against my target, nothing else)',
-                style: QText.body(size: 12, height: 17, color: QColors.textMuted),
+                style: QText.body(size: 12, height: 17, color: QColors.inkTertiary),
               ),
             ),
             Switch.adaptive(
@@ -210,7 +210,7 @@ class SubscriptionScreen extends StatelessWidget {
         ],
         if (quote.promoNote != null) ...[
           const SizedBox(height: 8),
-          Text(quote.promoNote!, style: QText.body(size: 12, height: 18, color: QColors.textMuted)),
+          Text(quote.promoNote!, style: QText.body(size: 12, height: 18, color: QColors.inkTertiary)),
         ],
 
         const SizedBox(height: 16),
@@ -221,18 +221,18 @@ class SubscriptionScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: QColors.amber.withValues(alpha: 0.10),
-              border: Border.all(color: QColors.amber.withValues(alpha: 0.4)),
+              color: QColors.inkSecondary.withValues(alpha: 0.10),
+              border: Border.all(color: QColors.inkSecondary.withValues(alpha: 0.4)),
               borderRadius: BorderRadius.circular(QRadii.control),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.info_outline, size: 16, color: QColors.amber),
+                const Icon(Icons.info_outline, size: 16, color: QColors.inkSecondary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(state.plusNotice!,
-                      style: QText.body(size: 12, height: 19, color: QColors.amberSoft)),
+                      style: QText.body(size: 12, height: 19, color: QColors.inkSecondary)),
                 ),
               ],
             ),
@@ -253,7 +253,7 @@ class SubscriptionScreen extends StatelessWidget {
                 ? TrialWords.paywallRule(AppState.trialOfferDays, ar: true, iso: state.iso)
                 : TrialWords.paywallRule(AppState.trialOfferDays, ar: false, iso: state.iso),
             textAlign: TextAlign.center,
-            style: QText.body(size: 11, height: 17, color: QColors.textMuted),
+            style: QText.body(size: 11, height: 17, color: QColors.inkTertiary),
           ),
           const SizedBox(height: 10),
         ],
@@ -270,7 +270,7 @@ class SubscriptionScreen extends StatelessWidget {
           child: TextButton(
             onPressed: () { state.restorePlusPurchases(); },
             child: Text(isAr ? 'تأكيد الاشتراك' : 'Confirm subscription',
-                style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
+                style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkTertiary)),
           ),
         ),
         const SizedBox(height: 4),
@@ -278,16 +278,16 @@ class SubscriptionScreen extends StatelessWidget {
           '${paymentLine(isAr, quote.paymentMethods)} ${isAr ? 'نقاط Su مش بتتباع ومش بتتشحن بفلوس — بتتكسب بس. عمولة الأفلييت كاش بالجنيه، مش نقاط.' : 'Su Points are never sold or topped up with money — they are only earned. Affiliate commission is EGP cash, not Su.'}',
           key: SubscriptionScreen.paymentKey,
           textAlign: TextAlign.center,
-          style: QText.body(size: 11, height: 17, color: QColors.textMuted),
+          style: QText.body(size: 11, height: 17, color: QColors.inkTertiary),
         ),
         const SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             QLegalLink(label: isAr ? 'الشروط' : 'Terms', url: QamarConfig.termsUrl),
-            Text('  ·  ', style: QText.body(size: 11, color: QColors.textMuted)),
+            Text('  ·  ', style: QText.body(size: 11, color: QColors.inkTertiary)),
             QLegalLink(label: isAr ? 'الخصوصية' : 'Privacy', url: QamarConfig.privacyUrl),
-            Text('  ·  ', style: QText.body(size: 11, color: QColors.textMuted)),
+            Text('  ·  ', style: QText.body(size: 11, color: QColors.inkTertiary)),
             QLegalLink(label: isAr ? 'الدعم' : 'Support', url: QamarConfig.supportUrl),
           ],
         ),
@@ -328,16 +328,16 @@ class _PromoFieldState extends State<_PromoField> {
       // A code is Latin: left to right in both languages ("QMR…", not "…QMR").
       textDirection: TextDirection.ltr,
       onChanged: (v) => context.read<AppState>().setPlusPromoCode(v),
-      style: QText.number(size: 15, color: QColors.textPrimary),
+      style: QText.number(size: 15, color: QColors.ink),
       decoration: InputDecoration(
         hintText: isAr ? 'QMR…' : 'QMR…',
-        hintStyle: QText.body(size: 14, color: QColors.textMuted),
+        hintStyle: QText.body(size: 15, color: QColors.inkTertiary),
         filled: true,
-        fillColor: QColors.cardDeep,
+        fillColor: QColors.surface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.borderSoft)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.borderSoft)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.violet)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.hairline)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.hairline)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.ink)),
       ),
     );
   }
@@ -374,10 +374,10 @@ class _TierCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
-        border: Border.all(color: QColors.violet, width: 1.6),
+        gradient: const LinearGradient(colors: [QColors.surfaceRaised, QColors.surface]),
+        border: Border.all(color: QColors.ink, width: 1.6),
         borderRadius: BorderRadius.circular(QRadii.card),
-        boxShadow: [BoxShadow(color: QColors.violet.withValues(alpha: 0.22), blurRadius: 26)],
+        boxShadow: [BoxShadow(color: QColors.ink.withValues(alpha: 0.22), blurRadius: 26)],
       ),
       // One plan, so no radio: a single option is not a choice.
       child: Row(
@@ -386,9 +386,9 @@ class _TierCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textPrimary)),
+                Text(title, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink)),
                 const SizedBox(height: 2),
-                Text(sub, style: QText.body(size: 12, color: QColors.textMuted)),
+                Text(sub, style: QText.body(size: 12, color: QColors.inkTertiary)),
               ],
             ),
           ),
@@ -400,13 +400,13 @@ class _TierCard extends StatelessWidget {
               if (quote.discounted)
                 Text(
                   formatEgp(quote.listPounds, ar: isAr, eastern: state.easternDigits),
-                  style: QText.number(size: 11, color: QColors.textMuted).copyWith(
+                  style: QText.number(size: 11, color: QColors.inkTertiary).copyWith(
                     decoration: TextDecoration.lineThrough,
                   ),
                 ),
               Text(
                 formatEgp(quote.amountPounds, ar: isAr, eastern: state.easternDigits),
-                style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.textPrimary),
+                style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.ink),
               ),
             ],
           ),
@@ -441,39 +441,39 @@ class _FeatureTable extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.card),
+      decoration: QDecor.card(color: QColors.surface, border: QColors.hairline, radius: QRadii.card),
       child: Column(
         children: [
           Row(
             children: [
               Expanded(
                 child: Text(isAr ? 'اللي بتاخده' : 'What you get',
-                    style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
+                    style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.inkTertiary)),
               ),
               SizedBox(
                 width: 52,
                 child: Text(isAr ? 'مجاني' : 'Free',
                     textAlign: TextAlign.center,
-                    style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
+                    style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.inkTertiary)),
               ),
               SizedBox(
                 width: 52,
                 child: Text('Qamar+', textDirection: TextDirection.ltr,
                     textAlign: TextAlign.center,
-                    style: QText.body(size: 11, weight: FontWeight.w600, color: QColors.violetSoft)),
+                    style: QText.body(size: 11, weight: FontWeight.w600, color: QColors.inkSecondary)),
               ),
             ],
           ),
           const SizedBox(height: 6),
           for (final f in _features) ...[
-            const Divider(color: QColors.borderSoft, height: 1),
+            const Divider(color: QColors.hairline, height: 1),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 9),
               child: Row(
                 children: [
                   Expanded(
                     child: Text(isAr ? f.ar : f.en,
-                        style: QText.body(size: 13, height: 18, color: QColors.textHigh)),
+                        style: QText.body(size: 13, height: 18, color: QColors.ink)),
                   ),
                   SizedBox(
                     width: 52,
@@ -481,12 +481,12 @@ class _FeatureTable extends StatelessWidget {
                     child: Icon(
                       f.inFree ? Icons.check : Icons.remove,
                       size: 16,
-                      color: f.inFree ? QColors.violetSoft : QColors.textMuted,
+                      color: f.inFree ? QColors.inkSecondary : QColors.inkTertiary,
                     ),
                   ),
                   const SizedBox(
                     width: 52,
-                    child: Icon(Icons.check, size: 16, color: QColors.violetSoft),
+                    child: Icon(Icons.check, size: 16, color: QColors.inkSecondary),
                   ),
                 ],
               ),

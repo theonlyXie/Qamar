@@ -26,9 +26,9 @@ class _Ai implements AiGateway {
 
 AiQuota _chat(int remaining) => AiQuota(bucket: 'chat', used: 3 - remaining, limit: 3, extra: 0, remaining: remaining);
 
-/// The conversation's ground under the header (ask_qamar_overlay's scrim
-/// top, cardDeep at 95%, over the app's darkest background).
-final _ground = over(QColors.cardDeep.withValues(alpha: 0.95), QColors.bgBottom);
+/// The conversation's ground under the header: solid black, as the page
+/// under a ChatGPT-style transcript is (ask_qamar_overlay).
+const _ground = QColors.canvas;
 
 void main() {
   setUpAll(loadAppFonts);
@@ -85,7 +85,7 @@ void main() {
     await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const MaterialApp(home: Scaffold(body: AskQamarOverlay()))));
     await tester.pump(const Duration(milliseconds: 400));
     final line = tester.widget<Text>(find.text('Last question today'));
-    expect(line.style!.color, QColors.textMuted);
-    expect(contrastRatio(QColors.textMuted, _ground), greaterThanOrEqualTo(4.5));
+    expect(line.style!.color, QColors.inkTertiary);
+    expect(contrastRatio(QColors.inkTertiary, _ground), greaterThanOrEqualTo(4.5));
   });
 }

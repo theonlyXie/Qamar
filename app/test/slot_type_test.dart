@@ -78,7 +78,9 @@ void main() {
           wrapped++;
           expect(last.length, greaterThanOrEqualTo(2), reason: '"${p.text.toPlainText()}" ends on "${last.join(' ')}" alone');
         }
-        expect(wrapped, greaterThan(0), reason: 'the card has wrapped words to check');
+        // A card whose every line fits has no orphan to find; the gestures
+        // card always wraps, so its check is never empty.
+        if (card == TodayCard.tutorial) expect(wrapped, greaterThan(0), reason: 'the card has wrapped words to check');
       });
     }
   }

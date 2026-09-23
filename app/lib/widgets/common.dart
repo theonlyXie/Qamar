@@ -9,9 +9,11 @@ import '../l10n/strings.dart';
 import '../models/problem.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/icons.dart';
 import '../theme/layout.dart';
 import '../theme/motion.dart';
 import '../theme/text_styles.dart';
+import 'glass.dart';
 
 /// The touch rule every control here keeps (O11).
 ///
@@ -141,20 +143,30 @@ class _RenderMinTap extends RenderShiftedBox {
 }
 
 /// How a control with nothing to do is drawn, everywhere (O11): no press, a
-/// faint edge, a muted label, no fill or glow.
+/// hairline, the disabled ink, a flat raised grey where a fill would be.
 abstract final class QDisabled {
-  /// Fainter than an enabled control's hairline.
-  static final edge = QColors.borderSoft.withValues(alpha: 0.55);
-  static const label = QColors.textDisabled;
-  static const fill = QColors.cardDeep;
+  static const edge = QColors.hairline;
+  static const label = QColors.inkDisabled;
+  static const fill = QColors.surfaceRaised;
 }
 
+/// How a pressed control answers, on the press: a little smaller, the way a
+/// real button gives under a finger. With reduce-motion on it dims instead.
+Widget qPressed(BuildContext context, {required bool pressed, required Widget child}) {
+  if (MediaQuery.disableAnimationsOf(context)) {
+    return AnimatedOpacity(opacity: pressed ? 0.7 : 1, duration: const Duration(milliseconds: 90), child: child);
+  }
+  return AnimatedScale(scale: pressed ? 0.97 : 1, duration: const Duration(milliseconds: 120), curve: Curves.easeOut, child: child);
+}
+
+/// The one thing to do on a screen: a white capsule with black words (the
+/// mono-glass skill). One per screen; everything else is secondary.
 class QPrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
   final double height;
-  final Gradient gradient;
-  const QPrimaryButton({super.key, required this.label, required this.onTap, this.height = 52, this.gradient = QColors.brandGradient});
+  final IconData? icon;
+  const QPrimaryButton({super.key, required this.label, required this.onTap, this.height = 52, this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -166,32 +178,37 @@ class QPrimaryButton extends StatelessWidget {
               onTap!();
             }
           : null,
-      builder: (context, pressed) => AnimatedOpacity(
-        opacity: pressed ? 0.82 : 1,
-        duration: const Duration(milliseconds: 90),
+      builder: (context, pressed) => qPressed(
+        context,
+        pressed: pressed,
         child: Container(
           height: height,
           alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: enabled
-              ? QDecor.gradientButton(gradient: gradient)
-              : BoxDecoration(
-                  color: QDisabled.fill,
-                  border: Border.all(color: QDisabled.edge),
-                  borderRadius: BorderRadius.circular(QRadii.control),
-                ),
-          child: Text(label,
-              textAlign: TextAlign.center,
-              style: QText.body(size: 17, weight: FontWeight.w600, color: enabled ? QColors.onAccent : QDisabled.label)),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: enabled ? QDecor.inkButton : QDecor.capsule(edge: QDisabled.edge, fill: QDisabled.fill),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 18, color: enabled ? QColors.onInk : QDisabled.label),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: Text(label,
+                    textAlign: TextAlign.center,
+                    style: QText.body(size: 17, weight: FontWeight.w600, color: enabled ? QColors.onInk : QDisabled.label)),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// A compact call to action inside a card: the brand gradient drawn as a
-/// 40pt pill, touched across 48 (O11). Where [QPrimaryButton] would be too
-/// much, and a text link too little.
+/// A compact call to action inside a card: a white capsule drawn 40 points
+/// tall, touched across 48 (O11). Where [QPrimaryButton] would be too much,
+/// and a text link too little.
 class QPillButton extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
@@ -200,16 +217,16 @@ class QPillButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => QTapArea(
         onTap: onTap,
-        builder: (context, pressed) => AnimatedOpacity(
-          opacity: pressed ? 0.82 : 1,
-          duration: const Duration(milliseconds: 90),
+        builder: (context, pressed) => qPressed(
+          context,
+          pressed: pressed,
           // As wide as its label: a Container with an alignment would fill
           // the row.
           child: Container(
             height: 40,
             padding: const EdgeInsets.symmetric(horizontal: 18),
-            decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),
-            child: Center(widthFactor: 1, child: Text(label, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onAccent))),
+            decoration: QDecor.inkButton,
+            child: Center(widthFactor: 1, child: Text(label, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.onInk))),
           ),
         ),
       );
@@ -604,13 +621,14 @@ class QStateCard extends StatelessWidget {
   final Problem problem;
   const QStateCard({super.key, required this.problem});
 
-  /// Each kind's glyph and tint.
+  /// Each kind's glyph. The glyph, not a colour, says what kind of thing
+  /// happened: every kind is drawn in the same white ink.
   static ({IconData icon, Color tint}) look(ProblemKind kind) => switch (kind) {
-        ProblemKind.empty => (icon: Icons.nightlight_round, tint: QColors.moonbeam),
-        ProblemKind.error => (icon: Icons.error_outline_rounded, tint: QColors.red),
-        ProblemKind.offline => (icon: Icons.cloud_off_rounded, tint: QColors.skyBlue),
-        ProblemKind.permission => (icon: Icons.lock_outline_rounded, tint: QColors.violetSoft),
-        ProblemKind.limit => (icon: Icons.hourglass_bottom_rounded, tint: QColors.amberSoft),
+        ProblemKind.empty => (icon: QIcons.empty, tint: QColors.ink),
+        ProblemKind.error => (icon: QIcons.error, tint: QColors.ink),
+        ProblemKind.offline => (icon: QIcons.offline, tint: QColors.ink),
+        ProblemKind.permission => (icon: QIcons.locked, tint: QColors.ink),
+        ProblemKind.limit => (icon: QIcons.limit, tint: QColors.ink),
       };
 
   @override
@@ -618,12 +636,8 @@ class QStateCard extends StatelessWidget {
     final p = problem;
     final l = look(p.kind);
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [QColors.cardMid, QColors.cardDeep]),
-        border: Border.all(color: QColors.borderSoft),
-        borderRadius: BorderRadius.circular(QRadii.card),
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+      decoration: QDecor.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
@@ -631,27 +645,27 @@ class QStateCard extends StatelessWidget {
           Center(
             child: Container(
               key: ValueKey('state-glyph-${p.kind.name}'),
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: l.tint.withValues(alpha: 0.12), border: Border.all(color: l.tint.withValues(alpha: 0.35))),
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: QColors.surfaceRaised, border: Border.all(color: QColors.hairlineStrong)),
               child: Icon(l.icon, size: 22, color: l.tint),
             ),
           ),
           const SizedBox(height: 14),
-          QBalancedText(p.what, style: QText.body(size: 17, height: 24, weight: FontWeight.w600, color: QColors.textHigh)),
+          QBalancedText(p.what, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
           if (p.why != null && p.why!.isNotEmpty) ...[
             const SizedBox(height: 6),
-            QBalancedText(p.why!, style: QText.body(size: 14, height: 21, color: QColors.textMuted)),
+            QBalancedText(p.why!, style: QText.body(size: 15, color: QColors.inkSecondary)),
           ],
           const SizedBox(height: 18),
           QPrimaryButton(label: p.action.label, onTap: p.action.onTap, height: 48),
           if (p.secondary != null) ...[
             const SizedBox(height: 8),
-            QOutlineButton(label: p.secondary!.label, onTap: p.secondary!.onTap, height: 48, color: QColors.textMid),
+            QOutlineButton(label: p.secondary!.label, onTap: p.secondary!.onTap, height: 48, color: QColors.ink),
           ],
           if (p.also != null) ...[
             const SizedBox(height: 8),
-            QOutlineButton(label: p.also!.label, onTap: p.also!.onTap, height: 48, color: QColors.textMid),
+            QOutlineButton(label: p.also!.label, onTap: p.also!.onTap, height: 48, color: QColors.ink),
           ],
         ],
       ),
@@ -679,26 +693,22 @@ class QStateLine extends StatelessWidget {
   final ProblemAction? action;
   final Color accent;
   final IconData icon;
-  const QStateLine({super.key, required this.line, this.action, this.accent = QColors.violet, this.icon = Icons.info_outline});
+  const QStateLine({super.key, required this.line, this.action, this.accent = QColors.ink, this.icon = QIcons.info});
 
   @override
   Widget build(BuildContext context) {
     final a = action;
     return Container(
       padding: EdgeInsetsDirectional.fromSTEB(14, 12, 14, a == null ? 12 : 2),
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.08),
-        border: Border.all(color: accent.withValues(alpha: 0.32)),
-        borderRadius: BorderRadius.circular(QRadii.card),
-      ),
+      decoration: QDecor.card(color: QColors.surface, border: QColors.hairline, radius: QRadii.control),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Padding(padding: const EdgeInsets.only(top: 3), child: Icon(icon, size: 14, color: accent)),
+            Padding(padding: const EdgeInsets.only(top: 2), child: Icon(icon, size: 17, color: accent)),
             const SizedBox(width: 8),
-            Expanded(child: Text(line, style: QText.body(size: 14, height: 21, weight: FontWeight.w600, color: QColors.textHigh))),
+            Expanded(child: Text(line, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.ink))),
           ]),
           if (a != null)
             Padding(
@@ -711,7 +721,7 @@ class QStateLine extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   foregroundColor: accent,
                 ),
-                child: Text(a.label, style: QText.body(size: 13, weight: FontWeight.w600, color: accent)),
+                child: Text(a.label, style: QText.body(size: 15, weight: FontWeight.w600, color: accent)),
               ),
             ),
         ],
@@ -720,6 +730,8 @@ class QStateLine extends StatelessWidget {
   }
 }
 
+/// The secondary action: a capsule outlined in the strong hairline, white
+/// words, no fill until pressed.
 class QOutlineButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
@@ -728,29 +740,43 @@ class QOutlineButton extends StatelessWidget {
   /// whatever this is (O11).
   final double height;
   final Color color;
-  const QOutlineButton({super.key, required this.label, required this.onTap, this.height = 44, this.color = QColors.textMuted});
+  final IconData? icon;
+  const QOutlineButton({super.key, required this.label, required this.onTap, this.height = 44, this.color = QColors.ink, this.icon});
 
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
+    final ink = enabled ? color : QDisabled.label;
     return QTapArea(
       onTap: onTap,
       minWidth: 64,
-      builder: (context, pressed) => ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 64),
-        child: Container(
-          height: height,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: pressed ? QColors.moonlight.withValues(alpha: 0.06) : Colors.transparent,
-            border: Border.all(color: enabled ? QColors.borderSoft : QDisabled.edge),
-            borderRadius: BorderRadius.circular(QRadii.control),
-          ),
-          child: Center(
-            widthFactor: 1,
-            child: Text(label,
-                textAlign: TextAlign.center,
-                style: QText.body(size: 14, weight: FontWeight.w500, color: enabled ? color : QDisabled.label)),
+      builder: (context, pressed) => qPressed(
+        context,
+        pressed: pressed,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 64),
+          child: Container(
+            height: height,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: QDecor.capsule(
+              edge: enabled ? QColors.hairlineStrong : QDisabled.edge,
+              fill: pressed ? QColors.surfaceRaised : Colors.transparent,
+            ),
+            child: Center(
+              widthFactor: 1,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 16, color: ink),
+                    const SizedBox(width: 6),
+                  ],
+                  Flexible(
+                    child: Text(label, textAlign: TextAlign.center, style: QText.body(size: 15, weight: FontWeight.w500, color: ink)),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -771,45 +797,75 @@ class QPillChip extends StatelessWidget {
         HapticFeedback.selectionClick();
         onTap();
       },
-      builder: (context, pressed) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-        decoration: BoxDecoration(
-          color: selected
-              ? QColors.violet.withValues(alpha: 0.18)
-              : pressed
-                  ? QColors.cardMid
-                  : QColors.cardDeep,
-          border: Border.all(color: selected ? QColors.violet : QColors.borderSoft),
-          borderRadius: BorderRadius.circular(QRadii.pill),
+      // Selected is inverted — a white capsule with black words — so it
+      // reads as chosen without a colour.
+      builder: (context, pressed) => qPressed(
+        context,
+        pressed: pressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          decoration: QDecor.capsule(
+            edge: selected ? QColors.ink : QColors.hairline,
+            fill: selected
+                ? QColors.ink
+                : pressed
+                    ? QColors.surfaceRaised
+                    : QColors.surface,
+          ),
+          child: Text(label, style: QText.body(size: 15, weight: FontWeight.w500, color: selected ? QColors.onInk : QColors.ink)),
         ),
-        child: Text(label, style: QText.body(size: 14, weight: FontWeight.w500, color: selected ? QColors.textPrimary : QColors.textMid)),
       ),
     );
   }
 }
 
+/// Su Points' coin, drawn in the palette: a white ring with a crescent in
+/// it — the moon's mark, as the coin of Qamar's own currency.
 class SuCoinIcon extends StatelessWidget {
   final double size;
-  const SuCoinIcon({super.key, this.size = 16});
+  final Color color;
+  const SuCoinIcon({super.key, this.size = 16, this.color = QColors.ink});
   @override
-  Widget build(BuildContext context) {
-    return ClipOval(
-      child: Image.asset('assets/images/su_coin.png', width: size, height: size, fit: BoxFit.cover),
-    );
-  }
+  Widget build(BuildContext context) => CustomPaint(size: Size.square(size), painter: _CoinPainter(color));
 }
 
+class _CoinPainter extends CustomPainter {
+  final Color color;
+  const _CoinPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = size.width / 2;
+    final c = Offset(r, r);
+    final stroke = math.max(1.0, size.width * 0.09);
+    canvas.drawCircle(c, r - stroke / 2, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..color = color);
+    // A crescent: a disc, less a disc a little to its upper right.
+    final moon = Path()..addOval(Rect.fromCircle(center: c, radius: r * 0.5));
+    final bite = Path()..addOval(Rect.fromCircle(center: c + Offset(r * 0.26, -r * 0.18), radius: r * 0.44));
+    canvas.drawPath(Path.combine(PathOperation.difference, moon, bite), Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_CoinPainter old) => old.color != color;
+}
+
+/// How sure the reading of a portion is. Sure is written in white inside the
+/// strong hairline; an estimate in the third ink inside the plain one. The
+/// word says which; the weight of the drawing agrees.
 class ConfidenceBadge extends StatelessWidget {
   final bool high;
   final String label;
   const ConfidenceBadge({super.key, required this.high, required this.label});
   @override
   Widget build(BuildContext context) {
-    final color = high ? QColors.green : QColors.amber;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(border: Border.all(color: color.withOpacity(0.4)), borderRadius: BorderRadius.circular(QRadii.pill)),
-      child: Text(label, style: QText.body(size: 11, weight: FontWeight.w500, color: color)),
+      decoration: QDecor.capsule(edge: high ? QColors.hairlineStrong : QColors.hairline),
+      child: Text(label, style: QText.body(size: 11, weight: FontWeight.w600, color: high ? QColors.ink : QColors.inkTertiary)),
     );
   }
 }
@@ -826,38 +882,27 @@ class QBackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
+    return QTapArea(
+      onTap: onTap,
       label: isAr ? 'رجوع' : 'Back',
-      excludeSemantics: true,
-      child: Tooltip(
-        message: isAr ? 'رجوع' : 'Back',
-        child: Material(
-          color: Colors.transparent,
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onTap,
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: Center(
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: QColors.borderSoft)),
-                  // arrow_back follows the text direction: it points right in Arabic.
-                  child: const Icon(Icons.arrow_back, size: 18, color: QColors.textMid),
-                ),
-              ),
-            ),
-          ),
+      builder: (context, pressed) => qPressed(
+        context,
+        pressed: pressed,
+        child: QGlass(
+          shape: QGlassShape.circle,
+          pressed: pressed,
+          width: 44,
+          height: 44,
+          // The chevron follows the text direction: it points right in Arabic.
+          child: const Center(child: Icon(QIcons.back, size: 20, color: QColors.ink)),
         ),
       ),
     );
   }
 }
 
+/// A round icon control on a card: a raised grey disc, a white glyph. On the
+/// canvas, where it floats, use glass instead (QGlass).
 class QRoundIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
@@ -874,15 +919,19 @@ class QRoundIconButton extends StatelessWidget {
     return QTapArea(
       onTap: onTap,
       label: label,
-      builder: (context, pressed) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: pressed ? QColors.cardMid : Colors.transparent,
-          border: Border.all(color: enabled ? QColors.borderSoft : QDisabled.edge),
+      builder: (context, pressed) => qPressed(
+        context,
+        pressed: pressed,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: pressed ? QColors.surfaceHigh : QColors.surfaceRaised,
+            border: Border.all(color: enabled ? QColors.hairline : QDisabled.edge),
+          ),
+          child: Icon(icon, size: size * 0.5, color: enabled ? QColors.ink : QDisabled.label),
         ),
-        child: Icon(icon, size: size * 0.5, color: enabled ? QColors.textMid : QDisabled.label),
       ),
     );
   }
@@ -985,10 +1034,10 @@ class _QWheelFieldState extends State<QWheelField> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         // One radius across the answer stack: the wheels and Continue (O7).
-        decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.control),
+        decoration: QDecor.card(color: QColors.surface, radius: QRadii.control),
         child: Column(
           children: [
-            Text(widget.unit, style: QText.body(size: 12, color: QColors.textMuted)),
+            Text(widget.unit, style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.inkSecondary)),
             const SizedBox(height: 2),
             SizedBox(
               height: 88,
@@ -999,11 +1048,9 @@ class _QWheelFieldState extends State<QWheelField> {
                   IgnorePointer(
                     child: Container(
                       height: 32,
-                      decoration: BoxDecoration(
-                        color: QColors.violet.withValues(alpha: 0.12),
-                        border: Border.symmetric(
-                          horizontal: BorderSide(color: QColors.violet.withValues(alpha: 0.45)),
-                        ),
+                      decoration: const BoxDecoration(
+                        color: QColors.surfaceHigh,
+                        borderRadius: BorderRadius.all(Radius.circular(QRadii.inset)),
                       ),
                     ),
                   ),
@@ -1062,14 +1109,7 @@ class QLangToggle extends StatelessWidget {
         children: [
           Positioned.fill(
             child: Center(
-              child: Container(
-                height: h,
-                decoration: BoxDecoration(
-                  color: QColors.cardDeep.withValues(alpha: 0.9),
-                  border: Border.all(color: QColors.borderSoft),
-                  borderRadius: BorderRadius.circular(QRadii.pill),
-                ),
-              ),
+              child: QGlass(height: h, child: const SizedBox.expand()),
             ),
           ),
           // Fixed left-to-right so the two options never swap places when the
@@ -1117,8 +1157,8 @@ class _Segment extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: large ? 14 : 11),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          gradient: selected ? QColors.brandGradient : null,
-          borderRadius: BorderRadius.circular(QRadii.pill),
+          color: selected ? QColors.ink : Colors.transparent,
+          borderRadius: const BorderRadius.all(Radius.circular(QRadii.pill)),
         ),
         child: ExcludeSemantics(
           child: Text(
@@ -1126,7 +1166,7 @@ class _Segment extends StatelessWidget {
             style: QText.body(
               size: large ? 13 : 12,
               weight: FontWeight.w600,
-              color: selected ? QColors.onAccent : QColors.textMuted,
+              color: selected ? QColors.onInk : QColors.inkSecondary,
             ),
           ),
         ),
@@ -1252,8 +1292,38 @@ class QLegalLink extends StatelessWidget {
         style: QText.body(
           size: size,
           weight: FontWeight.w500,
-          color: pressed ? QColors.textMid : QColors.textMuted,
-        ).copyWith(decoration: TextDecoration.underline, decorationColor: QColors.textMuted),
+          color: pressed ? QColors.inkSecondary : QColors.inkTertiary,
+        ).copyWith(decoration: TextDecoration.underline, decorationColor: QColors.inkTertiary),
+      ),
+    );
+  }
+}
+
+/// A thin bar of progress: white along a raised grey track, round-ended, 4
+/// points tall. How far along something is, said by length, not by colour.
+class QBar extends StatelessWidget {
+  final double value;
+  final double height;
+  const QBar({super.key, required this.value, this.height = 4});
+
+  @override
+  Widget build(BuildContext context) {
+    final v = value.clamp(0.0, 1.0);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(QRadii.pill),
+      child: SizedBox(
+        height: height,
+        child: Stack(
+          children: [
+            const Positioned.fill(child: ColoredBox(color: QColors.surfaceHigh)),
+            FractionallySizedBox(
+              alignment: AlignmentDirectional.centerStart,
+              widthFactor: v,
+              heightFactor: 1,
+              child: const ColoredBox(color: QColors.ink),
+            ),
+          ],
+        ),
       ),
     );
   }

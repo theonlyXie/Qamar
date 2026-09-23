@@ -23,8 +23,7 @@ class WeekGlanceCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 8, 12),
       decoration: QDecor.card(
-        gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
-        border: QColors.violet.withValues(alpha: 0.35),
+        border: QColors.ink.withValues(alpha: 0.35),
         radius: QRadii.card,
       ),
       child: Column(
@@ -37,13 +36,13 @@ class WeekGlanceCard extends StatelessWidget {
             constraints: const BoxConstraints(minHeight: QLayout.minTap),
             child: Row(
               children: [
-                Text(isAr ? 'أسبوعك مع قمر' : 'Your week with Qamar', style: QText.body(size: 11, weight: FontWeight.w600, color: QColors.violetSoft)),
+                Text(isAr ? 'أسبوعك مع قمر' : 'Your week with Qamar', style: QText.body(size: 11, weight: FontWeight.w600, color: QColors.inkSecondary)),
                 const Spacer(),
-                QOutlineButton(key: openKey, label: isAr ? 'شوف الأسبوع' : 'See the week', onTap: state.openWeekCard, height: 34, color: QColors.textMid),
+                QOutlineButton(key: openKey, label: isAr ? 'شوف الأسبوع' : 'See the week', onTap: state.openWeekCard, height: 34, color: QColors.inkSecondary),
               ],
             ),
           ),
-          Text(isAr ? review.insight.ar : review.insight.en, style: QText.body(size: 15, height: 21, weight: FontWeight.w600, color: QColors.textPrimary)),
+          Text(isAr ? review.insight.ar : review.insight.en, style: QText.body(size: 15, height: 21, weight: FontWeight.w600, color: QColors.ink)),
         ],
       ),
     );

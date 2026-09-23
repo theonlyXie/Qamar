@@ -1,7 +1,7 @@
-// Corners, seat 6's part: four radii and the pill (the scorecard counted
-// thirteen, 3 to 28), each shape taking the corner of what it is: an inset
-// (10), a control or field (16), a card or bubble (20), a sheet's top (28),
-// and the pill. No corner is written as a number outside the theme, and a
+// Corners (the mono-glass skill): four radii and the pill, each shape taking
+// the corner of what it is: an inset (12), a control or field (18), a card or
+// a message bubble (24), a sheet's top (32), and the pill for anything a
+// finger presses. No corner is written as a number outside the theme, and a
 // sweep of every screen, the tree and the conversation, in both languages,
 // finds no other corner drawn.
 
@@ -56,7 +56,7 @@ void main() {
   });
 
   test('four corners and the pill', () {
-    expect([QRadii.inset, QRadii.control, QRadii.card, QRadii.sheet, QRadii.pill], [10, 16, 20, 28, 999]);
+    expect([QRadii.inset, QRadii.control, QRadii.card, QRadii.sheet, QRadii.pill], [12, 18, 24, 32, 999]);
   });
 
   test('no corner is written as a number outside the theme', () {

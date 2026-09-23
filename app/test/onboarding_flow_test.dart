@@ -300,7 +300,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.textContaining('General guidance', findRichText: true), findsOneWidget);
       expect(find.textContaining('kcal remaining'), findsNothing);
-      expect(find.text('Why this number?'), findsNothing);
+      expect(find.text(s.t.whyCta), findsNothing);
 
       s.go(AppScreen.plan);
       await tester.pump();

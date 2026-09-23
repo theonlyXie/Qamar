@@ -274,11 +274,11 @@ class _ExplainableState extends State<Explainable> {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(QRadii.inset),
-        color: hovered ? QColors.violet.withValues(alpha: 0.16) : Colors.transparent,
+        color: hovered ? QColors.ink.withValues(alpha: 0.16) : Colors.transparent,
         border: Border.all(
-          color: hovered ? QColors.violet.withValues(alpha: 0.85) : Colors.transparent,
+          color: hovered ? QColors.ink.withValues(alpha: 0.85) : Colors.transparent,
         ),
-        boxShadow: hovered ? [BoxShadow(color: QColors.violet.withValues(alpha: 0.35), blurRadius: 18)] : null,
+        boxShadow: hovered ? [BoxShadow(color: QColors.ink.withValues(alpha: 0.35), blurRadius: 18)] : null,
       ),
       child: widget.child,
     );
@@ -297,7 +297,7 @@ class ExplainMark extends StatelessWidget {
   final Widget child;
   const ExplainMark({super.key, required this.child});
 
-  static final color = QColors.violetSoft.withValues(alpha: 0.7);
+  static final color = QColors.inkSecondary.withValues(alpha: 0.7);
 
   @override
   Widget build(BuildContext context) {
@@ -355,8 +355,8 @@ class _ExplainSheetState extends State<ExplainSheet> {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 34),
           decoration: const BoxDecoration(
-            color: QColors.cardDeep,
-            border: Border(top: BorderSide(color: QColors.borderStrong)),
+            color: QColors.surface,
+            border: Border(top: BorderSide(color: QColors.hairlineStrong)),
             borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
           ),
           child: Column(
@@ -367,7 +367,7 @@ class _ExplainSheetState extends State<ExplainSheet> {
                 child: Container(
                   width: 38,
                   height: 4,
-                  decoration: BoxDecoration(color: QColors.borderStrong, borderRadius: BorderRadius.circular(QRadii.pill)),
+                  decoration: BoxDecoration(color: QColors.hairlineStrong, borderRadius: BorderRadius.circular(QRadii.pill)),
                 ),
               ),
               const SizedBox(height: 16),
@@ -381,10 +381,10 @@ class _ExplainSheetState extends State<ExplainSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(isAr ? ex.titleAr : ex.titleEn,
-                            style: QText.display(size: 24, ar: isAr, color: QColors.textPrimary)),
+                            style: QText.display(size: 22, ar: isAr, color: QColors.ink)),
                         const SizedBox(height: 6),
                         Text(isAr ? ex.bodyAr : ex.bodyEn,
-                            style: QText.body(size: 14, height: 22, color: QColors.textHigh)),
+                            style: QText.body(size: 15, height: 22, color: QColors.ink)),
                       ],
                     ),
                   ),
@@ -394,18 +394,18 @@ class _ExplainSheetState extends State<ExplainSheet> {
               Container(
                 padding: const EdgeInsets.all(13),
                 decoration: BoxDecoration(
-                  color: QColors.violet.withValues(alpha: 0.10),
-                  border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
+                  color: QColors.ink.withValues(alpha: 0.10),
+                  border: Border.all(color: QColors.ink.withValues(alpha: 0.35)),
                   borderRadius: BorderRadius.circular(QRadii.control),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.lightbulb_outline, size: 16, color: QColors.violetSoft),
+                    const Icon(Icons.lightbulb_outline, size: 16, color: QColors.inkSecondary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(isAr ? ex.soWhatAr : ex.soWhatEn,
-                          style: QText.body(size: 13, height: 20, color: QColors.textMid)),
+                          style: QText.body(size: 13, height: 20, color: QColors.inkSecondary)),
                     ),
                   ],
                 ),
@@ -421,7 +421,7 @@ class _ExplainSheetState extends State<ExplainSheet> {
                         state.openChat();
                       },
                       height: 46,
-                      color: QColors.textMid,
+                      color: QColors.inkSecondary,
                     ),
                   ),
                   const SizedBox(width: 10),

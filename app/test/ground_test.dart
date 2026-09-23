@@ -63,14 +63,14 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(_strip(tester, HomeShell.topStripKey), QColors.scrim, reason: 'a sheet dims the status bar too');
-    expect(_strip(tester, HomeShell.bottomStripKey), QColors.bgBottom, reason: 'the sheet itself, at the bottom');
+    expect(_strip(tester, HomeShell.bottomStripKey), QColors.surface, reason: 'the sheet itself, at the bottom');
     s.closeWhy();
 
     s.openScan();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(_strip(tester, HomeShell.topStripKey), QColors.bgScan, reason: 'the scan is black edge to edge');
-    expect(_strip(tester, HomeShell.bottomStripKey), QColors.bgScan);
+    expect(_strip(tester, HomeShell.topStripKey), QColors.canvas, reason: 'the scan is black edge to edge');
+    expect(_strip(tester, HomeShell.bottomStripKey), QColors.canvas);
   });
 
   test('covers stack in the order they are drawn', () {
@@ -108,7 +108,7 @@ void main() {
             .map((b) => b.top.color)
             .toList();
         expect(edges, isNotEmpty, reason: eyebrow);
-        expect(edges.first, QColors.borderSoft, reason: '$eyebrow’s card: the one edge, not violet or green');
+        expect(edges.first, QColors.hairline, reason: '$eyebrow’s card: the one edge, the hairline');
       }
     });
   }

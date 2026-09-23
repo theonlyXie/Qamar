@@ -23,8 +23,8 @@ class ProviderRow extends StatelessWidget {
 
   static const _providers = <(OAuthChoice, String, Widget)>[
     (OAuthChoice.google, 'Google', GoogleMark(size: 18)),
-    (OAuthChoice.apple, 'Apple', Icon(Icons.apple, size: 20, color: QColors.textHigh)),
-    (OAuthChoice.facebook, 'Facebook', Icon(Icons.facebook, size: 20, color: QColors.textHigh)),
+    (OAuthChoice.apple, 'Apple', Icon(Icons.apple, size: 20, color: QColors.ink)),
+    (OAuthChoice.facebook, 'Facebook', Icon(Icons.facebook, size: 20, color: QColors.ink)),
   ];
 
   @override
@@ -66,7 +66,7 @@ class _GooglePainter extends CustomPainter {
   const _GooglePainter();
 
   static final _parts = <(Color, Path)>[
-    (QColors.googleRed, Path()
+    (QBrandMarks.googleRed, Path()
       ..moveTo(24, 9.5)
       ..cubicTo(27.54, 9.5, 30.71, 10.72, 33.21, 13.1)
       ..lineTo(40.06, 6.25)
@@ -75,7 +75,7 @@ class _GooglePainter extends CustomPainter {
       ..lineTo(10.54, 19.41)
       ..cubicTo(12.43, 13.72, 17.74, 9.5, 24, 9.5)
       ..close()),
-    (QColors.googleBlue, Path()
+    (QBrandMarks.googleBlue, Path()
       ..moveTo(46.98, 24.55)
       ..cubicTo(46.98, 22.98, 46.83, 21.46, 46.6, 20)
       ..lineTo(24, 20)
@@ -85,7 +85,7 @@ class _GooglePainter extends CustomPainter {
       ..lineTo(39.89, 42.2)
       ..cubicTo(44.4, 38.02, 46.98, 31.84, 46.98, 24.55)
       ..close()),
-    (QColors.googleYellow, Path()
+    (QBrandMarks.googleYellow, Path()
       ..moveTo(10.53, 28.59)
       ..cubicTo(10.05, 27.14, 9.77, 25.6, 9.77, 24)
       ..cubicTo(9.77, 22.4, 10.04, 20.86, 10.53, 19.41)
@@ -94,7 +94,7 @@ class _GooglePainter extends CustomPainter {
       ..cubicTo(0, 27.88, 0.92, 31.54, 2.56, 34.78)
       ..lineTo(10.53, 28.59)
       ..close()),
-    (QColors.googleGreen, Path()
+    (QBrandMarks.googleGreen, Path()
       ..moveTo(24, 48)
       ..cubicTo(30.48, 48, 35.93, 45.87, 39.89, 42.19)
       ..lineTo(32.16, 36.19)
@@ -138,8 +138,8 @@ class _ProviderButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: enabled ? onTap : null,
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: QColors.borderSoft),
-          backgroundColor: QColors.cardDeep,
+          side: const BorderSide(color: QColors.hairline),
+          backgroundColor: QColors.surface,
           padding: EdgeInsets.zero,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(QRadii.control)),
         ),
@@ -147,7 +147,7 @@ class _ProviderButton extends StatelessWidget {
             ? const SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2, color: QColors.textMid),
+                child: CircularProgressIndicator(strokeWidth: 2, color: QColors.inkSecondary),
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -159,7 +159,7 @@ class _ProviderButton extends StatelessWidget {
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: QText.body(size: 13, weight: FontWeight.w600, color: enabled ? QColors.textHigh : QColors.textDisabled),
+                      style: QText.body(size: 13, weight: FontWeight.w600, color: enabled ? QColors.ink : QColors.inkDisabled),
                     ),
                   ),
                 ],
@@ -205,8 +205,8 @@ class _AccountSheetState extends State<AccountSheet> {
           width: double.infinity,
           padding: EdgeInsets.fromLTRB(20, 18, 20, 24 + MediaQuery.of(context).viewInsets.bottom),
           decoration: const BoxDecoration(
-            gradient: QColors.sheet,
-            border: Border(top: BorderSide(color: QColors.borderStrong)),
+            color: QColors.surface,
+            border: Border(top: BorderSide(color: QColors.hairlineStrong)),
             borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
           ),
           child: Column(
@@ -226,9 +226,9 @@ class _AccountSheetState extends State<AccountSheet> {
 
     if (state.authDone != null) {
       return [
-        Text(title, style: QText.display(size: 24, ar: QText.arabic(title), color: QColors.textPrimary)),
+        Text(title, style: QText.display(size: 22, ar: QText.arabic(title), color: QColors.ink)),
         const SizedBox(height: 10),
-        Text(state.authDone!, style: QText.body(size: 14, height: 22, color: QColors.textHigh)),
+        Text(state.authDone!, style: QText.body(size: 15, height: 22, color: QColors.ink)),
         const SizedBox(height: 16),
         QPrimaryButton(label: isAr ? 'تمام' : 'Done', onTap: state.closeAuth, height: 50),
       ];
@@ -237,7 +237,7 @@ class _AccountSheetState extends State<AccountSheet> {
     return [
       Row(
         children: [
-          Expanded(child: Text(title, style: QText.display(size: 24, ar: QText.arabic(title), color: QColors.textPrimary))),
+          Expanded(child: Text(title, style: QText.display(size: 22, ar: QText.arabic(title), color: QColors.ink))),
           QRoundIconButton(icon: Icons.close, onTap: state.closeAuth, size: 34, label: state.isAr ? 'اقفل' : 'Close'),
         ],
       ),
@@ -250,7 +250,7 @@ class _AccountSheetState extends State<AccountSheet> {
             : (isAr
                 ? 'ادخل بنفس الطريقة اللي سجلت بيها.'
                 : 'Use whichever way you signed up with.'),
-        style: QText.body(size: 13, height: 20, color: QColors.textMuted),
+        style: QText.body(size: 13, height: 20, color: QColors.inkTertiary),
       ),
       const SizedBox(height: 14),
       // One tap first, typing second — most people will never reach the field
@@ -259,13 +259,13 @@ class _AccountSheetState extends State<AccountSheet> {
       const SizedBox(height: 14),
       Row(
         children: [
-          const Expanded(child: Divider(color: QColors.borderSoft, height: 1)),
+          const Expanded(child: Divider(color: QColors.hairline, height: 1)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(isAr ? 'أو بالإيميل' : 'or with email',
-                style: QText.body(size: 12, color: QColors.textMuted)),
+                style: QText.body(size: 12, color: QColors.inkTertiary)),
           ),
-          const Expanded(child: Divider(color: QColors.borderSoft, height: 1)),
+          const Expanded(child: Divider(color: QColors.hairline, height: 1)),
         ],
       ),
       const SizedBox(height: 14),
@@ -292,11 +292,11 @@ class _AccountSheetState extends State<AccountSheet> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: QColors.amber.withValues(alpha: 0.1),
-            border: Border.all(color: QColors.amber.withValues(alpha: 0.4)),
+            color: QColors.inkSecondary.withValues(alpha: 0.1),
+            border: Border.all(color: QColors.inkSecondary.withValues(alpha: 0.4)),
             borderRadius: BorderRadius.circular(QRadii.control),
           ),
-          child: Text(state.authError!, style: QText.body(size: 12, height: 18, color: QColors.amberSoft)),
+          child: Text(state.authError!, style: QText.body(size: 12, height: 18, color: QColors.inkSecondary)),
         ),
       ],
       const SizedBox(height: 14),
@@ -314,7 +314,7 @@ class _AccountSheetState extends State<AccountSheet> {
           child: TextButton(
             onPressed: state.authBusy ? null : state.sendAuthCode,
             child: Text(isAr ? 'ابعت الكود تاني' : 'Send it again',
-                style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
+                style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkTertiary)),
           ),
         ),
       ],
@@ -347,16 +347,16 @@ class _Field extends StatelessWidget {
       inputFormatters: formatters,
       textDirection: TextDirection.ltr,
       onChanged: onChanged,
-      style: QText.number(size: 15, color: QColors.textPrimary),
+      style: QText.number(size: 15, color: QColors.ink),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: QText.body(size: 14, color: QColors.textMuted),
+        hintStyle: QText.body(size: 15, color: QColors.inkTertiary),
         filled: true,
-        fillColor: QColors.cardDeep,
+        fillColor: QColors.surface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.borderSoft)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.borderSoft)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.violet)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.hairline)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.hairline)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(QRadii.control), borderSide: const BorderSide(color: QColors.ink)),
       ),
     );
   }

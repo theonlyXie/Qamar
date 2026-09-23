@@ -58,7 +58,7 @@ void main() {
           expect(link.left - mark.right, lessThanOrEqualTo(12));
         }
         final style = tester.widget<Text>(find.byKey(ReviewCard.footerKey)).style!;
-        expect(contrastRatio(style.color!, QColors.cardMid), greaterThanOrEqualTo(4.5), reason: 'readable, not a watermark');
+        expect(contrastRatio(style.color!, QColors.surfaceRaised), greaterThanOrEqualTo(4.5), reason: 'readable, not a watermark');
         final runText = find.textContaining(ar ? 'أيام ورا بعض' : 'days in a row');
         if (run >= 2) {
           final r = tester.getRect(runText);

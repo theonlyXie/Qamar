@@ -1,6 +1,6 @@
-// The type scale, seat 6's part: text is set at a size on the scale and
-// nowhere between (six steps for reading and controls, nothing under 11;
-// four for the serif display, each with its own line height; four for
+// The type scale (the mono-glass skill): text is set at a size on Apple's
+// scale and nowhere between (six steps for reading and controls, nothing
+// under 11; four display sizes, each with its own line height; four for
 // figures); tracking is set by size, none at reading sizes and tighter as
 // type grows; and Arabic is never tracked, where space between joined
 // letters broke the word (the eyebrow labels were set at +0.4 in both
@@ -53,8 +53,11 @@ void main() {
 
   group('the scale', () {
     test('six steps for reading, nothing under 11; four display sizes, each with its line height', () {
-      expect(QText.textSizes, [11, 12, 13, 14, 15, 17]);
-      expect(QText.displaySizes, {20: 24, 24: 30, 30: 38, 40: 48});
+      // Apple's Dynamic Type at the default size: caption 2, caption 1,
+      // footnote, subheadline, callout, body; title 3, title 2, title 1,
+      // large title.
+      expect(QText.textSizes, [11, 12, 13, 15, 16, 17]);
+      expect(QText.displaySizes, {20: 25, 22: 28, 28: 34, 34: 41});
       for (final e in QText.displaySizes.entries) {
         expect(QText.display(size: e.key, ar: false).height! * e.key, moreOrLessEquals(e.value));
       }
@@ -62,9 +65,9 @@ void main() {
 
     test('a size off the scale does not draw', () {
       expect(() => QText.body(size: 10), throwsAssertionError);
-      expect(() => QText.body(size: 16), throwsAssertionError);
+      expect(() => QText.body(size: 14), throwsAssertionError);
       expect(() => QText.number(size: 38), throwsAssertionError);
-      expect(() => QText.display(size: 34, ar: false), throwsAssertionError);
+      expect(() => QText.display(size: 24, ar: false), throwsAssertionError);
     });
 
     test('tracking by size: none at reading sizes, tighter as type grows', () {

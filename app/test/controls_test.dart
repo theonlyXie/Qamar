@@ -41,13 +41,13 @@ void main() {
     }
   });
 
-  test('switches are the palette’s: white on the deep violet, a muted thumb on an edged card', () {
+  test('switches are inverted, not coloured: on is a black thumb on a white track, off a white thumb on raised grey', () {
     final theme = buildQamarTheme().switchTheme;
-    expect(theme.thumbColor!.resolve({WidgetState.selected}), QColors.onAccent);
-    expect(theme.trackColor!.resolve({WidgetState.selected}), QColors.violetDeep);
-    expect(theme.thumbColor!.resolve({}), QColors.textMuted);
-    expect(theme.trackColor!.resolve({}), QColors.cardMid);
-    expect(theme.trackOutlineColor!.resolve({}), QColors.borderStrong);
+    expect(theme.thumbColor!.resolve({WidgetState.selected}), QColors.onInk);
+    expect(theme.trackColor!.resolve({WidgetState.selected}), QColors.ink);
+    expect(theme.thumbColor!.resolve({}), QColors.ink);
+    expect(theme.trackColor!.resolve({}), QColors.surfaceHigh);
+    expect(theme.trackOutlineColor!.resolve({}), QColors.hairlineStrong);
   });
 
   for (final lang in AppLang.values) {
@@ -102,8 +102,8 @@ void main() {
           .whereType<BoxDecoration>()
           .where((d) => d.color != null);
       final fill = boxes.first.color!;
-      expect(fill, QColors.glassHigh);
-      expect(fill.b, greaterThan(fill.r), reason: 'cool, not warm grey');
+      expect(fill, QColors.surfaceHigh);
+      expect(fill.b, fill.r, reason: 'a grey, with no hue in it');
     });
 
     testWidgets('below the smallest payout, the payout is off; with no code, the way to one is an instruction (${lang.name})', (tester) async {
@@ -117,7 +117,7 @@ void main() {
       expect(link.width, lessThan(390 * 0.6), reason: 'a compact pill, as wide as its label');
       expect(link.height, greaterThanOrEqualTo(48), reason: 'touched across 48');
       final placeholder = tester.widget<Text>(find.byKey(YouScreen.proCodeKey));
-      expect(placeholder.style!.color, QColors.textMuted);
+      expect(placeholder.style!.color, QColors.inkTertiary);
       expect(placeholder.style!.fontSize, lessThan(17), reason: 'not set like the code it stands in for');
 
       s.affiliateWallet = const AffiliateWallet(code: 'QMR-AB12', balanceCents: 5000);

@@ -117,7 +117,7 @@ void main() {
     expect(_inputsOpacity(tester, find.byType(QPillChip).first), 1);
   });
 
-  testWidgets('one radius across the answer stack; the composer a pill; the wheels’ labels at 12pt', (tester) async {
+  testWidgets('the wheel cards take the control corner; Continue and the composer are capsules; the wheels’ labels at 12pt', (tester) async {
     final s = AppState()..setLang(AppLang.en);
     s.startOnboarding();
     s.step = kOnboardingSteps.indexWhere((x) => x.id == 'dob');
@@ -142,8 +142,9 @@ void main() {
         .widgetList<DecoratedBox>(find.descendant(of: find.byType(QPrimaryButton), matching: find.byType(DecoratedBox)))
         .map((d) => d.decoration)
         .whereType<BoxDecoration>()
-        .firstWhere((d) => d.gradient != null);
-    expect(continueBox.borderRadius, BorderRadius.circular(QRadii.control), reason: 'Continue, the same radius');
+        .firstWhere((d) => d.color != null);
+    expect(continueBox.gradient, isNull, reason: 'white, not a gradient');
+    expect(continueBox.borderRadius, const BorderRadius.all(Radius.circular(QRadii.pill)), reason: 'Continue is pressed, so it is a capsule, as every button is');
 
     final field = tester.widget<TextField>(find.descendant(of: find.byKey(OnboardingScreen.dockKey), matching: find.byType(TextField)));
     final border = field.decoration!.enabledBorder! as OutlineInputBorder;
