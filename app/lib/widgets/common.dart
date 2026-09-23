@@ -186,6 +186,88 @@ class QPrimaryButton extends StatelessWidget {
   }
 }
 
+/// Centred text wrapped to even lines, the way CSS's `text-wrap: balance`
+/// does: at the narrowest width that keeps the same number of lines, so a
+/// centred sentence never ends on one orphaned word ("…Not a medical" /
+/// "service."). One line stays one line.
+class QBalancedText extends StatelessWidget {
+  final String text;
+  final TextStyle style;
+
+  /// On the [Text] itself, for a finder that reads it.
+  final Key? textKey;
+  const QBalancedText(this.text, {super.key, this.textKey, required this.style});
+
+  /// The width [text] balances to inside [maxWidth].
+  static double balancedWidth(String text, TextStyle style, double maxWidth, TextDirection direction, TextScaler scaler) {
+    int lines(double w) => (TextPainter(text: TextSpan(text: text, style: style), textDirection: direction, textScaler: scaler)..layout(maxWidth: w)).computeLineMetrics().length;
+    final n = lines(maxWidth);
+    if (n < 2) return maxWidth;
+    var lo = maxWidth / (n + 1), hi = maxWidth;
+    for (var i = 0; i < 14; i++) {
+      final mid = (lo + hi) / 2;
+      if (lines(mid) > n) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+    return math.min(maxWidth, hi.ceilToDouble() + 1);
+  }
+
+  @override
+  Widget build(BuildContext context) => _Balance(
+        text: text,
+        style: DefaultTextStyle.of(context).style.merge(style),
+        direction: Directionality.of(context),
+        scaler: MediaQuery.textScalerOf(context),
+        child: Text(text, key: textKey, textAlign: TextAlign.center, style: style),
+      );
+}
+
+/// Lays its text out at the balanced width, centred in the width it is
+/// given. A render object rather than a LayoutBuilder so a parent that asks
+/// for intrinsic sizes (a sliver filling the remaining space) can: the lines
+/// are the same in number at either width, so the height is the text's.
+class _Balance extends SingleChildRenderObjectWidget {
+  final String text;
+  final TextStyle style;
+  final TextDirection direction;
+  final TextScaler scaler;
+  const _Balance({required this.text, required this.style, required this.direction, required this.scaler, required super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderBalance(text, style, direction, scaler);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderBalance r) {
+    r
+      ..text = text
+      ..style = style
+      ..direction = direction
+      ..scaler = scaler
+      ..markNeedsLayout();
+  }
+}
+
+class _RenderBalance extends RenderShiftedBox {
+  String text;
+  TextStyle style;
+  TextDirection direction;
+  TextScaler scaler;
+  _RenderBalance(this.text, this.style, this.direction, this.scaler) : super(null);
+
+  @override
+  void performLayout() {
+    final c = child!;
+    final max = constraints.maxWidth;
+    final w = max.isFinite ? QBalancedText.balancedWidth(text, style, max, direction, scaler) : max;
+    c.layout(constraints.copyWith(minWidth: 0, maxWidth: w), parentUsesSize: true);
+    size = constraints.constrain(Size(max.isFinite ? max : c.size.width, c.size.height));
+    (c.parentData! as BoxParentData).offset = Offset((size.width - c.size.width) / 2, (size.height - c.size.height) / 2);
+  }
+}
+
 /// A [Problem] on a screen (O10): what happened, why when it is known, and
 /// the next step as a real button, with another way on under it when there
 /// is one. The "what" line is always shown whole.
@@ -234,10 +316,10 @@ class QStateCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          Text(p.what, textAlign: TextAlign.center, style: QText.body(size: 17, height: 24, weight: FontWeight.w600, color: QColors.textHigh)),
+          QBalancedText(p.what, style: QText.body(size: 17, height: 24, weight: FontWeight.w600, color: QColors.textHigh)),
           if (p.why != null && p.why!.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text(p.why!, textAlign: TextAlign.center, style: QText.body(size: 14, height: 21, color: QColors.textMuted)),
+            QBalancedText(p.why!, style: QText.body(size: 14, height: 21, color: QColors.textMuted)),
           ],
           const SizedBox(height: 18),
           QPrimaryButton(label: p.action.label, onTap: p.action.onTap, height: 48),

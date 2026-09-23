@@ -19,6 +19,7 @@ class SubscriptionScreen extends StatelessWidget {
   const SubscriptionScreen({super.key});
 
   static const leadKey = ValueKey('paywall-lead');
+  static const withoutKey = ValueKey('paywall-without');
   static const bannerKey = ValueKey('paywall-banner');
   static const paymentKey = ValueKey('paywall-payment');
   static const codeLineKey = ValueKey('paywall-code-line');
@@ -124,18 +125,20 @@ class SubscriptionScreen extends StatelessWidget {
         const SizedBox(height: 6),
         // What Qamar+ is for, first: the answer to "what do I eat?" The
         // night job writes tomorrow's plan for every member at 22:00 Cairo.
-        Text(
+        // The lockup (moon, name, the one sentence it is for) is centred and
+        // balanced; what follows reads from the start, like the rest of the
+        // screen, rather than as five centred lines.
+        QBalancedText(
           isAr ? 'قمر+ بيقولك تاكل إيه بكرة: بيكتبلك الخطة بالليل، بأكل مصري.' : 'Qamar+ tells you what to eat tomorrow: it writes the plan at night, in Egyptian dishes.',
-          key: SubscriptionScreen.leadKey,
-          textAlign: TextAlign.center,
+          textKey: SubscriptionScreen.leadKey,
           style: QText.body(size: 15, height: 23, weight: FontWeight.w600, color: QColors.textHigh),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 14),
         Text(
           isAr
               ? 'ومن غيره قمر شغال برضه: خطة النهارده، تلات صور وتلات أسئلة كل يوم، والكتابة والصوت بلا حد.'
               : 'Without it Qamar still works: today’s plan, three photos and three questions a day, and unlimited typing and speaking.',
-          textAlign: TextAlign.center,
+          key: SubscriptionScreen.withoutKey,
           style: QText.body(size: 14, height: 22, color: QColors.textMuted),
         ),
         const SizedBox(height: 16),
@@ -375,10 +378,9 @@ class _TierCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(QRadii.xl),
         boxShadow: [BoxShadow(color: QColors.violet.withValues(alpha: 0.22), blurRadius: 26)],
       ),
+      // One plan, so no radio: a single option is not a choice.
       child: Row(
         children: [
-          const Icon(Icons.radio_button_checked, size: 20, color: QColors.violet),
-          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -474,10 +476,11 @@ class _FeatureTable extends StatelessWidget {
                   ),
                   SizedBox(
                     width: 52,
+                    // "Included" is one mark in one colour in both columns.
                     child: Icon(
                       f.inFree ? Icons.check : Icons.remove,
                       size: 16,
-                      color: f.inFree ? QColors.green : QColors.textMuted,
+                      color: f.inFree ? QColors.violetSoft : QColors.textMuted,
                     ),
                   ),
                   const SizedBox(

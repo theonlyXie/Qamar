@@ -13,6 +13,8 @@ import '../widgets/welcome_dishes.dart';
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
+  static const boundaryKey = ValueKey('welcome-boundary');
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -78,12 +80,14 @@ class WelcomeScreen extends StatelessWidget {
               }),
             ),
           ),
+          // One axis for the whole screen: the moon, the name, the promise,
+          // the ways in and the fine print all hang from the centre line.
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(t.brand, style: QText.display(size: 40, ar: QText.arabic(t.brand), color: QColors.textPrimary)),
+              Text(t.brand, textAlign: TextAlign.center, style: QText.display(size: 40, ar: QText.arabic(t.brand), color: QColors.textPrimary)),
               const SizedBox(height: 8),
-              Text(t.promise, style: QText.body(size: 17, height: 25, color: QColors.textMid)),
+              QBalancedText(t.promise, style: QText.body(size: 17, height: 25, color: QColors.textMid)),
             ],
           ),
           const SizedBox(height: 12),
@@ -120,14 +124,15 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 4),
               TextButton(
                 onPressed: state.openSignIn,
-                child: Text(t.haveAccount, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textMuted)),
+                // Both ways back in read as links, in the one link colour.
+                child: Text(t.haveAccount, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.violetSoft)),
               ),
               // The friend's side of the referral loop: a code from someone
               // who is already here. Their name is the first thing shown.
               TextButton(
                 onPressed: state.invitationBusy ? null : () => _askInvitationCode(context, state),
                 child: Text(state.isAr ? 'عندك دعوة؟' : 'Have an invitation?',
-                    style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.violetSoft)),
+                    style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.violetSoft)),
               ),
               if (state.invitationNotice != null) ...[
                 Text(state.invitationNotice!,
@@ -137,12 +142,8 @@ class WelcomeScreen extends StatelessWidget {
               ],
               Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 300),
-                  child: Text(
-                    t.boundary,
-                    textAlign: TextAlign.center,
-                    style: QText.body(size: 11, height: 17, color: QColors.textMuted),
-                  ),
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: QBalancedText(t.boundary, textKey: WelcomeScreen.boundaryKey, style: QText.body(size: 11, height: 17, color: QColors.textMuted)),
                 ),
               ),
             ],
