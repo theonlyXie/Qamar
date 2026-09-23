@@ -9,6 +9,8 @@ import 'package:provider/provider.dart';
 
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
+import 'package:qamar/models/review.dart';
+import 'package:qamar/models/streak.dart';
 import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
@@ -44,6 +46,28 @@ void main() {
     expect(todayCardDue(_state(AppLang.en, now: _friday), TodayCard.weekCard), isTrue);
     expect(todayCardDue(_state(AppLang.en, now: _friday, logged: 2), TodayCard.weekCard), isFalse, reason: 'two days is not a week to read');
     expect(todayCardDue(_state(AppLang.en, now: _friday.add(const Duration(days: 1))), TodayCard.weekCard), isFalse, reason: 'Saturday is not review day');
+  });
+
+  test('on the general-guidance route the week never speaks of a range, a plan, or a lighter meal', () {
+    final range = RegExp(r'range|plan|light|النطاق|الخطة|خفيف');
+    final today = DateTime(_friday.year, _friday.month, _friday.day);
+    // Weeks that, with a target, would say "inside your range", "stick to the
+    // plan" or "a light dinner on Thursday".
+    final weeks = [
+      [for (var back = 1; back <= 5; back++) DayTotals(day: today.subtract(Duration(days: back)), kcal: 2000, meals: 2)],
+      [for (var back = 1; back <= 5; back++) DayTotals(day: today.subtract(Duration(days: back)), kcal: back == 1 ? 3200 : 1800, meals: 2)],
+      [for (var back = 1; back <= 5; back++) DayTotals(day: today.subtract(Duration(days: back)), kcal: 3000, meals: 2)],
+    ];
+    final ar = AppState()..setLang(AppLang.ar);
+    for (final week in weeks) {
+      final days = [for (var i = 6; i >= 0; i--) week.firstWhere((d) => d.day == today.subtract(Duration(days: i)), orElse: () => DayTotals(day: today.subtract(Duration(days: i)), kcal: 0, meals: 0))];
+      final withTarget = WeekReview.build(week: days, lastWeek: const [], targetKcal: 2000, streak: Streak.none, iso: ar.iso);
+      final guided = WeekReview.build(week: days, lastWeek: const [], targetKcal: 2000, hasTarget: false, streak: Streak.none, iso: ar.iso);
+      expect(range.hasMatch('${withTarget.insight.en} ${withTarget.change.en}'), isTrue, reason: 'the week the test means to cover');
+      for (final line in [guided.insight.en, guided.insight.ar, guided.change.en, guided.change.ar]) {
+        expect(range.hasMatch(line), isFalse, reason: line);
+      }
+    }
   });
 
   Future<void> pump(WidgetTester tester, AppState s) async {

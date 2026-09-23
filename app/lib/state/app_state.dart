@@ -2686,11 +2686,14 @@ class AppState extends ChangeNotifier {
   String _dayKey() => _clock().toIso8601String().substring(0, 10);
 
   /// Whether the quest wants Today's slot: a real one, not put away, not
-  /// past its time, not on a fasting day, and only while the score is shown.
+  /// past its time, not on a fasting day or the general-guidance route, and
+  /// only while the score is shown.
   bool get questDue {
     final q = quest;
     // No quest on a fasting day (0063): it would pay for eating in daylight.
-    if (q == null || !showScore || fasting || _questSkippedDay == _dayKey()) return false;
+    // None on the general-guidance route either (0068): a quest reads the
+    // day against a target and a plan, and there is deliberately neither.
+    if (q == null || !showScore || fasting || generalGuidance || _questSkippedDay == _dayKey()) return false;
     return q.done || q.expiresAt.isAfter(_clock());
   }
 
@@ -4325,13 +4328,16 @@ class AppState extends ChangeNotifier {
   DayNumbers dayNumbers() {
     final con = consumed();
     final tg = target();
+    // The general-guidance route has no target, on purpose: nothing is said
+    // against one (the moon is at rest there too).
+    final guided = generalGuidance;
     return DayNumbers(
       kcal: con.kcal,
-      targetKcal: tg.kcal,
+      targetKcal: guided ? null : tg.kcal,
       protein: con.p,
-      targetProtein: tg.protein,
+      targetProtein: guided ? null : tg.protein,
       hour: _clock().hour,
-      next: _plannedAhead(),
+      next: guided ? null : _plannedAhead(),
       ahead: _slotsAhead(),
     );
   }

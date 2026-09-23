@@ -21,11 +21,15 @@ import 'streak.dart';
 class DayNumbers {
   /// Eaten today, kcal.
   final int kcal;
-  final int targetKcal;
+
+  /// The day's target, or null where the person was deliberately given none
+  /// (the general-guidance route: pregnancy, breastfeeding, a condition under
+  /// care). With no target, nothing is said against one.
+  final int? targetKcal;
 
   /// Eaten today, grams of protein.
   final int protein;
-  final int targetProtein;
+  final int? targetProtein;
 
   /// The clock's hour now, 0 to 23.
   final int hour;
@@ -47,12 +51,13 @@ class DayNumbers {
     this.ahead = const [],
   });
 
-  /// Room left today. Negative past the target.
-  int get left => targetKcal - kcal;
+  /// Room left today. Negative past the target. Only read where there is a
+  /// target.
+  int get left => (targetKcal ?? kcal) - kcal;
 
   /// How close counts as "right at the target": 5% of it, and never under
   /// 100 kcal. The moon's own reach (OrbState.atTolerance), so there is one.
-  int get tolerance => OrbState.atTolerance(targetKcal);
+  int get tolerance => targetKcal == null ? 0 : OrbState.atTolerance(targetKcal!);
 }
 
 /// Which way the day reads. The first that applies, in this order.
@@ -88,18 +93,25 @@ enum DayShape {
 
   /// Anything else: the room left, and what it is for.
   room,
+
+  /// No reading of the day at all: no target to read it against (the moon
+  /// at rest, OrbDay.unknown). The words say what was logged and nothing
+  /// against any number.
+  logged,
 }
 
 DayShape shapeOf(DayNumbers d, {LoggedMeal? meal}) {
   final t = d.tolerance;
   // One reading of the day: the moon's.
   final moon = OrbState.dayFor(consumedKcal: d.kcal, targetKcal: d.targetKcal, logged: meal != null || d.kcal > 0);
+  if (moon == OrbDay.unknown) return DayShape.logged;
   if (moon == OrbDay.over) return DayShape.over;
   if (moon == OrbDay.at) return -d.left > t ? DayShape.nearOver : DayShape.atTarget;
-  final reached = d.targetProtein > 0 && d.protein >= d.targetProtein;
-  final reachedNow = meal == null ? reached : reached && d.protein - meal.p < d.targetProtein;
+  final tp = d.targetProtein ?? 0;
+  final reached = tp > 0 && d.protein >= tp;
+  final reachedNow = meal == null ? reached : reached && d.protein - meal.p < tp;
   if (reachedNow) return DayShape.proteinDone;
-  if (d.hour >= 15 && d.targetProtein > 0 && d.protein * 2 < d.targetProtein) return DayShape.proteinShort;
+  if (d.hour >= 15 && tp > 0 && d.protein * 2 < tp) return DayShape.proteinShort;
   final next = d.next;
   if (next != null) return next.kcal <= d.left + t ? DayShape.nextFits : DayShape.nextLarge;
   return DayShape.room;
@@ -112,7 +124,7 @@ String replyFor(LoggedMeal meal, DayNumbers day, {required bool ar, required Str
   final m = n(meal.kcal);
   final left = n(day.left);
   final over = n(-day.left);
-  final gap = n(math.max(0, day.targetProtein - day.protein));
+  final gap = n(math.max(0, (day.targetProtein ?? 0) - day.protein));
   final next = day.next;
   final name = next == null ? '' : (ar ? next.nameAr : next.nameEn);
   final nextK = next == null ? '' : n(next.kcal);
@@ -137,6 +149,7 @@ String replyFor(LoggedMeal meal, DayNumbers day, {required bool ar, required Str
         ? '$m سعرة؛ فاضل $left، يعني $name اللي في الخطة محتاج طبق أصغر.'
         : '$m kcal; $left left, so the plan’s $name would want a smaller plate.',
     DayShape.room => '$m ${ar ? 'سعرة؛' : 'kcal;'} ${_room(day, left, ar: ar, lower: true)}',
+    DayShape.logged => ar ? '$m سعرة، اتسجّلت.' : '$m kcal, logged.',
   };
 }
 
@@ -147,7 +160,7 @@ String dayLineFor(DayNumbers day, {required bool ar, required String Function(St
   String n(int v) => ar ? iso('$v') : '$v';
   final left = n(day.left);
   final over = n(-day.left);
-  final gap = n(math.max(0, day.targetProtein - day.protein));
+  final gap = n(math.max(0, (day.targetProtein ?? 0) - day.protein));
   final next = day.next;
   final name = next == null ? '' : (ar ? next.nameAr : next.nameEn);
   final nextK = next == null ? '' : n(next.kcal);
@@ -170,6 +183,7 @@ String dayLineFor(DayNumbers day, {required bool ar, required String Function(St
         ? 'فاضل $left سعرة، يعني $name اللي في الخطة محتاج طبق أصغر.'
         : '$left kcal left, so the plan’s $name would want a smaller plate.',
     DayShape.room => _room(day, left, ar: ar),
+    DayShape.logged => ar ? 'اتسجّل لحد دلوقتي ${n(day.kcal)} سعرة النهارده.' : '${n(day.kcal)} kcal logged so far today.',
   };
 }
 
@@ -191,7 +205,7 @@ String _room(DayNumbers d, String left, {required bool ar, bool lower = false}) 
   }
   if (d.ahead.length == 1) {
     final slot = _slot(d.ahead.single, ar);
-    final full = d.left * 4 >= d.targetKcal;
+    final full = d.left * 4 >= (d.targetKcal ?? 0);
     if (ar) return full ? 'فاضل $left سعرة — فيه مكان ل$slot كامل.' : 'فاضل $left سعرة — فيه مكان ل$slot خفيف.';
     return '$left kcal left — room for a ${full ? 'full' : 'light'} $slot.';
   }

@@ -155,6 +155,16 @@ void main() {
       expect(todayCardDue(s, TodayCard.quest), isFalse);
     });
 
+    test('no quest on the general-guidance route: it reads the day against a target there is deliberately none of', () {
+      for (final answer in [SafetyAnswer.pregnant, SafetyAnswer.breastfeeding, SafetyAnswer.chronic]) {
+        final s = _state(AppLang.en, quest: _q(QuestKind.lunchBy16));
+        expect(s.questDue, isTrue);
+        s.profile = s.profile.copyWith(safety: answer);
+        expect(s.questDue, isFalse, reason: '$answer');
+        expect(todayCardDue(s, TodayCard.quest), isFalse);
+      }
+    });
+
     test('no quest from the server, no card', () {
       expect(todayCardDue(_state(AppLang.en), TodayCard.quest), isFalse);
       expect(todayCardDue(_state(AppLang.en, quest: _q(QuestKind.water6)), TodayCard.quest), isTrue);

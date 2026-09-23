@@ -196,8 +196,10 @@ void main() {
       expect(TodayCard.values, [TodayCard.safety, TodayCard.tutorial, TodayCard.billing, TodayCard.fasting, TodayCard.weekCard, TodayCard.earnedMonth, TodayCard.quest]);
       // Take cards away from the top one by one: the next one takes the slot.
       for (var i = 0; i < TodayCard.values.length; i++) {
-        final due = TodayCard.values.sublist(i);
-        final s = _state(AppLang.en, due: due);
+        final asked = TodayCard.values.sublist(i);
+        // A safety answer means no target, and so never a quest (0068).
+        final due = asked.contains(TodayCard.safety) ? asked.where((c) => c != TodayCard.quest).toList() : asked;
+        final s = _state(AppLang.en, due: asked);
         expect(todayFocus(s), due.first, reason: 'due: $due');
         expect(todayCardsDue(s), due, reason: 'the rest keep their order');
       }
@@ -217,8 +219,9 @@ void main() {
     for (final score in scoreModes) {
       for (final withSafety in [false, true]) {
         final asked = withSafety ? TodayCard.values : TodayCard.values.where((c) => c != TodayCard.safety).toList();
-        // With the score off the quest is never due: it keeps score (O4).
-        final due = score ? asked : asked.where((c) => c != TodayCard.quest).toList();
+        // With the score off the quest is never due: it keeps score (O4). With
+        // a safety answer it is never due either: there is no target (0068).
+        final due = score && !withSafety ? asked : asked.where((c) => c != TodayCard.quest).toList();
         final label = '${lang.name}, score ${score ? 'on' : 'off'}, ${withSafety ? 'with' : 'without'} a safety answer';
 
         // The top of the screen at its tallest, both ways it can be: in the

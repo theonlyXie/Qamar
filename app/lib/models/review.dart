@@ -127,7 +127,9 @@ class WeekReview {
         ar: 'نفس الإيقاع زي الأسبوع اللي فات — الفرق أقل من ${iso('5')}٪.',
         en: 'The same rhythm as last week — the difference is under 5%.',
       );
-    } else if (inRange * 2 >= loggedDays) {
+    } else if (hasTarget && inRange * 2 >= loggedDays) {
+      // "Your range" is the target's: on the general-guidance route there is
+      // none, so this line is never said there.
       insight = (
         ar: '${iso('$inRange')} من ${iso('$loggedDays')} أيام مسجلة داخل النطاق. ده مش حظ.',
         en: '$inRange of $loggedDays logged days inside your range. That is not luck.',
@@ -140,7 +142,9 @@ class WeekReview {
     }
 
     final ReviewLine change;
-    if (spike != null) {
+    // On the general-guidance route (no target, no plan) the week's change
+    // never trims a meal or points at a plan: logging, and water.
+    if (hasTarget && spike != null) {
       final w = spike.day.day.weekday - 1;
       change = (
         ar: 'الأسبوع الجاي: عشا خفيف يوم ${_dayAr[w]}.',
@@ -151,7 +155,7 @@ class WeekReview {
         ar: 'الأسبوع الجاي: سجّل الغدا بس، ${iso('5')} أيام. الباقي أنا أحسبه.',
         en: 'Next week: log just lunch, five days. I’ll do the rest.',
       );
-    } else if (inRange * 2 < loggedDays) {
+    } else if (hasTarget && inRange * 2 < loggedDays) {
       change = (
         ar: 'الأسبوع الجاي: التزم بغدا الخطة ${iso('3')} أيام.',
         en: 'Next week: stick to the lunch on the plan three days.',

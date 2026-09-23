@@ -2,6 +2,7 @@
 // (O3): one sentence about this meal against this day, variable because the
 // day is, and never about points.
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +12,7 @@ import 'package:qamar/main.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/nudge.dart';
+import 'package:qamar/models/profile.dart';
 import 'package:qamar/models/reply.dart';
 import 'package:qamar/models/streak.dart';
 import 'package:qamar/models/su_economy.dart';
@@ -25,8 +27,8 @@ LoggedMeal _meal(int kcal, {int p = 20}) => LoggedMeal(name: 'x', sub: '', kcal:
 /// nothing yet eaten in them.
 List<MealSlot> _aheadAt(int hour) => hour < 11 ? const [MealSlot.lunch, MealSlot.dinner] : hour < 17 ? const [MealSlot.dinner] : const [];
 
-DayNumbers _day({int kcal = 1000, int target = 2000, int protein = 40, int targetProtein = 140, int hour = 13, ({String nameAr, String nameEn, int kcal})? next}) =>
-    DayNumbers(kcal: kcal, targetKcal: target, protein: protein, targetProtein: targetProtein, hour: hour, next: next, ahead: _aheadAt(hour));
+DayNumbers _day({int kcal = 1000, int? target = 2000, int? protein = 40, int? targetProtein = 140, int hour = 13, ({String nameAr, String nameEn, int kcal})? next}) =>
+    DayNumbers(kcal: kcal, targetKcal: target, protein: protein ?? 0, targetProtein: target == null ? null : targetProtein, hour: hour, next: next, ahead: _aheadAt(hour));
 
 const _dinner = (nameAr: 'فراخ مشوية بالسلطة', nameEn: 'Grilled chicken with salad', kcal: 600);
 
@@ -38,6 +40,12 @@ String _line(AppState s, DayNumbers d) => dayLineFor(d, ar: s.isAr, iso: s.iso);
 
 /// Every shape, and around its edges, for the sweeps below.
 Iterable<(LoggedMeal, DayNumbers)> _sweep() sync* {
+  // The general-guidance route: no target, so no reading of the day.
+  for (final kcal in [400, 1500, 2600]) {
+    for (final m in [_meal(300, p: 5), _meal(700, p: 45)]) {
+      yield (m, _day(kcal: kcal, target: null));
+    }
+  }
   for (final kcal in [0, 400, 900, 1500, 1900, 2000, 2080, 2150, 2300, 2480, 2600, 3400]) {
     for (final protein in [10, 60, 120, 139, 140, 190]) {
       for (final hour in [8, 13, 16, 21]) {
@@ -147,7 +155,7 @@ void main() {
     test('the words and the moon read every day the same way', () {
       // One reading of the day: the orb's (OrbState.dayFor). Over only where
       // the halo warms, at or a little past wherever the moon reads "at".
-      for (final target in [1500, 2000, 2800]) {
+      for (final target in [1500, 2000, 2800, null]) {
         for (var kcal = 25; kcal <= 4500; kcal += 25) {
           final d = _day(kcal: kcal, target: target);
           final moon = OrbState.dayFor(consumedKcal: kcal, targetKcal: target, logged: true);
@@ -155,9 +163,44 @@ void main() {
             final reason = '$kcal of $target: moon $moon, words $shape';
             expect(shape == DayShape.over, moon == OrbDay.over, reason: reason);
             expect(shape == DayShape.atTarget || shape == DayShape.nearOver, moon == OrbDay.at, reason: reason);
+            expect(shape == DayShape.logged, moon == OrbDay.unknown, reason: reason);
           }
         }
       }
+    });
+
+    test('with no target (the general-guidance route) the words make no claim against any number', () {
+      // Every day, every meal, every hour, with a plan meal offered or not:
+      // no target means no reading, and the moon is at rest there too.
+      final claim = RegExp(r'left|past|target|room|light|fits|protein|smaller|فاضل|هدف|فوق|مكان|خفيف|مناسب|بروتين|أصغر', caseSensitive: false);
+      final score = RegExp(r'\bsu\b|point|earn|reward|coin|نقط|نقاط|كسب|مكافأ', caseSensitive: false);
+      for (final kcal in [0, 300, 1500, 2300, 4000]) {
+        for (final hour in [8, 13, 16, 21]) {
+          for (final next in [null, _dinner]) {
+            final d = _day(kcal: kcal, target: null, protein: 60, hour: hour, next: next);
+            expect(OrbState.dayFor(consumedKcal: kcal, targetKcal: null, logged: true), OrbDay.unknown);
+            for (final m in [_meal(300, p: 5), _meal(700, p: 45)]) {
+              expect(shapeOf(d, meal: m), DayShape.logged);
+              for (final s in [_ar, _en]) {
+                final reply = _reply(s, m, d);
+                expect(claim.hasMatch(reply), isFalse, reason: reply);
+                expect(score.hasMatch(reply), isFalse, reason: reply);
+              }
+            }
+            if (kcal > 0) {
+              for (final s in [_ar, _en]) {
+                final line = _line(s, d);
+                expect(claim.hasMatch(line), isFalse, reason: line);
+                expect(score.hasMatch(line), isFalse, reason: line);
+              }
+            }
+          }
+        }
+      }
+      expect(_reply(_en, _meal(640), _day(kcal: 640, target: null)), '640 kcal, logged.');
+      expect(_reply(_ar, _meal(640), _day(kcal: 640, target: null)), '${_ar.iso('640')} سعرة، اتسجّلت.');
+      expect(_line(_en, _day(kcal: 1280, target: null)), '1280 kcal logged so far today.');
+      expect(_line(_ar, _day(kcal: 1280, target: null)), 'اتسجّل لحد دلوقتي ${_ar.iso('1280')} سعرة النهارده.');
     });
 
     test('no reply and no day line ever says Su, points or earned, in either language', () {
@@ -244,6 +287,46 @@ void main() {
       expect(shapeOf(s.dayNumbers()), DayShape.nearOver);
       expect(dayLineFor(s.dayNumbers(), ar: false, iso: s.iso), 'About 300 kcal past your target — within what an estimate can tell apart.');
     });
+
+    for (final lang in AppLang.values) {
+      test('on the general-guidance route a confirmed meal and a repeat say what was logged, against no target (${lang.name})', () {
+        final s = state(lang);
+        s.profile = s.profile.copyWith(safety: SafetyAnswer.pregnant);
+        expect(s.orbState().day, OrbDay.unknown);
+        s.proposal = const MealAnalysis([
+          ConfirmItemDef(ar: 'كشري', en: 'Koshary', portionAr: 'طبق', portionEn: 'a plate', conf: Confidence.low, kcal: 640, p: 20, c: 100, f: 18),
+        ]);
+        s.proposalQty = [1];
+        s.confirmProposal();
+        final ar = lang == AppLang.ar;
+        expect(s.chat.lastWhere((t) => t.who == ChatWho.q).text, ar ? '${s.iso('640')} سعرة، اتسجّلت.' : '640 kcal, logged.');
+        s.repeatMeal(s.meals.last);
+        expect(s.chat.last.text, ar ? '${s.iso('640')} سعرة، اتسجّلت.' : '640 kcal, logged.');
+        expect(s.dayNumbers().targetKcal, isNull);
+        expect(dayLineFor(s.dayNumbers(), ar: ar, iso: s.iso), ar ? 'اتسجّل لحد دلوقتي ${s.iso('1280')} سعرة النهارده.' : '1280 kcal logged so far today.');
+      });
+    }
+
+    for (final lang in AppLang.values) {
+      testWidgets('on the general-guidance route Today’s sentence says what was logged, not what is left (${lang.name})', (tester) async {
+        await loadAppFonts();
+        for (final name in const ['com.qamar.app/quick_events', 'com.qamar.app/quick_invoke']) {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(MethodChannel(name), (call) async => null);
+        }
+        final s = state(lang)..dismissOrbTutorial();
+        s.profile = s.profile.copyWith(safety: SafetyAnswer.breastfeeding);
+        s.meals.add(LoggedMeal(name: 'Koshary', sub: '', kcal: 640, p: 20, c: 100, f: 18, at: now));
+        s.go(AppScreen.today);
+        await tester.binding.setSurfaceSize(const Size(390, 844));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+        await tester.pump();
+        final ar = lang == AppLang.ar;
+        final sentence = tester.widget<Text>(find.byKey(const ValueKey('today-sentence'))).data!;
+        expect(sentence, ar ? 'اتسجّل لحد دلوقتي ${s.iso('640')} سعرة النهارده.' : '640 kcal logged so far today.');
+        expect(RegExp(ar ? r'فاضل|هدف' : r'left|target').hasMatch(sentence), isFalse);
+      });
+    }
 
     testWidgets('Today’s sentence after the first log is the day read in words', (tester) async {
       await loadAppFonts();
