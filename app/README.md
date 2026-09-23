@@ -207,7 +207,9 @@ in Me ("Your nutritionist's code"), or by `https://dr-qamar.com/p/<code>` /
 `qamar://p/<code>`. It waits on the phone exactly as an invitation does, and
 while it waits the seven-day week is not offered. `qamar_redeem_pro_code` puts
 the professional on the account (`pro_code_claims`, which checkout reads when no
-code is typed, so their 20% reaches them from the first payment) and, while the
+code is typed and the account has no `pro_referrals` row yet, so their 20%
+reaches them from the first payment; that payment writes the referral, and its
+twelve months decide every renewal after it — past them nobody is paid) and, while the
 account's one trial is unused, starts `billing_config.pro_trial_days` (14) with
 `plus_trials.source = 'pro'`. Only a code the operator has confirmed starts the
 trial: every account gets an affiliate code the first time Me loads, so without

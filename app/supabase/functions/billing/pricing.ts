@@ -115,17 +115,37 @@ export function savedProfessional(row: Record<string, unknown> | null | undefine
 }
 
 /**
- * Which saved professional a checkout with no typed code attaches: the
- * referral while it is inside its twelve months, otherwise the code the
- * person redeemed before paying (0069), so the share reaches the professional
- * without the client typing the code a second time. The claim is only looked
- * up when there is no referral.
+ * What checkout learned about this person's pro_referrals row: the lookup
+ * failed ({ ok: false }), or it answered with the row or with none. The row
+ * is read whatever its ends_at, because an expired referral is an answer too.
+ */
+export type ReferralLookup = { ok: false } | { ok: true; row: Record<string, unknown> | null };
+
+/**
+ * Which saved professional a checkout with no typed code attaches.
+ * - A referral row inside its twelve months (ends_at after [now]): that
+ *   professional, as every renewal of the year.
+ * - A referral row past its twelve months: nobody. The blueprint pays the
+ *   professional EGP 100 a month for twelve months, from the first payment.
+ * - No referral row at all: the code the person redeemed before paying
+ *   (pro_code_claims, 0069). It carries the first payment only; that payment
+ *   writes the referral row, and the row decides from then on.
+ * - A lookup that failed: nobody. A share is never attached on a guess.
+ * The claim is read only when there is no referral row.
  */
 export async function chooseSavedPromo(
-  referral: () => Promise<Promo | null>,
+  referral: ReferralLookup,
+  now: Date,
   claim: () => Promise<Promo | null>,
 ): Promise<Promo | null> {
-  return (await referral()) ?? (await claim());
+  if (!referral.ok) return null;
+  const row = referral.row;
+  if (row) {
+    const ends = typeof row.ends_at === "string" ? new Date(row.ends_at) : null;
+    if (!ends || Number.isNaN(ends.getTime()) || ends <= now) return null;
+    return savedProfessional(row);
+  }
+  return await claim();
 }
 
 function promoLive(promo: Promo, now: Date): boolean {

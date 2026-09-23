@@ -36,6 +36,7 @@ import {
   quotePlus,
   savedProfessional,
   type PaymentKind,
+  type ReferralLookup,
   type PlanId,
   type Promo,
   type Quote,
@@ -161,19 +162,19 @@ async function loadPromo(code: string): Promise<Promo | null> {
 }
 
 /**
- * The professional this client was referred by, if the referral is still
- * inside its twelve months. Written by qamar_apply_paid_order on the first
- * paid order that carried a professional's code, so a renewal attaches the
- * same share without the client typing the code again.
+ * This client's referral row, whatever its ends_at: written by
+ * qamar_apply_paid_order on the first paid order that carried a professional,
+ * with twelve months from there (0039). chooseSavedPromo decides what it
+ * means: inside the twelve months it attaches that professional to a renewal
+ * without the client typing the code again; past them, nobody.
  */
-async function loadReferral(userId: string): Promise<Promo | null> {
+async function loadReferral(userId: string): Promise<ReferralLookup> {
   const res = await db(
-    `pro_referrals?user_id=eq.${userId}&ends_at=gt.${encodeURIComponent(new Date().toISOString())}` +
-      `&select=promo_code_id,affiliate_user_id,promo_codes(code,active)&limit=1`,
+    `pro_referrals?user_id=eq.${userId}&select=promo_code_id,affiliate_user_id,ends_at,promo_codes(code,active)&limit=1`,
   );
-  if (!res.ok) return null;
+  if (!res.ok) return { ok: false };
   const rows = await res.json() as Array<Record<string, unknown>>;
-  return savedProfessional(Array.isArray(rows) ? rows[0] : null);
+  return { ok: true, row: Array.isArray(rows) && rows[0] ? rows[0] : null };
 }
 
 /**
@@ -206,7 +207,7 @@ async function buildQuote(userId: string, planRaw: unknown, codeRaw: unknown): P
       return q;
     }
   } else {
-    promo = await chooseSavedPromo(() => loadReferral(userId), () => loadClaim(userId));
+    promo = await chooseSavedPromo(await loadReferral(userId), new Date(), () => loadClaim(userId));
   }
   const first = await firstPurchase(userId);
   return quotePlus({ plan: planRaw, firstPurchase: first, buyerUserId: userId, promo });

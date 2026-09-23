@@ -118,16 +118,54 @@ Deno.test("a code redeemed before paying is read back as that professional's cod
   assertEquals(quotePlus({ plan: "monthly", firstPurchase: true, buyerUserId: "client", promo: off }).affiliateCommissionCents, 0);
 });
 
-Deno.test("with no typed code, the referral wins, and the claim is read only when there is none", async () => {
-  const referral: Promo = { ...PRO, ownerUserId: "dr-referral" };
+Deno.test("with no typed code, a live referral wins and the claim is read only when there is no referral row", async () => {
+  const now = new Date("2026-09-23T12:00:00Z");
+  const referralRow = (endsAt: string) => ({
+    promo_code_id: "promo-ref",
+    affiliate_user_id: "dr-referral",
+    ends_at: endsAt,
+    promo_codes: { code: "QMRREF1", active: true },
+  });
   const claim: Promo = { ...PRO, ownerUserId: "dr-claim" };
   let claimReads = 0;
   const readClaim = () => { claimReads++; return Promise.resolve(claim); };
-  assertEquals((await chooseSavedPromo(() => Promise.resolve(referral), readClaim))?.ownerUserId, "dr-referral");
+
+  // Inside the twelve months: the referral, and the claim is not read.
+  const live = await chooseSavedPromo({ ok: true, row: referralRow("2027-03-01T00:00:00Z") }, now, readClaim);
+  assertEquals(live?.ownerUserId, "dr-referral");
   assertEquals(claimReads, 0);
-  assertEquals((await chooseSavedPromo(() => Promise.resolve(null), readClaim))?.ownerUserId, "dr-claim");
+
+  // No referral row yet: the claim carries the first payment.
+  const first = await chooseSavedPromo({ ok: true, row: null }, now, readClaim);
+  assertEquals(first?.ownerUserId, "dr-claim");
   assertEquals(claimReads, 1);
-  assertEquals(await chooseSavedPromo(() => Promise.resolve(null), () => Promise.resolve(null)), null);
+  assertEquals(quotePlus({ plan: "monthly", firstPurchase: true, buyerUserId: "client", promo: first }).affiliateCommissionCents, 10_000);
+
+  // No row and no claim: nobody.
+  assertEquals(await chooseSavedPromo({ ok: true, row: null }, now, () => Promise.resolve(null)), null);
+});
+
+Deno.test("past the twelve months the professional is not paid again, claim or no claim", async () => {
+  const now = new Date("2026-09-23T12:00:00Z");
+  let claimReads = 0;
+  const readClaim = () => { claimReads++; return Promise.resolve({ ...PRO, ownerUserId: "dr-claim" }); };
+  const expired = { promo_code_id: "promo-ref", affiliate_user_id: "dr-sara", ends_at: "2026-09-01T00:00:00Z", promo_codes: { code: "QMRSARA1", active: true } };
+  const promo = await chooseSavedPromo({ ok: true, row: expired }, now, readClaim);
+  assertEquals(promo, null);
+  assertEquals(claimReads, 0, "an expired referral is an answer: the claim is never a way round it");
+  const q = quotePlus({ plan: "monthly", firstPurchase: false, buyerUserId: "client", promo });
+  assertEquals(q.affiliateCommissionCents, 0);
+  assertEquals(q.affiliateUserId, null);
+  assertEquals(q.amountCents, LIST_MONTHLY_CENTS);
+  // Ending exactly now is ended.
+  assertEquals(await chooseSavedPromo({ ok: true, row: { ...expired, ends_at: now.toISOString() } }, now, readClaim), null);
+});
+
+Deno.test("a referral lookup that failed attaches nobody: a share is never attached on a guess", async () => {
+  let claimReads = 0;
+  const readClaim = () => { claimReads++; return Promise.resolve({ ...PRO, ownerUserId: "dr-claim" }); };
+  assertEquals(await chooseSavedPromo({ ok: false }, new Date(), readClaim), null);
+  assertEquals(claimReads, 0);
 });
 
 Deno.test("checkout gets every integration id; the paywall names only the rails that are labelled", () => {
