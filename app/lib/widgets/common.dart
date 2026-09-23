@@ -284,16 +284,37 @@ class _QSpringInState extends State<QSpringIn> with SingleTickerProviderStateMix
 }
 
 /// A sheet's ground: the scrim fades in on the settle spring while the
-/// sheet ([child]) rises from below its own height on it.
+/// sheet ([child]) rises from below its own height on it. A tap on the
+/// scrim, anywhere outside the sheet, is [onDismiss]; a screen reader hears
+/// that layer as a button named "Close" (إغلاق), where it used to be an
+/// unnamed button the size of the screen. The sheet takes its own touches:
+/// it sits above the scrim, so nothing inside it needs to swallow taps.
 class QSheetScrim extends StatelessWidget {
   final Widget child;
-  const QSheetScrim({super.key, required this.child});
+  final VoidCallback onDismiss;
+  const QSheetScrim({super.key, required this.onDismiss, required this.child});
+
+  /// The dismiss layer, for tests.
+  static const dismissKey = ValueKey('sheet-dismiss');
+
+  static String closeLabel(BuildContext context) => Directionality.of(context) == TextDirection.rtl ? 'إغلاق' : 'Close';
 
   @override
   Widget build(BuildContext context) => Stack(
         fit: StackFit.expand,
         children: [
-          const QSpringIn(arrive: QArrive.fade, child: ColoredBox(color: QColors.scrim)),
+          Semantics(
+            key: dismissKey,
+            container: true,
+            button: true,
+            label: closeLabel(context),
+            onTap: onDismiss,
+            child: GestureDetector(
+              onTap: onDismiss,
+              excludeFromSemantics: true,
+              child: const QSpringIn(arrive: QArrive.fade, child: ColoredBox(color: QColors.scrim)),
+            ),
+          ),
           Align(alignment: Alignment.bottomCenter, child: QSpringIn(arrive: QArrive.rise, child: child)),
         ],
       );

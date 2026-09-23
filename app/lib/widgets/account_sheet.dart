@@ -203,25 +203,20 @@ class _AccountSheetState extends State<AccountSheet> {
       child: ClipRect(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: GestureDetector(
-            onTap: state.closeAuth,
-            child: QSheetScrim(
-              child: GestureDetector(
-                onTap: () {},
-                child: Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.fromLTRB(20, 18, 20, 24 + MediaQuery.of(context).viewInsets.bottom),
-                  decoration: const BoxDecoration(
-                    gradient: QColors.sheet,
-                    border: Border(top: BorderSide(color: QColors.borderStrong)),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: _body(context, state, isAr),
-                  ),
-                ),
+          child: QSheetScrim(
+            onDismiss: state.closeAuth,
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.fromLTRB(20, 18, 20, 24 + MediaQuery.of(context).viewInsets.bottom),
+              decoration: const BoxDecoration(
+                gradient: QColors.sheet,
+                border: Border(top: BorderSide(color: QColors.borderStrong)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: _body(context, state, isAr),
               ),
             ),
           ),

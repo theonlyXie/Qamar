@@ -31,39 +31,34 @@ class WhySheet extends StatelessWidget {
     ];
 
     return Positioned.fill(
-      child: GestureDetector(
-        onTap: state.closeWhy,
-        child: QSheetScrim(
-          child: GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 34),
-              decoration: const BoxDecoration(
-                color: QColors.cardSlate,
-                border: Border(top: BorderSide(color: QColors.borderStrong)),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(child: Container(width: 38, height: 4, decoration: BoxDecoration(color: QColors.borderStrong, borderRadius: BorderRadius.circular(QRadii.pill)))),
-                  const SizedBox(height: 12),
-                  Text(t.whyTitle, style: QText.display(size: 24, ar: QText.arabic(t.whyTitle), color: QColors.textPrimary)),
-                  for (final r in rows) ...[
-                    const SizedBox(height: 11),
-                    const Divider(color: QColors.borderFaint, height: 1),
-                    const SizedBox(height: 11),
-                    Text(r.$1, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
-                    const SizedBox(height: 4),
-                    Text(r.$2, style: QText.body(size: 14, height: 22, color: QColors.textHigh)),
-                  ],
-                  const SizedBox(height: 14),
-                  QPrimaryButton(label: t.whyClose, onTap: state.closeWhy, height: 50),
-                ],
-              ),
-            ),
+      child: QSheetScrim(
+        onDismiss: state.closeWhy,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 34),
+          decoration: const BoxDecoration(
+            color: QColors.cardSlate,
+            border: Border(top: BorderSide(color: QColors.borderStrong)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 38, height: 4, decoration: BoxDecoration(color: QColors.borderStrong, borderRadius: BorderRadius.circular(QRadii.pill)))),
+              const SizedBox(height: 12),
+              Text(t.whyTitle, style: QText.display(size: 24, ar: QText.arabic(t.whyTitle), color: QColors.textPrimary)),
+              for (final r in rows) ...[
+                const SizedBox(height: 11),
+                const Divider(color: QColors.borderFaint, height: 1),
+                const SizedBox(height: 11),
+                Text(r.$1, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
+                const SizedBox(height: 4),
+                Text(r.$2, style: QText.body(size: 14, height: 22, color: QColors.textHigh)),
+              ],
+              const SizedBox(height: 14),
+              QPrimaryButton(label: t.whyClose, onTap: state.closeWhy, height: 50),
+            ],
           ),
         ),
       ),

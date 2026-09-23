@@ -339,97 +339,92 @@ class ExplainSheet extends StatelessWidget {
     final isAr = state.isAr;
 
     return Positioned.fill(
-      child: GestureDetector(
-        onTap: state.closeExplain,
-        child: QSheetScrim(
-          child: GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 34),
-              decoration: const BoxDecoration(
-                color: QColors.cardSlate,
-                border: Border(top: BorderSide(color: QColors.borderStrong)),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
+      child: QSheetScrim(
+        onDismiss: state.closeExplain,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 34),
+          decoration: const BoxDecoration(
+            color: QColors.cardSlate,
+            border: Border(top: BorderSide(color: QColors.borderStrong)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(color: QColors.borderStrong, borderRadius: BorderRadius.circular(QRadii.pill)),
+                ),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+              const SizedBox(height: 16),
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 38,
-                      height: 4,
-                      decoration: BoxDecoration(color: QColors.borderStrong, borderRadius: BorderRadius.circular(QRadii.pill)),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const QamarMoon(size: 40),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(isAr ? ex.titleAr : ex.titleEn,
-                                style: QText.display(size: 24, ar: isAr, color: QColors.textPrimary)),
-                            const SizedBox(height: 6),
-                            Text(isAr ? ex.bodyAr : ex.bodyEn,
-                                style: QText.body(size: 14, height: 22, color: QColors.textHigh)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.all(13),
-                    decoration: BoxDecoration(
-                      color: QColors.violet.withValues(alpha: 0.10),
-                      border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
-                      borderRadius: BorderRadius.circular(QRadii.control),
-                    ),
-                    child: Row(
+                  const QamarMoon(size: 40),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.lightbulb_outline, size: 16, color: QColors.violetSoft),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(isAr ? ex.soWhatAr : ex.soWhatEn,
-                              style: QText.body(size: 13, height: 20, color: QColors.textMid)),
-                        ),
+                        Text(isAr ? ex.titleAr : ex.titleEn,
+                            style: QText.display(size: 24, ar: isAr, color: QColors.textPrimary)),
+                        const SizedBox(height: 6),
+                        Text(isAr ? ex.bodyAr : ex.bodyEn,
+                            style: QText.body(size: 14, height: 22, color: QColors.textHigh)),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: QOutlineButton(
-                          label: isAr ? 'اسأل قمر عن ده' : 'Ask Qamar about this',
-                          onTap: () {
-                            state.closeExplain();
-                            state.openChat();
-                          },
-                          height: 46,
-                          color: QColors.textMid,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: QPrimaryButton(
-                          label: isAr ? 'فهمت' : 'Got it',
-                          onTap: state.closeExplain,
-                          height: 46,
-                        ),
-                      ),
-                    ],
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(
+                  color: QColors.violet.withValues(alpha: 0.10),
+                  border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
+                  borderRadius: BorderRadius.circular(QRadii.control),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.lightbulb_outline, size: 16, color: QColors.violetSoft),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(isAr ? ex.soWhatAr : ex.soWhatEn,
+                          style: QText.body(size: 13, height: 20, color: QColors.textMid)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: QOutlineButton(
+                      label: isAr ? 'اسأل قمر عن ده' : 'Ask Qamar about this',
+                      onTap: () {
+                        state.closeExplain();
+                        state.openChat();
+                      },
+                      height: 46,
+                      color: QColors.textMid,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: QPrimaryButton(
+                      label: isAr ? 'فهمت' : 'Got it',
+                      onTap: state.closeExplain,
+                      height: 46,
+                    ),
                   ),
                 ],
               ),
-            ),
+            ],
           ),
         ),
       ),

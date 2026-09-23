@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
+import 'package:qamar/models/activity.dart';
 import 'package:qamar/models/meal.dart';
 import 'package:qamar/screens/welcome_screen.dart';
 import 'package:qamar/state/app_state.dart';
@@ -102,10 +103,10 @@ void main() {
 
   // O11: every control is a whole touch — 48 points each way on Android, 44
   // on iOS — and says what it is, on every screen in both languages, then
-  // with the tree and the conversation open. The rule lives in the shared
+  // with the tree, the conversation and each sheet open. The rule lives in the shared
   // controls (QTapArea), so a screen that uses them keeps it.
   for (final lang in AppLang.values) {
-    testWidgets('every control is a whole touch with a name, on every screen, the tree and the conversation (${lang.name})', (tester) async {
+    testWidgets('every control is a whole touch with a name, on every screen, the tree, the conversation and each sheet (${lang.name})', (tester) async {
       // A phone's width, tall enough that each screen's lists build to
       // their end: controls that are not built cannot be checked.
       tester.view.devicePixelRatio = 3;
@@ -138,6 +139,20 @@ void main() {
       state.openChat();
       await check('the conversation');
       state.closeChat();
+      // Each sheet open: its controls, and the scrim that closes it, which
+      // a screen reader hears as a button named Close (seat 2's review).
+      state.openWhy();
+      await check('the Why sheet');
+      state.closeWhy();
+      state.openExplain(kExplanations['kcal_remaining']!);
+      await check('an explanation');
+      state.closeExplain();
+      state.openLinkAccount();
+      await check('the account sheet');
+      state.closeAuth();
+      state.chooseActivity(ActivityKind.walk);
+      await check('the activity sheet');
+      state.cancelActivity();
       semantics.dispose();
     });
   }
