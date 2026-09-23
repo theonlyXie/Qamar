@@ -170,6 +170,18 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
 
 /// Name, one line of state, one way out. The quota takes the status line when
 /// there is no status to report, so the header never carries two pills at once.
+/// The conversation header's measures (O8), for the header and its tests.
+abstract final class ChatHeader {
+  /// The status line's type size.
+  static const double lineSize = 12;
+
+  /// The line's reserved height: its top gap and one 16pt line, kept when
+  /// the line is empty.
+  static const double lineHeight = 18;
+
+  static const lineKey = ValueKey('chat-header-line');
+}
+
 class _Header extends StatelessWidget {
   final AppState state;
   const _Header({required this.state});
@@ -188,17 +200,20 @@ class _Header extends StatelessWidget {
     // nothing (O8). The full count lives in Me.
     final quota = state.quotaLine;
     final line = heard.isNotEmpty ? heard : quota;
+    // The quota is read, not glanced past: textMuted passes AA on the
+    // conversation's ground where textFaint did not (O8).
     final colour = state.dictationError != null
         ? QColors.red
         : heard.isNotEmpty
             ? QColors.textMid
-            : QColors.textFaint;
+            : QColors.textMuted;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 10, 8, 6),
       child: Row(
         children: [
-          const SizedBox(width: 40),
+          // As wide as the close button, so the name is centred on the screen.
+          const SizedBox(width: QLayout.minTap),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -206,19 +221,25 @@ class _Header extends StatelessWidget {
                 // Large text reads too loose at its default tracking; the brand
                 // is the one place in this overlay that needs tightening.
                 Text(t.brand, style: QText.display(size: 19, height: 23, weight: FontWeight.w400, letterSpacing: -0.3, color: QColors.textBrand)),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: line.isEmpty
-                      ? const SizedBox(key: ValueKey('quiet'), height: 0, width: 0)
-                      : Padding(
-                          key: ValueKey(line),
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(line,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: QText.body(size: 11.5, height: 15, color: colour)),
-                        ),
+                // The line keeps its height when it has nothing to say, so
+                // the name never jumps as a status comes and goes (O8).
+                SizedBox(
+                  key: ChatHeader.lineKey,
+                  height: ChatHeader.lineHeight,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: line.isEmpty
+                        ? const SizedBox.shrink(key: ValueKey('quiet'))
+                        : Padding(
+                            key: ValueKey(line),
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(line,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: QText.body(size: ChatHeader.lineSize, height: 16, color: colour)),
+                          ),
+                  ),
                 ),
               ],
             ),
