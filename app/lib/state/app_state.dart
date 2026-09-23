@@ -3608,6 +3608,28 @@ class AppState extends ChangeNotifier {
   /// The offer's words, with the price the server charges.
   String get suQuestionLabel => isAr ? 'اسأله بـ${suAmount(questionPrice)}' : 'Ask it for ${suAmount(questionPrice)}';
 
+  /// After a purchase whose answer was lost: if the server already holds the
+  /// bought question, ask it; otherwise buy again with the same day's key,
+  /// which the server answers with the first purchase if it happened (0067).
+  Future<void> _retryBoughtQuestion(String words) async {
+    await _refreshQuota();
+    if (_disposed) return;
+    if (aiQuota.bucket == 'chat' && aiQuota.extra > 0 && aiQuota.remaining > 0) {
+      _questionBoughtDay = _dayKey();
+      final uid = _userId;
+      if (uid != null) {
+        try {
+          await _refreshWallet(uid);
+        } catch (_) {
+          // The balance catches up at the next refresh.
+        }
+      }
+      await sendChatMsg(words, again: true);
+      return;
+    }
+    await askWithSu(words);
+  }
+
   /// Buys this one question with Su, then asks it again. Nothing is spent
   /// unless the server takes it; if it does not, Qamar says so and the wall
   /// stays as it was.
@@ -3627,7 +3649,14 @@ class AppState extends ChangeNotifier {
       _buyingQuestion = false;
       if (_disposed) return;
       chatState = ChatState.idle;
-      final what = isAr ? 'مقدرتش أشتري السؤال دلوقتي، ومفيش نقاط اتصرفت.' : 'I could not buy the question just now, and no points were spent.';
+      // The server refused: its transaction rolled back, so nothing was
+      // spent. The connection failed: the purchase may have gone through
+      // with its answer lost, so the words say only what is known, and
+      // trying again is safe — the same key never charges twice (0067).
+      final refused = failureOf(e) == Failure.ours;
+      final what = refused
+          ? (isAr ? 'مقدرتش أشتري السؤال دلوقتي، ومفيش نقاط اتصرفت.' : 'I could not buy the question just now, and no points were spent.')
+          : (isAr ? 'مقدرتش أتأكد إن السؤال اتشرى. جرّب تاني — عمره ما بيتخصم مرتين.' : 'I could not confirm the question was bought. Try again — it is never charged twice.');
       chat.add(ChatTurn(
         who: ChatWho.q,
         text: what,
@@ -3635,9 +3664,11 @@ class AppState extends ChangeNotifier {
         problem: Problem(
           what: what,
           why: _failedWhy(e),
-          action: ProblemAction(isAr ? 'شوف \u2066Qamar+\u2069' : 'See Qamar+', () => _leaveChatForWall(photo: false)),
+          action: refused
+              ? ProblemAction(isAr ? 'شوف \u2066Qamar+\u2069' : 'See Qamar+', () => _leaveChatForWall(photo: false))
+              : ProblemAction(isAr ? 'جرّب تاني' : 'Try again', () => _retryBoughtQuestion(text)),
           secondary: ProblemAction(isAr ? 'سجّلها كوجبة' : 'Log it as a meal', () => logTextAsMeal(text)),
-          kind: failureOf(e) == Failure.ours ? ProblemKind.error : ProblemKind.offline,
+          kind: refused ? ProblemKind.error : ProblemKind.offline,
         ),
       ));
       _notify();

@@ -48,4 +48,24 @@ void main() {
       expect(seed, contains("('question_extra_daily', 1)"), reason: 'at most once a Cairo day');
     });
   });
+
+  group('buying with Su (0067)', () {
+    test('a replayed key returns the purchase before anything is debited or granted', () {
+      final body = latestFunction('qamar_wallet_redeem');
+      final replay = body.indexOf('idempotency_key = p_idempotency_key');
+      expect(replay, greaterThan(0), reason: 'a key already in the ledger is looked for');
+      expect(body.indexOf('return v_replay'), greaterThan(replay));
+      for (final later in ['qamar_wallet_credit(', 'qamar_ai_grant_extra(', 'qamar_ai_grant_chat_extra(', 'insert into public.wallet_redemptions']) {
+        expect(body.indexOf(later), greaterThan(body.indexOf('return v_replay')), reason: 'the replay returns before $later');
+      }
+    });
+
+    test('a question is bought only by the free tier, at today’s wall', () {
+      final body = latestFunction('qamar_wallet_redeem');
+      expect(body, contains('from public.chat_wall_days'));
+      expect(body, contains('day = public.qamar_cairo_today()'));
+      expect(body, contains('qamar_is_plus(p_user_id)'));
+      expect(body.indexOf('chat_wall_days'), lessThan(body.indexOf('qamar_wallet_credit(')), reason: 'checked before anything is debited');
+    });
+  });
 }

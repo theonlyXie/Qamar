@@ -260,13 +260,23 @@ class FakeWalletRepo implements WalletRepository {
   /// Called when a redemption goes through, as the server would grant it.
   void Function(String itemId)? onRedeem;
 
+  /// While set, the next redemption goes through on the server and its
+  /// answer never arrives: the phone sees this, and the purchase stands.
+  Object? loseNextAnswer;
+
   @override
   Future<void> redeem(String userId, {required SpendItemDef item, required String idempotencyKey}) async {
     final refused = redeemFails;
     if (refused != null) throw refused;
+    // A key the server has seen is the purchase that already happened (0067):
+    // no second debit, no second grant.
+    if (redeemKeys.contains(idempotencyKey)) return;
     redemptions.add(item.id);
     redeemKeys.add(idempotencyKey);
     onRedeem?.call(item.id);
+    final lost = loseNextAnswer;
+    loseNextAnswer = null;
+    if (lost != null) throw lost;
   }
 
   @override
@@ -3404,6 +3414,38 @@ void main() {
       expect(s.chat.last.text, 'I could not buy the question just now, and no points were spent.');
       expect(s.chat.last.problem!.action.label, 'See Qamar+');
       expect(s.chat.last.problem!.secondary!.label, 'Log it as a meal');
+    });
+
+    test('an answer lost on the way back is not called unspent; trying again asks it, and buys nothing more', () async {
+      final (:s, :wallet, :ai) = await atTheWall();
+      wallet.loseNextAnswer = TimeoutException('the answer never came');
+      s.chat.last.problem!.secondary!.onTap();
+      await settle();
+      final lost = s.chat.last;
+      expect(lost.text, 'I could not confirm the question was bought. Try again — it is never charged twice.');
+      expect(lost.text, isNot(contains('no points were spent')), reason: 'the server may well have taken them');
+      expect(lost.problem!.action.label, 'Try again');
+      expect(ai.chatMessages, hasLength(1), reason: 'nothing asked yet');
+
+      lost.problem!.action.onTap();
+      await settle();
+      expect(wallet.redemptions, ['chat_extra'], reason: 'the server already holds the question: it is not bought again');
+      expect(ai.chatMessages, ['is feteer ok before the gym?', 'is feteer ok before the gym?']);
+      expect(s.chat.last.text, 'grounded answer');
+    });
+
+    test('a connection that failed before the server: trying again buys it once, with the same key, and asks', () async {
+      final (:s, :wallet, :ai) = await atTheWall();
+      wallet.redeemFails = TimeoutException('no route');
+      s.chat.last.problem!.secondary!.onTap();
+      await settle();
+      expect(wallet.redemptions, isEmpty);
+      wallet.redeemFails = null;
+      s.chat.last.problem!.action.onTap();
+      await settle();
+      expect(wallet.redemptions, ['chat_extra']);
+      expect(ai.chatMessages, hasLength(2));
+      expect(s.chat.last.text, 'grounded answer');
     });
 
     test('in Arabic, in the app’s digits and the one name for Su', () async {
