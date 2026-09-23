@@ -4,8 +4,7 @@
 // character, one glyph with its own spacing, not three full stops; and every
 // character of copy is one a bundled face draws: every style names Inter
 // first and Noto Sans Arabic after it, so each script finds its face (You's
-// arrows once drew as boxes). The dot numerals' glyph grids are drawings, not
-// copy, and are left out.
+// arrows once drew as boxes).
 
 import 'dart:io';
 
@@ -19,9 +18,7 @@ final _emoji = RegExp('[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]', 
 final _literal = RegExp(r"'(?:[^'\\]|\\.)*'");
 
 Iterable<(String, String)> _copy() sync* {
-  // The dot numerals' 5×7 grids ('.###.') are pictures of digits, not words.
-  bool grid(File f) => f.path.replaceAll(r'\', '/').endsWith('lib/widgets/dot_number.dart');
-  for (final f in Directory('lib').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart') && !grid(f))) {
+  for (final f in Directory('lib').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart'))) {
     final lines = f.readAsLinesSync();
     for (var i = 0; i < lines.length; i++) {
       if (lines[i].trimLeft().startsWith('//')) continue;
