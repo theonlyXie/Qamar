@@ -123,11 +123,11 @@ void expectAboveFold(WidgetTester tester, Finder what, String name) {
 const budgets = (header: 110.0, qamar: 140.0, qamarMorning: 190.0, numbers: 290.0, slot: 120.0);
 
 /// The slot cards whose agreed words are longer than the slot's 120 points:
-/// the gestures card (three rows, seat 1 and seat 2's words) and the season's
-/// question (a question, its two answers and what "yes" changes). They still
-/// start in the slot and their first 120 points are above the fold; the rest
-/// scrolls. Every other card is wholly above it.
-const overBudget = {TodayCard.tutorial, TodayCard.fasting};
+/// the season's question (a question, its two answers and what "yes"
+/// changes). It still starts in the slot and its first 120 points are above
+/// the fold; the rest scrolls. Every other card is wholly above it, the
+/// gestures card included since its three gestures became one row of cells.
+const overBudget = {TodayCard.fasting};
 
 /// Each zone within its budget, and the slot's first [budgets].slot points —
 /// the whole card when it keeps to them — above the orb's band.

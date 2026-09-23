@@ -13,6 +13,7 @@ import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/explain.dart';
 import 'package:qamar/widgets/hold_coach_mark.dart';
 import 'package:qamar/widgets/living_orb.dart';
+import 'package:qamar/widgets/orb_gesture_guide.dart';
 import 'package:qamar/widgets/orb_nav.dart';
 
 /// Opens and closes the tree [n] times from the orb.
@@ -236,7 +237,10 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
         final line = HoldCopy.line(lang == AppLang.ar);
         expect(find.descendant(of: find.byType(HoldCoachMark), matching: find.text(line)), findsOneWidget);
-        expect(find.text(line), findsNWidgets(2), reason: 'the card’s hold row is the mark’s line, word for word');
+        // The card's hold cell carries its tick before the words.
+        final cell = find.descendant(of: find.byType(OrbGestureGuide), matching: find.textContaining(line));
+        expect(cell, findsOneWidget, reason: 'the card’s hold cell is the mark’s line');
+        expect(tester.widget<Text>(cell).textSpan!.toPlainText(includePlaceholders: false), line, reason: 'word for word, the tick aside');
       });
     }
   });

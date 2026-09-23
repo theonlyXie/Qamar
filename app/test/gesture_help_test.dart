@@ -12,9 +12,11 @@ import 'package:qamar/main.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/state/app_state.dart';
+import 'package:qamar/widgets/hold_coach_mark.dart';
 import 'package:qamar/widgets/orb_gesture_guide.dart';
 import 'package:qamar/widgets/tree_overlay.dart';
 
+import 'support/app_fonts.dart';
 import 'support/arabic_digits.dart';
 
 Future<void> _pump(WidgetTester tester, AppState s) async {
@@ -26,7 +28,8 @@ Future<void> _pump(WidgetTester tester, AppState s) async {
 }
 
 void main() {
-  setUpAll(() {
+  setUpAll(() async {
+    await loadAppFonts(); // the height checks below measure real lines
     for (final name in const ['com.qamar.app/quick_events', 'com.qamar.app/quick_invoke']) {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(MethodChannel(name), (call) async => null);
     }
@@ -54,6 +57,51 @@ void main() {
     for (final (_, _, _, doEn, _, _) in OrbGestureGuide.rows()) {
       expect(find.textContaining(doEn), findsOneWidget);
     }
+  });
+
+  // O15: the slot is 120 points, and on the phone the tutorial used to run
+  // to 205 (English) and 169 (Arabic), its last row under the orb.
+  for (final lang in AppLang.values) {
+    testWidgets('on Today it keeps to the slot’s 120 points on a phone, three gestures in one row of cells (${lang.name})', (tester) async {
+      tester.view.devicePixelRatio = 3;
+      tester.view.physicalSize = const Size(390, 844) * 3;
+      tester.view.padding = const FakeViewPadding(top: 47 * 3, bottom: 34 * 3);
+      addTearDown(tester.view.reset);
+      final s = AppState()..setLang(lang);
+      s.go(AppScreen.today);
+      await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(tester.takeException(), isNull, reason: 'nothing overflows');
+
+      final card = tester.getRect(find.byType(OrbGestureGuide));
+      expect(card.height, lessThanOrEqualTo(120), reason: 'the slot’s budget (${lang.name}: ${card.height})');
+      final cells = find.byKey(OrbGestureGuide.cellKey);
+      expect(cells, findsNWidgets(3));
+      final rects = [for (var i = 0; i < 3; i++) tester.getRect(cells.at(i))];
+      for (final r in rects) {
+        expect(r.height, greaterThanOrEqualTo(48), reason: 'each gesture a full cell');
+        expect(r.top, moreOrLessEquals(rects.first.top, epsilon: 0.5), reason: 'one row');
+      }
+      final isAr = lang == AppLang.ar;
+      expect(OrbGestureGuide.cellText(OrbGesture.hold, isAr), HoldCopy.line(isAr), reason: 'the hold cell is the hold mark’s line');
+      expect(find.descendant(of: find.byType(OrbGestureGuide), matching: find.textContaining(HoldCopy.line(isAr))), findsOneWidget);
+    });
+  }
+
+  testWidgets('the cells tick the real gestures as they are done', (tester) async {
+    final s = AppState()..setLang(AppLang.en);
+    s.go(AppScreen.today);
+    await _pump(tester, s);
+    final guide = find.byType(OrbGestureGuide);
+    expect(find.descendant(of: guide, matching: find.byIcon(Icons.check_circle)), findsNothing);
+    s.orbTap(); // the tree opens: the tap is learned
+    s.closeTree();
+    await tester.pump();
+    expect(find.descendant(of: guide, matching: find.byIcon(Icons.check_circle)), findsOneWidget);
+    expect(find.descendant(of: guide, matching: find.byIcon(Icons.mic_none)), findsOneWidget, reason: 'the hold, not yet');
+    expect(find.descendant(of: guide, matching: find.textContaining('Tap it\u00A0— opens the tree')), findsOneWidget);
+    expect(find.descendant(of: guide, matching: find.textContaining('Drag it onto a dotted number\u00A0— it explains itself')), findsOneWidget);
   });
 
   testWidgets('Me ticks the gestures already done', (tester) async {
