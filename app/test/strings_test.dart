@@ -3,10 +3,13 @@
 // type went (e04b50b) and is gone. So are the quest's Accept, Replace and
 // Completed, which O2 took away (the meal or glass pays the quest, not a
 // tap), and the plan's Mark eaten, which only opened the old Log page
-// before logging moved to the orb (seat 3). The table still holds 29 other
-// strings nothing reads; they are listed here by name, owed to the seats
-// whose screens they came from, so that this test holds the line: a string
-// that stops being read is either used again or deleted, not kept.
+// before logging moved to the orb (seat 3). And the welcome's old "Start
+// now", the name step's "First name" hint (the question is on screen), the
+// old typed log's "Continue", and "Done", which only looked read through a
+// quest's `q.done` (seat 1). The table still holds 26 other strings nothing
+// reads; they are listed here by name, owed to the seats whose screens they
+// came from, so that this test holds the line: a string that stops being
+// read is either used again or deleted, not kept.
 
 import 'dart:io';
 
@@ -14,9 +17,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Unread before this test, left for their owners to use or retire.
 const _owed = {
-  'restart', 'startNow', 'guestNote', 'scanInbodySub', 'walletSub', 'priceLabel', 'limitLabel', 'barcode', 'barcodeSub',
-  'labelSub', 'suEarned', 'namePlaceholder', 'logMeal', 'logSub', 'voiceSub', 'textSub', 'recent',
-  'recentSub', 'describeMeal', 'mealPlaceholder', 'continueLabel', 'permissionNote', 'analyzing', 'sourcePreview',
+  'restart', 'guestNote', 'scanInbodySub', 'walletSub', 'priceLabel', 'limitLabel', 'barcode', 'barcodeSub',
+  'labelSub', 'suEarned', 'logMeal', 'logSub', 'voiceSub', 'textSub', 'recent',
+  'recentSub', 'describeMeal', 'mealPlaceholder', 'permissionNote', 'analyzing', 'sourcePreview',
   'uncertainNote', 'online', 'sIdle', 'sAnswer', 'tapPrompt',
 };
 
@@ -49,6 +52,15 @@ void main() {
     }
     for (final words in const ["'Accept'", "'Replace'", "'Completed'", "'Mark eaten'", "'موافق'", "'غيّرها'", "'اتعملت'", "'اتاكلت'"]) {
       expect(table, isNot(contains(words)), reason: words);
+    }
+  });
+
+  test('seat 1’s retired strings are gone from the table, "Done" with them', () {
+    for (final f in const ['startNow', 'namePlaceholder', 'continueLabel', 'done']) {
+      expect(fields, isNot(contains(f)), reason: '$f is not read anywhere');
+    }
+    for (final words in const ['Start now', 'ابدأ دلوقتي', 'First name', 'اسمك الأول']) {
+      expect(table, isNot(contains(words)));
     }
   });
 
