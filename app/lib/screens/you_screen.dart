@@ -43,6 +43,9 @@ class YouScreen extends StatelessWidget {
   static const avoidEntryKey = ValueKey('you-avoid-entry');
   static const walletCardKey = ValueKey('you-wallet');
 
+  /// The wallet card's top row, the one way to the wallet on You.
+  static const walletRowKey = ValueKey('you-wallet-row');
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -54,6 +57,11 @@ class YouScreen extends StatelessWidget {
     // what Qamar actually holds about this person — it used to say "6 items"
     // regardless of whether it knew anything at all.
     final remembered = state.rememberedCount();
+    // Lifetime earned keeps score (it is what Level is made of), so with
+    // "Points and streaks" off the wallet's line says only the balance.
+    final balance = state.showScore
+        ? (isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح · ${state.iso(state.formatSu(state.suLifetime))} مكتسب' : '${state.formatSu(state.suAvailable)} available · ${state.formatSu(state.suLifetime)} lifetime')
+        : (isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح' : '${state.formatSu(state.suAvailable)} available');
     final rows = <(String, String)>[
       (isAr ? 'الهدف والسعرات' : 'Target and calories', isAr ? '${state.iso('${tg.kcal}')} سعر' : '${tg.kcal} kcal'),
       (isAr ? 'ما يجب تجنبه' : 'What to avoid', state.profile.prefs.isNotEmpty ? state.iso('${state.profile.prefs.length}') : (isAr ? 'مفيش' : 'None')),
@@ -205,32 +213,45 @@ class YouScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         // The wallet, and under it, in the same card, what "Points and
-        // streaks" hides (O4): the switch is about the wallet's score, and
-        // the card's Spend is the one way to the wallet on this screen.
+        // streaks" hides (O4): the switch is about the wallet's score. The
+        // card's top row is the one way to the wallet on this screen, named
+        // for it and led on by the Qamar+ card's chevron, where the way in
+        // was a small "Spend" button that named one of the wallet's tabs.
         Container(
           key: YouScreen.walletCardKey,
           decoration: BoxDecoration(color: QColors.gold.withValues(alpha: 0.08), border: Border.all(color: QColors.gold.withValues(alpha: 0.32)), borderRadius: BorderRadius.circular(QRadii.card)),
           child: Column(children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(children: [
-                const SuCoinIcon(size: 30),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(t.walletTitle, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.goldPale)),
-                    // Lifetime earned keeps score (it is what Level is made of),
-                    // so with "Points and streaks" off only the balance is said.
-                    Text(
-                      state.showScore
-                          ? (isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح · ${state.iso(state.formatSu(state.suLifetime))} مكتسب' : '${state.formatSu(state.suAvailable)} available · ${state.formatSu(state.suLifetime)} lifetime')
-                          : (isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح' : '${state.formatSu(state.suAvailable)} available'),
-                      style: QText.body(size: 12, color: QColors.goldMuted),
+            Semantics(
+              container: true,
+              button: true,
+              label: '${t.walletTitle}, $balance',
+              onTap: state.openWallet,
+              excludeSemantics: true,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  key: YouScreen.walletRowKey,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(QRadii.card)),
+                  onTap: state.openWallet,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: QLayout.minTap),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(children: [
+                        const SuCoinIcon(size: 30),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(t.walletTitle, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.goldPale)),
+                            Text(balance, style: QText.body(size: 12, color: QColors.goldMuted)),
+                          ]),
+                        ),
+                        const Icon(Icons.chevron_right, size: 20, color: QColors.textMuted),
+                      ]),
                     ),
-                  ]),
+                  ),
                 ),
-                QOutlineButton(label: t.spendTab, onTap: state.openWallet, height: 36, color: QColors.gold),
-              ]),
+              ),
             ),
             Divider(color: QColors.gold.withValues(alpha: 0.2), height: 1),
             // "Points and streaks" (O4): off hides everything on screen that
