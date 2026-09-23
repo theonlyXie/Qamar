@@ -11,9 +11,14 @@ import 'moon.dart';
 
 /// What "Chat with Qamar" opens first (O5): something real before any
 /// question. Three everyday dishes as chips; a tap shows the dish with the
-/// food graph's numbers and one plain sentence; "Get my target, two minutes"
-/// starts the consultation, and is there from the start, so the taster never
-/// stands in the way.
+/// food graph's numbers and one plain sentence; "Tell me about you — two
+/// minutes" starts the consultation, and is there from the start, so the
+/// taster never stands in the way.
+///
+/// Nothing here promises a target. The welcome comes before the safety
+/// question, and someone who answers it is deliberately given none (the
+/// general-guidance route), so every line is one that is true for everyone:
+/// the consultation, and how long it takes.
 ///
 /// Chips only, no typing: consent comes before anything personal, and what
 /// someone ate is health data. Nothing about the person leaves the phone
@@ -23,6 +28,12 @@ class WelcomeDishes extends StatefulWidget {
   const WelcomeDishes({super.key, required this.state});
 
   static const startKey = ValueKey('welcome-dishes-start');
+
+  /// Qamar's first line, above the chips.
+  static String intro(bool ar) => ar ? 'قبل أي أسئلة: اختار أكلة، وأنا أوريك فيها إيه.' : 'Before any questions: pick a dish, and I’ll show you what’s in it.';
+
+  /// The button that starts the consultation: what it is, and how long.
+  static String startLabel(bool ar) => ar ? 'احكيلي عنك — دقيقتين' : 'Tell me about you — two minutes';
   static Key chipKey(String id) => ValueKey('welcome-dish-$id');
 
   static Future<void> show(BuildContext context, AppState state) => showModalBottomSheet<void>(
@@ -78,7 +89,7 @@ class _WelcomeDishesState extends State<WelcomeDishes> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          isAr ? 'قبل أي أسئلة: اختار أكلة، وأنا أوريك فيها إيه.' : 'Before any questions: pick a dish, and I’ll show you what’s in it.',
+                          WelcomeDishes.intro(isAr),
                           style: QText.body(size: 15, height: 22, color: QColors.textHigh),
                         ),
                       ),
@@ -102,7 +113,7 @@ class _WelcomeDishesState extends State<WelcomeDishes> {
                   const SizedBox(height: 16),
                   QPrimaryButton(
                     key: WelcomeDishes.startKey,
-                    label: isAr ? 'اعرف هدفك — دقيقتين' : 'Get my target, two minutes',
+                    label: WelcomeDishes.startLabel(isAr),
                     height: 52,
                     onTap: () {
                       Navigator.of(context).pop();

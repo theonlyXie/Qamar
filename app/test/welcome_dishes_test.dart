@@ -34,7 +34,7 @@ void main() {
     test('is read from the dish’s own numbers, so it is true of the card', () {
       final f = _dish('koshary').facts();
       final carbsPct = (f.carbs * 4 * 100 / (f.carbs * 4 + f.protein * 4 + f.fat * 9)).round();
-      expect(dishSentence(f, ar: false, iso: en.iso), 'Most of its energy is carbs ($carbsPct%), with ${f.protein} g of protein — once I know you, I’ll say what share of your day that is.');
+      expect(dishSentence(f, ar: false, iso: en.iso), 'Most of its energy is carbs ($carbsPct%), with ${f.protein} g of protein.');
       final eggs = _dish('eggs_areesh_bread').facts();
       expect(dishSentence(eggs, ar: false, iso: en.iso), anyOf(contains('is fat'), contains('is protein'), contains('is carbs')));
     });
@@ -51,6 +51,35 @@ void main() {
       for (final id in kWelcomeDishIds) {
         expect(dishSentence(_dish(id).facts(), ar: false, iso: en.iso), isNot(contains('% of your')));
       }
+    });
+  });
+
+  group('nothing on the welcome promises a target', () {
+    // The welcome comes before the safety question, and whoever answers it is
+    // given no target (the general-guidance route). So no line here may
+    // promise one: not the pill, not the sheet, not the dish's sentence.
+    final target = RegExp(r'target|goal|share of your day|of your day|your day|kcal a day|هدف|من يومك|يومك|قد إيه', caseSensitive: false);
+
+    test('the pill, the sheet and every dish’s sentence, in both languages', () {
+      for (final lang in AppLang.values) {
+        final s = AppState()..setLang(lang);
+        final ar = lang == AppLang.ar;
+        final lines = [
+          s.t.chatDirectSub,
+          WelcomeDishes.intro(ar),
+          WelcomeDishes.startLabel(ar),
+          for (final d in kEgyptianDishes) dishSentence(d.facts(), ar: ar, iso: s.iso),
+          dishSentence((kcal: 0, protein: 0, carbs: 0, fat: 0, live: false), ar: ar, iso: s.iso),
+        ];
+        for (final line in lines) {
+          expect(target.hasMatch(line), isFalse, reason: line);
+        }
+      }
+    });
+
+    test('the button promises the consultation and how long, in both languages alike', () {
+      expect(WelcomeDishes.startLabel(false), 'Tell me about you — two minutes');
+      expect(WelcomeDishes.startLabel(true), 'احكيلي عنك — دقيقتين');
     });
   });
 
@@ -81,6 +110,7 @@ void main() {
         final sub = find.text(s.t.chatDirectSub);
         expect(sub, findsOneWidget);
         expect(s.t.chatDirectSub, contains(lang == AppLang.ar ? 'أكلة' : 'dish'), reason: 'it names what opens');
+        expect(s.t.chatDirectSub, contains(lang == AppLang.ar ? 'سؤال' : 'questions'), reason: 'and what follows it, in both languages');
         expect(s.t.chatDirectSub, isNot(contains(lang == AppLang.ar ? 'دقيق' : 'minute')),
             reason: 'both languages promise the same; the button says how long');
         final paragraph = tester.renderObject<RenderParagraph>(find.descendant(of: sub, matching: find.byType(RichText)));
@@ -112,7 +142,7 @@ void main() {
       expect(find.textContaining('من هدفك'), findsNothing);
     });
 
-    testWidgets('"Get my target" starts the consultation, with or without a dish', (tester) async {
+    testWidgets('"Tell me about you" starts the consultation, with or without a dish', (tester) async {
       final s = await pump(tester, AppLang.en);
       await open(tester, s);
       await tester.tap(find.byKey(WelcomeDishes.startKey));
