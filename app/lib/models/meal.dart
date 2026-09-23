@@ -208,7 +208,7 @@ const List<SpendItemDef> kSpendCatalog = [
     nameEn: 'Extra photo today',
     whatAr: 'صوّر وجبة رابعة النهارده بعد التلاتة المجانية.',
     whatEn: 'Photograph a fourth meal today, after the free three.',
-    limitAr: 'لحد ١٠ زيادة في اليوم · بكرة الصبح بيتجددوا',
+    limitAr: 'لحد ١٠ زيادة في اليوم · بيتجددوا نص الليل بتوقيت القاهرة',
     limitEn: 'Up to 10 extras a day · refreshes at Cairo midnight',
   ),
   SpendItemDef(

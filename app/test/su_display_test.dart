@@ -246,6 +246,17 @@ void main() {
     }
   });
 
+  // The extra photo's cap counts per Cairo day (0067: the purchases whose
+  // Cairo date is today), so both languages name the same reset: English
+  // said "refreshes at Cairo midnight", Arabic "بكرة الصبح" (tomorrow
+  // morning), hours after the photos are back.
+  test('the extra photo\'s limit names the same reset in both languages: Cairo midnight', () {
+    final photo = kSpendCatalog.singleWhere((i) => i.id == 'ai_extra');
+    expect(photo.limitEn, contains('Cairo midnight'));
+    expect(photo.limitAr, contains('نص الليل بتوقيت القاهرة'));
+    expect(photo.limitAr, isNot(contains('الصبح')));
+  });
+
   group('the naming rule', () {
     test('English: the number and "Su"', () {
       final s = AppState()..setLang(AppLang.en);
