@@ -29,8 +29,11 @@ class SubscriptionScreen extends StatelessWidget {
             ? 'السنة بتاعة أخصائيك على اشتراكك خلصت، فمفيش نصيب بيتدفع له دلوقتي. السعر زي ما هو.'
             : 'Your nutritionist’s twelve months on your subscription have ended, so no share is paid to them now. Your price is the same.',
         'other_professional' => isAr
-            ? 'فيه أخصائي تاني على اشتراكك، وهو اللي بياخد النصيب لحد ما سنته تخلص. لو عايز تغيّر، كلّم الدعم. السعر زي ما هو.'
-            : 'Another nutritionist is already on your subscription, and their share stays with them for their twelve months. To change, write to support. Your price is the same.',
+            // "Account", not "subscription": before a first payment the other
+            // professional is a claim on the account (0069), and there is no
+            // subscription yet. The same word as Me's refusal.
+            ? 'فيه أخصائي تاني على حسابك، وهو اللي بياخد النصيب لحد ما سنته تخلص. لو عايز تغيّر، كلّم الدعم. السعر زي ما هو.'
+            : 'Another nutritionist is already on your account, and their share stays with them for their twelve months. To change, write to support. Your price is the same.',
         'unchecked' => isAr
             ? 'مقدرتش أتأكد من كود الأخصائي دلوقتي، فمفيش نصيب على الدفعة دي. السعر زي ما هو.'
             : 'I could not check the nutritionist’s code just now, so no share is attached to this payment. Your price is the same.',

@@ -151,6 +151,15 @@ void main() {
           expect(line, isNot(contains(ar ? 'الكود شغال' : 'Code applied')));
         }
       }
+      // Pinned: another professional may be a claim on the account before any
+      // payment, so it is "your account", never "your subscription" — the
+      // word Me's refusal uses. A referral ends only after payments, so there
+      // "subscription" is true.
+      expect(SubscriptionScreen.promoNoticeLine(false, 'other_professional'),
+          'Another nutritionist is already on your account, and their share stays with them for their twelve months. To change, write to support. Your price is the same.');
+      expect(SubscriptionScreen.promoNoticeLine(true, 'other_professional'),
+          'فيه أخصائي تاني على حسابك، وهو اللي بياخد النصيب لحد ما سنته تخلص. لو عايز تغيّر، كلّم الدعم. السعر زي ما هو.');
+      expect(SubscriptionScreen.promoNoticeLine(false, 'referral_ended'), contains('twelve months on your subscription have ended'));
       expect(SubscriptionScreen.promoNoticeLine(false, null), isNull);
       expect(SubscriptionScreen.promoNoticeLine(false, 'something new'), isNull);
     });
@@ -169,7 +178,7 @@ void main() {
       );
       await _paywall(tester, _lite(AppLang.en, earned: _stated(), quote: quote));
       final line = tester.widget<Text>(find.byKey(SubscriptionScreen.codeLineKey)).data!;
-      expect(line, startsWith('Another nutritionist is already on your subscription'));
+      expect(line, startsWith('Another nutritionist is already on your account'));
       expect(line, isNot(contains('Code applied')));
     });
 
