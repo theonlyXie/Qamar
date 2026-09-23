@@ -11,6 +11,15 @@ import 'common.dart';
 class WhySheet extends StatelessWidget {
   const WhySheet({super.key});
 
+  /// A code set left to right in either language, in its own order. The
+  /// version line "calc v2.0 · 2026-08-13", in Arabic digits, drew as
+  /// "calc v١٣-٠٨-٢٠٢٦ · ٢.٠": the bidi algorithm treats Arabic-Indic
+  /// digits with the dots and hyphens between them as one right-to-left
+  /// run, even inside iso()'s left-to-right isolate, so the version and
+  /// the date swapped and the date read backwards. A left-to-right mark
+  /// either side of every separator holds each run of digits in its place.
+  static String inOrder(String code) => code.replaceAllMapped(RegExp('[^\u0660-\u06690-9\u2066\u2069]+'), (m) => '\u200E${m[0]}\u200E');
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -27,7 +36,7 @@ class WhySheet extends StatelessWidget {
       ),
       (t.whySource, t.whySourceVal),
       (t.whyGuide, t.whyGuideVal),
-      (t.whyVersion, state.iso('calc v2.0 · 2026-08-13')),
+      (t.whyVersion, WhySheet.inOrder(state.iso('calc v2.0 · 2026-08-13'))),
     ];
 
     return Positioned.fill(
