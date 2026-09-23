@@ -46,7 +46,11 @@ void main() {
       .where((f) => f.path.endsWith('.dart') && !f.path.endsWith('l10n/strings.dart'))
       .map((f) => f.readAsStringSync())
       .join('\n');
-  bool read(String f) => RegExp('\\.$f\\b').hasMatch(elsewhere);
+  // A string is read through the table, AppState.t (`t.brand`,
+  // `state.t.brand`). Any `.name` matched far too much: a field called
+  // `photo` was "read" by `state.photo`, `.label` by every widget's label
+  // (seat 4's review found eight hidden that way; they are deleted since).
+  bool read(String f) => RegExp('\\bt\\.$f\\b').hasMatch(elsewhere);
 
   test('"or type instead" is gone from the table', () {
     expect(fields, isNot(contains('typeInstead')));
