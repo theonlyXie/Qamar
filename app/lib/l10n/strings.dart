@@ -286,7 +286,7 @@ class QStrings {
     swap: 'بدّل', openPlan: 'افتح الخطة', accept: 'موافق', replace: 'غيّرها', done2: 'اتعملت',
     logMeal: 'سجّل وجبة', loggedToday: 'المسجّل النهاردة',
     logSub: 'اختار أسهل طريقة. كله بيوصل لنفس شاشة التأكيد.',
-    photo: 'صورة', photoSub: 'صوّر الأكل · Qamar+', voice: 'صوت', voiceSub: 'احكيلي بالمصري',
+    photo: 'صورة', photoSub: 'صوّر الأكل · قمر+', voice: 'صوت', voiceSub: 'احكيلي بالمصري',
     text: 'كتابة', textSub: 'اكتب الوجبة', recent: 'وجبات سابقة', recentSub: 'كرّر وجبة قديمة',
     describeMeal: 'اكتب الوجبة', mealPlaceholder: 'مثال: كشري وسط + دقة',
     continueLabel: 'كمّل', permissionNote: 'الكاميرا والمايك بنطلبهم وقت الاستخدام بس. الرفض مش بيمنعك من التسجيل بالكتابة.',

@@ -2610,7 +2610,7 @@ class AppState extends ChangeNotifier {
                 ? 'مقدرتش أقرأ الوجبة من الصورة دي. جرّب صورة أوضح، أو احكيلي أكلت إيه.'
                 : 'I could not read this meal. Try a clearer photo, or tell me what you ate.')
             : (isAr
-                ? 'مقدرتش ألاقي الأكل ده. جرّب اسم أوضح، أو صوّر الطبق من Qamar+.'
+                ? 'مقدرتش ألاقي الأكل ده. جرّب اسم أوضح، أو صوّر الطبق من قمر+.'
                 : 'I could not match that food. Try a clearer name, or photograph the plate with Qamar+.');
         chat.add(ChatTurn(
           who: ChatWho.q,

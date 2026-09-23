@@ -90,7 +90,7 @@ const kExplanations = <String, Explanation>{
     titleAr: 'نقاط Su',
     titleEn: 'Su Points',
     bodyAr:
-        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة (+١٠٠، وأول وجبة +٥٠٠)، كوباية مياه (+٥، ومع Qamar+ +١٠)، مهمة اليوم لما اللي بتطلبه يتسجّل (+٢٥٠، في حدود سقف اليوم)، أسبوع كامل في السلسلة (+١٠٠). بتتصرف على صورة زيادة أو تجميد السلسلة — ومرة في اليوم، عند حد الأسئلة، على السؤال ده بس. السؤال الرابع لسه بيفتح Qamar+ الأول.',
+        'بتتكسب لما تعمل حاجة مفيدة لنفسك — تسجّل وجبة (+١٠٠، وأول وجبة +٥٠٠)، كوباية مياه (+٥، ومع قمر+ +١٠)، مهمة اليوم لما اللي بتطلبه يتسجّل (+٢٥٠، في حدود سقف اليوم)، أسبوع كامل في السلسلة (+١٠٠). بتتصرف على صورة زيادة أو تجميد السلسلة — ومرة في اليوم، عند حد الأسئلة، على السؤال ده بس. السؤال الرابع لسه بيفتح قمر+ الأول.',
     bodyEn:
         'Earned when you do something useful for yourself — logging a meal (+100, first meal +500), a glass of water (+5, +10 with Qamar+), the day’s quest, when what it asks is logged (+250, within the day’s cap), a full week of streak (+100). Spent on another photo or a streak freeze — and, once a day at the question limit, on that one question. The fourth question still opens Qamar+ first.',
     soWhatAr: 'النقط دي بتتكسب بس. مش بتتشترى بفلوس ومالهاش قيمة نقدية. لو مش عايز تشوفها، اقفل «النقاط والسلسلة» من أنا — بتستخبى بس، وبتفضل تتحسب.',
