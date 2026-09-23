@@ -2056,6 +2056,11 @@ void main() {
       final a = MemoryAnalytics();
       final sharer = MemorySharer();
       final state = AppState(sharer: sharer, analytics: a);
+      // A week with something to say: Share waits for three logged days.
+      final now = DateTime.now();
+      for (var back = 1; back <= 3; back++) {
+        state.dayHistory.add(DayTotals(day: DateTime(now.year, now.month, now.day - back), kcal: 1900, meals: 2));
+      }
       await state.setImprove(true);
       await state.shareReview(Uint8List.fromList([1, 2, 3]));
       expect(a.named('review_shared'), hasLength(1));

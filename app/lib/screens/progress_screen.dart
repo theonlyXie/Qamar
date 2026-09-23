@@ -31,6 +31,9 @@ class ProgressScreen extends StatelessWidget {
   /// The streak card, found by tests: drawn only while the score is shown.
   static const streakKey = ValueKey('progress-streak');
 
+  /// "Share the week", found by tests: it waits for three logged days.
+  static const shareKey = ValueKey('progress-share-week');
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -409,9 +412,13 @@ class _ShareableReviewState extends State<_ShareableReview> {
         Row(
           children: [
             Expanded(
+              // It waits for three logged days, as the week card on Today
+              // does: before then the card's sentence is what is still
+              // missing, said to the person, not something to send anyone.
               child: QOutlineButton(
+                key: ProgressScreen.shareKey,
                 label: _busy ? (isAr ? 'لحظة…' : 'One moment…') : (isAr ? 'شارك كارت الأسبوع' : 'Share the week'),
-                onTap: _busy ? null : _share,
+                onTap: _busy || !review.enough ? null : _share,
                 height: 40,
                 color: QColors.violetSoft,
               ),

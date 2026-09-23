@@ -4394,10 +4394,12 @@ class AppState extends ChangeNotifier {
     return '${isAr ? r.insight.ar : r.insight.en}\n${isAr ? 'أسبوعي مع قمر' : 'My week with Qamar'} · ${QamarConfig.site}';
   }
 
-  /// The card, rendered by the screen, handed to the share sheet.
+  /// The card, rendered by the screen, handed to the share sheet: only
+  /// once the week has three logged days ([WeekReview.enough]), as the week
+  /// card on Today waits. Before then its sentence is what is still missing.
   Future<void> shareReview(Uint8List png) async {
     final s = _sharer;
-    if (s == null) return;
+    if (s == null || !weekReview().enough) return;
     await s.shareImage(png, text: reviewShareText(), fileName: 'qamar-week.png');
     _track('review_shared');
   }
