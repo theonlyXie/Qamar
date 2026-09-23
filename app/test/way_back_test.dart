@@ -15,6 +15,7 @@ import 'package:qamar/main.dart';
 import 'package:qamar/models/messages.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/common.dart';
+import 'package:qamar/widgets/explain.dart';
 import 'package:qamar/widgets/orb_nav.dart';
 
 import 'support/app_fonts.dart';
@@ -140,6 +141,47 @@ void main() {
     expect(s.screen, AppScreen.today);
     expect(s.handlesSystemBack, isFalse, reason: 'at Today with nothing open, back is the system’s');
   });
+
+  for (final lang in AppLang.values) {
+    testWidgets('the phone’s back closes the sheet on top first, as it leaves, and the screen stays (${lang.name})', (tester) async {
+      final s = AppState()..setLang(lang);
+      s.dismissOrbTutorial();
+      s.go(AppScreen.today);
+      s.go(AppScreen.plan);
+      await _pump(tester, s);
+      // Two sheets, the explanation over the Why sheet.
+      s.openWhy();
+      s.openExplain(kExplanations['kcal_remaining']!);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      final panels = find.byKey(QSheetScrim.panelKey);
+      expect(panels, findsNWidgets(2));
+      final top = tester.getRect(panels.last).top;
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 30));
+      expect(s.explainOpen, isNull, reason: 'the sheet on top closes first');
+      expect(s.whyOpen, isTrue, reason: 'the one under it stays');
+      expect(s.screen, AppScreen.plan, reason: 'the screen stays');
+      expect(panels, findsNWidgets(2), reason: 'it is still leaving, the way a tap on its scrim sends it');
+      expect(tester.getRect(panels.last).top, greaterThan(top), reason: 'going down, not vanishing');
+      await tester.pump(const Duration(milliseconds: 900));
+      expect(panels, findsOneWidget, reason: 'and then gone');
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      expect(s.whyOpen, isFalse);
+      expect(s.screen, AppScreen.plan);
+      await tester.pump(const Duration(milliseconds: 900));
+      expect(panels, findsNothing);
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      expect(s.screen, AppScreen.today, reason: 'with no sheet left, back goes back');
+      expect(s.handlesSystemBack, isFalse);
+    });
+  }
 
   test('the consultation left part-way keeps its answers and carries on', () {
     final s = AppState()..setLang(AppLang.en);
