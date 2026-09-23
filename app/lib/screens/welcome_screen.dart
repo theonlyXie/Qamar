@@ -153,11 +153,14 @@ class WelcomeScreen extends StatelessWidget {
                     onPressed: state.invitationBusy ? null : () => _askInvitationCode(context, state),
                     child: Text(isAr ? 'عندك دعوة؟' : 'Have an invitation?', style: link),
                   ),
+                  // The notice's own tone (seat 1's invitationNoticeGood): good
+                  // news in cyan, the inviter named or not; anything that did not
+                  // happen in amber, whoever invited before.
                   if (state.invitationNotice != null) ...[
                     QBalancedText(state.invitationNotice!,
                         textKey: WelcomeScreen.noticeKey,
                         maxWidth: 320,
-                        style: QText.body(size: 12, height: 18, color: state.invitedBy != null ? QColors.cyan : QColors.amberSoft)),
+                        style: QText.body(size: 12, height: 18, color: state.invitationNoticeGood ? QColors.cyan : QColors.amberSoft)),
                     const SizedBox(height: 12),
                   ],
                   QBalancedText(t.boundary, textKey: WelcomeScreen.boundaryKey, maxWidth: 320, style: QText.body(size: 11, height: 17, color: QColors.textMuted)),

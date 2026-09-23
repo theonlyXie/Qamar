@@ -24,6 +24,8 @@ import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
 import 'package:qamar/screens/subscription_screen.dart';
 import 'package:qamar/screens/welcome_screen.dart';
+import 'package:qamar/models/invitation.dart';
+import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/colors.dart';
 import 'package:qamar/theme/text_styles.dart';
@@ -31,6 +33,7 @@ import 'package:qamar/widgets/account_sheet.dart';
 import 'package:qamar/widgets/common.dart';
 import 'package:qamar/widgets/moon.dart';
 
+import 'persistence_test.dart' show FakeInvitationRepo;
 import 'support/app_fonts.dart';
 
 const _phone = Size(390, 844);
@@ -49,30 +52,54 @@ const _welcomePhones = [
   (Size(390, 844), 47.0, 34.0),
 ];
 
-/// What the welcome can say under "Have an invitation?", seat 1's scenarios:
-/// nothing; a link opened before there is an account; a code kept on the
-/// phone because the server could not be reached, the longest; and a
-/// redeemed invitation, which names the friend.
+/// What the welcome can say under "Have an invitation?", seat 1's scenarios,
+/// each reached the way the app reaches it: nothing; a link opened before
+/// there is an account (good news: it waits); a link opened with an account
+/// and no signal, whose code is kept on the phone (the longest notice); a
+/// redeemed invitation, from a friend who is named and from one who is not
+/// (good news either way); and a refusal after a success, which is not good
+/// news although the friend is still named.
 enum _Notice {
-  none,
-  guest,
-  kept,
-  invited;
+  none(good: false),
+  waiting(good: true),
+  kept(good: false),
+  invited(good: true),
+  unnamed(good: true),
+  refusedAfter(good: false);
 
-  Future<void> show(AppState s) async {
-    final ar = s.isAr;
+  const _Notice({required this.good});
+
+  /// Drawn in cyan when true, in amber when not.
+  final bool good;
+
+  Future<AppState> make(AppLang lang) async {
     switch (this) {
       case _Notice.none:
-        return;
-      case _Notice.guest:
+        return AppState()..setLang(lang);
+      case _Notice.waiting:
+        final s = AppState()..setLang(lang);
         await s.acceptInvitationLink('QMR-LATER');
+        return s;
       case _Notice.kept:
-        s.invitationNotice = ar
-            ? 'مقدرتش أفعّل الدعوة دلوقتي. هي محفوظة على الموبايل، وهجرّب تاني أول ما تفتح التطبيق وانت متوصل.'
-            : 'I could not redeem your invitation just now. It is kept on this phone, and I will try again the next time you open the app with a connection.';
+        final s = AppState(invitationRepo: FakeInvitationRepo()..failWith = StateError('no signal'), userId: 'user-1')..setLang(lang);
+        await s.acceptInvitationLink('QMR-LIVE');
+        return s;
       case _Notice.invited:
-        s.invitedBy = 'Basel';
-        s.invitationNotice = ar ? 'Basel عزمك. ١٤ يوم قمر+ عليك من دلوقتي.' : 'Basel invited you. 14 days of Qamar+ are yours from now.';
+        final s = AppState(invitationRepo: FakeInvitationRepo(), userId: 'user-1')..setLang(lang);
+        await s.redeemInvitation('QMR-7F3A1');
+        return s;
+      case _Notice.unnamed:
+        final repo = FakeInvitationRepo()..redemption = const InvitationRedemption(inviterName: '', inviteeName: 'Omar', trialDays: 14);
+        final s = AppState(invitationRepo: repo, userId: 'user-1')..setLang(lang);
+        await s.redeemInvitation('QMR-7F3A1');
+        return s;
+      case _Notice.refusedAfter:
+        final repo = FakeInvitationRepo();
+        final s = AppState(invitationRepo: repo, userId: 'user-1')..setLang(lang);
+        await s.redeemInvitation('QMR-7F3A1');
+        repo.failWith = const InvitationException('this account already used an invitation', refused: true);
+        await s.redeemInvitation('QMR-9Z9Z9');
+        return s;
     }
   }
 }
@@ -222,8 +249,7 @@ void main() {
           tester.view.devicePixelRatio = 3;
           tester.view.physicalSize = phone * 3;
           tester.view.padding = FakeViewPadding(top: top * 3, bottom: bottom * 3);
-          final s = AppState()..setLang(lang);
-          await notice.show(s);
+          final s = await notice.make(lang);
           await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 400));
@@ -264,14 +290,38 @@ void main() {
           }
           final page = tester.state<ScrollableState>(find.descendant(of: find.byType(WelcomeScreen), matching: find.byType(Scrollable)).first);
           if (page.position.maxScrollExtent > 0) failures.add('$at: scrolls ${page.position.maxScrollExtent}');
-          if (notice == _Notice.invited) {
-            expect(tester.widget<Text>(find.byKey(WelcomeScreen.noticeKey)).style!.color, QColors.cyan, reason: 'a redeemed invitation is good news');
-          }
           await tester.pumpWidget(const SizedBox());
         }
       }
       tester.view.reset();
       expect(failures, isEmpty, reason: failures.join('\n'));
+    });
+
+    testWidgets('the notice is drawn in its own tone: good news cyan, the inviter named or not; anything that did not happen amber (${lang.name})', (tester) async {
+      final ar = lang == AppLang.ar;
+      tester.view.devicePixelRatio = 3;
+      tester.view.physicalSize = _phone * 3;
+      tester.view.padding = const FakeViewPadding(top: 47 * 3, bottom: 34 * 3);
+      addTearDown(tester.view.reset);
+      final says = {
+        _Notice.waiting: ar ? 'وصلتك دعوة.' : 'You have an invitation.',
+        _Notice.kept: ar ? 'محفوظة على الموبايل' : 'kept on this phone',
+        _Notice.invited: ar ? 'Basel عزمك.' : 'Basel invited you.',
+        _Notice.unnamed: ar ? 'صاحبك عزمك.' : 'A friend invited you.',
+        _Notice.refusedAfter: 'this account already used an invitation',
+      };
+      for (final notice in _Notice.values.where((n) => n != _Notice.none)) {
+        final s = await notice.make(lang);
+        await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        final text = tester.widget<Text>(find.byKey(WelcomeScreen.noticeKey));
+        expect(text.data, contains(says[notice]!), reason: '${notice.name}: the notice the app says');
+        if (notice == _Notice.refusedAfter) expect(s.invitedBy, 'Basel', reason: 'still invited by Basel, and the tone is not');
+        if (notice == _Notice.unnamed) expect(s.invitedBy, isNull, reason: 'no name, and still good news');
+        expect(text.style!.color, notice.good ? QColors.cyan : QColors.amberSoft, reason: '${notice.name} ${notice.good ? 'is good news' : 'did not happen'}');
+        await tester.pumpWidget(const SizedBox());
+      }
     });
 
     testWidgets('where even a moonless welcome is taller than the phone, it scrolls, and nothing is scaled (${lang.name})', (tester) async {
@@ -280,8 +330,7 @@ void main() {
       tester.view.devicePixelRatio = 3;
       tester.view.physicalSize = const Size(740, 360) * 3;
       addTearDown(tester.view.reset);
-      final s = AppState()..setLang(lang);
-      await _Notice.kept.show(s);
+      final s = await _Notice.kept.make(lang);
       await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
