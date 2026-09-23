@@ -3758,12 +3758,12 @@ class AppState extends ChangeNotifier {
   ///
   /// Off hides everything that counts at the person: Today's Su chip, the
   /// orb's passing receipt, the orb's streak ring, the streak line under the
-  /// name, the quest and its coin, Progress's streak card and the streak on
-  /// the week card. Off only hides. Points are still earned, freezes still
-  /// apply, the earned month still counts its days, photos can still be
-  /// bought, and the wallet in Me still shows the balance for whoever goes
-  /// to look. Switching back costs nothing. Everything that keeps score reads
-  /// this and nothing else.
+  /// name, the quest and its coin, Progress's streak card, the streak on the
+  /// week card, and Level and lifetime earned in the wallet. Off only hides.
+  /// Points are still earned, freezes still apply, the earned month still
+  /// counts its days, photos can still be bought, and the wallet still shows
+  /// the balance for whoever goes to look. Switching back costs nothing.
+  /// Everything that keeps score reads this and nothing else.
   bool showScore = true;
 
   void setShowScore(bool on) {

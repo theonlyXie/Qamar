@@ -18,6 +18,7 @@ import 'package:qamar/models/streak.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/screens/progress_screen.dart';
 import 'package:qamar/screens/today_screen.dart';
+import 'package:qamar/screens/wallet_screen.dart';
 import 'package:qamar/screens/you_screen.dart';
 import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/state/app_state.dart';
@@ -110,6 +111,50 @@ void main() {
       await tester.pump();
       expect(s.showScore, isFalse);
       expect(find.text(s.t.walletTitle), findsOneWidget, reason: 'the wallet stays, for whoever goes to look');
+    });
+
+    testWidgets('the whole row is the control, not only the switch (${lang.name})', (tester) async {
+      final s = _state(lang)..go(AppScreen.you);
+      await _pump(tester, s);
+      await tester.dragUntilVisible(find.byKey(YouScreen.scoreRowKey), find.byType(ListView).first, const Offset(0, -200));
+      await tester.pump();
+      await tester.tap(find.text(ar ? 'النقاط والسلسلة' : 'Points and streaks'));
+      await tester.pump();
+      expect(s.showScore, isFalse, reason: 'a tap on the words turns it off');
+      await tester.tap(find.textContaining(ar ? 'بتستخبى بس' : 'Off only hides them'));
+      await tester.pump();
+      expect(s.showScore, isTrue, reason: 'and on again');
+    });
+
+    testWidgets('the wallet with it off: the balance to spend, and no Level or lifetime (${lang.name})', (tester) async {
+      final s = _state(lang)
+        ..suAvailable = 1250
+        ..suLifetime = 3400
+        ..go(AppScreen.wallet);
+      await _pump(tester, s);
+      final level = ar ? 'المستوى ${s.iso('${s.level()}')}' : 'Level ${s.level()}';
+      expect(find.byKey(WalletScreen.levelKey), findsOneWidget);
+      expect(find.text(level), findsOneWidget);
+      expect(find.text(s.t.levelNote), findsOneWidget);
+      expect(find.byKey(WalletScreen.lifetimeKey), findsOneWidget);
+
+      s.setShowScore(false);
+      await tester.pump();
+      expect(find.text(s.formatSu(1250)), findsOneWidget, reason: 'the balance stays: spending needs it');
+      expect(find.byKey(WalletScreen.levelKey), findsNothing, reason: 'the Level bar keeps score');
+      expect(find.text(level), findsNothing);
+      expect(find.text(s.t.levelNote), findsNothing);
+      expect(find.byKey(WalletScreen.lifetimeKey), findsNothing, reason: 'lifetime earned is what Level is made of');
+      expect(find.text(s.formatSu(3400)), findsNothing);
+
+      // And Me's wallet card says only the balance.
+      s.go(AppScreen.you);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.dragUntilVisible(find.text(s.t.walletTitle), find.byType(ListView).first, const Offset(0, -200));
+      await tester.pump();
+      expect(find.textContaining(s.formatSu(3400)), findsNothing);
+      expect(find.text(ar ? '${s.iso(s.formatSu(1250))} متاح' : '1,250 available'), findsOneWidget);
     });
 
     testWidgets('Today with it off: no Su chip, streak line, quest, ring or receipt (${lang.name})', (tester) async {

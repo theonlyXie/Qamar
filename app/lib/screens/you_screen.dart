@@ -17,8 +17,9 @@ import '../widgets/moon.dart';
 class YouScreen extends StatelessWidget {
   const YouScreen({super.key});
 
-  /// The "Points and streaks" switch (O4), found by tests.
+  /// The "Points and streaks" switch (O4) and its row, found by tests.
   static const scoreSwitchKey = ValueKey('points-and-streaks');
+  static const scoreRowKey = ValueKey('points-and-streaks-row');
 
   @override
   Widget build(BuildContext context) {
@@ -202,8 +203,12 @@ class YouScreen extends StatelessWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(t.walletTitle, style: QText.body(size: 15, weight: FontWeight.w600, color: const Color(0xFFF2E4C6))),
+                // Lifetime earned keeps score (it is what Level is made of),
+                // so with "Points and streaks" off only the balance is said.
                 Text(
-                  isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح · ${state.iso(state.formatSu(state.suLifetime))} مكتسب' : '${state.formatSu(state.suAvailable)} available · ${state.formatSu(state.suLifetime)} lifetime',
+                  state.showScore
+                      ? (isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح · ${state.iso(state.formatSu(state.suLifetime))} مكتسب' : '${state.formatSu(state.suAvailable)} available · ${state.formatSu(state.suLifetime)} lifetime')
+                      : (isAr ? '${state.iso(state.formatSu(state.suAvailable))} متاح' : '${state.formatSu(state.suAvailable)} available'),
                   style: QText.body(size: 12, color: const Color(0xFFB9A57C)),
                 ),
               ]),
@@ -213,31 +218,40 @@ class YouScreen extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         // "Points and streaks" (O4): off hides everything on screen that keeps
-        // score, and only hides it. The wallet above stays, for whoever goes
-        // to look, and earning, freezes and photo purchases carry on.
+        // score, and only hides it. The wallet's balance stays, for whoever
+        // goes to look, and earning, freezes and photo purchases carry on.
+        // The whole row is the control, not only the switch.
         MergeSemantics(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
-            child: Row(children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(isAr ? 'النقاط والسلسلة' : 'Points and streaks', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
-                  Text(
-                    isAr
-                        ? 'نقاط Su والسلسلة ومهمة اليوم على شاشاتك. لو قفلتها بتستخبى بس: النقاط بتتحسب زي ما هي، ومحفظتك فاضلة هنا.'
-                        : 'Su, the streak and the day’s quest on your screens. Off only hides them: you still earn, and your wallet stays here.',
-                    style: QText.body(size: 12, height: 16, color: QColors.textMuted),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: YouScreen.scoreRowKey,
+              borderRadius: BorderRadius.circular(QRadii.lg),
+              onTap: () => state.setShowScore(!state.showScore),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.lg),
+                child: Row(children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(isAr ? 'النقاط والسلسلة' : 'Points and streaks', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textHigh)),
+                      Text(
+                        isAr
+                            ? 'نقاط Su ومستواك والسلسلة ومهمة اليوم على شاشاتك. لو قفلتها بتستخبى بس: النقاط بتتحسب زي ما هي، ورصيدك فاضل في المحفظة.'
+                            : 'Su, your level, the streak and the day’s quest on your screens. Off only hides them: you still earn, and your balance stays in the wallet.',
+                        style: QText.body(size: 12, height: 16, color: QColors.textMuted),
+                      ),
+                    ]),
+                  ),
+                  Switch.adaptive(
+                    key: YouScreen.scoreSwitchKey,
+                    value: state.showScore,
+                    activeThumbColor: QColors.violet,
+                    onChanged: state.setShowScore,
                   ),
                 ]),
               ),
-              Switch.adaptive(
-                key: YouScreen.scoreSwitchKey,
-                value: state.showScore,
-                activeThumbColor: QColors.violet,
-                onChanged: state.setShowScore,
-              ),
-            ]),
+            ),
           ),
         ),
         const SizedBox(height: 14),

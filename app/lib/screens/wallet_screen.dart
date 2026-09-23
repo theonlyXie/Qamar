@@ -12,6 +12,11 @@ import '../widgets/explain.dart';
 class WalletScreen extends StatelessWidget {
   const WalletScreen({super.key});
 
+  /// Found by tests: Level and lifetime earned, drawn only while the score
+  /// is shown (O4).
+  static const levelKey = ValueKey('wallet-level');
+  static const lifetimeKey = ValueKey('wallet-lifetime');
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -45,25 +50,34 @@ class WalletScreen extends StatelessWidget {
                   Text('${state.formatSu(state.suAvailable)}', style: QText.number(size: 34, weight: FontWeight.w600, color: const Color(0xFFF2E4C6))),
                 ]),
                 const Spacer(),
-                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  Text(t.suLifetime, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
-                  Text('${state.formatSu(state.suLifetime)}', style: QText.number(size: 18, weight: FontWeight.w600, color: QColors.textMid)),
-                ]),
+                // Lifetime earned is the number Level is made of and a
+                // leaderboard would rank, so it keeps score: it goes with
+                // "Points and streaks" (O4). The balance stays, because
+                // spending needs it.
+                if (state.showScore)
+                  Column(key: WalletScreen.lifetimeKey, crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text(t.suLifetime, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
+                    Text('${state.formatSu(state.suLifetime)}', style: QText.number(size: 18, weight: FontWeight.w600, color: QColors.textMid)),
+                  ]),
               ]),
-              const SizedBox(height: 16),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(value: state.levelPct() / 100, minHeight: 6, backgroundColor: QColors.borderFaint, valueColor: const AlwaysStoppedAnimation(QColors.gold)),
-              ),
-              const SizedBox(height: 6),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                // Level lives here only (O9): Today keeps one Su chip.
-                Explainable(
-                  id: 'level',
-                  child: ExplainMark(child: Text(isAr ? 'المستوى ${state.iso('${state.level()}')}' : 'Level ${state.level()}', style: QText.body(size: 11, color: QColors.textFaint))),
+              // Level lives here only (O9), and only while the score is shown
+              // (O4): it buys nothing, and it is the leaderboard's number.
+              if (state.showScore) ...[
+                const SizedBox(height: 16),
+                ClipRRect(
+                  key: WalletScreen.levelKey,
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(value: state.levelPct() / 100, minHeight: 6, backgroundColor: QColors.borderFaint, valueColor: const AlwaysStoppedAnimation(QColors.gold)),
                 ),
-                Text(t.levelNote, style: QText.body(size: 11, color: QColors.textFaint)),
-              ]),
+                const SizedBox(height: 6),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Explainable(
+                    id: 'level',
+                    child: ExplainMark(child: Text(isAr ? 'المستوى ${state.iso('${state.level()}')}' : 'Level ${state.level()}', style: QText.body(size: 11, color: QColors.textFaint))),
+                  ),
+                  Text(t.levelNote, style: QText.body(size: 11, color: QColors.textFaint)),
+                ]),
+              ],
             ],
           ),
         ),
