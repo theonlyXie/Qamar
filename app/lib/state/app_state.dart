@@ -957,6 +957,20 @@ class AppState extends ChangeNotifier {
   /// like the prototype's `iso()` — keeps "٨٢ كجم" reading correctly in RTL.
   /// Every computed number on an Arabic screen passes through here, so it is
   /// also where the digit preference is applied.
+  ///
+  /// What the isolate holds, and what it does not (measured, and pinned in
+  /// iso_direction_test):
+  ///  * One number is kept whole, and the Arabic around it cannot move it.
+  ///  * Several Arabic-Indic numbers in one isolate still take the bidi
+  ///    rules for Arabic numbers. Joined by a lone "/", ":", "." or ",", no
+  ///    spaces ("١/٩", "٢.٠"), they read left to right. Joined by anything
+  ///    else (spaces, " / ", "-", "·") they read right to left, the first
+  ///    number on the right. So the macros' "٣٤ / ١٤٨ جم" is read consumed
+  ///    first, as meant, but a date or a version comes out backwards
+  ///    ("٢٠٢٦-٠٨-١٣" with the day first), and a code needs marks of its own
+  ///    (WhySheet.inOrder).
+  ///  * With Western digits chosen, the numbers are a Latin run and read
+  ///    left to right: "34 / 148", consumed first in that order too.
   String iso(String x) => '\u2066${digits(x)}\u2069';
 
   /// Thousands separators so 2,500 looks like a score, not a calorie leftover.
