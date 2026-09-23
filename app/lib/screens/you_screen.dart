@@ -26,6 +26,18 @@ class YouScreen extends StatelessWidget {
   /// The "Qamar's questions" count, [n] a day.
   static ValueKey<String> nudgeKey(int n) => ValueKey('nudges-$n');
 
+  /// How many things Qamar remembers, counted the way each language counts:
+  /// "1 item" and "2 items"; in Arabic one, two (the dual), three to ten
+  /// (the plural) and eleven on (the singular), where both used to say the
+  /// plural for every number ("1 items", "١ عناصر").
+  static String itemsLine(int n, {required bool isAr, required String Function(String) iso}) {
+    if (!isAr) return n == 1 ? '1 item' : '$n items';
+    if (n == 1) return 'عنصر واحد';
+    if (n == 2) return 'عنصرين';
+    final lastTwo = n % 100;
+    return lastTwo >= 3 && lastTwo <= 10 ? '${iso('$n')} عناصر' : '${iso('$n')} عنصر';
+  }
+
   /// The read-out of what Qamar holds, and the wallet card.
   static const readOutKey = ValueKey('you-read-out');
   static const walletCardKey = ValueKey('you-wallet');
@@ -46,9 +58,7 @@ class YouScreen extends StatelessWidget {
       (isAr ? 'ما يجب تجنبه' : 'What to avoid', state.profile.prefs.isNotEmpty ? state.iso('${state.profile.prefs.length}') : (isAr ? 'مفيش' : 'None')),
       (
         isAr ? 'ذاكرة قمر' : 'Qamar memory',
-        remembered == 0
-            ? (isAr ? 'فاضية' : 'Empty')
-            : (isAr ? '${state.iso('$remembered')} عناصر' : '$remembered items')
+        remembered == 0 ? (isAr ? 'فاضية' : 'Empty') : YouScreen.itemsLine(remembered, isAr: isAr, iso: state.iso)
       ),
       (isAr ? 'الموافقات' : 'Consents', isAr ? 'الإصدار ${state.digits(QamarConfig.consentVersion)}' : 'v${QamarConfig.consentVersion}'),
     ];
