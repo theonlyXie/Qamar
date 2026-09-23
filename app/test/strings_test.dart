@@ -19,7 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 const _owed = {
   'restart', 'guestNote', 'scanInbodySub', 'walletSub', 'priceLabel', 'limitLabel', 'barcode', 'barcodeSub',
   'labelSub', 'suEarned', 'logMeal', 'logSub', 'voiceSub', 'textSub', 'recent',
-  'recentSub', 'describeMeal', 'mealPlaceholder', 'permissionNote', 'analyzing', 'sourcePreview',
+  'recentSub', 'describeMeal', 'mealPlaceholder', 'analyzing', 'sourcePreview',
   'uncertainNote', 'online', 'sIdle', 'sAnswer', 'tapPrompt',
 };
 

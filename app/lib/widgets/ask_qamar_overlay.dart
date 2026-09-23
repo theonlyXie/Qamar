@@ -64,6 +64,9 @@ class AskQamarOverlay extends StatefulWidget {
 class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProviderStateMixin {
   final _chat = ChatScroller();
   final _ctrl = TextEditingController();
+  /// The composer's focus, taken when the state asks ("Type it instead").
+  final _focus = FocusNode();
+  int? _focusAsked;
   /// The entrance, on the settle spring (QSpring): quick, and at rest
   /// without passing its mark. Under reduce-motion a plain fade.
   late final AnimationController _in = AnimationController.unbounded(vsync: this);
@@ -83,6 +86,7 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
     _in.dispose();
     _chat.dispose();
     _ctrl.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
@@ -96,6 +100,14 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
     if (_ctrl.text != state.chatDraft) {
       _ctrl.value = TextEditingValue(text: state.chatDraft, selection: TextSelection.collapsed(offset: state.chatDraft.length));
     }
+    // A request made while the conversation is open takes the keyboard; the
+    // count already there when it opened is not a request.
+    if (_focusAsked != null && _focusAsked != state.composerFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focus.requestFocus();
+      });
+    }
+    _focusAsked = state.composerFocus;
 
     final showSuggestions = state.chatDraft.isEmpty && state.chatState != ChatState.thinking;
 
@@ -186,7 +198,7 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                           // here?" is implied.
                           if (state.chatPhotoPath != null && !kIsWeb)
                             _Attachment(path: state.chatPhotoPath!, label: state.isAr ? 'صورة المنيو' : 'Menu photo', onRemove: state.detachChatPhoto),
-                          _Composer(state: state, ctrl: _ctrl, placeholder: state.chatPhotoPath != null
+                          _Composer(state: state, ctrl: _ctrl, focus: _focus, placeholder: state.chatPhotoPath != null
                               ? (state.isAr ? 'اسأل عن المنيو، أو ابعت الصورة بس' : 'Ask about the menu, or just send the photo')
                               : t.chatPlaceholder),
                         ],
@@ -483,8 +495,9 @@ class _EndFade extends StatelessWidget {
 class _Composer extends StatelessWidget {
   final AppState state;
   final TextEditingController ctrl;
+  final FocusNode focus;
   final String placeholder;
-  const _Composer({required this.state, required this.ctrl, required this.placeholder});
+  const _Composer({required this.state, required this.ctrl, required this.focus, required this.placeholder});
 
   @override
   Widget build(BuildContext context) {
@@ -504,6 +517,7 @@ class _Composer extends StatelessWidget {
             // the padding that used to sit around it is inside it now.
             child: TextField(
                 controller: ctrl,
+                focusNode: focus,
                 minLines: 1,
                 maxLines: 5,
                 textInputAction: TextInputAction.send,

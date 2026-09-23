@@ -5135,9 +5135,59 @@ class AppState extends ChangeNotifier {
   /// are said instead of arriving all at once.
   String heard = '';
 
-  /// Set when dictation cannot run at all — no recogniser, or the microphone
-  /// was refused. The UI offers typing instead of leaving a dead button.
+  /// Set when dictation cannot run at all — no recogniser, or the recogniser
+  /// failed. The UI offers typing instead of leaving a dead button. A refused
+  /// microphone is not this: it is a permission, said as Qamar's line with
+  /// its ways on ([micProblem]).
   String? dictationError;
+
+  /// Qamar's "I am listening" line, while it is the last thing said: a
+  /// microphone that turns out to be off must not leave it standing.
+  ChatTurn? _listeningLine;
+
+  /// Asked each time the composer should take the keyboard, as "Type it
+  /// instead" does; the conversation's field follows it.
+  int composerFocus = 0;
+
+  void focusComposer() {
+    composerFocus++;
+    _notify();
+  }
+
+  /// The microphone is off for Qamar (O10): a permission, like the camera's,
+  /// with Settings first where the phone can be taken there, and typing
+  /// always, which never needed the microphone.
+  Problem micProblem({required ProblemAction instead}) {
+    final settings = canOpenAppSettings ? ProblemAction(isAr ? 'افتح الإعدادات' : 'Open Settings', openAppSettings) : null;
+    return Problem(
+      what: isAr ? 'المايك مقفول لقمر.' : 'The microphone is off for Qamar.',
+      why: settings != null
+          ? (isAr ? 'افتحه من الإعدادات، أو اكتبها بدل كده.' : 'Allow it in Settings, or type it instead.')
+          : (isAr ? 'اسمح لقمر بالمايك من إعدادات الموبايل، أو اكتبها بدل كده.' : 'Allow the microphone for Qamar in your phone’s Settings, or type it instead.'),
+      action: settings ?? instead,
+      secondary: settings == null ? null : instead,
+      kind: ProblemKind.permission,
+    );
+  }
+
+  /// Listening was asked for and the microphone is off: Qamar says so in
+  /// place of "I am listening", and a meal being logged stays armed, so what
+  /// is typed next is still the meal.
+  void _micRefused() {
+    final logging = _loggingMeal;
+    if (_listeningLine != null && chat.isNotEmpty && identical(chat.last, _listeningLine)) chat.removeLast();
+    _listeningLine = null;
+    final p = micProblem(instead: ProblemAction(isAr ? 'اكتبها بدل كده' : 'Type it instead', focusComposer));
+    chat.add(ChatTurn(who: ChatWho.q, text: p.what, sub: p.why, problem: p));
+    if (logging) {
+      _armMealLog();
+      proposalInput = 'text';
+    }
+    dictationError = null;
+    chatState = ChatState.idle;
+    _track('mic_refused', {'logging': logging});
+    _notify();
+  }
 
   /// Starts real dictation. Replaces a placeholder that waited 1.5 seconds and
   /// then inserted a scripted sentence.
@@ -5164,8 +5214,10 @@ class AppState extends ChangeNotifier {
       return;
     }
 
+    var failed = false;
     final ok = await dictation.prepare(
       onError: (e) {
+        failed = true;
         dictationError = isAr ? 'مقدرتش أسمعك — جرّب تاني، أو اكتبها.' : 'I couldn’t hear that — try again, or type it.';
         debugPrint('dictation: $e');
         chatState = ChatState.idle;
@@ -5175,14 +5227,18 @@ class AppState extends ChangeNotifier {
       },
     );
     if (!ok) {
-      dictationError = isAr
-          ? 'محتاج إذن الميكروفون عشان أسمعك.'
-          : 'I need microphone permission to hear you.';
-      _notify();
+      // The recogniser failed and has said so; otherwise the microphone was
+      // not allowed, which is a permission with a way on, not an error.
+      if (failed) {
+        _notify();
+        return;
+      }
+      _micRefused();
       return;
     }
 
     dictationError = null;
+    _listeningLine = null;
     heard = '';
     lastUser = '';
     chatState = ChatState.listening;
@@ -5516,13 +5572,15 @@ class AppState extends ChangeNotifier {
     if (kind == QuickLog.photo) return; // the caller hands the shot back
 
     proposalInput = kind == QuickLog.voice ? 'voice' : 'text';
-    chat.add(ChatTurn(
+    final ask = ChatTurn(
       who: ChatWho.q,
       text: kind == QuickLog.voice
           ? (isAr ? 'أنا سامعك. أكلت إيه؟' : 'I am listening. What did you eat?')
           : (isAr ? 'اكتبلي أكلت إيه.' : 'Tell me what you ate.'),
       sub: isAr ? 'مفيش حاجة بتتسجل قبل ما تأكد.' : 'Nothing is saved until you confirm.',
-    ));
+    );
+    chat.add(ask);
+    _listeningLine = kind == QuickLog.voice ? ask : null;
     // Whatever they say or type next, in answer, is a meal, not a question.
     _armMealLog();
     if (kind == QuickLog.voice) tapOrbListen();

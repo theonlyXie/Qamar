@@ -92,6 +92,23 @@ class _Dictation implements Dictation {
   Future<void> cancel() async {}
 }
 
+/// A phone where the microphone is not allowed: the recogniser will not
+/// start, and says nothing about why.
+class _RefusedMic implements Dictation {
+  @override
+  bool get available => false;
+  @override
+  bool get listening => false;
+  @override
+  Future<bool> prepare({void Function(String status)? onStatus, void Function(String error)? onError}) async => false;
+  @override
+  Future<bool> start({required String lang, required void Function(String text, bool isFinal) onResult}) async => false;
+  @override
+  Future<void> stop() async {}
+  @override
+  Future<void> cancel() async {}
+}
+
 class _Account implements Account {
   Object fails = Exception('AuthRetryableFetchException(message: something_new, statusCode: 500)');
   @override
@@ -341,6 +358,85 @@ void main() {
       _plain(s.dictationError);
       expect(s.dictationError, isNot(contains('error_network')));
       expect(s.dictationError, 'I couldn’t hear that — try again, or type it.');
+    });
+
+    group('a microphone that is off', () {
+      test('on Android: a permission in place of "I am listening", and typing keeps the meal', () async {
+        final ai = _Ai();
+        final s = AppState(ai: ai, dictation: _RefusedMic())..setLang(AppLang.en);
+        s.quickLog(QuickLog.voice);
+        await Future<void>.delayed(Duration.zero);
+        final p = s.chat.last.problem!;
+        _plainProblem(p);
+        expect(p.kind, ProblemKind.permission);
+        expect(p.what, 'The microphone is off for Qamar.');
+        expect(p.why, contains('phone’s Settings'), reason: 'Android cannot be taken there, so the words say where');
+        expect(p.action.label, 'Type it instead');
+        expect(p.secondary, isNull);
+        expect(s.chat.any((t) => t.text.contains('I am listening')), isFalse, reason: 'nothing is left saying Qamar is listening');
+        expect(s.chatState, ChatState.idle);
+        expect(s.dictationError, isNull, reason: 'said once, as Qamar’s line, not again in the header');
+
+        final asked = s.composerFocus;
+        p.action.onTap();
+        expect(s.composerFocus, asked + 1, reason: '"Type it instead" takes the keyboard');
+        await s.sendChatMsg('koshary with daqqa');
+        expect(ai.mealTexts, ['koshary with daqqa'], reason: 'what is typed next is still the meal');
+        expect(ai.chatCalls, 0, reason: 'and never spends a question');
+      });
+
+      test('on an iPhone, in Arabic: "Open Settings" first, "Type it instead" beside it', () async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        var opened = 0;
+        final s = AppState(
+          dictation: _RefusedMic(),
+          openSettings: () async {
+            opened++;
+            return true;
+          },
+        )..setLang(AppLang.ar);
+        s.quickLog(QuickLog.voice);
+        await Future<void>.delayed(Duration.zero);
+        final p = s.chat.last.problem!;
+        expect(p.what, 'المايك مقفول لقمر.');
+        expect(p.why, 'افتحه من الإعدادات، أو اكتبها بدل كده.');
+        expect(p.action.label, 'افتح الإعدادات');
+        expect(p.secondary!.label, 'اكتبها بدل كده');
+        expect(s.chat.any((t) => t.text.contains('أنا سامعك')), isFalse);
+        p.action.onTap();
+        expect(opened, 1);
+      });
+
+      test('a question asked by voice: said the same way, and what is typed next is a question', () async {
+        final ai = _Ai();
+        final s = AppState(ai: ai, dictation: _RefusedMic())..setLang(AppLang.en);
+        s.openChat();
+        final before = s.chat.length;
+        await s.tapOrbListen();
+        expect(s.chat.length, before + 1, reason: 'Qamar’s opening line stays; the microphone line follows it');
+        expect(s.chat.last.problem!.what, 'The microphone is off for Qamar.');
+        await s.sendChatMsg('is feteer ok tonight?');
+        expect(ai.chatCalls, 1);
+        expect(ai.mealTexts, isEmpty);
+      });
+
+      testWidgets('"Type it instead" in the conversation puts the keyboard in the field', (tester) async {
+        final s = AppState(dictation: _RefusedMic())..setLang(AppLang.en);
+        s.go(AppScreen.today);
+        await tester.binding.setSurfaceSize(const Size(900, 2400));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+        s.quickLog(QuickLog.voice);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+        final field = find.byType(TextField);
+        expect(tester.widget<TextField>(field).focusNode!.hasFocus, isFalse);
+        await tester.tap(find.text('Type it instead'));
+        await tester.pump();
+        await tester.pump();
+        expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+      });
     });
   });
 
