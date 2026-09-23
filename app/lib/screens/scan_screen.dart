@@ -178,10 +178,9 @@ class _ScanScreenState extends State<ScanScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: QColors.brandGradient,
-                          border: Border.all(color: const Color(0xFF33415C), width: 3),
-                          boxShadow: [
-                            BoxShadow(color: QColors.blue.withValues(alpha: 0.35), blurRadius: 30, offset: const Offset(0, 8)),
-                          ],
+                          // One ring, concentric with the fill. The offset glow
+                          // it used to cast read as a second circle, off centre.
+                          border: Border.all(color: QColors.borderStrong, width: 3),
                         ),
                         child: Icon(
                           _busy ? Icons.more_horiz : Icons.photo_camera,

@@ -59,8 +59,9 @@ class HoldCoachMark extends StatelessWidget {
             decoration: BoxDecoration(
               color: _fill,
               border: Border.all(color: _edge),
+              // It floats by its lighter fill and edge; a black shadow has
+              // nothing to darken on this ground.
               borderRadius: BorderRadius.circular(14),
-              boxShadow: const [BoxShadow(color: Color(0x8005080F), blurRadius: 18, offset: Offset(0, 8))],
             ),
             child: Row(
               children: [

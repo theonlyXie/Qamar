@@ -213,8 +213,9 @@ class _FloatingPill extends StatelessWidget {
           decoration: BoxDecoration(
             color: emphasis ? const Color(0xD1141C2E) : const Color(0xDB111827),
             border: Border.all(color: emphasis ? QColors.violet.withOpacity(0.5) : QColors.borderSoft),
+            // Lifted by its lighter fill and edge, not by a shadow: a black
+            // shadow on a near-black ground drew a hard slab under the pill.
             borderRadius: BorderRadius.circular(999),
-            boxShadow: const [BoxShadow(color: Color(0x8005080F), blurRadius: 30, offset: Offset(0, 12))],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

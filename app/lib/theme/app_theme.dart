@@ -72,13 +72,15 @@ class QDecor {
         borderRadius: BorderRadius.circular(QRadii.pill),
       );
 
+  /// The one filled button. No shadow: on a near-black ground a cast shadow
+  /// has nothing to darken, and under a Material it was clipped to the
+  /// button's square bounds, which drew dark slabs at the rounded corners.
+  /// The gradient is already the brightest thing on the screen; that is the
+  /// elevation.
   static BoxDecoration gradientButton({Gradient gradient = QColors.brandGradient, double radius = QRadii.lg}) =>
       BoxDecoration(
         gradient: gradient,
         borderRadius: BorderRadius.circular(radius),
-        boxShadow: [
-          BoxShadow(color: QColors.blue.withOpacity(0.32), blurRadius: 26, offset: const Offset(0, 10)),
-        ],
       );
 }
 
