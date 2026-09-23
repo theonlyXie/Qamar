@@ -60,6 +60,50 @@ class OrbGestureGuide extends StatelessWidget {
 
   static const cellKey = ValueKey('orb-gesture-cell');
 
+  /// The glyph that leads a cell's words (13 points and a 4-point gap), and
+  /// the cell's padding and the gap between cells.
+  static const _glyph = Size(17, 13);
+  static const _cellPad = 6.0;
+  static const _gap = 5.0;
+
+  /// The least share a cell's words are given, in letters, for [words] in
+  /// [avail] points: each cell's share is its letter count, never under
+  /// this floor, so a short cell is not squeezed. The floor is the smallest
+  /// of 30 to 40 at which no cell needs more lines than the others must and
+  /// none ends on a lone word (a last line under 40% of its width): at 30,
+  /// the English "Tap it — opens the tree" left "tree" alone on a third
+  /// line, while the Arabic fitted as it was.
+  static int shareFloor(List<InlineSpan> words, List<int> letters, double avail, {required TextDirection direction, required TextScaler scaler}) {
+    ({int lines, int lone}) layoutAt(int floor) {
+      final shares = [for (final n in letters) math.max(n, floor)];
+      final total = shares.fold(0, (a, b) => a + b);
+      final inner = avail - _gap * (words.length - 1);
+      var lines = 0, lone = 0;
+      for (var i = 0; i < words.length; i++) {
+        final width = inner * shares[i] / total - 2 * _cellPad;
+        final p = TextPainter(text: words[i], textDirection: direction, textScaler: scaler)
+          ..setPlaceholderDimensions(const [PlaceholderDimensions(size: _glyph, alignment: PlaceholderAlignment.middle)])
+          ..layout(maxWidth: width);
+        final metrics = p.computeLineMetrics();
+        p.dispose();
+        lines = math.max(lines, metrics.length);
+        if (metrics.length > 1 && metrics.last.width < 0.4 * width) lone++;
+      }
+      return (lines: lines, lone: lone);
+    }
+
+    var best = 30;
+    var bestAt = layoutAt(30);
+    for (var floor = 32; floor <= 40; floor += 2) {
+      final at = layoutAt(floor);
+      if (at.lines < bestAt.lines || (at.lines == bestAt.lines && at.lone < bestAt.lone)) {
+        best = floor;
+        bestAt = at;
+      }
+    }
+    return best;
+  }
+
   @override
   Widget build(BuildContext context) => dismissible ? _today(context) : _help(context);
 
@@ -80,48 +124,56 @@ class OrbGestureGuide extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _titleRow(isAr),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final (i, (g, icon, _, _, _, _)) in rows().indexed) ...[
-                  if (i > 0) const SizedBox(width: 5),
-                  // Each cell as wide as its words need, and never too narrow
-                  // for a short line, so all three stay within three lines in
-                  // either language.
-                  Expanded(
-                    flex: math.max(cellText(g, isAr).length, 30),
-                    child: Container(
-                      key: cellKey,
-                      constraints: const BoxConstraints(minHeight: 48),
-                      padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
-                      decoration: BoxDecoration(
-                        color: QColors.violet.withValues(alpha: learned.contains(g) ? 0.04 : 0.1),
-                        borderRadius: BorderRadius.circular(QRadii.inset),
-                      ),
-                      child: Text.rich(
-                        TextSpan(children: [
-                          WidgetSpan(
-                            alignment: PlaceholderAlignment.middle,
-                            child: Padding(
-                              padding: const EdgeInsetsDirectional.only(end: 4),
-                              child: Icon(
-                                learned.contains(g) ? Icons.check_circle : icon,
-                                size: 13,
-                                color: learned.contains(g) ? QColors.green : QColors.violetSoft,
-                              ),
-                            ),
-                          ),
-                          TextSpan(text: cellText(g, isAr)),
-                        ]),
-                        style: QText.body(size: 11, height: 15, color: learned.contains(g) ? QColors.textMuted : QColors.textMid),
+          LayoutBuilder(builder: (context, box) {
+            final gestures = rows();
+            final words = [
+              for (final (g, icon, _, _, _, _) in gestures)
+                TextSpan(
+                  children: [
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Padding(
+                        padding: const EdgeInsetsDirectional.only(end: 4),
+                        child: Icon(
+                          learned.contains(g) ? Icons.check_circle : icon,
+                          size: 13,
+                          color: learned.contains(g) ? QColors.green : QColors.violetSoft,
+                        ),
                       ),
                     ),
-                  ),
+                    TextSpan(text: cellText(g, isAr)),
+                  ],
+                  style: QText.body(size: 11, height: 15, color: learned.contains(g) ? QColors.textMuted : QColors.textMid),
+                ),
+            ];
+            final letters = [for (final (g, _, _, _, _, _) in gestures) cellText(g, isAr).length];
+            final floor = shareFloor(words, letters, box.maxWidth, direction: Directionality.of(context), scaler: MediaQuery.textScalerOf(context));
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < gestures.length; i++) ...[
+                    if (i > 0) const SizedBox(width: _gap),
+                    // Each cell as wide as its words need, and never too
+                    // narrow for a short line ([shareFloor]).
+                    Expanded(
+                      flex: math.max(letters[i], floor),
+                      child: Container(
+                        key: cellKey,
+                        constraints: const BoxConstraints(minHeight: 48),
+                        padding: const EdgeInsets.all(_cellPad),
+                        decoration: BoxDecoration(
+                          color: QColors.violet.withValues(alpha: learned.contains(gestures[i].$1) ? 0.04 : 0.1),
+                          borderRadius: BorderRadius.circular(QRadii.inset),
+                        ),
+                        child: Text.rich(words[i]),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
-          ),
+              ),
+            );
+          }),
         ],
       ),
     );

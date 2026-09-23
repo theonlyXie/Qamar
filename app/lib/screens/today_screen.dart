@@ -678,8 +678,10 @@ class _FastingPrompt extends StatelessWidget {
           ]),
           const SizedBox(height: 2),
           Text(
+            // A no-break space keeps the closing sentence whole, so the
+            // Arabic never ends on "للكل." alone under "ببلاش".
             isAr
-                ? 'لو أيوة: الخطة تبقى إفطار وسحور، والمياه على مواعيد الليل. ببلاش للكل.'
+                ? 'لو أيوة: الخطة تبقى إفطار وسحور، والمياه على مواعيد الليل. ببلاش\u00A0للكل.'
                 : 'If yes: the plan becomes iftar and suhoor, and water moves to the night’s windows. Free for everyone.',
             style: QText.body(size: 12, height: 18, color: QColors.textMuted),
           ),
