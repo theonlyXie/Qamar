@@ -2599,6 +2599,11 @@ class AppState extends ChangeNotifier {
 
   bool get _loggingMeal => _mealAskAt != null && _mealAskAt == chat.length - 1;
 
+  /// Whether what is typed or said next is a meal to log, not a question: the
+  /// composer then shows a meal, not "Ask Qamar…", since a meal read spends no
+  /// question.
+  bool get loggingMeal => _loggingMeal;
+
   /// Arms the log on the question just put on screen.
   void _armMealLog() => _mealAskAt = chat.length - 1;
 

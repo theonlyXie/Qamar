@@ -126,6 +126,37 @@ void main() {
     });
   });
 
+  // The field's hint says what it takes (O10, the unread mealPlaceholder):
+  // while a meal is being logged, a meal, since a meal read spends no
+  // question; otherwise a question for Qamar.
+  group('the composer’s hint', () {
+    String hint(WidgetTester tester) => tester.widget<TextField>(find.byType(TextField)).decoration!.hintText!;
+
+    for (final lang in AppLang.values) {
+      testWidgets('a meal while one is being logged, a question otherwise (${lang.name})', (tester) async {
+        final ar = lang == AppLang.ar;
+        final s = AppState()..setLang(lang);
+        s.quickLog(QuickLog.text);
+        await _pumpChat(tester, s);
+        expect(hint(tester), ar ? 'مثال: كشري وسط + دقة' : 'e.g. medium koshary + daqqa');
+        expect(hint(tester), isNot(s.t.chatPlaceholder), reason: 'a question’s words would suggest a question is spent');
+
+        // The meal's words sent, the next thing typed is a question again.
+        await s.sendChatMsg(ar ? 'كشري' : 'koshary');
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(s.loggingMeal, isFalse);
+        expect(hint(tester), ar ? 'اسأل قمر…' : 'Message Qamar…');
+      });
+    }
+
+    testWidgets('a conversation opened to ask: a question', (tester) async {
+      final s = AppState()..setLang(AppLang.en);
+      s.openChat();
+      await _pumpChat(tester, s);
+      expect(hint(tester), 'Message Qamar…');
+    });
+  });
+
   group('the full count, in Me', () {
     test('questions and photos left of the day, in Eastern digits in Arabic', () {
       final s = _state(AppLang.ar, left: 2)

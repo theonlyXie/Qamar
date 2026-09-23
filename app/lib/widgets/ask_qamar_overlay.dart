@@ -198,9 +198,15 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                           // here?" is implied.
                           if (state.chatPhotoPath != null && !kIsWeb)
                             _Attachment(path: state.chatPhotoPath!, label: state.isAr ? 'صورة المنيو' : 'Menu photo', onRemove: state.detachChatPhoto),
+                          // The field's hint says what it takes now: a menu's
+                          // question, a meal being logged (an example, never a
+                          // question's words: a meal read spends none), or a
+                          // question for Qamar.
                           _Composer(state: state, ctrl: _ctrl, focus: _focus, placeholder: state.chatPhotoPath != null
                               ? (state.isAr ? 'اسأل عن المنيو، أو ابعت الصورة بس' : 'Ask about the menu, or just send the photo')
-                              : t.chatPlaceholder),
+                              : state.loggingMeal
+                                  ? t.mealPlaceholder
+                                  : t.chatPlaceholder),
                         ],
                       ),
                     ),
