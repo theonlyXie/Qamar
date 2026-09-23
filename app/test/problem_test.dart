@@ -374,13 +374,52 @@ void main() {
     expect(s.screen, AppScreen.onboard);
   });
 
-  test('in Arabic the Qamar+ button isolates the Latin brand, so its plus stays on its side', () async {
+  group('words the food data cannot match', () {
+    // The gateway's note for this case says a photo needs Qamar+; the free
+    // tier has three a day, so the app says its own line instead.
+    const gatewayNote = 'I could not match that to a food we know. Try a clearer name. Photographing a plate is Qamar+.';
+    for (final lang in AppLang.values) {
+      for (final left in [3, 0]) {
+        test('offer ${left > 0 ? 'a photo, with no Qamar+' : 'the words that can be matched, the photos used'} (${lang.code})', () async {
+          final ai = _NotFoundAi()
+            ..quotas = AiQuotas(
+              chat: AiQuotas.empty.chat,
+              photo: AiQuota(bucket: 'photo', used: 3 - left, limit: 3, extra: 0, remaining: left),
+              plan: AiQuotas.empty.plan,
+            );
+          final s = AppState(ai: ai)..setLang(lang);
+          s.openChat();
+          await s.logTextAsMeal('fesikh bel tahina');
+          final said = s.chat.last.text;
+          expect(said, isNot(contains('Qamar+')));
+          expect(said, isNot(contains('قمر+')), reason: 'a photo is not Qamar+: the free tier has three a day');
+          final isAr = lang == AppLang.ar;
+          expect(
+            said,
+            left > 0
+                ? (isAr ? 'مقدرتش ألاقي الأكل ده. جرّب اسم أوضح، أو صوّر الطبق.' : 'I could not match that food. Try a clearer name, or photograph the plate.')
+                : (isAr ? 'مقدرتش ألاقي الأكل ده. جرّب اسم أوضح، أو قوللي فيه إيه وقد إيه.' : 'I could not match that food. Try a clearer name, or tell me what’s in it and how much.'),
+            reason: left > 0 ? 'photos are left today' : 'no photo is left today, so none is offered',
+          );
+        });
+      }
+    }
+    test('the gateway’s note is not what is said', () async {
+      final s = AppState(ai: _NotFoundAi())..setLang(AppLang.en);
+      await s.logTextAsMeal('fesikh');
+      expect(s.chat.last.text, isNot(gatewayNote));
+    });
+  });
+
+  test('in Arabic the Qamar+ button names it قمر+, as the Arabic paywall does', () async {
     final ai = _Ai()
       ..chatFails = AiQuotaException('دي كانت آخر سؤال ببلاش النهارده.', const AiQuota(bucket: 'chat', used: 3, limit: 3, extra: 0, remaining: 0));
     final s = AppState(ai: ai)..setLang(AppLang.ar);
     s.openChat();
     await s.sendChatMsg('أكلت كشري');
-    expect(s.chat.last.problem!.action.label, 'شوف \u2066Qamar+\u2069');
+    final label = s.chat.last.problem!.action.label;
+    expect(label, 'شوف قمر+');
+    expect(label, isNot(contains('Qamar')), reason: 'no Latin brand dropped into Arabic');
   });
 
   test('the Problem kinds are the five the component draws', () {
@@ -732,6 +771,13 @@ void main() {
     expect(wall.openWallet, isTrue);
     expect(wall.problem!.secondary!.label, 'Type it instead');
   });
+}
+
+/// A reading that finds nothing, with the gateway's note for that case.
+class _NotFoundAi extends _Ai {
+  @override
+  Future<MealAnalysis> analyzeMeal({required String inputType, String? text, String? imagePath, String lang = 'ar'}) async =>
+      const MealAnalysis([], note: 'I could not match that to a food we know. Try a clearer name. Photographing a plate is Qamar+.');
 }
 
 class _PhotoWallAi extends _Ai {

@@ -2605,17 +2605,16 @@ class AppState extends ChangeNotifier {
       if (result.items.isEmpty) {
         // An empty reading is a real answer — a name the graph does not carry,
         // or a photo too dark to trust. Saying so beats inventing a plate.
-        final fallback = inputType == 'photo'
-            ? (isAr
-                ? 'مقدرتش أقرأ الوجبة من الصورة دي. جرّب صورة أوضح، أو احكيلي أكلت إيه.'
-                : 'I could not read this meal. Try a clearer photo, or tell me what you ate.')
-            : (isAr
-                ? 'مقدرتش ألاقي الأكل ده. جرّب اسم أوضح، أو صوّر الطبق من قمر+.'
-                : 'I could not match that food. Try a clearer name, or photograph the plate with Qamar+.');
-        chat.add(ChatTurn(
-          who: ChatWho.q,
-          text: result.note ?? fallback,
-        ));
+        // For words, the app's own line: it knows whether today's photos are
+        // left, and the gateway's note for this case says a photo needs
+        // Qamar+, which the free tier's three a day make untrue.
+        final text = inputType == 'photo'
+            ? (result.note ??
+                (isAr
+                    ? 'مقدرتش أقرأ الوجبة من الصورة دي. جرّب صورة أوضح، أو احكيلي أكلت إيه.'
+                    : 'I could not read this meal. Try a clearer photo, or tell me what you ate.'))
+            : notFoundReply;
+        chat.add(ChatTurn(who: ChatWho.q, text: text));
         proposal = null;
         proposalQty = [];
       } else {
@@ -3801,9 +3800,8 @@ class AppState extends ChangeNotifier {
         problem: Problem(what: e.message, action: way, kind: ProblemKind.limit),
       );
     }
-    // In Arabic the Latin brand is isolated, or its trailing "+" is drawn on
-    // the wrong side of the word ("+Qamar").
-    final label = photo ? (isAr ? 'افتح المحفظة' : 'Open the wallet') : (isAr ? 'شوف \u2066Qamar+\u2069' : 'See Qamar+');
+    // In Arabic the product is قمر+, as the Arabic paywall names it.
+    final label = photo ? (isAr ? 'افتح المحفظة' : 'Open the wallet') : (isAr ? 'شوف قمر+' : 'See Qamar+');
     final ProblemAction? instead = photo
         ? (mealLog ? ProblemAction(isAr ? 'اكتبها بدل كده' : 'Type it instead', () => quickLog(QuickLog.text)) : null)
         : (words.isEmpty ? null : ProblemAction(isAr ? 'سجّلها كوجبة' : 'Log it as a meal', () => logTextAsMeal(words)));
@@ -3919,7 +3917,7 @@ class AppState extends ChangeNotifier {
           what: what,
           why: _failedWhy(e),
           action: refused
-              ? ProblemAction(isAr ? 'شوف \u2066Qamar+\u2069' : 'See Qamar+', () => _leaveChatForWall(photo: false))
+              ? ProblemAction(isAr ? 'شوف قمر+' : 'See Qamar+', () => _leaveChatForWall(photo: false))
               : ProblemAction(isAr ? 'جرّب تاني' : 'Try again', () => _retryBoughtQuestion(text)),
           secondary: ProblemAction(isAr ? 'سجّلها كوجبة' : 'Log it as a meal', () => logTextAsMeal(text)),
           kind: refused || failureOf(e) == Failure.ours ? ProblemKind.error : ProblemKind.offline,
@@ -4841,6 +4839,14 @@ class AppState extends ChangeNotifier {
         ? 'فاضل النهارده — أسئلة: ${iso('${q.remaining}')} من ${iso('$qTotal')} · صور: ${iso('${p.remaining}')} من ${iso('$pTotal')}'
         : 'Left today — questions: ${q.remaining} of $qTotal · photos: ${p.remaining} of $pTotal';
   }
+
+  /// A typed or spoken meal the food data could not match (O10): the other
+  /// way to log it, if it works today. A photo, while today's photos last —
+  /// the free tier has its three a day, so no Qamar+ is needed; once they
+  /// are used, the words that can be matched instead.
+  String get notFoundReply => photoQuota.remaining > 0
+      ? (isAr ? 'مقدرتش ألاقي الأكل ده. جرّب اسم أوضح، أو صوّر الطبق.' : 'I could not match that food. Try a clearer name, or photograph the plate.')
+      : (isAr ? 'مقدرتش ألاقي الأكل ده. جرّب اسم أوضح، أو قوللي فيه إيه وقد إيه.' : 'I could not match that food. Try a clearer name, or tell me what’s in it and how much.');
 
   void openChat() {
     chatOpen = true;

@@ -1,9 +1,9 @@
 // The brand in Arabic copy, seat 6's part: running Arabic text names the
 // product the way the Arabic paywall does, قمر+, not a Latin "Qamar+"
 // dropped into the sentence (where its plus lands on the wrong side and the
-// line switches script mid-word). Two Latin uses stay, each marked as such:
-// a button's brand isolated between FSI and PDI (seat 2's, problem_test),
-// and the Siri phrases a person has to say as written, in «».
+// line switches script mid-word). Latin stays only where it is marked as
+// such: a brand isolated between FSI and PDI, and the Siri phrases a person
+// has to say as written, in «».
 
 import 'dart:io';
 
