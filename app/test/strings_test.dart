@@ -12,8 +12,10 @@
 // and nutrition-label scans that were never built, the old tab bar's "Log",
 // and the conversation's superseded states ("Online", "Tap the moon and
 // speak", "What's on your mind?"), with the camera-and-mic note that the
-// permission problems now say where it happens (seat 2). The table still
-// holds 6 other strings nothing reads; they are listed here by name, owed
+// permission problems now say where it happens (seat 2). And the wallet's
+// old subtitle, "Never purchased, never cash", whose cue the wallet's terms
+// now carry, where it is drawn (seat 4). The table still holds 5 other
+// strings nothing reads; they are listed here by name, owed
 // to the seats whose screens they came from, so that this test holds the
 // line: a string that stops being read is either used again or deleted,
 // not kept.
@@ -24,7 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Unread before this test, left for their owners to use or retire.
 const _owed = {
-  'restart', 'guestNote', 'walletSub', 'priceLabel', 'limitLabel', 'suEarned',
+  'restart', 'guestNote', 'priceLabel', 'limitLabel', 'suEarned',
 };
 
 void main() {
@@ -65,6 +67,13 @@ void main() {
     }
     for (final words in const ['Start now', 'ابدأ دلوقتي', 'First name', 'اسمك الأول']) {
       expect(table, isNot(contains(words)));
+    }
+  });
+
+  test('the wallet\'s old subtitle is gone from the table; its cue is in the terms the wallet draws', () {
+    expect(fields, isNot(contains('walletSub')));
+    for (final words in const ['Never purchased', 'Earned through useful actions', 'بتتكسب بالأفعال المفيدة']) {
+      expect(table, isNot(contains(words)), reason: words);
     }
   });
 

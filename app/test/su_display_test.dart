@@ -12,6 +12,7 @@ import 'package:qamar/main.dart';
 import 'package:qamar/models/activity.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/screens/today_screen.dart';
+import 'package:qamar/screens/wallet_screen.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/common.dart';
 import 'package:qamar/widgets/explain.dart';
@@ -208,6 +209,40 @@ void main() {
       final shown = _texts(tester, find.byType(MaterialApp)).map((t) => t.replaceAll(RegExp('[\u2066-\u2069]'), ''));
       expect(shown, contains('المستوى ١'));
     });
+  });
+
+  // The one cue a price in Su needs beside it: Su cannot be bought. It was
+  // in a line nothing drew (walletSub) and in the chip's explainer, which
+  // "Points and streaks" hides with the chip; so with the switch off,
+  // nothing in the app said it. The wallet's terms, at the foot of both
+  // tabs whatever the switch, say it now, in the explainer's own words.
+  // "Never sold" and not "cannot be bought with money": a friend who pays a
+  // first month is paid Su for the invitation, and that is not a sale.
+  group('Su are earned, never sold', () {
+    const sentence = {AppLang.en: 'Su Points are only earned, never sold.', AppLang.ar: 'نقاط Su بتتكسب بس ومش بتتباع.'};
+    for (final lang in AppLang.values) {
+      for (final shown in const [true, false]) {
+        testWidgets('the wallet says so on both tabs, with "Points and streaks" ${shown ? 'on' : 'off'} (${lang.name})', (tester) async {
+          final s = AppState()..setLang(lang);
+          s.setShowScore(shown);
+          s.go(AppScreen.wallet);
+          await _pumpApp(tester, s);
+          await tester.pump(const Duration(milliseconds: 400));
+          for (final tab in [s.showSpend, s.showHistory]) {
+            tab();
+            await tester.pump();
+            await tester.dragUntilVisible(find.byKey(WalletScreen.termsKey), find.byType(Scrollable).first, const Offset(0, -200));
+            final terms = tester.widget<Text>(find.byKey(WalletScreen.termsKey)).data!;
+            expect(terms, startsWith(sentence[lang]!), reason: s.walletTab.name);
+          }
+        });
+      }
+      test('the Su explainer says it in the same words (${lang.name})', () {
+        final e = kExplanations['su_points']!;
+        expect(lang == AppLang.ar ? e.soWhatAr : e.soWhatEn, startsWith(sentence[lang]!));
+        expect(QStrings.of(lang).walletTerms, startsWith(sentence[lang]!));
+      });
+    }
   });
 
   group('the naming rule', () {

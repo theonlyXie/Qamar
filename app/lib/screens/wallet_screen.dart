@@ -20,6 +20,10 @@ class WalletScreen extends StatelessWidget {
   static const availableLabelKey = ValueKey('wallet-available-label');
   static const lifetimeLabelKey = ValueKey('wallet-lifetime-label');
 
+  /// The terms at the foot of both tabs, whatever "Points and streaks" is
+  /// set to: they are where the wallet says Su are earned, never sold.
+  static const termsKey = ValueKey('wallet-terms');
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -135,7 +139,7 @@ class WalletScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderSoft, radius: QRadii.control),
-          child: Text(t.walletTerms, style: QText.body(size: 12, height: 19, color: QColors.textMuted)),
+          child: Text(t.walletTerms, key: WalletScreen.termsKey, style: QText.body(size: 12, height: 19, color: QColors.textMuted)),
         ),
       ],
     );
