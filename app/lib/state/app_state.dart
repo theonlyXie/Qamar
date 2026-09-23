@@ -1399,6 +1399,7 @@ class AppState extends ChangeNotifier {
     screen = AppScreen.onboard;
     step = 0;
     msgs.clear();
+    _nameAsked = false;
     scanned = false;
     _notify();
     _screen(AppScreen.onboard);
@@ -1501,16 +1502,16 @@ class AppState extends ChangeNotifier {
       } catch (e) {
         scanRead = BodyScan(
           note: isAr
-              ? 'مقدرتش أقرا التقرير دلوقتي، فهسألك الأرقام بنفسي.'
-              : 'I could not read the report just now, so I will ask you for the numbers.',
+              ? 'مقدرتش أقرا التقرير، فهسألك الأرقام بنفسي.'
+              : 'I couldn’t read the report, so I’ll ask you for the numbers.',
         );
         debugPrint('Qamar: body scan read failed — $e');
       }
     } else {
       scanRead = BodyScan(
         note: isAr
-            ? 'لسه مش متوصل بالمساعد، فمش هقدر أقرا التقرير. هسألك الأرقام.'
-            : 'I am not connected to the assistant, so I cannot read the report. I will ask you instead.',
+            ? 'مش هقدر أقرا التقارير دلوقتي، فهسألك الأرقام بنفسي.'
+            : 'I can’t read reports right now, so I’ll ask you for the numbers.',
       );
     }
     if (_disposed) return;
@@ -1531,6 +1532,7 @@ class AppState extends ChangeNotifier {
     screen = AppScreen.onboard;
     step = 0;
     msgs.clear();
+    _nameAsked = false;
     // When the report could not be read, say why before asking — otherwise the
     // user has photographed something and been silently ignored.
     if (!scanned && read.note != null && read.note!.isNotEmpty) {
@@ -1627,8 +1629,8 @@ class AppState extends ChangeNotifier {
           if (read?.bodyFatPct != null) '${read!.bodyFatPct}% body fat',
         ];
         _pushQ(
-          'قريت من التقرير: ${ar.join(' · ')}. لو في حاجة غلط اكتبهالي.',
-          'I read this off the report: ${en.join(' · ')}. Type a correction if anything is off.',
+          'من تقريرك: ${ar.join(' · ')}. لو في حاجة غلط اكتبهالي.',
+          'From your report: ${en.join(' · ')}. Type a fix if anything is off.',
         );
         advance();
       });
@@ -1664,8 +1666,8 @@ class AppState extends ChangeNotifier {
     void next() {
       if (answer != SafetyAnswer.none) {
         _pushQ(
-          'شكراً إنك قلتلي. في الحالة دي مش هحسبلك هدف سعرات ولا خطة — الأنسب متابعة مع أخصائي. بس قمر معاك: تعرف إيه اللي في أكلك وتسأل أي سؤال عام. كام سؤال كمان وندخل.',
-          'Thank you for telling me. In this case I won’t calculate a calorie target or a plan — a qualified professional is the right route. Qamar is still with you: see what’s in your meals and ask anything general. A few more questions and we’re in.',
+          'شكراً إنك قلتلي. في الحالة دي مش هحط لك هدف سعرات ولا خطة، ده دور الأخصائي. بس تقدر تسجّل أكلك وتسألني أي سؤال عام. كام سؤال كمان.',
+          'Thanks for telling me. In this case I won’t set a calorie target or a plan; that’s for a professional. You can still log meals and ask me anything general. A couple more questions.',
         );
       }
       advance();
@@ -1687,11 +1689,12 @@ class AppState extends ChangeNotifier {
       typing = false;
       msgs.addAll([
         const ObMessage.q(
-          ar: 'كده خلصنا. مفيش هدف سعرات في حالتك — ده للأخصائي. جوه التطبيق: سجّل أكلك وأنا أقولك فيه إيه، واسألني أي سؤال عام.',
-          en: 'That’s everything. There’s no calorie target in your case — that’s for a professional. Inside: log what you eat and I’ll tell you what’s in it, and ask me anything general.',
+          ar: 'كده خلصنا. مفيش هدف سعرات في حالتك، بس سجّل أكلك وأنا أقولك فيه إيه.',
+          en: 'That’s all. No calorie target in your case, but log what you eat and I’ll tell you what’s in it.',
         ),
         const ObMessage.save(),
       ]);
+      _askName();
       _track('intake_completed', {'route': 'general_guidance'});
       _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
       _notify();
@@ -1794,8 +1797,8 @@ class AppState extends ChangeNotifier {
   /// "Tell me more" at the consent question: what each choice covers, in
   /// plain words, and then the same two choices again. It never advances.
   void _explainConsent() => qamarSay(
-        'باختصار: بحسبلك هدف سعرات تقريبي وأقترح أكل مصري في حدوده، ومش بشخّص ولا بوصف علاج — وده اللي لازم أعالج بياناتك عشانه. التحسين اختيار منفصل: لو وافقت، بنشوف إزاي التطبيق بيتستخدم (أنهي خطوات وأنهي زراير)، من غير أكلك ولا وزنك ولا اسمك، وتقدر تقفله من «حسابي» في أي وقت. اختار من تحت.',
-        'In short: I estimate a calorie target and suggest Egyptian meals inside it; I don’t diagnose or prescribe — that is what your data is processed for. Helping improve Qamar is separate: if you agree, we see how the app is used (which steps, which buttons), never your food, your weight or your name, and you can turn it off in Me at any time. Pick one below.',
+        'بستخدم إجاباتك بس عشان أحسب هدفك وأقترح أكل مصري، ومش بشخّص ولا بوصف علاج. التحسين اختيار منفصل: نشوف أنهي خطوات وزراير بتتستخدم، من غير أكلك ولا وزنك ولا اسمك، وتقدر تقفله من «حسابي» في أي وقت. اختار من تحت.',
+        'I use your answers only to set your target and suggest Egyptian meals; I don’t diagnose or prescribe. Helping improve Qamar is separate: we’d see which steps and buttons are used, never your food, your weight or your name, and you can turn it off in Me anytime. Pick one below.',
       );
 
   void bumpAge(int d) => _bumpProfile(age: (profile.age + d).clamp(18, 90).toInt());
@@ -1867,8 +1870,8 @@ class AppState extends ChangeNotifier {
         minor = true;
         _notify();
         _pushQ(
-          'شكراً إنك قلتلي. قمر للبالغين ١٨ سنة أو أكتر بس، فمش هكمّل حساب هدف. لو محتاج مساعدة في الأكل، الأنسب متابعة مع أخصائي بموافقة ولي الأمر.',
-          'Thanks for telling me. Qamar is for adults 18 and over, so I won’t continue to a target. For food support at your age, a professional with guardian consent is the right route.',
+          'شكراً إنك قلتلي. قمر للي عندهم ١٨ سنة أو أكتر، فهقف هنا. في سنك، الأنسب أخصائي تغذية بموافقة أهلك.',
+          'Thanks for telling me. Qamar is for adults 18 and over, so I’ll stop here. At your age, the right way is a nutritionist, with your parents’ OK.',
         );
       });
       return;
@@ -1932,7 +1935,18 @@ class AppState extends ChangeNotifier {
       return;
     }
     if (st == null) {
-      qamarSay('خلصنا الأسئلة. اضغط "يلا نبدأ" وهنكمل جوه التطبيق.', 'That’s all my questions. Tap “Let’s start” and we’ll keep going inside the app.');
+      // The name, asked beside "Let's start": what is typed is taken as it
+      // when it reads as one; anything else gets the way in.
+      final name = nameAsked ? _nameFrom(raw) : null;
+      if (name != null) {
+        profile = profile.copyWith(name: name);
+        _nameAsked = false;
+        _notify();
+        if (isBacked) _saveProfile();
+        qamarSay('اتشرفنا يا $name.', 'Nice to meet you, $name.');
+        return;
+      }
+      qamarSay('خلصنا الأسئلة. اضغط «يلا نبدأ» ونكمّل جوه.', 'That’s all my questions. Tap “Let’s start” and we’ll carry on inside.');
       return;
     }
 
@@ -2040,18 +2054,6 @@ class AppState extends ChangeNotifier {
           return;
         }
         unclear();
-        return;
-
-      case 'name':
-        final n = raw.replaceFirst(RegExp(r"^(اسمي|أنا|انا|my name is|i am|i'm|im|call me)\s*", caseSensitive: false), '').trim();
-        final trimmed = n.length > 24 ? n.substring(0, 24) : n;
-        if (trimmed.isEmpty) {
-          unclear();
-          return;
-        }
-        profile = profile.copyWith(name: trimmed);
-        _notify();
-        advance();
         return;
 
       case 'body':
@@ -2250,8 +2252,8 @@ class AppState extends ChangeNotifier {
       // The dish first; Qamar goes on typing towards the numbers.
       msgs.addAll(const [
         ObMessage.q(
-          ar: 'قبل الأرقام، حاجة تاكلها — من الأكل المصري، على قد اللي قلته:',
-          en: 'Before the numbers, something to eat — Egyptian food, sized to what you told me:',
+          ar: 'فكرة لوجبتك الجاية، على قدّك:',
+          en: 'An idea for your next meal, sized to you:',
         ),
         ObMessage.dish(),
       ]);
@@ -2269,14 +2271,15 @@ class AppState extends ChangeNotifier {
       // Only what can be changed afterwards is said to be changeable: what to
       // avoid, in Me (saveAvoid). The target's own answers cannot be, yet.
       const ObMessage.q(
-        ar: 'حسبتلك الهدف على أساس اللي قلته. دي تقديرات. واللي بتتجنبه في الأكل تقدر تغيّره من «حسابي» في أي وقت.',
-        en: 'I calculated your target from what you told me. These are estimates. What you avoid in food can be changed in Me at any time.',
+        ar: 'وده هدفك اليومي. واللي بتتجنبه في الأكل تقدر تغيّره من «حسابي» في أي وقت.',
+        en: 'And here’s your daily target. What you avoid in food can be changed in Me anytime.',
       ),
       const ObMessage.target(),
       const ObMessage.save(),
     ]);
     _track('intake_completed', {'route': 'target'});
     _offerTrialAfterReveal();
+    _askName();
     // Shown at once; paid by the server (qamar_grant_onboarding, once per
     // account), and the wallet is re-read so the two numbers agree.
     _credit(SuEconomy.onboarding, ar: 'إكمال التهيئة', en: 'Onboarding completed');
@@ -2312,6 +2315,36 @@ class AppState extends ChangeNotifier {
   void dismissSave() {
     msgs.removeWhere((m) => m.kind == ObKind.save);
     _notify();
+  }
+
+  // ---- the name, once there is something to show for it --------------------
+  //
+  // Optional, so it is not a step (the spec's S08: "ask after first value").
+  // It is Qamar's last line at the reveal, beside "Let's start": typed, it is
+  // kept and Qamar says so; left, it costs nothing, and Today says "friend".
+
+  bool _nameAsked = false;
+
+  /// The reveal asked for the name and nothing has answered it yet: what is
+  /// typed now is taken as the name when it reads as one.
+  bool get nameAsked => _nameAsked && profile.name.isEmpty;
+
+  void _askName() {
+    if (profile.name.isNotEmpty) return;
+    _nameAsked = true;
+    msgs.add(const ObMessage.q(
+      ar: 'أناديك بإيه؟ ده اختياري.',
+      en: 'What should I call you? It’s optional.',
+    ));
+  }
+
+  /// [raw] as a name: "My name is Basel" or "اسمي باسل" is the name after the
+  /// words; a question, a number or a sentence is not a name.
+  static String? _nameFrom(String raw) {
+    final n = raw.replaceFirst(RegExp(r"^(اسمي|أنا|انا|my name is|i am|i'm|im|call me)\s*", caseSensitive: false), '').trim();
+    if (n.isEmpty || n.length > 24 || n.split(RegExp(r'\s+')).length > 3) return null;
+    if (RegExp(r'[?؟0-9٠-٩]').hasMatch(n)) return null;
+    return n;
   }
 
   /// "Link account" on the save card: the account sheet opens, to link one

@@ -3,8 +3,10 @@
 // Consent comes before any personal data, and safety comes next, so an answer
 // that rules out a calorie target changes the rest of the conversation
 // rather than ending it. The goal comes before the numbers. The 18+ gate is
-// the date step, before any target, on either route. The rule for the screen:
-// an input never appears before its question.
+// the date step, before any target, on either route. The name is not a step:
+// it is optional, so it is asked beside "Let's start" once the target is on
+// screen, and leaving it costs nothing. The rule for the screen: an input
+// never appears before its question.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -35,8 +37,9 @@ Future<AppState> _pastConsent({AppLang lang = AppLang.en}) async {
 }
 
 void main() {
-  test('the agreed order: consent, safety, name, goal, date of birth, sex, body, activity, food', () {
-    expect(kOnboardingSteps.map((s) => s.id).toList(), ['consent', 'safety', 'name', 'goal', 'dob', 'gender', 'body', 'activity', 'food']);
+  test('the agreed order: consent, safety, goal, date of birth, sex, body, activity, food, and no step for the name', () {
+    expect(kOnboardingSteps.map((s) => s.id).toList(), ['consent', 'safety', 'goal', 'dob', 'gender', 'body', 'activity', 'food']);
+    expect(kOnboardingSteps.where((s) => s.kind == StepKind.text), isEmpty, reason: 'nothing to type before the target: every step is answered with a tap');
     expect(kGeneralGuidanceSkips, {'goal', 'gender', 'body', 'activity'}, reason: 'the date of birth is never skipped');
   });
 
@@ -60,7 +63,7 @@ void main() {
     expect(s.questionShown, isFalse, reason: 'the safety question is still being typed');
     await _wait(700);
     expect(s.questionShown, isTrue);
-    expect(s.msgs.last.text(false), 'One safety question before we start: does any of these apply?');
+    expect(s.msgs.last.text(false), 'One safety question: does any of these apply to you?');
   });
 
   test('"None of these" goes on to the target’s questions, in order', () async {
@@ -68,14 +71,11 @@ void main() {
     s.pickOption(_option('safety', 'none'));
     await _wait();
     expect(s.generalGuidance, isFalse);
-    expect(s.currentStep!.id, 'name');
-    s.skipStep();
-    await _wait();
-    expect(s.currentStep!.id, 'goal', reason: 'the goal before the numbers');
+    expect(s.currentStep!.id, 'goal', reason: 'the goal before the numbers, with nothing between');
     s.pickOption(_option('goal', 'maintain'));
     await _wait();
     expect(s.currentStep!.id, 'dob');
-    expect(s.msgs.last.text(false), contains('feeds the calorie maths'));
+    expect(s.msgs.last.text(false), 'When were you born? Qamar is for adults, and age shapes your target.');
   });
 
   for (final answer in ['pregnant', 'breastfeeding', 'chronic']) {
@@ -86,13 +86,9 @@ void main() {
 
       expect(s.generalGuidance, isTrue);
       expect(s.blocked, isFalse, reason: 'the conversation goes on');
-      expect(s.msgs.any((m) => m.text(false).contains('I won’t calculate a calorie target or a plan')), isTrue);
-      expect(s.currentStep!.id, 'name');
-
-      s.skipStep();
-      await _wait();
+      expect(s.msgs.any((m) => m.text(false).contains('I won’t set a calorie target or a plan')), isTrue);
       expect(s.currentStep!.id, 'dob', reason: 'the goal feeds only the target, so it is not asked');
-      expect(s.msgs.last.text(false), 'Qamar is for adults, so I need to know: what’s your date of birth?');
+      expect(s.msgs.last.text(false), 'When were you born? Qamar is for adults only.');
 
       s.profile = s.profile.copyWith(age: 30);
       s.primarySubmit();
@@ -103,7 +99,7 @@ void main() {
       await _wait();
       expect(s.currentStep, isNull);
       expect(s.msgs.any((m) => m.kind == ObKind.target), isFalse, reason: 'no target card on this route');
-      expect(s.msgs.any((m) => m.text(false).contains('There’s no calorie target in your case')), isTrue);
+      expect(s.msgs.any((m) => m.text(false).contains('No calorie target in your case')), isTrue);
 
       s.primarySubmit(); // "Let's start"
       expect(s.screen, AppScreen.today, reason: 'a way into the app');
@@ -113,8 +109,6 @@ void main() {
   test('the 18+ gate still holds on the general-guidance route', () async {
     final s = await _pastConsent();
     s.pickOption(_option('safety', 'pregnant'));
-    await _wait();
-    s.skipStep();
     await _wait();
     expect(s.currentStep!.id, 'dob');
     s.profile = s.profile.copyWith(age: 16);
@@ -144,7 +138,7 @@ void main() {
       await _wait();
       expect(s.profile.safety, want, reason: typed);
       expect(s.blocked, isFalse, reason: typed);
-      expect(s.currentStep!.id, 'name', reason: typed);
+      expect(s.currentStep!.id, want == SafetyAnswer.none ? 'goal' : 'dob', reason: typed);
     }
   });
 
@@ -171,7 +165,7 @@ void main() {
     final targetAt = kinds.indexOf(ObKind.target);
     expect(dishAt, greaterThanOrEqualTo(0), reason: 'a dish is shown');
     expect(dishAt, lessThan(targetAt), reason: 'before the calorie card');
-    expect(s.msgs[dishAt - 1].text(false), startsWith('Before the numbers, something to eat'));
+    expect(s.msgs[dishAt - 1].text(false), 'An idea for your next meal, sized to you:');
 
     final dish = s.revealDish!;
     expect(dish.ruledOutBy.intersection({'lactose', 'meat'}), isEmpty);
@@ -184,8 +178,6 @@ void main() {
     final s = await _pastConsent();
     s.pickOption(_option('safety', 'chronic'));
     await _wait();
-    s.skipStep();
-    await _wait();
     s.profile = s.profile.copyWith(age: 30);
     s.primarySubmit();
     await _wait();
@@ -193,6 +185,51 @@ void main() {
     await _wait(2000);
     expect(s.msgs.any((m) => m.kind == ObKind.dish), isFalse);
     expect(s.revealDish, isNull);
+  });
+
+  test('the name is asked beside "Let’s start" once the target is on screen: typed, it is kept; left, nothing is lost', () async {
+    final s = AppState()..setLang(AppLang.en);
+    s.step = kOnboardingSteps.indexWhere((x) => x.id == 'food');
+    s.primarySubmit();
+    await _wait(2600);
+    expect(s.currentStep, isNull);
+    expect(s.msgs.any((m) => m.kind == ObKind.target), isTrue);
+    expect(s.msgs.last.text(false), 'What should I call you? It’s optional.', reason: 'the last line, on the field that answers it');
+    expect(s.nameAsked, isTrue);
+
+    // A question is not a name.
+    s.onDraftChanged('What should I eat tonight?');
+    s.sendDraft();
+    await _wait();
+    expect(s.profile.name, isEmpty);
+    expect(s.nameAsked, isTrue);
+
+    s.onDraftChanged('My name is Basel');
+    s.sendDraft();
+    await _wait();
+    expect(s.profile.name, 'Basel');
+    expect(s.nameAsked, isFalse);
+    expect(s.msgs.last.text(false), 'Nice to meet you, Basel.');
+
+    final left = AppState()..setLang(AppLang.ar);
+    left.step = kOnboardingSteps.indexWhere((x) => x.id == 'food');
+    left.primarySubmit();
+    await _wait(2600);
+    expect(left.msgs.last.text(true), 'أناديك بإيه؟ ده اختياري.');
+    left.primarySubmit(); // "Let's start", with no name
+    expect(left.screen, AppScreen.today);
+    expect(left.profile.name, isEmpty);
+  });
+
+  test('a name already known is not asked for again', () async {
+    final s = AppState()..setLang(AppLang.en);
+    s.profile = s.profile.copyWith(name: 'Nour');
+    s.step = kOnboardingSteps.indexWhere((x) => x.id == 'food');
+    s.primarySubmit();
+    await _wait(2600);
+    expect(s.nameAsked, isFalse);
+    expect(s.msgs.any((m) => m.text(false).contains('call you')), isFalse);
+    expect(s.msgs.any((m) => m.kind == ObKind.target), isTrue, reason: 'and the reveal is there');
   });
 
   group('on screen', () {
@@ -208,7 +245,7 @@ void main() {
       s.startOnboarding();
       await tester.pump();
       expect(find.textContaining('Hi, I’m Qamar.'), findsOneWidget);
-      expect(find.widgetWithText(QPillChip, 'Agree to the required only'), findsOneWidget, reason: 'the first frame has both');
+      expect(find.widgetWithText(QPillChip, 'Agree'), findsOneWidget, reason: 'the first frame has both');
 
       s.pickOption(_option('consent', 'yes'));
       await tester.pump(const Duration(milliseconds: 400));

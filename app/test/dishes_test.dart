@@ -10,6 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:qamar/models/dishes.dart';
 import 'package:qamar/models/nudge.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/theme/app_theme.dart';
+import 'package:qamar/theme/colors.dart';
+import 'package:qamar/theme/text_styles.dart';
 import 'package:qamar/widgets/dish_card.dart';
 
 final _seed = File('supabase/migrations/0017_egyptian_food_seed.sql').readAsStringSync();
@@ -155,16 +158,29 @@ void main() {
 
     String allText(WidgetTester tester) => tester.widgetList<Text>(find.byType(Text)).map((t) => t.data ?? '').join(' | ');
 
-    testWidgets('names the dish and its portions, costs it against the target, and says it is an estimate', (tester) async {
+    testWidgets('names the meal, the dish and its portions, costs it against the target, and says it is an estimate', (tester) async {
       final d = _dish('chicken_salad_bread');
       await pump(tester, DishCard(dish: d, facts: d.facts(), targetKcal: 2180, slot: MealSlot.dinner, isAr: false, iso: (s) => s), ar: false);
       final text = allText(tester);
-      expect(text, contains('Tonight, for example'));
+      expect(text, contains('TONIGHT'), reason: 'the meal, as the card’s eyebrow');
       expect(text, contains('Grilled chicken breast with baladi salad'));
       expect(text, contains('a chicken breast + a plate of baladi salad + half a baladi loaf'));
       expect(text, contains('About 419 kcal · 19% of your 2180'));
       expect(text, contains('Protein 51 g · Carbs 33 g · Fat 11 g'));
       expect(text, contains('An estimate'));
+      expect(text, isNot(contains('database')), reason: 'what the numbers are, not the machinery behind them');
+    });
+
+    testWidgets('is a card on the page: the flat surface, the hairline and the card corner, no gradient', (tester) async {
+      final d = _dish('koshary');
+      await pump(tester, DishCard(dish: d, facts: d.facts(), targetKcal: 2180, slot: MealSlot.lunch, isAr: false, iso: (s) => s), ar: false);
+      final box = tester.widget<Container>(find.descendant(of: find.byType(DishCard), matching: find.byType(Container)).first);
+      final decoration = box.decoration! as BoxDecoration;
+      expect(decoration.gradient, isNull);
+      expect(decoration.color, QColors.surface);
+      expect((decoration.border! as Border).top.color, QColors.hairline);
+      expect(decoration.borderRadius, BorderRadius.circular(QRadii.card));
+      expect(decoration.boxShadow, isNull);
     });
 
     testWidgets('in Arabic, right to left, with Eastern digits throughout', (tester) async {
@@ -177,13 +193,15 @@ void main() {
       expect(RegExp('[0-9]').hasMatch(text), isFalse, reason: text);
     });
 
-    testWidgets('with no target yet (the welcome entry), the numbers alone', (tester) async {
+    testWidgets('with no target and no meal, the numbers alone', (tester) async {
       final d = _dish('ful_bread');
       await pump(tester, DishCard(dish: d, facts: d.facts(), isAr: false, iso: (s) => s), ar: false);
       final text = allText(tester);
       expect(text, contains('About 338 kcal'));
       expect(text, isNot(contains('%')));
-      expect(text, isNot(contains('for example')), reason: 'no slot given, no slot line');
+      for (final slot in MealSlot.values) {
+        expect(text, isNot(contains(QText.eyebrowText(DishCard.slotLine(slot, false), ar: false))), reason: 'no slot given, no slot line');
+      }
     });
   });
 }

@@ -1,9 +1,10 @@
 // O7: an input never appears before its question. Walked through the whole
 // consultation, on every step: while Qamar is typing the next question no
 // wheel, chip, number input, Continue or Skip is drawn, and the free-text
-// box sends nothing — what is typed waits for the question.
+// box sends nothing — what is typed waits for the question. The walk is the
+// consultation's eight questions: the name is no longer one of them (it is
+// asked beside "Let's start", once the target is on screen).
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -28,7 +29,7 @@ void _noAnswerDrawn(WidgetTester tester, String where) {
   expect(find.byType(QPillChip), findsNothing, reason: 'a chip before its question ($where)');
   expect(find.byType(QPrimaryButton), findsNothing, reason: 'Continue before its question ($where)');
   expect(find.text('Skip'), findsNothing, reason: 'Skip before its question ($where)');
-  final send = tester.widget<InkWell>(find.byKey(OnboardingScreen.sendKey));
+  final send = tester.widget<QTapArea>(find.byKey(OnboardingScreen.sendKey));
   expect(send.onTap, isNull, reason: 'send before its question ($where)');
 }
 
@@ -81,7 +82,7 @@ void main() {
       _answer(s, step);
       await tester.pump(const Duration(milliseconds: 300)); // the answer's own beat
     }
-    expect(walked, ['consent', 'safety', 'name', 'goal', 'dob', 'gender', 'body', 'activity', 'food'],
+    expect(walked, ['consent', 'safety', 'goal', 'dob', 'gender', 'body', 'activity', 'food'],
         reason: 'every step of the consultation was walked');
     // The reveal that follows the last answer: the dish, the calorie card,
     // and "Let's start", which also waits for Qamar to stop typing.
@@ -90,6 +91,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 250));
     }
     await tester.pump(const Duration(seconds: 3));
+    expect(find.widgetWithText(QPrimaryButton, 'Let’s start'), findsOneWidget, reason: 'the way in, once the last line is there');
   });
 
   testWidgets('what is typed while Qamar types waits in the box, and is sent once the question is there', (tester) async {
