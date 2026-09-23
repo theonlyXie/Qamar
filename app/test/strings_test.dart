@@ -6,10 +6,17 @@
 // before logging moved to the orb (seat 3). And the welcome's old "Start
 // now", the name step's "First name" hint (the question is on screen), the
 // old typed log's "Continue", and "Done", which only looked read through a
-// quest's `q.done` (seat 1). The table still holds 26 other strings nothing
-// reads; they are listed here by name, owed to the seats whose screens they
-// came from, so that this test holds the line: a string that stops being
-// read is either used again or deleted, not kept.
+// quest's `q.done` (seat 1). And the old log sheet's words (its inputs,
+// "Recent", "Describe the meal", "Analyzing", "Source preview", "Confirm
+// meal", the portion note the confirm card's badges now carry), the barcode
+// and nutrition-label scans that were never built, the old tab bar's "Log",
+// and the conversation's superseded states ("Online", "Tap the moon and
+// speak", "What's on your mind?"), with the camera-and-mic note that the
+// permission problems now say where it happens (seat 2). The table still
+// holds 6 other strings nothing reads; they are listed here by name, owed
+// to the seats whose screens they came from, so that this test holds the
+// line: a string that stops being read is either used again or deleted,
+// not kept.
 
 import 'dart:io';
 
@@ -17,10 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Unread before this test, left for their owners to use or retire.
 const _owed = {
-  'restart', 'guestNote', 'walletSub', 'priceLabel', 'limitLabel', 'barcode', 'barcodeSub',
-  'labelSub', 'suEarned', 'logSub', 'voiceSub', 'textSub', 'recent',
-  'recentSub', 'describeMeal', 'analyzing', 'sourcePreview',
-  'uncertainNote', 'online', 'sIdle', 'sAnswer', 'tapPrompt',
+  'restart', 'guestNote', 'walletSub', 'priceLabel', 'limitLabel', 'suEarned',
 };
 
 void main() {
