@@ -3555,7 +3555,7 @@ void main() {
       final wall = s.chat.last;
       expect(wall.openPlus, isTrue);
       expect(wall.problem!.action.label, 'See Qamar+', reason: 'the Qamar+ wall first, every time');
-      expect(wall.problem!.secondary!.label, 'Ask it for 800 Su');
+      expect(wall.problem!.secondary!.label, 'Ask just this one for 800 Su');
       expect(wall.problem!.also!.label, 'Log it as a meal', reason: 'the way that keeps what they were doing stays');
       final asked = s.chat.where((t) => t.who == ChatWho.u).length;
 
@@ -3575,9 +3575,38 @@ void main() {
       expect(s.suQuestionOffered, isFalse, reason: 'once a day');
     });
 
+    test('a member at their own limit is not sold Qamar+: the wall keeps "Log it as a meal", in both languages', () async {
+      for (final lang in AppLang.values) {
+        final wallet = FakeWalletRepo()..stored = (available: 5000, lifetime: 5000);
+        final ai = FakeGateway()
+          ..quotas = const AiQuotas(
+            chat: AiQuota(bucket: 'chat', used: 50, limit: 50, extra: 0, remaining: 0),
+            photo: AiQuota.emptyPhoto,
+            plan: AiQuota(bucket: 'plan', used: 0, limit: 3, extra: 0, remaining: 3),
+          );
+        final billing = FakeBilling()
+          ..current = PlusEntitlement(
+            status: 'active',
+            plan: 'monthly',
+            periodEnd: DateTime.now().toUtc().add(const Duration(days: 20)),
+            provider: 'paymob',
+          );
+        final s = backed(wallet: wallet, ai: ai, billing: billing)..setLang(lang);
+        await settle();
+        expect(s.plusActive, isTrue);
+        s.openChat();
+        await s.sendChatMsg('is feteer ok before the gym?');
+        final wall = s.chat.last;
+        expect(wall.openPlus, isFalse, reason: 'a member already has it');
+        expect(wall.problem!.action.label, lang == AppLang.ar ? 'سجّلها كوجبة' : 'Log it as a meal');
+        expect(wall.problem!.secondary, isNull, reason: 'and no Su question: that is the free tier\'s way through');
+        expect(s.suQuestionOffered, isFalse);
+      }
+    });
+
     test('the price is the one the server charges', () async {
       final (:s, wallet: _, ai: _) = await atTheWall(price: 900);
-      expect(s.chat.last.problem!.secondary!.label, 'Ask it for 900 Su');
+      expect(s.chat.last.problem!.secondary!.label, 'Ask just this one for 900 Su');
     });
 
     test('not offered when the balance does not cover it', () async {
@@ -3614,7 +3643,7 @@ void main() {
       await settle();
       expect(s.suAvailable, 2000, reason: 'nothing spent');
       expect(ai.chatMessages, ['is feteer ok before the gym?'], reason: 'the question was not asked again');
-      expect(s.chat.last.text, 'I could not buy the question just now, and no points were spent.');
+      expect(s.chat.last.text, 'I could not buy the question, and no points were spent.');
       expect(s.chat.last.problem!.action.label, 'See Qamar+');
       expect(s.chat.last.problem!.secondary!.label, 'Log it as a meal');
     });
@@ -3625,7 +3654,7 @@ void main() {
       s.chat.last.problem!.secondary!.onTap();
       await settle();
       final lost = s.chat.last;
-      expect(lost.text, 'I could not confirm the question was bought. Try again — it is never charged twice.');
+      expect(lost.text, 'I could not confirm the question was bought. Tap Try again: if it went through I will ask it, and it is never charged twice.');
       expect(lost.text, isNot(contains('no points were spent')), reason: 'the server may well have taken them');
       expect(lost.problem!.action.label, 'Try again');
       expect(ai.chatMessages, hasLength(1), reason: 'nothing asked yet');
@@ -3654,7 +3683,7 @@ void main() {
     test('in Arabic, in the app’s digits and the one name for Su', () async {
       final (:s, wallet: _, ai: _) = await atTheWall(lang: AppLang.ar);
       final label = s.chat.last.problem!.secondary!.label;
-      expect(label.replaceAll(RegExp('[\u2066-\u2069]'), ''), 'اسأله بـ٨٠٠ نقطة Su');
+      expect(label.replaceAll(RegExp('[\u2066-\u2069]'), ''), 'اسأل السؤال ده بس بـ٨٠٠ نقطة Su');
       expect(RegExp('[0-9]').hasMatch(label), isFalse);
       expect(s.chat.last.problem!.also!.label, 'سجّلها كوجبة');
     });

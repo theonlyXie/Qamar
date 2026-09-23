@@ -21,7 +21,8 @@ Deno.test("each wall names its own way out", () => {
 
   const chat = quotaExceededMessage("en", "chat");
   assertEquals(chat.includes("Qamar+"), true);
-  assertEquals(chat.includes("third question"), true);
+  assertEquals(chat.includes("last free question"), true);
+  assertEquals(chat.includes("what to eat tomorrow"), true, "the wall leads with what Qamar+ is for");
   // The words name Qamar+ only. The question bought with Su (O13, 0066) is a
   // button under the wall, offered only when the balance covers it, so the
   // message itself never promises it to someone who cannot afford it.
@@ -45,3 +46,24 @@ Deno.test("the payload the app parses is the bucket and its counters", () => {
     true,
   );
 });
+
+Deno.test("the wall states no limit of its own, and never sells Qamar+ to a member", () => {
+  // The limits are configuration (ai_quota_config): a number in the words
+  // would go false the day they are tuned.
+  for (const lang of ["ar", "en"] as const) {
+    for (const b of ["photo", "chat", "plan"] as const) {
+      for (const plus of [false, true]) {
+        const m = quotaExceededMessage(lang, b, plus);
+        assertEquals(/\b(three|third|3|50|30)\b|تلات|تالت|[٠-٩]/.test(m), false, `${lang} ${b} ${plus}: ${m}`);
+      }
+    }
+  }
+  const member = quotaExceededMessage("en", "chat", true);
+  assertEquals(member.includes("Qamar+"), false, "a member already has it");
+  assertEquals(quotaExceededMessage("ar", "chat", true).includes("قمر+"), false);
+  // Arabic writes the brand in Arabic: a Latin "Qamar+" opening an RTL line
+  // is drawn "+Qamar".
+  assertEquals(quotaExceededMessage("ar", "chat").includes("Qamar+"), false);
+  assertEquals(quotaExceededMessage("ar", "chat").includes("قمر+"), true);
+});
+

@@ -301,7 +301,7 @@ void main() {
     test('words that hit the question limit can be logged as a meal, which spends no question', () async {
       final ai = _Ai()
         ..chatFails = AiQuotaException(
-          'That was today’s third question. Qamar+ opens the questions and tomorrow’s plan — or come back in the morning.',
+          'That was today’s last free question. Qamar+ keeps the conversation going and tells you what to eat tomorrow — or ask again in the morning.',
           const AiQuota(bucket: 'chat', used: 3, limit: 3, extra: 0, remaining: 0),
         );
       final s = AppState(ai: ai)..setLang(AppLang.en);
@@ -376,7 +376,7 @@ void main() {
 
   test('in Arabic the Qamar+ button isolates the Latin brand, so its plus stays on its side', () async {
     final ai = _Ai()
-      ..chatFails = AiQuotaException('دي كانت تالت سؤال النهارده.', const AiQuota(bucket: 'chat', used: 3, limit: 3, extra: 0, remaining: 0));
+      ..chatFails = AiQuotaException('دي كانت آخر سؤال ببلاش النهارده.', const AiQuota(bucket: 'chat', used: 3, limit: 3, extra: 0, remaining: 0));
     final s = AppState(ai: ai)..setLang(AppLang.ar);
     s.openChat();
     await s.sendChatMsg('أكلت كشري');
@@ -410,7 +410,7 @@ void main() {
 
     test('the question and photo limits are limits, not errors', () async {
       final ai = _Ai()
-        ..chatFails = AiQuotaException('That was today’s third question.', const AiQuota(bucket: 'chat', used: 3, limit: 3, extra: 0, remaining: 0));
+        ..chatFails = AiQuotaException('That was today’s last free question.', const AiQuota(bucket: 'chat', used: 3, limit: 3, extra: 0, remaining: 0));
       final s = AppState(ai: ai)..setLang(AppLang.en);
       await s.sendChatMsg('what should I eat tonight?');
       expect(s.chat.last.problem!.kind, ProblemKind.limit);

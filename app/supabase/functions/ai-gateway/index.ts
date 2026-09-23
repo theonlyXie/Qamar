@@ -162,7 +162,7 @@ async function quotaStatus(userId: string, bucket: Bucket): Promise<Quota> {
 }
 
 function quotaDenied(lang: "ar" | "en", q: Quota): Response {
-  const message = quotaExceededMessage(lang, q.bucket);
+  const message = quotaExceededMessage(lang, q.bucket, q.plus === true);
   return json({
     error: message,
     reply: message,

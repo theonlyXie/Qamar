@@ -276,6 +276,17 @@ Without the key the SDK is never initialised. With it, three rules hold:
   onboarding's offer) writes `organic`, a nutritionist's code writes `pro`.
   An invitation's fortnight is still attributed by the metric (0059).
 
+  **A cohort boundary: the day 0065 reaches the live database.** Before
+  0065 the free tier's last question, photo and plan rewrite were counted
+  and then refused, so the free tier really had two of each and met the
+  question wall at the third question; from 0065 it has the three it is
+  promised and meets the wall at the fourth. The wall is the organic trial's
+  and the Su question's trigger, so `trial_to_paid_organic` and
+  `qamar_su_question_conversion` (0066) are only comparable within one side
+  of that day. Record the date 0065 is applied, and read either number for
+  cohorts that started after it — never a window that spans it — before
+  deciding anything about the price or the wall (O13).
+
 - **A refusal that can pass later needs its own SQLSTATE.** The phone keeps
   a waiting invitation or nutritionist's code until the server has answered
   it, and treats the redeem function's own refusal — a plain `raise

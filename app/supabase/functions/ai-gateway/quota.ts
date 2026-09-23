@@ -48,21 +48,29 @@ export function asQuota(raw: unknown, fallback: Bucket = "chat"): Quota | null {
  * Qamar+, and the plan simply waits for tomorrow. Once a day the app also
  * offers the question itself for Su under the chat wall (O13, 0066), as a
  * button shown only when the balance covers it; the words stay Qamar+'s.
+ *
+ * The words state no number: the day's limits are configuration
+ * (ai_quota_config), so "the third question" would go false the day they are
+ * tuned. And a member ([plus]) who reaches their own limit is not sold the
+ * Qamar+ they already have. Arabic writes the brand as قمر+, which an RTL line
+ * draws the right way round.
  */
-export function quotaExceededMessage(lang: "ar" | "en", bucket: Bucket): string {
+export function quotaExceededMessage(lang: "ar" | "en", bucket: Bucket, plus = false): string {
   const ar: Record<Bucket, string> = {
     photo:
-      "خلصت التلات صور بتوع النهارده. اكتب أو قول الوجبة مجاناً، أو اصرف نقاط Su على صورة زيادة من المحفظة. الصور بتتجدد الصبح.",
-    chat:
-      "دي كانت تالت سؤال النهارده. Qamar+ بيفتح الأسئلة والخطة بتاعة بكرة — أو استنى الصبح وارجع اسأل.",
+      "دي كانت آخر صورة النهارده. اكتب أو قول الوجبة مجاناً، أو اصرف نقاط Su على صورة زيادة من المحفظة. الصور بتتجدد الصبح.",
+    chat: plus
+      ? "دي كانت آخر سؤال النهارده. اسأل تاني الصبح."
+      : "دي كانت آخر سؤال ببلاش النهارده. قمر+ بيكمّل معاك الكلام وبيقولك تاكل إيه بكرة — أو اسأل تاني الصبح.",
     plan:
       "الخطة اتكتبت كفاية النهارده. عدّل الوجبات من الخطة نفسها، أو قوللي إيه اللي اتغيّر وأنا أظبط الباقي.",
   };
   const en: Record<Bucket, string> = {
     photo:
-      "That’s today’s three photos. Type or say the meal for free, or spend Su Points on another photo from the wallet. Photos refresh in the morning.",
-    chat:
-      "That was today’s third question. Qamar+ opens the questions and tomorrow’s plan — or come back in the morning.",
+      "That was today’s last photo. Type or say the meal for free, or spend Su Points on another photo from the wallet. Photos refresh in the morning.",
+    chat: plus
+      ? "That was today’s last question. Ask again in the morning."
+      : "That was today’s last free question. Qamar+ keeps the conversation going and tells you what to eat tomorrow — or ask again in the morning.",
     plan:
       "Today’s plan has been rewritten enough. Swap meals on the plan itself, or tell me what changed and I will adjust the rest.",
   };

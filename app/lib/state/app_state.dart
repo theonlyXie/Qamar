@@ -3759,6 +3759,19 @@ class AppState extends ChangeNotifier {
   /// that keeps what the person was doing ("Log it as a meal", O10).
   ChatTurn _wallTurn(AiQuotaException e, {required String words, required bool mealLog, required bool offerSu}) {
     final photo = e.quota.bucket == 'photo';
+    // A member at their own question limit is not sold the Qamar+ they have:
+    // the way on is the one that keeps what they were doing (O10), and the
+    // gateway's words say to ask again in the morning.
+    if (!photo && plusActive) {
+      final way = words.isEmpty
+          ? ProblemAction(isAr ? 'رجوع للنهارده' : 'Back to Today', closeChat)
+          : ProblemAction(isAr ? 'سجّلها كوجبة' : 'Log it as a meal', () => logTextAsMeal(words));
+      return ChatTurn(
+        who: ChatWho.q,
+        text: e.message,
+        problem: Problem(what: e.message, action: way, kind: ProblemKind.limit),
+      );
+    }
     // In Arabic the Latin brand is isolated, or its trailing "+" is drawn on
     // the wrong side of the word ("+Qamar").
     final label = photo ? (isAr ? 'افتح المحفظة' : 'Open the wallet') : (isAr ? 'شوف \u2066Qamar+\u2069' : 'See Qamar+');
@@ -3814,7 +3827,8 @@ class AppState extends ChangeNotifier {
       suAvailable >= questionPrice;
 
   /// The offer's words, with the price the server charges.
-  String get suQuestionLabel => isAr ? 'اسأله بـ${suAmount(questionPrice)}' : 'Ask it for ${suAmount(questionPrice)}';
+  /// "Just this one": the button buys one question, not a membership.
+  String get suQuestionLabel => isAr ? 'اسأل السؤال ده بس بـ${suAmount(questionPrice)}' : 'Ask just this one for ${suAmount(questionPrice)}';
 
   /// After a purchase whose answer was lost: if the server already holds the
   /// bought question, ask it; otherwise buy again with the same day's key,
@@ -3863,8 +3877,10 @@ class AppState extends ChangeNotifier {
       // trying again is safe — the same key never charges twice (0067).
       final refused = failureOf(e) == Failure.ours;
       final what = refused
-          ? (isAr ? 'مقدرتش أشتري السؤال دلوقتي، ومفيش نقاط اتصرفت.' : 'I could not buy the question just now, and no points were spent.')
-          : (isAr ? 'مقدرتش أتأكد إن السؤال اتشرى. جرّب تاني — عمره ما بيتخصم مرتين.' : 'I could not confirm the question was bought. Try again — it is never charged twice.');
+          ? (isAr ? 'مقدرتش أشتري السؤال، ومفيش ولا نقطة اتصرفت.' : 'I could not buy the question, and no points were spent.')
+          : (isAr
+              ? 'مقدرتش أتأكد إن السؤال اتشرى. دوس «جرّب تاني»: لو اتشرى هسأله، وعمره ما بيتخصم مرتين.'
+              : 'I could not confirm the question was bought. Tap Try again: if it went through I will ask it, and it is never charged twice.');
       chat.add(ChatTurn(
         who: ChatWho.q,
         text: what,
