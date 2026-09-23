@@ -209,7 +209,10 @@ while it waits the seven-day week is not offered. `qamar_redeem_pro_code` puts
 the professional on the account (`pro_code_claims`, which checkout reads when no
 code is typed and the account has no `pro_referrals` row yet, so their 20%
 reaches them from the first payment; that payment writes the referral, and its
-twelve months decide every renewal after it — past them nobody is paid) and, while the
+twelve months decide every renewal after it — past them nobody is paid, and a
+code typed at checkout obeys the same rule: it cannot restart the twelve months
+or switch the share to another professional; `attachPromo` in
+`functions/billing/pricing.ts`) and, while the
 account's one trial is unused, starts `billing_config.pro_trial_days` (14) with
 `plus_trials.source = 'pro'`. Only a code the operator has confirmed starts the
 trial: every account gets an affiliate code the first time Me loads, so without

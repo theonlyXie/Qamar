@@ -29,7 +29,7 @@ import { amountMatches, signedOrderId, txnObject, txnOutcome, type OrderRow } fr
 import {
   MIN_PAYOUT_CENTS,
   PLANS,
-  chooseSavedPromo,
+  attachPromo,
   isPlanId,
   normalizePromoCode,
   paymentConfig,
@@ -122,6 +122,7 @@ function quoteJson(q: Quote) {
     affiliate_commission_cents: q.affiliateCommissionCents,
     promo_note: q.promoNote,
     promo_error: q.promoError,
+    promo_notice: q.promoNotice,
     // What checkout can take here, so the paywall names only that (card,
     // meeza, wallet). Empty when the integrations are not labelled.
     payment_methods: paymentKinds(),
@@ -164,7 +165,7 @@ async function loadPromo(code: string): Promise<Promo | null> {
 /**
  * This client's referral row, whatever its ends_at: written by
  * qamar_apply_paid_order on the first paid order that carried a professional,
- * with twelve months from there (0039). chooseSavedPromo decides what it
+ * with twelve months from there (0039). attachPromo decides what it
  * means: inside the twelve months it attaches that professional to a renewal
  * without the client typing the code again; past them, nobody.
  */
@@ -196,21 +197,29 @@ async function buildQuote(userId: string, planRaw: unknown, codeRaw: unknown): P
     return json({ error: "only the monthly plan exists" }, 400);
   }
   const code = normalizePromoCode(typeof codeRaw === "string" ? codeRaw : "");
-  let promo: Promo | null = null;
+  let typed: Promo | null = null;
   if (code) {
-    promo = await loadPromo(code);
-    if (!promo) {
+    typed = await loadPromo(code);
+    if (!typed) {
       const first = await firstPurchase(userId);
       const q = quotePlus({ plan: planRaw, firstPurchase: first, buyerUserId: userId, promo: null });
       q.promoError = "This code was not found";
       q.promoCode = code;
       return q;
     }
-  } else {
-    promo = await chooseSavedPromo(await loadReferral(userId), new Date(), () => loadClaim(userId));
   }
+  // One rule for a typed code and for none: the professional already on the
+  // account decides, for twelve months and not after (attachPromo).
+  const { promo, notice } = await attachPromo({
+    typed,
+    referral: () => loadReferral(userId),
+    now: new Date(),
+    claim: () => loadClaim(userId),
+  });
   const first = await firstPurchase(userId);
-  return quotePlus({ plan: planRaw, firstPurchase: first, buyerUserId: userId, promo });
+  const q = quotePlus({ plan: planRaw, firstPurchase: first, buyerUserId: userId, promo });
+  q.promoNotice = notice;
+  return q;
 }
 
 async function quoteRoute(userId: string, body: Record<string, unknown>): Promise<Response> {

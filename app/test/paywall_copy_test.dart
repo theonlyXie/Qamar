@@ -141,6 +141,44 @@ void main() {
     expect(text, isNot(contains('مع Qamar+')));
   });
 
+  group('a typed professional\'s code that is not the one paid says why', () {
+    test('each reason, in both languages, never claiming the code pays a share', () {
+      for (final notice in ['referral_ended', 'other_professional', 'unchecked']) {
+        for (final ar in [false, true]) {
+          final line = SubscriptionScreen.promoNoticeLine(ar, notice);
+          expect(line, isNotNull);
+          expect(line, contains(ar ? 'السعر زي ما هو' : 'Your price is the same'));
+          expect(line, isNot(contains(ar ? 'الكود شغال' : 'Code applied')));
+        }
+      }
+      expect(SubscriptionScreen.promoNoticeLine(false, null), isNull);
+      expect(SubscriptionScreen.promoNoticeLine(false, 'something new'), isNull);
+    });
+
+    test('the quote keeps only the reasons the phone can say', () {
+      expect(PlusQuote.fromJson(const {'promo_notice': 'referral_ended'}).promoNotice, 'referral_ended');
+      expect(PlusQuote.fromJson(const {'promo_notice': 'rm -rf'}).promoNotice, isNull);
+      expect(PlusQuote.fromJson(const {}).promoNotice, isNull);
+    });
+
+    testWidgets('on the paywall it replaces "Code applied", even though another professional is paid', (tester) async {
+      const quote = PlusQuote(
+        plan: 'monthly', days: 30, listCents: 50000, amountCents: 50000,
+        pricingReason: 'affiliate', firstPurchase: false, promoCode: 'QMRSARA1', promoKind: 'affiliate',
+        promoNotice: 'other_professional',
+      );
+      await _paywall(tester, _lite(AppLang.en, earned: _stated(), quote: quote));
+      final line = tester.widget<Text>(find.byKey(SubscriptionScreen.codeLineKey)).data!;
+      expect(line, startsWith('Another nutritionist is already on your subscription'));
+      expect(line, isNot(contains('Code applied')));
+    });
+
+    testWidgets('with no reason, the line is what it was', (tester) async {
+      await _paywall(tester, _lite(AppLang.en, earned: _stated()));
+      expect(tester.widget<Text>(find.byKey(SubscriptionScreen.codeLineKey)).data, startsWith('If a nutritionist or coach sent you'));
+    });
+  });
+
   group('how to pay names only what checkout can take', () {
     test('the rails the server names, in both languages', () {
       expect(SubscriptionScreen.paymentLine(false, const ['card', 'meeza', 'wallet']),

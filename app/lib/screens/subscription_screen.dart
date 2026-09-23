@@ -20,6 +20,22 @@ class SubscriptionScreen extends StatelessWidget {
   static const leadKey = ValueKey('paywall-lead');
   static const bannerKey = ValueKey('paywall-banner');
   static const paymentKey = ValueKey('paywall-payment');
+  static const codeLineKey = ValueKey('paywall-code-line');
+
+  /// The billing function's reason a typed professional's code is not the
+  /// one paid, in the person's language; null when there is none.
+  static String? promoNoticeLine(bool isAr, String? notice) => switch (notice) {
+        'referral_ended' => isAr
+            ? 'السنة بتاعة أخصائيك على اشتراكك خلصت، فمفيش نصيب بيتدفع له دلوقتي. السعر زي ما هو.'
+            : 'Your nutritionist’s twelve months on your subscription have ended, so no share is paid to them now. Your price is the same.',
+        'other_professional' => isAr
+            ? 'فيه أخصائي تاني على اشتراكك، وهو اللي بياخد النصيب لحد ما سنته تخلص. لو عايز تغيّر، كلّم الدعم. السعر زي ما هو.'
+            : 'Another nutritionist is already on your subscription, and their share stays with them for their twelve months. To change, write to support. Your price is the same.',
+        'unchecked' => isAr
+            ? 'مقدرتش أتأكد من كود الأخصائي دلوقتي، فمفيش نصيب على الدفعة دي. السعر زي ما هو.'
+            : 'I could not check the nutritionist’s code just now, so no share is attached to this payment. Your price is the same.',
+        _ => null,
+      };
 
   /// How to pay, naming only the rails the billing function says checkout
   /// can take (its labelled Paymob integrations). With none stated it names
@@ -146,13 +162,18 @@ class SubscriptionScreen extends StatelessWidget {
         const _PromoField(),
         const SizedBox(height: 6),
         Text(
-          quote.pricingReason == 'affiliate'
+          key: SubscriptionScreen.codeLineKey,
+          // A typed code that is not the one paid says why, before anything
+          // that would say it is (the billing function's rule: twelve months,
+          // one professional per client).
+          promoNoticeLine(isAr, quote.promoNotice) ??
+          (quote.pricingReason == 'affiliate'
               ? (isAr
                   ? 'الكود شغال. السعر زي ما هو، وأخصائيك بيتابع خطتك وبياخد نصيب من الاشتراك لمدة سنة.'
                   : 'Code applied. Your price is unchanged; your nutritionist follows your plan and earns a share of this subscription for a year.')
               : (isAr
                   ? 'لو أخصائي أو مدرّب بعتك، اكتب الكود هنا. السعر مش بيتغير — الكود بيربط خطتك بيه وبيديه نصيب من الاشتراك.'
-                  : 'If a nutritionist or coach sent you, enter their code. The price does not change — the code links your plan to them and pays them a share.'),
+                  : 'If a nutritionist or coach sent you, enter their code. The price does not change — the code links your plan to them and pays them a share.')),
           style: QText.body(size: 12, height: 18, color: QColors.textFaint),
         ),
         if (quote.promoError != null) ...[

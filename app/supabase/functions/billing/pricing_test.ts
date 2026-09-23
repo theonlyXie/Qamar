@@ -4,6 +4,7 @@ import {
   PLANS,
   PRO_SHARE_MONTHS,
   PRO_SHARE_PERCENT,
+  attachPromo,
   chooseSavedPromo,
   isPlanId,
   normalizePromoCode,
@@ -167,6 +168,80 @@ Deno.test("a referral lookup that failed attaches nobody: a share is never attac
   assertEquals(await chooseSavedPromo({ ok: false }, new Date(), readClaim), null);
   assertEquals(claimReads, 0);
 });
+
+// A code typed at checkout obeys the same rule as none: twelve months, one
+// professional, and not after.
+{
+  const now = new Date("2026-09-23T12:00:00Z");
+  const sara: Promo = { ...PRO, id: "promo-sara", code: "QMRSARA1", ownerUserId: "dr-sara" };
+  const hany: Promo = { ...PRO, id: "promo-hany", code: "QMRHANY1", ownerUserId: "coach-hany" };
+  const row = (endsAt: string) => ({
+    promo_code_id: "promo-sara",
+    affiliate_user_id: "dr-sara",
+    ends_at: endsAt,
+    promo_codes: { code: "QMRSARA1", active: true },
+  });
+  const live = () => Promise.resolve({ ok: true as const, row: row("2027-03-01T00:00:00Z") });
+  const expired = () => Promise.resolve({ ok: true as const, row: row("2026-09-01T00:00:00Z") });
+  const none = () => Promise.resolve({ ok: true as const, row: null });
+  const noClaim = () => Promise.resolve(null);
+  const pay = (promo: Promo | null) => quotePlus({ plan: "monthly", firstPurchase: false, buyerUserId: "client", promo });
+
+  Deno.test("past the twelve months a re-typed code pays nothing, and says why", async () => {
+    const a = await attachPromo({ typed: sara, referral: expired, now, claim: noClaim });
+    assertEquals(a.promo, null);
+    assertEquals(a.notice, "referral_ended");
+    const q = pay(a.promo);
+    assertEquals(q.affiliateCommissionCents, 0);
+    assertEquals(q.affiliateUserId, null);
+    assertEquals(q.amountCents, LIST_MONTHLY_CENTS, "the price is the same");
+  });
+
+  Deno.test("inside the twelve months the same professional's typed code pays that professional", async () => {
+    const a = await attachPromo({ typed: sara, referral: live, now, claim: noClaim });
+    assertEquals(a.promo?.ownerUserId, "dr-sara");
+    assertEquals(a.notice, null);
+    assertEquals(pay(a.promo).affiliateCommissionCents, 10_000);
+  });
+
+  Deno.test("another professional's typed code does not switch the share: the one on the account decides", async () => {
+    // During a live referral (0039: first professional wins).
+    const during = await attachPromo({ typed: hany, referral: live, now, claim: noClaim });
+    assertEquals(during.promo?.ownerUserId, "dr-sara");
+    assertEquals(during.notice, "other_professional");
+    assertEquals(pay(during.promo).affiliateUserId, "dr-sara");
+    // Before the first payment, against the claim made in Me (0069: one professional per account).
+    const before = await attachPromo({ typed: hany, referral: none, now, claim: () => Promise.resolve(sara) });
+    assertEquals(before.promo?.ownerUserId, "dr-sara");
+    assertEquals(before.notice, "other_professional");
+  });
+
+  Deno.test("with no referral row a typed code attaches, and carries the first payment", async () => {
+    const a = await attachPromo({ typed: hany, referral: none, now, claim: noClaim });
+    assertEquals(a.promo?.ownerUserId, "coach-hany");
+    assertEquals(a.notice, null);
+    const q = quotePlus({ plan: "monthly", firstPurchase: true, buyerUserId: "client", promo: a.promo });
+    assertEquals(q.pricingReason, "affiliate");
+    assertEquals(q.affiliateCommissionCents, 10_000);
+  });
+
+  Deno.test("a typed code on a referral lookup that failed pays nobody, and says it could not check", async () => {
+    const a = await attachPromo({ typed: sara, referral: () => Promise.resolve({ ok: false as const }), now, claim: noClaim });
+    assertEquals(a.promo, null);
+    assertEquals(a.notice, "unchecked");
+  });
+
+  Deno.test("a typed campaign code is a discount, not a professional: untouched, and nothing is looked up for it", async () => {
+    const campaign: Promo = { ...PRO, id: "sale", code: "RAMADAN", kind: "campaign", ownerUserId: null, percentOff: 50 };
+    let lookups = 0;
+    const count = () => { lookups++; return expired(); };
+    const a = await attachPromo({ typed: campaign, referral: count, now, claim: () => { lookups++; return Promise.resolve(sara); } });
+    assertEquals(a.promo?.code, "RAMADAN");
+    assertEquals(a.notice, null);
+    assertEquals(lookups, 0);
+    assertEquals(pay(a.promo).amountCents, 25_000);
+  });
+}
 
 Deno.test("checkout gets every integration id; the paywall names only the rails that are labelled", () => {
   const labelled = paymentConfig("card:123456, meeza:123456 ,wallet:789012");

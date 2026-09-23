@@ -92,6 +92,12 @@ class PlusQuote {
   /// the server has not said, and then the paywall names none.
   final List<String> paymentMethods;
 
+  /// Why a typed professional's code is not the one paid, as the billing
+  /// function decided it: 'referral_ended' (their twelve months are over),
+  /// 'other_professional' (another professional is on the account), or
+  /// 'unchecked' (the account's referral could not be read). Null otherwise.
+  final String? promoNotice;
+
   const PlusQuote({
     required this.plan,
     required this.days,
@@ -105,6 +111,7 @@ class PlusQuote {
     this.promoNote,
     this.promoError,
     this.paymentMethods = const [],
+    this.promoNotice,
   });
 
   int get amountPounds => amountCents ~/ 100;
@@ -128,6 +135,7 @@ class PlusQuote {
       affiliateCommissionCents: (json['affiliate_commission_cents'] as num?)?.toInt() ?? 0,
       promoNote: json['promo_note'] as String?,
       promoError: json['promo_error'] as String?,
+      promoNotice: const {'referral_ended', 'other_professional', 'unchecked'}.contains(json['promo_notice']) ? json['promo_notice'] as String : null,
     );
   }
 }

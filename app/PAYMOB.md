@@ -9,7 +9,7 @@ The app and the server are already wired for this. Your job is the business side
 | Plan | What they pay | What you keep in mind |
 |---|---|---|
 | Monthly | **500** | The only plan. No annual or family tier yet — those wait on month-2 retention. No discount marketing: a campaign code is the one thing that can lower the price, none is issued, and while one applies the paywall stops saying "same price for everyone". |
-| Professional's code | **500** | The client pays the same 500. The nutritionist or coach who gave the code is owed **100 EGP a month (20%) for 12 months** from the client's first payment, in their EGP wallet. This is not Su Points. |
+| Professional's code | **500** | The client pays the same 500. The nutritionist or coach who gave the code is owed **100 EGP a month (20%) for 12 months** from the client's first payment, in their EGP wallet, and not after — re-typing the code at checkout does not restart the twelve months. One professional per client: another professional's code does not take the share over (switching is a support conversation). This is not Su Points. |
 
 The phone never decides the price. Checkout asks the server; the server stamps the amount Paymob collects. A later campaign code (the earned-month promo, Ramadan) goes in the `promo_codes` table as `kind = campaign` — you do not need another app release to add one.
 

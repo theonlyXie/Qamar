@@ -84,7 +84,16 @@ export type Quote = {
   affiliateCommissionCents: number;
   promoNote: string | null;
   promoError: string | null;
+  /**
+   * Why a typed professional's code is not the one that is paid (the phone
+   * says it in the person's language): "referral_ended" — their twelve months
+   * are over; "other_professional" — another professional is on the account;
+   * "unchecked" — the account's referral could not be read. Null otherwise.
+   */
+  promoNotice: PromoNotice | null;
 };
+
+export type PromoNotice = "referral_ended" | "other_professional" | "unchecked";
 
 /**
  * A professional already on this person's account, read back from a
@@ -122,30 +131,62 @@ export function savedProfessional(row: Record<string, unknown> | null | undefine
 export type ReferralLookup = { ok: false } | { ok: true; row: Record<string, unknown> | null };
 
 /**
- * Which saved professional a checkout with no typed code attaches.
+ * Which professional, if any, a checkout pays — the one rule for every path,
+ * a code typed at checkout or none. The blueprint pays a professional EGP 100
+ * a month for twelve months from the client's first payment, and one
+ * professional per client (0039: "first professional wins"; 0069 the same
+ * before the first payment). So the professional already on the account
+ * decides, whatever is typed:
  * - A referral row inside its twelve months (ends_at after [now]): that
- *   professional, as every renewal of the year.
- * - A referral row past its twelve months: nobody. The blueprint pays the
- *   professional EGP 100 a month for twelve months, from the first payment.
- * - No referral row at all: the code the person redeemed before paying
- *   (pro_code_claims, 0069). It carries the first payment only; that payment
- *   writes the referral row, and the row decides from then on.
- * - A lookup that failed: nobody. A share is never attached on a guess.
- * The claim is read only when there is no referral row.
+ *   professional. Their own code typed again pays them; another
+ *   professional's typed code does not switch the share ("other_professional").
+ * - A referral row past its twelve months: nobody, typed code or claim
+ *   ("referral_ended" when a code was typed).
+ * - No referral row: the claim made before paying (pro_code_claims, 0069),
+ *   which a different typed code does not replace; with no claim, the typed
+ *   code. Either carries the first payment only: that payment writes the
+ *   referral row, and the row decides from then on.
+ * - A referral lookup that failed: nobody. A share is never attached on a
+ *   guess ("unchecked" when a code was typed).
+ * A typed campaign code is a discount, not a professional: it is left as it
+ * is and nothing here is read for it.
+ */
+export async function attachPromo(input: {
+  typed: Promo | null;
+  referral: () => Promise<ReferralLookup>;
+  now: Date;
+  claim: () => Promise<Promo | null>;
+}): Promise<{ promo: Promo | null; notice: PromoNotice | null }> {
+  const { typed, now } = input;
+  if (typed && typed.kind !== "affiliate") return { promo: typed, notice: null };
+  const referral = await input.referral();
+  if (!referral.ok) return { promo: null, notice: typed ? "unchecked" : null };
+  const row = referral.row;
+  if (row) {
+    const ends = typeof row.ends_at === "string" ? new Date(row.ends_at) : null;
+    if (!ends || Number.isNaN(ends.getTime()) || ends <= now) {
+      return { promo: null, notice: typed ? "referral_ended" : null };
+    }
+    const saved = savedProfessional(row);
+    if (typed && saved && typed.ownerUserId !== saved.ownerUserId) return { promo: saved, notice: "other_professional" };
+    return { promo: typed ?? saved, notice: null };
+  }
+  const claimed = await input.claim();
+  if (typed && claimed && typed.ownerUserId !== claimed.ownerUserId) return { promo: claimed, notice: "other_professional" };
+  return { promo: typed ?? claimed, notice: null };
+}
+
+/**
+ * The same rule for a checkout with no typed code (kept for its callers and
+ * tests): the referral inside its twelve months, nobody after them, the claim
+ * only when there is no referral row, nobody on a failed lookup.
  */
 export async function chooseSavedPromo(
   referral: ReferralLookup,
   now: Date,
   claim: () => Promise<Promo | null>,
 ): Promise<Promo | null> {
-  if (!referral.ok) return null;
-  const row = referral.row;
-  if (row) {
-    const ends = typeof row.ends_at === "string" ? new Date(row.ends_at) : null;
-    if (!ends || Number.isNaN(ends.getTime()) || ends <= now) return null;
-    return savedProfessional(row);
-  }
-  return await claim();
+  return (await attachPromo({ typed: null, referral: () => Promise.resolve(referral), now, claim })).promo;
 }
 
 function promoLive(promo: Promo, now: Date): boolean {
@@ -246,6 +287,7 @@ export function quotePlus(input: {
     affiliateCommissionCents,
     promoNote,
     promoError,
+    promoNotice: null,
   };
 }
 
