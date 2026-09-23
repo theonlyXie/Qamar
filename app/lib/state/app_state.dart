@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:intl/intl.dart';
 
+import '../l10n/trial_words.dart';
 import '../l10n/strings.dart';
 import '../l10n/words.dart';
 import '../models/days.dart';
@@ -3467,8 +3468,8 @@ class AppState extends ChangeNotifier {
       _prefs?.setString(_kProName, proName!).catchError((_) {});
       proNotice = r.trialDays > 0
           ? (isAr
-              ? '$proName بعتك. ${iso('${r.trialDays}')} يوم قمر+ عليك من دلوقتي — من غير بطاقة، ومفيش حاجة بتتجدد لوحدها.'
-              : '$proName sent you. ${r.trialDays} days of Qamar+ are yours from now — no card, and nothing renews on its own.')
+              ? TrialWords.proRedeemed(proName!, r.trialDays, ar: true, iso: iso)
+              : TrialWords.proRedeemed(proName!, r.trialDays, ar: false, iso: iso))
           : (isAr
               ? 'كود $proName على حسابك. لما تشترك، بياخد نصيبه والسعر زي ما هو.'
               : '$proName’s code is on your account. When you subscribe they get their share, at the same price.');
@@ -3730,8 +3731,8 @@ class AppState extends ChangeNotifier {
       if (plusActive) _track('trial_started', {if (placement != null) 'placement': placement});
       plusNotice = plusActive
           ? (isAr
-              ? 'أسبوعك مع قمر كامل بدأ: ${iso('$trialOfferDays')} أيام، من غير بطاقة، ومفيش حاجة بتتجدد لوحدها.'
-              : 'Your week of the full Qamar has started: $trialOfferDays days, no card, and nothing renews on its own.')
+              ? TrialWords.started(trialOfferDays, ar: true, iso: iso)
+              : TrialWords.started(trialOfferDays, ar: false, iso: iso))
           : (isAr ? 'مقدرتش أبدأ الأسبوع المجاني دلوقتي.' : 'Could not start the free week just now.');
       _notify();
       await _refreshQuota();

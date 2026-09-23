@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/trial_words.dart';
 import '../l10n/words.dart';
 import '../models/plan.dart';
 import '../models/reply.dart';
@@ -252,8 +253,8 @@ class QamarCard extends StatelessWidget {
                         child: Text(
                           offerWeek
                               ? (isAr
-                                  ? 'افتح الخطة بأسبوعك المجاني: ${state.iso('${AppState.trialOfferDays}')} أيام، من غير بطاقة'
-                                  : 'Open the plan with your free week: ${AppState.trialOfferDays} days, no card')
+                                  ? TrialWords.lockLink(AppState.trialOfferDays, ar: true, iso: state.iso)
+                                  : TrialWords.lockLink(AppState.trialOfferDays, ar: false, iso: state.iso))
                               : locked
                                   ? (isAr ? 'الخطة الكاملة في قمر+' : 'The full plan is Qamar+')
                                   : (isAr ? 'افتح خطة النهارده' : 'Open today’s plan'),

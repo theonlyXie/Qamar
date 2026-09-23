@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/trial_words.dart';
 import '../l10n/words.dart';
 import '../models/billing.dart';
 import '../models/invitation.dart';
@@ -139,8 +140,8 @@ class YouScreen extends StatelessWidget {
                           : state.trialWaiting
                               // "Not now" at the reveal leaves the free week here.
                               ? (isAr
-                                  ? 'أسبوعك المجاني مستنيك: ${state.iso('${AppState.trialOfferDays}')} أيام، من غير بطاقة، ومفيش حاجة بتتجدد لوحدها.'
-                                  : 'Your free week is waiting: ${AppState.trialOfferDays} days, no card, nothing renews.')
+                                  ? TrialWords.waitingInMe(AppState.trialOfferDays, ar: true, iso: state.iso)
+                                  : TrialWords.waitingInMe(AppState.trialOfferDays, ar: false, iso: state.iso))
                               : (isAr ? 'خطة بكرة، وصور وأسئلة أكتر' : 'Tomorrow’s plan, more photos and questions'),
                       style: QText.body(size: 12, height: 18, color: QColors.textMuted),
                     ),
@@ -770,13 +771,7 @@ class _AffiliateCard extends StatelessWidget {
                 // (0069), and its length is the server's.
                 (wallet.clientTrialDays <= 0
                     ? ''
-                    : wallet.professional
-                        ? (isAr
-                            ? ' عميلك لما يكتبه في «حسابي» قبل ما يشترك بياخد ${state.iso('${wallet.clientTrialDays}')} يوم قمر+ ببلاش.'
-                            : ' A client who enters it in Me before subscribing also gets ${wallet.clientTrialDays} days of Qamar+ free.')
-                        : (isAr
-                            ? ' لما قمر يتأكد إنك أخصائي أو مدرّب، عميلك اللي يكتبه في «حسابي» بياخد كمان ${state.iso('${wallet.clientTrialDays}')} يوم قمر+ ببلاش.'
-                            : ' Once Qamar confirms you are a nutritionist or coach, a client who enters it in Me also gets ${wallet.clientTrialDays} days of Qamar+ free.')),
+                    : TrialWords.clientDays(wallet.clientTrialDays, confirmed: wallet.professional, ar: isAr, iso: state.iso)),
             style: QText.body(size: 12, height: 18, color: QColors.textMuted),
           ),
           const SizedBox(height: 10),
@@ -848,7 +843,7 @@ class _ClientsCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             isAr
-                ? 'اللي وافقوا على المشاركة بس. أيام التسجيل من ٧، وكام يوم منهم قريب من الهدف.'
+                ? 'اللي وافقوا على المشاركة بس. أيام التسجيل من ٧، وكام يوم منهم في حدود الهدف.'
                 : 'Only those who said yes to sharing. Days logged out of 7, and how many of them landed near the target.',
             style: QText.body(size: 12, height: 18, color: QColors.textMuted),
           ),
@@ -871,8 +866,8 @@ class _ClientsCard extends StatelessWidget {
                                     ? 'متوسط ${state.iso('${c.avgKcal}')} سعر في اليوم'
                                     : 'avg ${c.avgKcal} kcal a day')
                                 : (isAr
-                                    ? 'متوسط ${state.iso('${c.avgKcal}')} من ${state.iso('${c.targetKcal}')} سعر · ${state.iso('${c.onTargetDays}')} يوم قريب من الهدف'
-                                    : 'avg ${c.avgKcal} of ${c.targetKcal} kcal · ${c.onTargetDays} day${c.onTargetDays == 1 ? '' : 's'} near target'),
+                                    ? 'متوسط ${state.iso('${c.avgKcal}')} من ${state.iso('${c.targetKcal}')} سعر · ${TrialWords.nearTarget(c.onTargetDays, ar: true, iso: state.iso)}'
+                                    : 'avg ${c.avgKcal} of ${c.targetKcal} kcal · ${TrialWords.nearTarget(c.onTargetDays, ar: false, iso: state.iso)}'),
                         style: QText.body(size: 12, height: 17, color: QColors.textMuted),
                       ),
                     ]),

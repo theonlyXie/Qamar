@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/trial_words.dart';
 import '../models/messages.dart';
 import '../models/onboarding.dart';
 import '../models/profile.dart';
@@ -528,7 +529,7 @@ class _TrialOfferCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              isAr ? '${state.iso('$days')} أيام من قمر كامل.' : '$days days of the full Qamar.',
+              TrialWords.offerTitle(days, ar: isAr, iso: state.iso),
               style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh),
             ),
             const SizedBox(height: 4),
