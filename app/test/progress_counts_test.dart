@@ -1,9 +1,12 @@
 // Progress and the week's card count days, meals and the run the way each
 // language counts (Counted, lib/l10n/words.dart), seat 3's part. They said
 // "٢ أيام ورا بعض", "١٢ أيام", "٢ أيام نشاط", "٢ وجبة" and "لسه ١ يوم"; the
-// weekly insight's gate wrote its "٣" in Eastern digits whatever the
-// setting, and the weight trend's span and amount ignored it, with "over 1
-// days" in English.
+// week's gate wrote its "٣" in Eastern digits whatever the setting, and the
+// weight trend's span and amount ignored it, with "over 1 days" in English.
+//
+// Since mono-glass, the week's days are one figure in dots with "of 7 days"
+// beside it (the noun agrees with the seven, whatever the figure), its meals
+// counted in words under it; the gate is the shared card's own sentence.
 
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
@@ -14,8 +17,10 @@ import 'package:provider/provider.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
 import 'package:qamar/models/meal.dart';
+import 'package:qamar/screens/progress_screen.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
+import 'package:qamar/widgets/dot_number.dart';
 import 'package:qamar/widgets/review_card.dart';
 
 import 'support/app_fonts.dart';
@@ -54,13 +59,22 @@ Future<List<String>> _progress(WidgetTester tester, AppState s) async {
   return [for (final e in find.byType(RichText).evaluate()) _plain((e.renderObject! as RenderParagraph).text.toPlainText())];
 }
 
+/// Every line of text inside [of], as read.
+List<String> _within(Finder of) => [
+      for (final e in find.descendant(of: of, matching: find.byType(RichText)).evaluate()) _plain((e.renderObject! as RenderParagraph).text.toPlainText()),
+    ];
+
 /// The run as the shared card says it.
-String _cardRun(WidgetTester tester) {
-  final texts = [
-    for (final e in find.descendant(of: find.byType(ReviewCard), matching: find.byType(RichText)).evaluate())
-      _plain((e.renderObject! as RenderParagraph).text.toPlainText()),
-  ];
-  return texts.firstWhere((t) => t.contains('ورا بعض') || t.contains('in a row'), orElse: () => '(no run)');
+String _cardRun(WidgetTester tester) =>
+    _within(find.byType(ReviewCard)).firstWhere((t) => t.contains('ورا بعض') || t.contains('in a row'), orElse: () => '(no run)');
+
+/// The streak card's lines: its name, its run, and its note when it has one.
+List<String> _streak(WidgetTester tester) => _within(find.byKey(ProgressScreen.streakKey));
+
+/// The week's figure as drawn, and as a screen reader hears it.
+({String drawn, String heard}) _figure(WidgetTester tester) {
+  final dots = tester.widget<DotNumber>(find.descendant(of: find.byKey(ProgressScreen.weekKey), matching: find.byType(DotNumber)));
+  return (drawn: dots.text, heard: _plain(dots.semanticsLabel!));
 }
 
 void main() {
@@ -72,60 +86,80 @@ void main() {
   });
 
   testWidgets('a run of one, two and twelve, on the streak card and the shared card', (tester) async {
-    var lines = await _progress(tester, _state(AppLang.ar, today: 1));
-    expect(lines, contains('يوم واحد ورا بعض · النهاردة محسوب'));
+    await _progress(tester, _state(AppLang.ar, today: 1));
+    expect(_streak(tester), contains('يوم واحد ورا بعض'));
 
-    lines = await _progress(tester, _state(AppLang.ar, days: [1], today: 1));
-    expect(lines, contains('يومين ورا بعض · النهاردة محسوب'));
+    await _progress(tester, _state(AppLang.ar, days: [1], today: 1));
+    expect(_streak(tester), contains('يومين ورا بعض'));
     expect(_cardRun(tester), 'يومين ورا بعض');
 
-    lines = await _progress(tester, _state(AppLang.ar, days: List.filled(11, 1), today: 1));
-    expect(lines, contains('١٢ يوم ورا بعض · النهاردة محسوب'));
+    await _progress(tester, _state(AppLang.ar, days: List.filled(11, 1), today: 1));
+    expect(_streak(tester), contains('١٢ يوم ورا بعض'));
     expect(_cardRun(tester), '١٢ يوم ورا بعض');
 
-    lines = await _progress(tester, _state(AppLang.ar, days: [1, 1, 1], today: 1));
+    await _progress(tester, _state(AppLang.ar, days: [1, 1, 1], today: 1));
     expect(_cardRun(tester), '٤ أيام ورا بعض');
 
-    lines = await _progress(tester, _state(AppLang.ar, days: [1, 1]));
-    expect(lines, contains('يومين · وجبة واحدة قبل نص الليل تكمّلها'), reason: 'a run today has not joined yet');
+    // A run today has not joined yet: its length, and what keeps it.
+    await _progress(tester, _state(AppLang.ar, days: [1, 1]));
+    expect(_streak(tester), containsAll(['يومين', 'وجبة واحدة قبل نص الليل تكمّلها.']));
 
-    lines = await _progress(tester, _state(AppLang.en, days: [1], today: 1));
-    expect(lines, contains('2 days in a row · today counted'));
+    await _progress(tester, _state(AppLang.en, days: [1], today: 1));
+    expect(_streak(tester), contains('2 days in a row'));
     expect(_cardRun(tester), '2 days in a row');
-    lines = await _progress(tester, _state(AppLang.en, today: 1));
-    expect(lines, contains('1 day in a row · today counted'));
+    await _progress(tester, _state(AppLang.en, today: 1));
+    expect(_streak(tester), contains('1 day in a row'));
+    await _progress(tester, _state(AppLang.en, days: [1, 1]));
+    expect(_streak(tester), containsAll(['2 days', 'One meal before midnight keeps it going.']));
   });
 
-  testWidgets('this week: days active and meals logged', (tester) async {
+  testWidgets('this week: the days in the figure, the meals counted in words', (tester) async {
     var lines = await _progress(tester, _state(AppLang.ar, today: 1));
-    expect(lines.any((l) => l.startsWith('يوم واحد نشاط · وجبة واحدة مسجلة')), isTrue, reason: '$lines');
+    expect(_figure(tester), (drawn: '١', heard: '١ من ٧ أيام متسجّلة'));
+    expect(lines, contains('من ٧ أيام متسجّلة، وجبة واحدة'));
     lines = await _progress(tester, _state(AppLang.ar, days: [1], today: 1));
-    expect(lines.any((l) => l.startsWith('يومين نشاط · وجبتين مسجلتين')), isTrue, reason: '$lines');
+    expect(_figure(tester).drawn, '٢');
+    expect(lines, contains('من ٧ أيام متسجّلة، وجبتين'));
     lines = await _progress(tester, _state(AppLang.ar, days: [3, 3, 3, 1], today: 1));
-    expect(lines.any((l) => l.startsWith('٥ أيام نشاط · ١١ وجبة مسجلة')), isTrue, reason: '$lines');
+    expect(_figure(tester).drawn, '٥');
+    expect(lines, contains('من ٧ أيام متسجّلة، ١١ وجبة'));
     lines = await _progress(tester, _state(AppLang.ar, days: [2, 2], today: 1));
-    expect(lines.any((l) => l.startsWith('٣ أيام نشاط · ٥ وجبات مسجلة')), isTrue, reason: '$lines');
+    expect(_figure(tester).drawn, '٣');
+    expect(lines, contains('من ٧ أيام متسجّلة، ٥ وجبات'));
+    lines = await _progress(tester, _state(AppLang.en, days: [2, 2], today: 1));
+    expect(_figure(tester), (drawn: '3', heard: '3 of 7 days logged'));
+    expect(lines, contains('of 7 days logged · 5 meals'));
+    // Nothing logged: the week says so in words, with no lonely zero.
+    lines = await _progress(tester, _state(AppLang.ar));
+    expect(find.descendant(of: find.byKey(ProgressScreen.weekKey), matching: find.byType(DotNumber)), findsNothing);
+    expect(lines, contains('لسه مفيش أكل متسجّل الأسبوع ده. أول وجبة تسجّلها هتبان هنا.'));
   });
 
-  testWidgets('the weekly insight waits for three days, in the app’s digits', (tester) async {
+  testWidgets('the week’s card waits for three days, in the app’s digits', (tester) async {
     var lines = await _progress(tester, _state(AppLang.ar, today: 1));
-    expect(lines, contains('رأي الأسبوع بيظهر بعد ٣ أيام مسجلة. لسه يومين.'));
+    expect(lines, contains('سجّل ٣ أيام على الأقل وأقدر أقولك حاجة متتوقعها. لسه يومين.'));
     lines = await _progress(tester, _state(AppLang.ar, days: [1], today: 1));
-    expect(lines, contains('رأي الأسبوع بيظهر بعد ٣ أيام مسجلة. لسه يوم واحد.'));
+    expect(lines, contains('سجّل ٣ أيام على الأقل وأقدر أقولك حاجة متتوقعها. لسه يوم واحد.'));
     lines = await _progress(tester, _state(AppLang.ar, today: 1, eastern: false));
-    expect(lines, contains('رأي الأسبوع بيظهر بعد 3 أيام مسجلة. لسه يومين.'), reason: 'Western digits asked for');
+    expect(lines, contains('سجّل 3 أيام على الأقل وأقدر أقولك حاجة متتوقعها. لسه يومين.'), reason: 'Western digits asked for');
+    expect(_figure(tester).drawn, '1', reason: 'the figure too');
     expect(lines.where((l) => RegExp('[٠-٩]').hasMatch(l)), isEmpty, reason: 'no Eastern digit anywhere on Progress');
   });
 
   testWidgets('the weight trend counts its span, and draws its figures in the app’s digits', (tester) async {
     WeightReading at(int day, double kg) => WeightReading(at: DateTime(2026, 9, day, 8), kg: kg);
     var lines = await _progress(tester, _state(AppLang.ar, today: 1, weights: [at(16, 80), at(23, 79)]));
-    expect(lines, contains('نزلت ١.٠ كجم على مدى ٧ أيام. قياس واحد مش دليل.'));
+    expect(lines, contains('نزلت ١.٠ كجم في ٧ أيام.'));
     lines = await _progress(tester, _state(AppLang.ar, today: 1, weights: [at(22, 80), at(23, 80.1)]));
-    expect(lines, contains('وزنك ثابت تقريباً على مدى يوم واحد. قياس واحد مش دليل.'));
+    expect(lines, contains('وزنك ثابت تقريباً بقاله يوم واحد.'));
     lines = await _progress(tester, _state(AppLang.en, today: 1, weights: [at(22, 80), at(23, 80.1)]));
-    expect(lines, contains('Essentially level over 1 day. A single reading is not evidence.'));
+    expect(lines, contains('Steady for 1 day.'));
+    lines = await _progress(tester, _state(AppLang.en, today: 1, weights: [at(16, 80), at(23, 79)]));
+    expect(lines, contains('Down 1.0 kg in 7 days.'));
     lines = await _progress(tester, _state(AppLang.ar, today: 1, eastern: false, weights: [at(16, 80), at(23, 79)]));
-    expect(lines, contains('نزلت 1.0 كجم على مدى 7 أيام. قياس واحد مش دليل.'));
+    expect(lines, contains('نزلت 1.0 كجم في 7 أيام.'));
+    // One reading is no trend: nothing is drawn, and nothing is held open.
+    lines = await _progress(tester, _state(AppLang.en, today: 1, weights: [at(23, 79)]));
+    expect(lines.where((l) => l.contains('kg')), isEmpty);
   });
 }

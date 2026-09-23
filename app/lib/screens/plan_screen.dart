@@ -1,24 +1,34 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/words.dart';
 import '../models/plan.dart';
 import '../models/problem.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/icons.dart';
 import '../theme/layout.dart';
+import '../theme/motion.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/explain.dart';
 
-/// The day's meals, generated for this person.
+/// The day's meals, generated for this person: each one plainly, what goes
+/// on the plate, one tap to swap it, and one tap to shop the lot.
 ///
-/// The screen used to render a fixed three-meal menu that was identical for
-/// every user, target and allergy. It now shows the plan the assistant built
-/// from their own numbers, and when there isn't one it says so and offers to
-/// build it — an empty plan is recoverable, a plausible wrong one is not.
+/// The plan is the one the assistant built from their own numbers; when
+/// there isn't one it says so and offers to build it, since an empty plan is
+/// recoverable and a plausible wrong one is not.
 class PlanScreen extends StatefulWidget {
   const PlanScreen({super.key});
+
+  /// A meal's swap, and "Shop this plan"'s button, for tests.
+  static Key swapKey(String slotId) => ValueKey('plan-swap-$slotId');
+  static const shopKey = ValueKey('plan-shop');
 
   @override
   State<PlanScreen> createState() => _PlanScreenState();
@@ -38,42 +48,36 @@ class _PlanScreenState extends State<PlanScreen> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final t = state.t;
-
-    final meals = state.planMeals();
-    final dayTotal = meals.fold(0, (sum, m) => sum + mealKcal(m));
-
-    final header = <Widget>[
-      Row(children: [
-        QBackButton(onTap: state.back, isAr: state.isAr),
-        const SizedBox(width: 6),
-        Expanded(child: Text(t.plan, style: QText.display(size: 34, ar: QText.arabic(t.plan), color: QColors.ink))),
-      ]),
-      const SizedBox(height: 4),
-      Text(t.planSub, style: QText.body(size: 15, height: 22, color: QColors.inkTertiary)),
-      const SizedBox(height: 10),
-    ];
+    final title = Row(children: [
+      QBackButton(onTap: state.back, isAr: state.isAr),
+      const SizedBox(width: 8),
+      Expanded(child: Text(state.t.plan, style: QText.display(size: 34, ar: state.isAr))),
+    ]);
 
     // No plan yet, or one that could not be written: the state sits in the
-    // middle of the free space under the header, not stuck to its top with
+    // middle of the free space under the title, not stuck to its top with
     // the rest of the screen empty below (O10).
     if (!state.hasPlan) {
       return CustomScrollView(
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, QLayout.pageTop, 20, 0),
-            sliver: SliverList(delegate: SliverChildListDelegate(header)),
+            sliver: SliverToBoxAdapter(child: title),
           ),
           SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, QLayout.pageBottom),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, QLayout.pageBottom),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(child: QStateArea(child: _PlanEmpty(state: state))),
-                  const SizedBox(height: 14),
-                  _DayChanged(state: state),
+                  // On the general-guidance route there is no plan for a
+                  // changed day to rewrite, so nothing offers to.
+                  if (!state.generalGuidance) ...[
+                    const SizedBox(height: 16),
+                    _DayChanged(state: state),
+                  ],
                 ],
               ),
             ),
@@ -82,46 +86,188 @@ class _PlanScreenState extends State<PlanScreen> {
       );
     }
 
+    final meals = state.planMeals();
+    final why = state.plan?.rationale;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, QLayout.pageTop, 20, QLayout.pageBottom),
       children: [
-        ...header,
-        ...[
-          // A rewrite that did not happen (the plan's cap, a failure, a
-          // fasting switch it could not follow) is said above the plan it
-          // left in place, never only where it was asked (O10).
-          if (state.planProblem case final problem? when !state.planLoading) ...[
-            QStateCard(problem: problem),
-            const SizedBox(height: 10),
-          ],
-          Explainable(id: 'plan_total', child: _DayTotal(state: state, kcal: dayTotal)),
-          if (state.nudgePromptDue) ...[
-            const SizedBox(height: 10),
-            _NudgePrompt(state: state),
-          ],
-          if (state.plan?.rationale case final why? when why.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(why, style: QText.body(size: 13, height: 20, color: QColors.inkTertiary)),
-          ],
-          const SizedBox(height: 14),
-          for (final m in meals)
-            Explainable(
-              id: 'plan_meal_${m.id}',
-              explanation: mealExplanation(m, iso: state.iso, digits: state.digits),
-              child: _MealCard(state: state, meal: m),
-            ),
-          if (state.canShopPlan) ...[
-            _ShopCard(state: state),
-            const SizedBox(height: 14),
-          ],
+        title,
+        const SizedBox(height: 8),
+        _DayTotal(state: state, kcal: meals.fold(0, (sum, m) => sum + mealKcal(m))),
+        if (why != null && why.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(why, style: QText.body(size: 15, color: QColors.inkTertiary)),
         ],
+        const SizedBox(height: 20),
+        // A rewrite that did not happen (the plan's cap, a failure, a
+        // fasting switch it could not follow) is said above the plan it
+        // left in place, never only where it was asked (O10).
+        if (state.planProblem case final problem? when !state.planLoading) ...[
+          QStateCard(problem: problem),
+          const SizedBox(height: 14),
+        ],
+        if (state.nudgePromptDue) ...[
+          _NudgePrompt(state: state),
+          const SizedBox(height: 14),
+        ],
+        for (final m in meals) ...[
+          _MealCard(state: state, meal: m),
+          const SizedBox(height: 14),
+        ],
+        if (state.canShopPlan) ...[
+          _ShopCard(state: state),
+          const SizedBox(height: 14),
+        ],
+        const SizedBox(height: 6),
         _DayChanged(state: state),
       ],
     );
   }
 }
 
-/// "Day changed?" and the way to say so: the conversation adjusts the route.
+/// How far an [Explainable] insets what it holds: its 4 points of padding and
+/// its hairline, drawn when the orb hovers.
+const _explainInset = 5.0;
+
+/// The day's total under the title, against the target.
+class _DayTotal extends StatelessWidget {
+  final AppState state;
+  final int kcal;
+  const _DayTotal({required this.state, required this.kcal});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final diff = kcal - state.target().kcal;
+    final vsTarget = diff == 0
+        ? (isAr ? 'على هدفك بالظبط' : 'right on your target')
+        : diff < 0
+            ? (isAr ? 'أقل من هدفك بـ ${state.iso('${-diff}')}' : '${-diff} under your target')
+            : (isAr ? 'أعلى من هدفك بـ ${state.iso('$diff')}' : '$diff over your target');
+    // The explainable's inset hangs outside the line, so the figure starts
+    // at the page's edge, as everything under the title does.
+    return Transform.translate(
+      offset: Offset(isAr ? _explainInset : -_explainInset, 0),
+      child: Explainable(
+        id: 'plan_total',
+        child: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            ExplainMark(
+              child: Text(isAr ? '${state.iso('$kcal')} سعر' : '$kcal kcal', style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink, ar: isAr)),
+            ),
+            // Arabic takes its own comma: a "·" there reads as a zero.
+            Text(isAr ? '، $vsTarget' : ' · $vsTarget', style: QText.body(size: 15, color: QColors.inkSecondary)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One meal: when, what, what goes on the plate, and the one tap to swap it.
+class _MealCard extends StatelessWidget {
+  final AppState state;
+  final PlanMeal meal;
+  const _MealCard({required this.state, required this.meal});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final kcal = mealKcal(meal);
+    final name = isAr ? meal.nameAr : meal.nameEn;
+    final note = isAr ? meal.noteAr : meal.noteEn;
+    final swapped = state.isSlotSwapped(meal.id);
+    final still = MediaQuery.disableAnimationsOf(context);
+
+    final content = Column(
+      key: ValueKey('${meal.id}:$name'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Expanded(child: Text(QText.eyebrowText(isAr ? meal.slotAr : meal.slotEn, ar: isAr), style: QText.eyebrow(ar: isAr))),
+          ExplainMark(
+            child: Text(isAr ? '${state.iso('$kcal')} سعر' : '$kcal kcal', style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink, ar: isAr)),
+          ),
+        ]),
+        const SizedBox(height: 6),
+        Text(name, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
+        if (note.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(note, style: QText.body(size: 15, color: QColors.inkSecondary)),
+        ],
+        if (meal.portions.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Divider(color: QColors.hairline, height: 1, thickness: 1),
+          const SizedBox(height: 6),
+          // What goes on the plate, and how much: the portions a plan is
+          // only actionable with. Their calories are the meal's, above, and
+          // the orb explains the split.
+          for (final p in meal.portions)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(children: [
+                Expanded(child: Text(isAr ? p.ar : p.en, style: QText.body(size: 15, color: QColors.ink))),
+                const SizedBox(width: 12),
+                Text(isAr ? state.digits(p.amountAr) : p.amountEn, style: QText.body(size: 15, color: QColors.inkSecondary)),
+              ]),
+            ),
+        ],
+      ],
+    );
+
+    return Container(
+      // With the explainable's own inset, the card's 20 and 16.
+      padding: const EdgeInsets.symmetric(horizontal: 20 - _explainInset, vertical: 13),
+      decoration: QDecor.card(),
+      // The whole meal is what the orb explains: dropped on it, the portions
+      // and their calories.
+      child: Explainable(
+        id: 'plan_meal_${meal.id}',
+        explanation: mealExplanation(meal, iso: state.iso, digits: state.digits),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // A swap changes the meal in place: the new one fades in where the
+            // old one was, and the card takes its size at once, so nothing
+            // grows while the words change.
+            AnimatedSwitcher(
+              duration: Duration(milliseconds: still ? 150 : 200),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeOutCubic,
+              layoutBuilder: (current, previous) => Stack(
+                alignment: AlignmentDirectional.topStart,
+                children: [
+                  for (final p in previous) Positioned(top: 0, left: 0, right: 0, child: p),
+                  if (current != null) current,
+                ],
+              ),
+              child: content,
+            ),
+            // Only when the slot really has somewhere else to go: a button
+            // that swaps a dish for itself is worse than no button. Logging
+            // the meal is the orb's job, not a button here.
+            if (state.slotHasAlternative(meal.id)) ...[
+              const SizedBox(height: 12),
+              QOutlineButton(
+                key: PlanScreen.swapKey(meal.id),
+                icon: QIcons.swap,
+                label: swapped ? (isAr ? 'رجّعها' : 'Swap back') : state.t.swap,
+                height: 36,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  state.toggleSlotSwap(meal.id);
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Day changed?", and the way to say so: the conversation rewrites the plan.
 class _DayChanged extends StatelessWidget {
   final AppState state;
   const _DayChanged({required this.state});
@@ -129,26 +275,16 @@ class _DayChanged extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = state.t;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-      decoration: BoxDecoration(
-        color: QColors.ink.withValues(alpha: 0.1),
-        border: Border.all(color: QColors.ink.withValues(alpha: 0.4)),
-        borderRadius: BorderRadius.circular(QRadii.card),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(t.dayChanged, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.ink)),
-          const SizedBox(height: 4),
-          QPillButton(label: t.adjustRoute, onTap: state.openChat),
-        ],
-      ),
-    );
+    return Row(children: [
+      Expanded(child: Text(t.dayChanged, style: QText.body(size: 15, color: QColors.inkSecondary))),
+      const SizedBox(width: 12),
+      QOutlineButton(label: t.adjustRoute, onTap: state.openChat, height: 36),
+    ]);
   }
 }
 
-/// Shown when there is no plan: building, refused, or simply not built yet.
+/// Shown when there is no plan: building it, refused, the general-guidance
+/// route, or simply not built yet.
 class _PlanEmpty extends StatelessWidget {
   final AppState state;
   const _PlanEmpty({required this.state});
@@ -158,176 +294,98 @@ class _PlanEmpty extends StatelessWidget {
     final isAr = state.isAr;
     final busy = state.planLoading;
 
+    // No target on the general-guidance route, so no plan: the note says
+    // why, with no button, since a plan could only be refused.
+    if (state.generalGuidance) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: QDecor.card(),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Padding(padding: EdgeInsets.only(top: 1), child: Icon(QIcons.safety, size: 20, color: QColors.ink)),
+          const SizedBox(width: 12),
+          Expanded(child: Text(state.generalGuidancePlanNote, style: QText.body(size: 17, color: QColors.ink))),
+        ]),
+      );
+    }
+
+    // Writing: a breathing dot and what is happening, in words.
+    if (busy) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: QDecor.card(),
+        child: Row(children: [
+          const _BreathingDot(),
+          const SizedBox(width: 12),
+          Expanded(child: Text(isAr ? 'بكتب خطة النهارده…' : 'Writing today’s plan…', style: QText.body(size: 17, color: QColors.ink))),
+        ]),
+      );
+    }
+
     // A failed plan says what happened and offers the next step as its
     // button ("Try again", "Finish the questions"…), in place of the build
     // button (O10).
     final problem = state.planProblem;
-    if (problem != null && !busy && !state.generalGuidance) return QStateCard(problem: problem);
+    if (problem != null) return QStateCard(problem: problem);
 
     // Nothing written yet, and nothing wrong: an empty state, with the way
-    // on as its button. The same two sentences as before, as what and why.
-    if (!busy && !state.generalGuidance) {
-      return QStateCard(
-        problem: Problem(
-          what: isAr ? 'لسه مفيش خطة لليوم.' : 'No plan for today yet.',
-          why: isAr ? 'هبنيها على هدفك واللي بتتجنبه.' : 'I’ll build it around your target and what you avoid.',
-          action: ProblemAction(isAr ? 'اعملي خطة النهاردة' : 'Build today’s plan', () => state.ensurePlan(force: true)),
-          kind: ProblemKind.empty,
+    // on as its button.
+    return QStateCard(
+      problem: Problem(
+        what: isAr ? 'لسه مفيش خطة لليوم.' : 'No plan for today yet.',
+        why: isAr ? 'هبنيها على هدفك واللي بتتجنبه.' : 'I’ll build it around your target and what you avoid.',
+        action: ProblemAction(isAr ? 'اعملي خطة النهاردة' : 'Build today’s plan', () => state.ensurePlan(force: true)),
+        kind: ProblemKind.empty,
+      ),
+    );
+  }
+}
+
+/// Waiting, said with light rather than a spinner: a dot that breathes
+/// between full and half brightness every 2.4 seconds, and holds still
+/// with reduce-motion on.
+class _BreathingDot extends StatefulWidget {
+  const _BreathingDot();
+
+  @override
+  State<_BreathingDot> createState() => _BreathingDotState();
+}
+
+class _BreathingDotState extends State<_BreathingDot> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: QMotion.ring);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c.stop();
+      _c.value = 0;
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) => Opacity(
+            opacity: 0.75 + 0.25 * math.cos(2 * math.pi * _c.value),
+            child: const SizedBox.square(dimension: 10, child: DecoratedBox(decoration: BoxDecoration(color: QColors.ink, shape: BoxShape.circle))),
+          ),
         ),
       );
-    }
-
-    // Writing, or the general-guidance note (no button: it could only be
-    // refused).
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [QColors.surfaceRaised, QColors.surface]),
-        border: Border.all(color: QColors.hairline),
-        borderRadius: BorderRadius.circular(QRadii.card),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            state.generalGuidance ? state.generalGuidancePlanNote : (isAr ? 'بكتب خطة اليوم…' : 'Writing today’s plan…'),
-            style: QText.body(size: 15, height: 22, color: QColors.ink),
-          ),
-          if (busy && !state.generalGuidance) ...[
-            const SizedBox(height: 14),
-            QPrimaryButton(label: isAr ? 'ثانية…' : 'One moment…', onTap: null, height: 48),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _DayTotal extends StatelessWidget {
-  final AppState state;
-  final int kcal;
-  const _DayTotal({required this.state, required this.kcal});
-
-  @override
-  Widget build(BuildContext context) {
-    final target = state.target().kcal;
-    final diff = kcal - target;
-    final isAr = state.isAr;
-    final label = isAr ? 'إجمالي الخطة' : 'Plan total';
-    final vsTarget = diff == 0
-        ? (isAr ? 'مطابق لهدفك' : 'matches your target')
-        : diff < 0
-            ? (isAr ? 'أقل من هدفك بـ ${state.iso('${-diff}')}' : '${-diff} under your target')
-            : (isAr ? 'أعلى من هدفك بـ ${state.iso('$diff')}' : '$diff over your target');
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: QDecor.card(color: QColors.surface, border: QColors.hairline, radius: QRadii.control),
-      child: Row(
-        children: [
-          Text(label, style: QText.body(size: 12, color: QColors.inkTertiary)),
-          const Spacer(),
-          ExplainMark(
-            child: Text(isAr ? '${state.iso('$kcal')} سعر' : '$kcal kcal',
-                style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink)),
-          ),
-          const SizedBox(width: 8),
-          Text('· $vsTarget', style: QText.body(size: 11, color: QColors.inkTertiary)),
-        ],
-      ),
-    );
-  }
-}
-
-class _MealCard extends StatelessWidget {
-  final AppState state;
-  final PlanMeal meal;
-  const _MealCard({required this.state, required this.meal});
-
-  @override
-  Widget build(BuildContext context) {
-    final t = state.t;
-    final isAr = state.isAr;
-    final kcal = mealKcal(meal);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: QDecor.card(radius: QRadii.card),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text(isAr ? meal.slotAr : meal.slotEn,
-                style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.inkTertiary)),
-            ExplainMark(
-              child: Text(isAr ? '${state.iso('$kcal')} سعر' : '$kcal kcal',
-                  style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.ink)),
-            ),
-          ]),
-          Text(isAr ? meal.nameAr : meal.nameEn,
-              style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink)),
-          Text(isAr ? meal.noteAr : meal.noteEn, style: QText.body(size: 12, color: QColors.inkTertiary)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: QDecor.card(color: QColors.surface, border: QColors.hairline, radius: QRadii.control),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Text(isAr ? 'المقادير' : 'Portions',
-                        style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.inkTertiary)),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                for (final p in meal.portions) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(isAr ? p.ar : p.en,
-                              style: QText.body(size: 13, color: QColors.ink), overflow: TextOverflow.ellipsis),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(isAr ? p.amountAr : p.amountEn,
-                            style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.inkSecondary)),
-                        const SizedBox(width: 10),
-                        SizedBox(
-                          width: 52,
-                          child: Text(isAr ? state.iso('${p.kcal}') : '${p.kcal}',
-                              textAlign: isAr ? TextAlign.left : TextAlign.right,
-                              style: QText.number(size: 12, color: QColors.inkTertiary)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          // Only "swap" here: logging a meal is the orb's job now, not a
-          // button that pushes the user into another page. And only when the
-          // slot actually has an alternative — the gateway may return a meal
-          // without one, and a button that swaps a dish for itself is worse
-          // than no button.
-          if (state.slotHasAlternative(meal.id)) ...[
-            const SizedBox(height: 10),
-            Row(children: [
-              QOutlineButton(label: t.swap, onTap: () => state.toggleSlotSwap(meal.id), height: 34, color: QColors.inkSecondary),
-            ]),
-          ],
-        ],
-      ),
-    );
-  }
 }
 
 /// The one place notification permission is asked: after the plan is on
-/// screen, with the reason stated, as the blueprint has it. "No" is zero a
-/// day, not a prompt again next week.
+/// screen, with the reason in a sentence. "No" is zero a day, not a prompt
+/// again next week. Its answer is not the screen's one thing to do, so both
+/// ways are quiet.
 class _NudgePrompt extends StatelessWidget {
   final AppState state;
   const _NudgePrompt({required this.state});
@@ -336,47 +394,50 @@ class _NudgePrompt extends StatelessWidget {
   Widget build(BuildContext context) {
     final isAr = state.isAr;
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: QColors.ink.withValues(alpha: 0.10),
-        border: Border.all(color: QColors.ink.withValues(alpha: 0.35)),
-        borderRadius: BorderRadius.circular(QRadii.card),
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      decoration: QDecor.card(border: QColors.hairlineStrong),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            isAr ? 'قمر يسأل في مواعيد أكلك' : 'Qamar asks at your meal times',
-            style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink),
-          ),
+          Row(children: [
+            const Icon(QIcons.bell, size: 20, color: QColors.ink),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(isAr ? 'أسألك في مواعيد أكلك؟' : 'Shall I ask at your meal times?', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
+            ),
+          ]),
           const SizedBox(height: 6),
           Text(
             isAr
-                ? 'مرتين في اليوم، بصوت قمر: «الغدا إيه النهاردة؟» — مفيش «متنساش تسجّل». تقدر تقللها لصفر من «حسابي» في أي وقت. أول أسبوعين بس؛ بعدها بتبقى عارف لوحدك.'
-                : 'Twice a day, in Qamar’s voice: “What’s for lunch today?” — never “don’t forget to log”. Lower it to zero any time from Me. Only for the first two weeks; after that you’ll know on your own.',
-            style: QText.body(size: 13, height: 20, color: QColors.inkSecondary),
+                ? 'مرتين في اليوم، زي «الغدا إيه النهارده؟»، أول أسبوعين بس. تغيّرها من «أنا» في أي وقت.'
+                : 'Twice a day, like “What’s for lunch today?”, for your first two weeks. Change it any time in Me.',
+            style: QText.body(size: 15, color: QColors.inkSecondary),
           ),
-          const SizedBox(height: 12),
-          QPrimaryButton(
-            label: isAr ? 'اسمح بالأسئلة' : 'Allow the questions',
-            height: 44,
-            onTap: () { state.allowNudges(); },
-          ),
-          const SizedBox(height: 4),
-          Center(
-            child: TextButton(
-              onPressed: state.declineNudges,
-              child: Text(isAr ? 'لا، شكراً' : 'No, thanks', style: QText.body(size: 13, color: QColors.inkTertiary)),
+          const SizedBox(height: 8),
+          Row(children: [
+            QOutlineButton(label: isAr ? 'اسمح' : 'Allow', height: 36, onTap: state.allowNudges),
+            const SizedBox(width: 8),
+            QTapArea(
+              onTap: state.declineNudges,
+              builder: (context, pressed) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(isAr ? 'لا، شكراً' : 'No, thanks', style: QText.body(size: 15, weight: FontWeight.w500, color: pressed ? QColors.ink : QColors.inkSecondary)),
+              ),
             ),
-          ),
+          ]),
         ],
       ),
     );
   }
 }
 
-/// Shop this plan: the plan's portions as a basket at the signed partner.
-/// Only when a partner is configured; the commission is said out loud.
+/// The plan's portions, counted as the basket counts them: صنف واحد،
+/// صنفين، ٣ أصناف، ١١ صنف.
+const _item = Counted(en: 'item', enPlural: 'items', arOne: 'صنف واحد', arTwo: 'صنفين', arFew: 'أصناف', arMany: 'صنف');
+
+/// Shop this plan: the plan's portions as a basket at the signed partner,
+/// in one tap. Only when a partner is configured; the commission is said
+/// out loud, under the button.
 class _ShopCard extends StatelessWidget {
   final AppState state;
   const _ShopCard({required this.state});
@@ -384,54 +445,54 @@ class _ShopCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAr = state.isAr;
-    final basket = state.basket;
-    final partner = state.groceryPartner;
-    final shown = basket.lines.take(4).toList();
-    final more = basket.count - shown.length;
+    final partner = state.groceryPartner.name;
+    final items = _item.of(state.basket.count, ar: isAr, iso: state.iso);
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: QColors.ink.withValues(alpha: 0.07),
-        border: Border.all(color: QColors.ink.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(QRadii.card),
-      ),
+      padding: const EdgeInsets.all(20),
+      decoration: QDecor.card(),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(children: [
-            const Icon(Icons.shopping_basket_outlined, size: 16, color: QColors.ink),
-            const SizedBox(width: 6),
-            Text(isAr ? 'اشتري خطة النهاردة' : 'Shop this plan',
-                style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink)),
+            const Icon(QIcons.shop, size: 20, color: QColors.ink),
+            const SizedBox(width: 8),
+            Expanded(child: Text(isAr ? 'اشتري خطة النهارده' : 'Shop this plan', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink))),
           ]),
           const SizedBox(height: 6),
           Text(
-            isAr
-                ? '${state.iso('${basket.count}')} صنف من أطباق النهاردة، في سلة ${partner.name}. قمر بياخد عمولة صغيرة من الشريك؛ الخطة نفسها مش بتتغير عشانها.'
-                : '${basket.count} item${basket.count == 1 ? '' : 's'} from today’s dishes, into ${partner.name}’s basket. Qamar earns a small commission from the partner; the plan itself never changes for it.',
-            style: QText.body(size: 12, height: 18, color: QColors.inkTertiary),
+            isAr ? '$items من أكل النهارده، جاهزين في سلة $partner.' : '$items from today’s meals, ready in $partner’s basket.',
+            style: QText.body(size: 15, color: QColors.inkSecondary),
           ),
-          const SizedBox(height: 10),
-          for (final l in shown)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(children: [
-                Expanded(child: Text(l.name(ar: isAr), style: QText.body(size: 13, color: QColors.ink))),
-                Text(l.amount(ar: isAr), style: QText.body(size: 12, color: QColors.inkTertiary)),
-              ]),
+          const SizedBox(height: 16),
+          // The screen's one white button, unless a problem's card above the
+          // plan has the one thing to do; then shopping steps back.
+          if (state.planProblem != null && !state.planLoading)
+            QOutlineButton(
+              key: PlanScreen.shopKey,
+              icon: QIcons.shop,
+              label: isAr ? 'اطلب من $partner' : 'Shop at $partner',
+              onTap: () => state.shopThisPlan(),
+            )
+          else
+            QPrimaryButton(
+              key: PlanScreen.shopKey,
+              label: isAr ? 'اطلب من $partner' : 'Shop at $partner',
+              height: 48,
+              onTap: () => state.shopThisPlan(),
             ),
-          if (more > 0)
-            Text(isAr ? '+${state.iso('$more')} كمان' : '+$more more', style: QText.body(size: 12, color: QColors.inkTertiary)),
-          const SizedBox(height: 10),
-          QPrimaryButton(
-            label: isAr ? 'افتح السلة في ${partner.name}' : 'Open the basket at ${partner.name}',
-            height: 44,
-            onTap: () { state.shopThisPlan(); },
-          ),
-          if (state.shopNotice != null) ...[
-            const SizedBox(height: 8),
-            Text(state.shopNotice!, style: QText.body(size: 12, color: QColors.inkSecondary)),
+          if (state.shopNotice case final notice?) ...[
+            const SizedBox(height: 10),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Padding(padding: EdgeInsets.only(top: 1), child: Icon(QIcons.error, size: 16, color: QColors.ink)),
+              const SizedBox(width: 8),
+              Expanded(child: Text(notice, style: QText.body(size: 13, color: QColors.ink))),
+            ]),
           ],
+          const SizedBox(height: 10),
+          Text(
+            isAr ? 'قمر بياخد عمولة صغيرة من $partner، والخطة عمرها ما بتتغيّر عشانها.' : 'Qamar earns a small commission from $partner. The plan never changes for it.',
+            style: QText.body(size: 12, color: QColors.inkTertiary),
+          ),
         ],
       ),
     );

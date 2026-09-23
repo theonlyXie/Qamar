@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/icons.dart';
 import '../theme/text_styles.dart';
 
 /// Today on the general-guidance route, in place of the calorie card.
@@ -26,36 +27,32 @@ class GeneralGuidanceCard extends StatelessWidget {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: maxHeight),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          color: QColors.ink.withValues(alpha: 0.06),
-          border: Border.all(color: QColors.ink.withValues(alpha: 0.3)),
-          borderRadius: BorderRadius.circular(QRadii.card),
-        ),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: QDecor.card(),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Padding(
-              padding: EdgeInsets.only(top: 2),
-              child: Icon(Icons.health_and_safety_outlined, size: 18, color: QColors.ink),
+              padding: EdgeInsets.only(top: 1),
+              child: Icon(QIcons.safety, size: 20, color: QColors.ink),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
-              child: Text.rich(
-                TextSpan(children: [
-                  TextSpan(
-                    text: isAr ? 'إرشاد عام · ' : 'General guidance · ',
-                    style: QText.body(size: 15, height: 21, weight: FontWeight.w600, color: QColors.ink),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(isAr ? 'إرشاد عام' : 'General guidance', style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink)),
+                  const SizedBox(height: 2),
+                  Text(
+                    isAr
+                        ? 'مفيش هدف سعرات في حالتك، ده شغل الأخصائي. سجّل أكلك وأقولك فيه إيه، واسألني أي سؤال عام.'
+                        : 'No calorie target in your case; that’s for a professional. Log meals to see what’s in them, and ask me anything general.',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: QText.body(size: 15, color: QColors.inkSecondary),
                   ),
-                  TextSpan(
-                    text: isAr
-                        ? 'مفيش هدف سعرات في حالتك — ده للأخصائي. سجّل أكلك وأقولك فيه إيه، واسألني أي سؤال عام.'
-                        : 'No calorie target in your case — that’s for a professional. Log meals to see what’s in them, and ask general questions.',
-                  ),
-                ]),
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-                style: QText.body(size: 15, height: 21, color: QColors.ink),
+                ],
               ),
             ),
           ],
