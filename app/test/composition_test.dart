@@ -3,13 +3,14 @@
 // read alike as links, its fine print ends on no orphan word; on the paywall
 // the lockup is centred and balanced and the rest reads from the start, one
 // plan has no radio, and "included" is one mark in one colour in both
-// columns. And the welcome's two ways in sit above and below the moon, never
-// over it, on a tall phone and a short one.
+// columns.
 //
-// The welcome is seat 1's content in seat 6's layout: no sign-up block (the
-// three providers and "Continue with email" are in the account sheet that
-// "I already have an account" opens, Google's mark in colour), the guest
-// line in the divider's place, and one order top to bottom. The pills are
+// The welcome in mono-glass: the moon sitting on the name, the promise, then
+// the one white button ("Chat with Qamar") and the report as an outline under
+// it, the width of the page; no sign-up block (the three providers and
+// "Continue with email" are in the account sheet that "Sign in" opens,
+// Google's mark in colour), the guest line, the way back in and the
+// invitation side by side, and one order top to bottom. The buttons are
 // never scaled, the moon gives way first, and the invitation, its notice and
 // the fine print stay on screen, at 360x640, 375x667, 360x800 and 390x844,
 // in both languages and with each of the invitation's notices.
@@ -69,7 +70,7 @@ enum _Notice {
 
   const _Notice({required this.good});
 
-  /// Drawn in cyan when true, in amber when not.
+  /// Drawn in the first ink when true, in the second when not.
   final bool good;
 
   Future<AppState> make(AppLang lang) async {
@@ -162,7 +163,7 @@ void main() {
   });
 
   for (final lang in AppLang.values) {
-    testWidgets('the welcome hangs from one centre line, its links alike, its fine print whole (${lang.name})', (tester) async {
+    testWidgets('the welcome hangs from one centre line: one white button, its links alike, its fine print whole (${lang.name})', (tester) async {
       final s = AppState()..setLang(lang);
       await _pumpApp(tester, s);
       expect(find.byType(WelcomeScreen), findsOneWidget);
@@ -175,8 +176,16 @@ void main() {
       }
       _expectNoOrphan(tester.renderObject<RenderParagraph>(find.byKey(WelcomeScreen.boundaryKey)), 'the fine print');
 
+      // One thing to do, in white; the report is the second way in, drawn
+      // by its edge.
+      final primaries = find.descendant(of: find.byType(WelcomeScreen), matching: find.byType(QPrimaryButton));
+      expect(primaries, findsOneWidget, reason: 'one white button on the screen');
+      expect(tester.widget<QPrimaryButton>(primaries).label, s.t.chatDirect);
+      expect(find.descendant(of: find.byKey(WelcomeScreen.scanPillKey), matching: find.text(s.t.scanInbody)), findsOneWidget);
+      expect(tester.widget(find.byKey(WelcomeScreen.scanPillKey)), isA<QOutlineButton>());
+
       final haveAccount = tester.widget<Text>(find.text(s.t.haveAccount));
-      final invitation = tester.widget<Text>(find.text(lang == AppLang.ar ? 'عندك دعوة؟' : 'Have an invitation?'));
+      final invitation = tester.widget<Text>(find.text(WelcomeScreen.invitationLabel(lang == AppLang.ar)));
       expect(haveAccount.style!.color, QColors.inkSecondary, reason: 'a quiet action: the second ink, never a hue');
       expect(invitation.style!.color, haveAccount.style!.color);
       expect(invitation.style!.fontSize, haveAccount.style!.fontSize);
@@ -205,43 +214,37 @@ void main() {
     });
 
     for (final phone in const [Size(390, 844), Size(360, 800), Size(375, 667), Size(360, 640)]) {
-      testWidgets('the welcome’s ways in never sit on the moon, with room around them (${lang.name}, ${phone.width.toInt()}x${phone.height.toInt()})', (tester) async {
+      testWidgets('the moon sits on the name with air round it, and the ways in are under the promise, the width of the page (${lang.name}, ${phone.width.toInt()}x${phone.height.toInt()})', (tester) async {
         tester.view.devicePixelRatio = 3;
         tester.view.physicalSize = phone * 3;
         addTearDown(tester.view.reset);
         final s = AppState()..setLang(lang);
         await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pump(const Duration(milliseconds: 600));
         expect(tester.takeException(), isNull);
         final chat = tester.getRect(find.byKey(WelcomeScreen.chatPillKey));
         final scan = tester.getRect(find.byKey(WelcomeScreen.scanPillKey));
+        final name = tester.getRect(find.text(s.t.brand));
+        final promise = tester.getRect(find.text(s.t.promise));
         final moon = find.descendant(of: find.byKey(WelcomeScreen.moonKey), matching: find.byType(QamarMoon));
         if (phone.height >= 800) expect(moon, findsOneWidget, reason: 'a phone this tall has room for the moon');
         if (moon.evaluate().isNotEmpty) {
           final disc = tester.getRect(moon.first);
-          expect(chat.bottom, lessThanOrEqualTo(disc.top), reason: 'Chat with Qamar above the moon, not over it');
-          expect(scan.top, greaterThanOrEqualTo(disc.bottom), reason: 'the scan below it');
-          expect(disc.height, greaterThanOrEqualTo(64));
+          expect(disc.height, greaterThanOrEqualTo(WelcomeScreen.moonMin - 4), reason: 'a moon worth the name');
+          expect(name.top - disc.bottom, greaterThanOrEqualTo(12), reason: 'the moon sits on the name, not on top of it');
         }
-        expect(chat.bottom, lessThanOrEqualTo(scan.top), reason: 'the two ways in never overlap');
-        final name = tester.getRect(find.text(s.t.brand));
-        expect(name.top - scan.bottom, greaterThanOrEqualTo(18), reason: 'room between the hero and the name');
+        expect(chat.top - promise.bottom, greaterThanOrEqualTo(24), reason: 'room between the promise and the ways in');
+        expect(scan.top, greaterThanOrEqualTo(chat.bottom), reason: 'the two ways in never overlap');
         for (final r in [chat, scan]) {
-          expect(r.left, greaterThanOrEqualTo(0));
-          expect(r.right, lessThanOrEqualTo(phone.width));
-        }
-        // The first way in hangs from the start edge, the second from the end.
-        if (lang == AppLang.ar) {
-          expect(chat.right, greaterThan(scan.right - 1), reason: 'mirrored in Arabic');
-        } else {
-          expect(chat.left, lessThan(scan.left + 1));
+          expect(r.left, moreOrLessEquals(20, epsilon: 0.5), reason: 'the page’s margin, in either language');
+          expect(r.right, moreOrLessEquals(phone.width - 20, epsilon: 0.5));
         }
       });
     }
 
-    testWidgets('the welcome in seat 1’s order, its pills whole, its notice and fine print on screen, at four sizes (${lang.name})', (tester) async {
-      final invitation = lang == AppLang.ar ? 'عندك دعوة؟' : 'Have an invitation?';
+    testWidgets('the welcome in its order, its buttons whole, its notice and fine print on screen, at four sizes (${lang.name})', (tester) async {
+      final invitation = WelcomeScreen.invitationLabel(lang == AppLang.ar);
       final failures = <String>[];
       for (final (phone, top, bottom) in _welcomePhones) {
         for (final notice in _Notice.values) {
@@ -255,28 +258,34 @@ void main() {
           await tester.pump(const Duration(milliseconds: 400));
           expect(tester.takeException(), isNull, reason: 'nothing overflows at $at');
 
-          // Never scaled: the pills are their own height at every size.
+          // Never scaled: the buttons are their own height at every size.
           final chat = tester.getRect(find.byKey(WelcomeScreen.chatPillKey));
           final scan = tester.getRect(find.byKey(WelcomeScreen.scanPillKey));
-          if (chat.height != 60 || scan.height != 52) failures.add('$at: pills ${chat.height} and ${scan.height}');
+          if (chat.height != 52 || scan.height != 48) failures.add('$at: buttons ${chat.height} and ${scan.height}');
 
           final moon = find.descendant(of: find.byKey(WelcomeScreen.moonKey), matching: find.byType(QamarMoon));
           final disc = moon.evaluate().isEmpty ? null : tester.getRect(moon.first);
           final wantsMoon = phone.height >= 800;
-          if (wantsMoon && (disc == null || disc.height < 64)) failures.add('$at: moon ${disc?.height}');
-          if (disc != null && disc.height < 64) failures.add('$at: a moon of ${disc.height}, under 64');
+          if (wantsMoon && disc == null) failures.add('$at: no moon');
+          if (disc != null && disc.height < WelcomeScreen.moonMin - 4) failures.add('$at: a moon of ${disc.height}');
+
+          // The way back in and the invitation share a line, side by side.
+          final account = tester.getRect(find.text(s.t.haveAccount));
+          final invite = tester.getRect(find.text(invitation));
+          if ((account.center.dy - invite.center.dy).abs() > 1) failures.add('$at: the links are not on one line');
+          if (account.overlaps(invite)) failures.add('$at: the links overlap');
+          final links = account.expandToInclude(invite);
 
           // Top to bottom, each clear of the next.
           final order = <(String, Rect)>[
             ('language', tester.getRect(find.byType(QLangToggle))),
-            ('chat', chat),
             if (disc != null) ('moon', disc),
-            ('scan', scan),
             ('name', tester.getRect(find.text(s.t.brand))),
             ('promise', tester.getRect(find.text(s.t.promise))),
+            ('chat', chat),
+            ('scan', scan),
             ('guest line', tester.getRect(find.byKey(WelcomeScreen.guestNoteKey))),
-            ('account', tester.getRect(find.text(s.t.haveAccount))),
-            ('invitation', tester.getRect(find.text(invitation))),
+            ('links', links),
             if (notice != _Notice.none) ('notice', tester.getRect(find.byKey(WelcomeScreen.noticeKey))),
             ('fine print', tester.getRect(find.byKey(WelcomeScreen.boundaryKey))),
           ];
@@ -297,7 +306,7 @@ void main() {
       expect(failures, isEmpty, reason: failures.join('\n'));
     });
 
-    testWidgets('the notice is drawn in its own tone: good news cyan, the inviter named or not; anything that did not happen amber (${lang.name})', (tester) async {
+    testWidgets('the notice is drawn in its own ink: good news in the first, the inviter named or not; anything that did not happen in the second (${lang.name})', (tester) async {
       final ar = lang == AppLang.ar;
       tester.view.devicePixelRatio = 3;
       tester.view.physicalSize = _phone * 3;
@@ -325,7 +334,7 @@ void main() {
     });
 
     testWidgets('where even a moonless welcome is taller than the phone, it scrolls, and nothing is scaled (${lang.name})', (tester) async {
-      // A phone on its side: the pills stay whole and the fine print is a
+      // A phone on its side: the buttons stay whole and the fine print is a
       // scroll away, where the hero used to be scaled down as a picture.
       tester.view.devicePixelRatio = 3;
       tester.view.physicalSize = const Size(740, 360) * 3;
@@ -335,8 +344,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(tester.takeException(), isNull);
-      expect(tester.getRect(find.byKey(WelcomeScreen.chatPillKey)).height, 60);
-      expect(tester.getRect(find.byKey(WelcomeScreen.scanPillKey)).height, 52);
+      expect(tester.getRect(find.byKey(WelcomeScreen.chatPillKey)).height, 52);
+      expect(tester.getRect(find.byKey(WelcomeScreen.scanPillKey)).height, 48);
       expect(find.byType(FittedBox), findsNothing, reason: 'nothing on the welcome is drawn smaller than its size');
       final page = find.descendant(of: find.byType(WelcomeScreen), matching: find.byType(Scrollable)).first;
       expect(tester.state<ScrollableState>(page).position.maxScrollExtent, greaterThan(0));

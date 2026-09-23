@@ -23,6 +23,7 @@ import 'package:qamar/services/auth_service.dart';
 import 'package:qamar/services/dictation.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/common.dart';
+import 'package:qamar/screens/scan_screen.dart';
 import 'package:qamar/screens/today_screen.dart';
 import 'package:qamar/state/today_focus.dart';
 import 'package:qamar/widgets/tree_overlay.dart';
@@ -457,7 +458,7 @@ void main() {
       await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
       await tester.pump();
       expect(
-        find.text(lang == AppLang.ar ? 'صوّر التقرير وأنا هقرا أرقامك.' : 'Photograph the report and I’ll read your numbers.'),
+        find.text(lang == AppLang.ar ? 'صوّر أول صفحة من التقرير، وأنا هقرا أرقامك.' : 'Photograph the first page, and I’ll read your numbers.'),
         findsOneWidget,
         reason: 'what a scan gives is said before capture, not only its name on the welcome',
       );
@@ -473,7 +474,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
     await tester.pump();
-    await tester.tap(find.byIcon(Icons.photo_camera));
+    await tester.tap(find.byKey(ScanScreen.shutterKey));
     // The platform call fails on its own clock, outside the test's.
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
     await tester.pump();

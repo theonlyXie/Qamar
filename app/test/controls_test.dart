@@ -17,6 +17,7 @@ import 'package:qamar/screens/you_screen.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/app_theme.dart';
 import 'package:qamar/theme/colors.dart';
+import 'package:qamar/theme/icons.dart';
 import 'package:qamar/widgets/common.dart';
 
 import 'support/app_fonts.dart';
@@ -131,7 +132,7 @@ void main() {
       final s = AppState()..setLang(lang);
       s.openScan();
       await _pumpApp(tester, s);
-      expect(find.byIcon(Icons.keyboard_outlined), findsOneWidget);
+      expect(find.byIcon(QIcons.keyboard), findsOneWidget);
       expect(find.text(lang == AppLang.ar ? 'أو اكتب بدل الكلام' : 'or type instead'), findsNothing);
       expect(find.byType(TextButton), findsNothing);
     });

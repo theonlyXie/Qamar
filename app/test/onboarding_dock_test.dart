@@ -4,7 +4,10 @@
 // right on its answer; the dock keeps its height between one question and
 // the next, so the conversation does not drop and come back; the inputs'
 // entrance starts on the frame their question paints; one radius across the
-// answer stack, the composer a pill; wheel labels at 12pt.
+// answer stack; wheel labels at 12pt. And it reads as the conversation does
+// (the mono-glass chat pattern, as Ask Qamar draws it): Qamar's words plain
+// across the page, the person's in a grey bubble on their side, and one
+// glass composer with its white send.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,11 +16,15 @@ import 'package:provider/provider.dart';
 
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
+import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/onboarding.dart';
 import 'package:qamar/screens/onboarding_screen.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/app_theme.dart';
+import 'package:qamar/theme/colors.dart';
+import 'package:qamar/theme/layout.dart';
 import 'package:qamar/widgets/common.dart';
+import 'package:qamar/widgets/glass.dart';
 
 import 'support/app_fonts.dart';
 
@@ -117,7 +124,7 @@ void main() {
     expect(_inputsOpacity(tester, find.byType(QPillChip).first), 1);
   });
 
-  testWidgets('the wheel cards take the control corner; Continue and the composer are capsules; the wheels’ labels at 12pt', (tester) async {
+  testWidgets('the wheel cards take the control corner; Continue is a capsule, the composer one glass capsule; the wheels’ labels at 12pt', (tester) async {
     final s = AppState()..setLang(AppLang.en);
     s.startOnboarding();
     s.step = kOnboardingSteps.indexWhere((x) => x.id == 'dob');
@@ -146,8 +153,63 @@ void main() {
     expect(continueBox.gradient, isNull, reason: 'white, not a gradient');
     expect(continueBox.borderRadius, const BorderRadius.all(Radius.circular(QRadii.pill)), reason: 'Continue is pressed, so it is a capsule, as every button is');
 
-    final field = tester.widget<TextField>(find.descendant(of: find.byKey(OnboardingScreen.dockKey), matching: find.byType(TextField)));
-    final border = field.decoration!.enabledBorder! as OutlineInputBorder;
-    expect(border.borderRadius, BorderRadius.circular(QRadii.pill), reason: 'the composer is a pill, beside its round send');
+    // The composer: one piece of glass round the field and its send, a
+    // capsule while it holds one line, as the conversation's is.
+    final field = find.descendant(of: find.byKey(OnboardingScreen.dockKey), matching: find.byType(TextField));
+    final glass = find.ancestor(of: field, matching: find.byType(QGlass));
+    expect(glass, findsOneWidget, reason: 'the composer is glass, and glass is not stacked on glass');
+    final panel = tester.widget<QGlass>(glass);
+    expect(panel.shape, QGlassShape.rounded);
+    expect(panel.radius * 2, moreOrLessEquals(tester.getSize(glass).height, epsilon: 1), reason: 'one line: a capsule');
+    final send = find.descendant(of: glass, matching: find.byKey(OnboardingScreen.sendKey));
+    expect(send, findsOneWidget, reason: 'the send is in the composer, at its end');
+    expect(tester.getSize(send), const Size(QLayout.minTap, QLayout.minTap));
   });
+
+  for (final lang in AppLang.values) {
+    testWidgets('Qamar’s words are plain across the page, the answer a grey bubble on the person’s side (${lang.name})', (tester) async {
+      final ar = lang == AppLang.ar;
+      final s = AppState()..setLang(lang);
+      s.startOnboarding();
+      await _pump(tester, s);
+      s.pickOption(s.currentStep!.options.firstWhere((o) => o.value == 'yes'));
+      // The answer's beat, then the next question typed and on screen.
+      for (var i = 0; i < 80 && !(s.currentStep!.id == 'safety' && s.questionShown); i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(s.msgs.last.kind, ObKind.q);
+      await tester.pump(const Duration(milliseconds: 400));
+
+      final transcript = find.byKey(OnboardingScreen.transcriptKey);
+      final list = tester.getRect(transcript);
+      // Qamar: no bubble, no card, the words from the start of the page.
+      final question = find.text(s.msgs.last.text(ar));
+      final inTranscript = tester.element(transcript);
+      final boxes = find.ancestor(of: question, matching: find.byWidgetPredicate((w) => w is Container && w.decoration != null)).evaluate().where((e) {
+        var inside = false;
+        e.visitAncestorElements((up) => !(inside = up == inTranscript));
+        return inside;
+      });
+      expect(boxes, isEmpty, reason: 'the assistant is plain text: no bubble, no card');
+      final q = tester.getRect(question);
+      if (ar) {
+        expect(q.right, moreOrLessEquals(list.right - 20, epsilon: 1), reason: 'from the start, the right in Arabic');
+      } else {
+        expect(q.left, moreOrLessEquals(list.left + 20, epsilon: 1));
+      }
+      // The person: a grey bubble on the trailing side, the card corner.
+      final answer = find.text(ar ? 'موافق' : 'Agree');
+      final bubble = tester.widget<Container>(find.ancestor(of: answer, matching: find.byWidgetPredicate((w) => w is Container && w.decoration != null)).first);
+      final decoration = bubble.decoration! as BoxDecoration;
+      expect(decoration.color, QColors.surfaceHigh);
+      expect(decoration.borderRadius, BorderRadius.circular(QRadii.card));
+      final a = tester.getRect(find.byWidget(bubble));
+      if (ar) {
+        expect(a.left, moreOrLessEquals(list.left + 20, epsilon: 1), reason: 'the trailing side, the left in Arabic');
+      } else {
+        expect(a.right, moreOrLessEquals(list.right - 20, epsilon: 1));
+      }
+      await tester.pump(const Duration(seconds: 2));
+    });
+  }
 }

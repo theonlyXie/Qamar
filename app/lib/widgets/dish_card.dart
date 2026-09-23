@@ -8,10 +8,14 @@ import '../theme/text_styles.dart';
 
 /// One real Egyptian dish with its numbers (O5): named, portioned, costed.
 ///
-/// With a [targetKcal] it also says what share of the person's day it is —
-/// the first moment of value in the consultation. Without one (the welcome
-/// entry, before any target exists) it shows the dish and its numbers alone.
-/// Always labelled as an estimate: the portions are household sizes.
+/// With a [targetKcal] it also says what share of the person's day it is,
+/// the consultation's first moment of value. Without one it shows the dish
+/// and its numbers alone. Always said to be an estimate: the portions are
+/// household sizes.
+///
+/// A card on the page (the mono-glass skill): the flat surface, a hairline,
+/// the card corner; an eyebrow for the meal, the dish as the lead line, its
+/// numbers under it in two steps of ink.
 class DishCard extends StatelessWidget {
   final EgyptianDish dish;
   final DishFacts facts;
@@ -35,12 +39,13 @@ class DishCard extends StatelessWidget {
     required this.iso,
   });
 
+  /// The meal it is for, as the card's eyebrow.
   static String slotLine(MealSlot slot, bool isAr) => switch (slot) {
-        MealSlot.breakfast => isAr ? 'على الفطار مثلاً' : 'For breakfast, for example',
-        MealSlot.lunch => isAr ? 'على الغدا مثلاً' : 'For lunch, for example',
-        MealSlot.dinner => isAr ? 'على العشا مثلاً' : 'Tonight, for example',
-        MealSlot.iftar => isAr ? 'على الإفطار مثلاً' : 'For iftar, for example',
-        MealSlot.suhoor => isAr ? 'على السحور مثلاً' : 'For suhoor, for example',
+        MealSlot.breakfast => isAr ? 'على الفطار' : 'For breakfast',
+        MealSlot.lunch => isAr ? 'على الغدا' : 'For lunch',
+        MealSlot.dinner => isAr ? 'على العشا' : 'Tonight',
+        MealSlot.iftar => isAr ? 'على الإفطار' : 'For iftar',
+        MealSlot.suhoor => isAr ? 'على السحور' : 'For suhoor',
       };
 
   /// "About 507 kcal · 23% of your 2180" / "حوالي ٥٠٧ سعرة · ٢٣٪ من هدفك ٢١٨٠".
@@ -59,35 +64,31 @@ class DishCard extends StatelessWidget {
       ? 'بروتين ${iso('${facts.protein}')} جم · كربوهيدرات ${iso('${facts.carbs}')} جم · دهون ${iso('${facts.fat}')} جم'
       : 'Protein ${facts.protein} g · Carbs ${facts.carbs} g · Fat ${facts.fat} g';
 
+  /// What the numbers are: an estimate, at home-sized portions.
+  static String estimateLine(bool isAr) => isAr ? 'تقدير، بحصص البيت.' : 'An estimate, for home-sized portions.';
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [QColors.surfaceRaised, QColors.surface], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        border: Border.all(color: QColors.ink.withValues(alpha: 0.4)),
-        borderRadius: BorderRadius.circular(QRadii.card),
-      ),
+      padding: const EdgeInsets.all(QSpace.xl),
+      decoration: QDecor.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           if (slot != null) ...[
-            Text(slotLine(slot!, isAr), style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.ink)),
-            const SizedBox(height: 6),
+            Text(QText.eyebrowText(slotLine(slot!, isAr), ar: isAr), style: QText.eyebrow(ar: isAr)),
+            const SizedBox(height: QSpace.sm),
           ],
-          Text(isAr ? dish.nameAr : dish.nameEn, style: QText.body(size: 17, height: 24, weight: FontWeight.w600, color: QColors.ink)),
+          Text(isAr ? dish.nameAr : dish.nameEn, style: QText.body(size: 17, weight: FontWeight.w600)),
           const SizedBox(height: 2),
-          Text(dish.portions(isAr), style: QText.body(size: 12, height: 18, color: QColors.inkTertiary)),
-          const SizedBox(height: 10),
-          Text(costLine(), style: QText.body(size: 15, height: 22, weight: FontWeight.w600, color: QColors.ink)),
+          Text(dish.portions(isAr), style: QText.body(size: 13, color: QColors.inkTertiary)),
+          const SizedBox(height: QSpace.md),
+          Text(costLine(), style: QText.number(size: 15, weight: FontWeight.w600, ar: isAr)),
           const SizedBox(height: 2),
-          Text(macroLine(), style: QText.body(size: 12, height: 18, color: QColors.inkSecondary)),
-          const SizedBox(height: 8),
-          Text(
-            isAr ? 'تقدير — بحصص البيت، والأرقام من قاعدة بيانات الأكل.' : 'An estimate — household portions, numbers from the food database.',
-            style: QText.body(size: 11, height: 16, color: QColors.inkSecondary),
-          ),
+          Text(macroLine(), style: QText.body(size: 13, color: QColors.inkSecondary)),
+          const SizedBox(height: QSpace.md),
+          Text(estimateLine(isAr), style: QText.body(size: 12, color: QColors.inkTertiary)),
         ],
       ),
     );
