@@ -268,20 +268,55 @@ class _ExplainableState extends State<Explainable> {
 
     final hovered = context.select<AppState, bool>((s) => s.explainHoverId == widget.id);
 
-    return AnimatedContainer(
+    // Under the orb it lifts: the raised surface behind it and the strong
+    // edge around it, no glow — a lighter fill is the lift on black. Both
+    // are painted just outside the value, not padded into it, so wrapping
+    // something to explain never moves or narrows it.
+    return TweenAnimationBuilder<double>(
       key: _key,
+      tween: Tween(end: hovered ? 1 : 0),
       duration: const Duration(milliseconds: 160),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      // Under the orb it lifts: the raised surface and the strong edge, no
-      // glow — a lighter fill is the lift on black.
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(QRadii.inset),
-        color: hovered ? QColors.surfaceHigh : Colors.transparent,
-        border: Border.all(color: hovered ? QColors.ink : Colors.transparent),
-      ),
       child: widget.child,
+      builder: (context, t, child) => CustomPaint(
+        painter: _HoverLift(t, fill: true),
+        foregroundPainter: _HoverLift(t, fill: false),
+        child: child,
+      ),
     );
   }
+}
+
+/// The lift an explainable value takes while the orb is over it: [t] from 0
+/// (none) to 1, painted 4 points out to the sides and 2 above and below.
+class _HoverLift extends CustomPainter {
+  final double t;
+  final bool fill;
+  const _HoverLift(this.t, {required this.fill});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (t <= 0) return;
+    final r = RRect.fromRectAndRadius((Offset.zero & size).inflate(4).deflateRect(0, 2), const Radius.circular(QRadii.inset));
+    if (fill) {
+      canvas.drawRRect(r, Paint()..color = Color.lerp(Colors.transparent, QColors.surfaceHigh, t)!);
+    } else {
+      canvas.drawRRect(
+        r,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = QColors.ink.withValues(alpha: t),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_HoverLift old) => old.t != t || old.fill != fill;
+}
+
+extension on Rect {
+  /// This rect less [dx] at each side and [dy] at the top and bottom.
+  Rect deflateRect(double dx, double dy) => Rect.fromLTRB(left + dx, top + dy, right - dx, bottom - dy);
 }
 
 /// The mark that says "the orb explains this": a quiet dotted line under a

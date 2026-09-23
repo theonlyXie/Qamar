@@ -30,7 +30,9 @@ class WhySheet extends StatelessWidget {
       (
         t.whyAssume,
         state.isAr
-            ? '${state.iso('${p.age}')} سنة · ${p.gender == Gender.female ? 'أنثى' : 'ذكر'} · ${state.iso('${p.height}')} سم · ${state.iso('${p.weight}')} كجم · نشاط ${state.iso('${p.activity}')}'
+            // "،" where English has "·": beside Arabic digits a middle dot
+            // reads as a zero.
+            ? '${state.iso('${p.age}')} سنة، ${p.gender == Gender.female ? 'أنثى' : 'ذكر'}، ${state.iso('${p.height}')} سم، ${state.iso('${p.weight}')} كجم، نشاط ${state.iso('${p.activity}')}'
             : '${p.age} years · ${p.gender == Gender.female ? 'female' : 'male'} · ${p.height} cm · ${p.weight} kg · activity ${p.activity}',
       ),
       (t.whySource, t.whySourceVal),

@@ -55,7 +55,7 @@ class _ActivitySheetState extends State<ActivitySheet> {
                   for (final m in ActivityCatalog.durations)
                     QOutlineButton(
                       label: isAr
-                          ? '${state.iso('$m')} د · ${state.iso('${ActivityCatalog.kcalFor(kind, m, state.profile.weight)}')} سعر'
+                          ? '${state.iso('$m')} د، ${state.iso('${ActivityCatalog.kcalFor(kind, m, state.profile.weight)}')} سعر'
                           : '$m min · ${ActivityCatalog.kcalFor(kind, m, state.profile.weight)} kcal',
                       height: 44,
                       onTap: () => state.logActivity(m),

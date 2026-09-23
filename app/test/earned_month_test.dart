@@ -69,10 +69,10 @@ void main() {
     expect(en, isNot(contains('1 days')));
 
     final two = plain(await _screenText(tester, at(logged: 2, left: 2, needed: 20, lang: AppLang.ar), AppScreen.today));
-    expect(two, contains('سجّلت يومين من ٢٠ · باقي يومين'));
+    expect(two, contains('سجّلت يومين من ٢٠، باقي يومين'));
 
     final few = plain(await _screenText(tester, at(logged: 5, left: 1, needed: 10, lang: AppLang.ar), AppScreen.today));
-    expect(few, contains('سجّلت ٥ أيام من ١٠ · باقي يوم واحد'));
+    expect(few, contains('سجّلت ٥ أيام من ١٠، باقي يوم واحد'));
     expect(few, contains('سجّل ١٠ أيام من أول ٣٠'));
 
     final tile = plain(await _screenText(tester, at(logged: 5, left: 1, needed: 10, lang: AppLang.ar), AppScreen.subscription));

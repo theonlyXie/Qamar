@@ -570,7 +570,9 @@ class _ActivityCard extends StatelessWidget {
             ),
             Text(
               isAr
-                  ? '${state.iso('${state.activityMinutesToday}')} د · ~${state.iso('${state.activityKcalToday}')} سعرة'
+                  // "،" where English has "·": beside Arabic digits a
+                  // middle dot reads as a zero.
+                  ? '${state.iso('${state.activityMinutesToday}')} د، حوالي ${state.iso('${state.activityKcalToday}')} سعرة'
                   : '${state.activityMinutesToday} min · ~${state.activityKcalToday} kcal',
               style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.ink),
             ),
@@ -719,7 +721,7 @@ class _EarnedMonthCard extends StatelessWidget {
     final body = granted
         ? (isAr ? 'سجّلت ${days(e.loggedDays)} من أول ${state.iso('${e.windowDays}')}. قمر+ شغال لحد $when.' : 'You logged ${e.loggedDays} of your first ${days(e.windowDays)}. Qamar+ runs until $when.')
         : (isAr
-            ? 'سجّلت ${days(e.loggedDays)} من ${state.iso('${e.needed}')} · باقي ${days(e.daysLeft)}'
+            ? 'سجّلت ${days(e.loggedDays)} من ${state.iso('${e.needed}')}، باقي ${days(e.daysLeft)}'
             : '${e.loggedDays} of ${days(e.needed)} logged · ${days(e.daysLeft)} left');
     final note = granted
         ? (isAr ? 'اضغط للإخفاء' : 'Tap to dismiss')
