@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/strings.dart';
 import '../services/repositories.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
@@ -27,9 +28,6 @@ class ProgressScreen extends StatelessWidget {
 
   /// The streak card, found by tests: drawn only while the score is shown.
   static const streakKey = ValueKey('progress-streak');
-
-  static const _dayLettersAr = ['ن', 'ث', 'ر', 'خ', 'ج', 'س', 'ح'];
-  static const _dayLettersEn = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +164,7 @@ class ProgressScreen extends StatelessWidget {
                   children: [
                     for (var i = 0; i < week.length; i++) ...[
                       if (i > 0) const SizedBox(width: 8),
-                      Expanded(child: _DayBar(day: week[i], peak: peak, target: target, letter: (isAr ? _dayLettersAr : _dayLettersEn)[week[i].day.weekday - 1])),
+                      Expanded(child: _DayBar(day: week[i], peak: peak, target: target, letter: (isAr ? kWeekdayShortAr : kWeekdayShortEn)[week[i].day.weekday - 1])),
                     ],
                   ],
                 ),

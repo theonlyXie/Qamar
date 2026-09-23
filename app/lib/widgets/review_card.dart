@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import '../models/review.dart';
 import '../models/streak.dart';
 import '../theme/app_theme.dart';
@@ -35,13 +36,10 @@ class ReviewCard extends StatelessWidget {
     required this.iso,
   });
 
-  static const _lettersAr = ['ن', 'ث', 'ر', 'خ', 'ج', 'س', 'ح'];
-  static const _lettersEn = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
   @override
   Widget build(BuildContext context) {
     final fills = review.fills;
-    final letters = isAr ? _lettersAr : _lettersEn;
+    final letters = isAr ? kWeekdayShortAr : kWeekdayShortEn;
     return Directionality(
       textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
       child: Container(

@@ -8,6 +8,13 @@ extension AppLangX on AppLang {
   String get code => this == AppLang.ar ? 'ar' : 'en';
 }
 
+/// The days of the week, Monday first, as a week's row labels them. In
+/// English two letters, since one left two T's and two S's side by side and
+/// no way to tell Tuesday from Thursday; the Arabic initials are each a
+/// different letter already.
+const kWeekdayShortEn = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const kWeekdayShortAr = ['ن', 'ث', 'ر', 'خ', 'ج', 'س', 'ح'];
+
 class QStrings {
   final String brand,
       restart,
