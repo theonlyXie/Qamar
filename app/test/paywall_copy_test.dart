@@ -133,4 +133,45 @@ void main() {
       expect(s.plusNotice, isNot(contains(lang == AppLang.ar ? 'تلغي' : 'cancel')));
     }
   });
+
+  testWidgets('Arabic rows write the brand as قمر+, never a Latin "Qamar+" an RTL line draws as "(+Qamar"', (tester) async {
+    final text = await _paywall(tester, _lite(AppLang.ar, earned: _stated()));
+    expect(text, contains('(٣٠ مع قمر+)'));
+    expect(text, contains('(٥٠ مع قمر+)'));
+    expect(text, isNot(contains('مع Qamar+')));
+  });
+
+  group('how to pay names only what checkout can take', () {
+    test('the rails the server names, in both languages', () {
+      expect(SubscriptionScreen.paymentLine(false, const ['card', 'meeza', 'wallet']),
+          'You pay in EGP through Paymob: Visa or Mastercard, a Meeza card, or Vodafone Cash or another mobile wallet. Qamar+ turns on once Paymob confirms the payment.');
+      expect(SubscriptionScreen.paymentLine(true, const ['card', 'wallet']),
+          'الدفع بالجنيه عن طريق Paymob: فيزا أو ماستركارد، أو فودافون كاش أو أي محفظة موبايل. قمر+ بيتفعل أول ما Paymob يأكد الدفع.');
+      expect(SubscriptionScreen.paymentLine(false, const ['card']), startsWith('You pay in EGP through Paymob: Visa or Mastercard.'));
+    });
+
+    test('with no rail stated, none is named: no Vodafone Cash, no Meeza', () {
+      for (final ar in [false, true]) {
+        final line = SubscriptionScreen.paymentLine(ar, const []);
+        for (final never in ['Vodafone', 'Meeza', 'Visa', 'فودافون', 'ميزة', 'فيزا']) {
+          expect(line, isNot(contains(never)));
+        }
+      }
+    });
+
+    test('the quote carries the server\'s rails and nothing else', () {
+      final q = PlusQuote.fromJson(const {'payment_methods': ['card', 'wallet', 'fawry', 7]});
+      expect(q.paymentMethods, ['card', 'wallet'], reason: 'only rails the paywall knows how to name');
+      expect(PlusQuote.fromJson(const {}).paymentMethods, isEmpty);
+    });
+
+    testWidgets('the paywall shows it', (tester) async {
+      const quote = PlusQuote(plan: 'monthly', days: 30, listCents: 50000, amountCents: 50000, pricingReason: 'list', firstPurchase: true, paymentMethods: ['wallet']);
+      await _paywall(tester, _lite(AppLang.en, earned: _stated(), quote: quote));
+      final line = tester.widget<Text>(find.byKey(SubscriptionScreen.paymentKey)).data!;
+      expect(line, contains('Vodafone Cash or another mobile wallet'));
+      expect(line, isNot(contains('Mastercard')), reason: 'no card integration was named');
+    });
+  });
 }
+

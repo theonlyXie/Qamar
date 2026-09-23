@@ -7,6 +7,7 @@ import {
   chooseSavedPromo,
   isPlanId,
   normalizePromoCode,
+  paymentConfig,
   proShareCents,
   quotePlus,
   savedProfessional,
@@ -128,3 +129,23 @@ Deno.test("with no typed code, the referral wins, and the claim is read only whe
   assertEquals(claimReads, 1);
   assertEquals(await chooseSavedPromo(() => Promise.resolve(null), () => Promise.resolve(null)), null);
 });
+
+Deno.test("checkout gets every integration id; the paywall names only the rails that are labelled", () => {
+  const labelled = paymentConfig("card:123456, meeza:123456 ,wallet:789012");
+  assertEquals(labelled.methods, [123456, 789012], "each id once, labels removed, as numbers");
+  assertEquals(labelled.kinds, ["card", "meeza", "wallet"]);
+
+  // Before labels existed: ids only. Checkout still works; the paywall names no rail.
+  const bare = paymentConfig("123456,789012");
+  assertEquals(bare.methods, [123456, 789012]);
+  assertEquals(bare.kinds, []);
+
+  // A card integration alone: no wallet is promised.
+  assertEquals(paymentConfig("card:123456").kinds, ["card"]);
+  // Names pass through as names; unknown labels name nothing.
+  assertEquals(paymentConfig("wallet:MIGS-online, kiosk:555").methods, ["MIGS-online", 555]);
+  assertEquals(paymentConfig("wallet:MIGS-online, kiosk:555").kinds, ["wallet"]);
+  assertEquals(paymentConfig("").methods, []);
+  assertEquals(paymentConfig(undefined).kinds, []);
+});
+

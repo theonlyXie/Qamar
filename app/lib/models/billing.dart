@@ -87,6 +87,11 @@ class PlusQuote {
   final String? promoNote;
   final String? promoError;
 
+  /// The rails checkout can take, as the billing function reads them from
+  /// its labelled Paymob integrations: 'card', 'meeza', 'wallet'. Empty when
+  /// the server has not said, and then the paywall names none.
+  final List<String> paymentMethods;
+
   const PlusQuote({
     required this.plan,
     required this.days,
@@ -99,6 +104,7 @@ class PlusQuote {
     this.affiliateCommissionCents = 0,
     this.promoNote,
     this.promoError,
+    this.paymentMethods = const [],
   });
 
   int get amountPounds => amountCents ~/ 100;
@@ -115,6 +121,10 @@ class PlusQuote {
       firstPurchase: json['first_purchase'] == true,
       promoCode: json['promo_code'] as String?,
       promoKind: json['promo_kind'] as String?,
+      paymentMethods: [
+        for (final m in (json['payment_methods'] is List ? json['payment_methods'] as List : const []))
+          if (m is String && const {'card', 'meeza', 'wallet'}.contains(m)) m,
+      ],
       affiliateCommissionCents: (json['affiliate_commission_cents'] as num?)?.toInt() ?? 0,
       promoNote: json['promo_note'] as String?,
       promoError: json['promo_error'] as String?,

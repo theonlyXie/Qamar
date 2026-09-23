@@ -18,7 +18,9 @@
 //   PAYMOB_SECRET_KEY
 //   PAYMOB_PUBLIC_KEY
 //   PAYMOB_HMAC_SECRET
-//   PAYMOB_INTEGRATION_IDS   comma-separated integration ids or names (card,wallet)
+//   PAYMOB_INTEGRATION_IDS   comma-separated integration ids or names, each
+//                            labelled with its rail so the paywall can name it:
+//                            card:123456,meeza:123456,wallet:789012
 //   PAYMOB_BASE_URL          optional, defaults to https://accept.paymob.com
 
 import { notYetEarnedMessage, type EarnedStatus } from "./earned.ts";
@@ -30,8 +32,10 @@ import {
   chooseSavedPromo,
   isPlanId,
   normalizePromoCode,
+  paymentConfig,
   quotePlus,
   savedProfessional,
+  type PaymentKind,
   type PlanId,
   type Promo,
   type Quote,
@@ -58,8 +62,12 @@ function json(body: unknown, status = 200): Response {
 }
 
 function paymentMethods(): Array<number | string> {
-  const raw = (Deno.env.get("PAYMOB_INTEGRATION_IDS") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  return raw.map((s) => (/^\d+$/.test(s) ? Number(s) : s));
+  return paymentConfig(Deno.env.get("PAYMOB_INTEGRATION_IDS")).methods;
+}
+
+/** The rails the paywall may name: only labelled integrations (card:, meeza:, wallet:). */
+function paymentKinds(): PaymentKind[] {
+  return paymentConfig(Deno.env.get("PAYMOB_INTEGRATION_IDS")).kinds;
 }
 
 async function authenticate(req: Request): Promise<{ id: string; email?: string } | null> {
@@ -113,6 +121,9 @@ function quoteJson(q: Quote) {
     affiliate_commission_cents: q.affiliateCommissionCents,
     promo_note: q.promoNote,
     promo_error: q.promoError,
+    // What checkout can take here, so the paywall names only that (card,
+    // meeza, wallet). Empty when the integrations are not labelled.
+    payment_methods: paymentKinds(),
   };
 }
 

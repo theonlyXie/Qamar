@@ -3419,8 +3419,8 @@ class AppState extends ChangeNotifier {
     final billing = _billing;
     if (!isBacked || billing == null) {
       plusNotice = isAr
-          ? 'الدفع في مصر عن طريق Paymob. اربط حسابك الأول، وبعدين نفتح صفحة الدفع بالجنيه المصري (فيزا، محفظة، أو Meeza).'
-          : 'Egypt billing runs through Paymob. Link your account first, then we open checkout in EGP (card, wallet, or Meeza).';
+          ? 'الدفع بالجنيه عن طريق Paymob. اربط حسابك الأول، وبعدين نفتح صفحة الدفع.'
+          : 'You pay in EGP through Paymob. Link your account first, then we open its checkout.';
       _notify();
       return;
     }

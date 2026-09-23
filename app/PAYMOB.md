@@ -1,6 +1,6 @@
 # Turning on Paymob (no code)
 
-Qamar+ in Egypt is billed through **Paymob**, in **Egyptian pounds**. People can pay with a card (Visa, Mastercard, Meeza) or an Egyptian mobile wallet (Vodafone Cash, Orange Cash, and the others Paymob enables on your account). Su Points are still earned only — they are never sold.
+Qamar+ in Egypt is billed through **Paymob**, in **Egyptian pounds**. People can pay with a card (Visa, Mastercard, and Meeza where Paymob enables it) or an Egyptian mobile wallet (Vodafone Cash, Orange Cash, and the others Paymob enables on your account) — whichever integrations you configure and label (step 4); the paywall names only those. Su Points are still earned only — they are never sold.
 
 The app and the server are already wired for this. Your job is the business side: a Paymob merchant account, approval, and pasting four secrets into Supabase. Until those secrets exist, the paywall tells the truth and does not pretend a payment went through.
 
@@ -8,7 +8,7 @@ The app and the server are already wired for this. Your job is the business side
 
 | Plan | What they pay | What you keep in mind |
 |---|---|---|
-| Monthly | **500** | The only plan. No annual, no family tier, no discounts — those wait on month-2 retention. |
+| Monthly | **500** | The only plan. No annual or family tier yet — those wait on month-2 retention. No discount marketing: a campaign code is the one thing that can lower the price, none is issued, and while one applies the paywall stops saying "same price for everyone". |
 | Professional's code | **500** | The client pays the same 500. The nutritionist or coach who gave the code is owed **100 EGP a month (20%) for 12 months** from the client's first payment, in their EGP wallet. This is not Su Points. |
 
 The phone never decides the price. Checkout asks the server; the server stamps the amount Paymob collects. A later campaign code (the earned-month promo, Ramadan) goes in the `promo_codes` table as `kind = campaign` — you do not need another app release to add one.
@@ -63,7 +63,7 @@ Open **Settings → API Keys** (wording may be “Developers”):
 | HMAC secret | `PAYMOB_HMAC_SECRET` |
 | Integration ID for **card** (and wallet if you want wallets) | `PAYMOB_INTEGRATION_IDS` |
 
-If you have more than one integration ID (card + wallet), write them in one line, separated by commas, no spaces: `123456,789012`.
+Write each integration ID with the rail it is, in one line, separated by commas: `card:123456,wallet:789012`. Add `meeza:<id>` (usually the card integration's own id, `meeza:123456`) once Paymob has enabled Meeza on the account. The label is how the paywall knows what to name: it lists only the rails you labelled, so it never promises Vodafone Cash or Meeza your account cannot take. Unlabelled IDs (`123456,789012`) still check out, but the paywall then names no rail at all.
 
 Test IDs only work with the test secret. Live IDs only work with the live secret. Mixing them is the usual reason checkout says the integration does not exist.
 
@@ -75,7 +75,14 @@ Still in the dashboard, enable at least:
 - Meeza if they offer it on your account
 - Mobile wallets (Vodafone Cash, Orange Cash, e& / We Pay) if you want those on day one
 
-Not every method is on by default. If a method is missing, write to Paymob support from the dashboard rather than changing the app.
+Not every method is on by default. If a method is missing, write to Paymob support from the dashboard rather than changing the app. When a method goes live, add its label to `PAYMOB_INTEGRATION_IDS`; when one is switched off, remove it, and the paywall stops naming it.
+
+**Not built yet, and what each needs from you** (the blueprint's v1 names Vodafone Cash, Fawry and Meeza):
+- **Vodafone Cash and the other wallets:** nothing new in code. Paymob's mobile-wallet integration, enabled on the account, and its id labelled `wallet:` above.
+- **Meeza:** nothing new in code. Paymob enabling Meeza on the card integration, then `meeza:<card id>`.
+- **Fawry (pay at a kiosk or in the Fawry app):** needs a merchant contract that does not exist yet. Either a FawryPay merchant account (its merchant code and security key, for a direct integration that has to be written), or Paymob's cash/kiosk integration if Paymob enables one on the account (its integration id; it is not labelled for the paywall until the paywall copy for paying in cash at a kiosk is written with it).
+- **InstaPay:** after v1, per the blueprint.
+- **iPhone:** an App Store build must sell digital subscriptions through Apple In-App Purchase (see below); Paymob stays for Android and the web.
 
 ### 6. Paste the secrets into Supabase
 

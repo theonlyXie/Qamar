@@ -228,3 +228,35 @@ export function quotePlus(input: {
     promoError,
   };
 }
+
+/** The payment rails a checkout can offer, as the paywall names them. */
+export type PaymentKind = "card" | "meeza" | "wallet";
+const PAYMENT_KINDS: readonly PaymentKind[] = ["card", "meeza", "wallet"];
+
+/**
+ * PAYMOB_INTEGRATION_IDS, read two ways. Each entry is an integration id or
+ * name, optionally labelled with the rail it is: `card:123456,wallet:789012`.
+ * A Meeza card usually rides on the card integration; label it too when
+ * Paymob has enabled it on the account (`meeza:123456` beside `card:123456`).
+ *
+ * - [methods] is what Paymob's intention is given: every id, labels
+ *   removed, each once, numbers as numbers, exactly as before.
+ * - [kinds] is what the paywall may name. Only labelled entries count: an
+ *   unlabelled id could be any rail, so the paywall then names none rather
+ *   than promise Vodafone Cash to someone the account cannot take it from.
+ */
+export function paymentConfig(raw: string | null | undefined): { methods: Array<number | string>; kinds: PaymentKind[] } {
+  const methods: Array<number | string> = [];
+  const kinds = new Set<PaymentKind>();
+  for (const entry of (raw ?? "").split(",").map((s) => s.trim()).filter(Boolean)) {
+    const at = entry.indexOf(":");
+    const label = at > 0 ? entry.slice(0, at).trim().toLowerCase() : "";
+    const id = (at > 0 ? entry.slice(at + 1) : entry).trim();
+    if (!id) continue;
+    const value = /^\d+$/.test(id) ? Number(id) : id;
+    if (!methods.includes(value)) methods.push(value);
+    if ((PAYMENT_KINDS as readonly string[]).includes(label)) kinds.add(label as PaymentKind);
+  }
+  return { methods, kinds: PAYMENT_KINDS.filter((k) => kinds.has(k)) };
+}
+

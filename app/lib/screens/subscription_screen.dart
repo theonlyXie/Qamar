@@ -19,6 +19,25 @@ class SubscriptionScreen extends StatelessWidget {
 
   static const leadKey = ValueKey('paywall-lead');
   static const bannerKey = ValueKey('paywall-banner');
+  static const paymentKey = ValueKey('paywall-payment');
+
+  /// How to pay, naming only the rails the billing function says checkout
+  /// can take (its labelled Paymob integrations). With none stated it names
+  /// none, rather than promise Vodafone Cash or Meeza an account cannot take.
+  static String paymentLine(bool isAr, List<String> methods) {
+    final names = [
+      if (methods.contains('card')) isAr ? 'فيزا أو ماستركارد' : 'Visa or Mastercard',
+      if (methods.contains('meeza')) isAr ? 'كارت ميزة' : 'a Meeza card',
+      if (methods.contains('wallet')) isAr ? 'فودافون كاش أو أي محفظة موبايل' : 'Vodafone Cash or another mobile wallet',
+    ];
+    final join = names.length < 2
+        ? names.join()
+        : '${names.sublist(0, names.length - 1).join(isAr ? '، ' : ', ')}${isAr ? '، أو ' : ', or '}${names.last}';
+    final how = names.isEmpty
+        ? (isAr ? 'الدفع بالجنيه عن طريق Paymob.' : 'You pay in EGP through Paymob.')
+        : (isAr ? 'الدفع بالجنيه عن طريق Paymob: $join.' : 'You pay in EGP through Paymob: $join.');
+    return '$how ${isAr ? 'قمر+ بيتفعل أول ما Paymob يأكد الدفع.' : 'Qamar+ turns on once Paymob confirms the payment.'}';
+  }
 
   /// The price, as O14 agreed it: priced against a nutritionist, not against
   /// apps, and every clause true for the person reading it.
@@ -227,9 +246,8 @@ class SubscriptionScreen extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          isAr
-              ? 'الدفع في مصر عن طريق Paymob بالجنيه: فيزا، ماستركارد، Meeza، أو محفظة فودافون/أورانج. قمر+ بيتفعل بعد ما Paymob يأكد التحويل. نقاط Su مش بتتباع ومش بتتشحن بفلوس — بتتكسب بس. عمولة الأفلييت كاش بالجنيه، مش نقاط.'
-              : 'Egypt billing is Paymob, in EGP: Visa, Mastercard, Meeza, or Vodafone/Orange Cash. Qamar+ turns on after Paymob confirms the transfer. Su Points are never sold or topped up with money — they are only earned. Affiliate commission is EGP cash, not Su.',
+          '${paymentLine(isAr, quote.paymentMethods)} ${isAr ? 'نقاط Su مش بتتباع ومش بتتشحن بفلوس — بتتكسب بس. عمولة الأفلييت كاش بالجنيه، مش نقاط.' : 'Su Points are never sold or topped up with money — they are only earned. Affiliate commission is EGP cash, not Su.'}',
+          key: SubscriptionScreen.paymentKey,
           textAlign: TextAlign.center,
           style: QText.body(size: 11, height: 17, color: QColors.textFaint),
         ),
@@ -377,8 +395,8 @@ const _features = <PlusFeature>[
   (ar: 'خطة بكرة، مكتوبة بالليل', en: 'Tomorrow’s plan, written overnight', inFree: false),
   (ar: 'تسجيل الوجبات بالكتابة أو الصوت، بلا حد', en: 'Log meals by typing or speaking, unlimited', inFree: true),
   (ar: 'خطة اليوم بأطباق حقيقية', en: 'Today’s plan in real dishes', inFree: true),
-  (ar: 'تصوير الوجبة — ٣ في اليوم (٣٠ مع Qamar+)', en: 'Photograph a meal — 3 a day (30 with Qamar+)', inFree: true),
-  (ar: 'أسئلة لقمر — ٣ في اليوم (٥٠ مع Qamar+)', en: 'Questions to Qamar — 3 a day (50 with Qamar+)', inFree: true),
+  (ar: 'تصوير الوجبة — ٣ في اليوم (٣٠ مع قمر+)', en: 'Photograph a meal — 3 a day (30 with Qamar+)', inFree: true),
+  (ar: 'أسئلة لقمر — ٣ في اليوم (٥٠ مع قمر+)', en: 'Questions to Qamar — 3 a day (50 with Qamar+)', inFree: true),
   (ar: 'صورة زيادة من المحفظة بنقاط Su', en: 'An extra photo from the wallet with Su Points', inFree: true),
   (ar: 'نقاط Su والمهام اليومية', en: 'Su Points and daily quests', inFree: true),
   (ar: 'المراجعة الأسبوعية الكاملة والمشاركة', en: 'The full weekly review, shareable', inFree: false),

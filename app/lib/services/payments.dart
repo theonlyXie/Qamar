@@ -5,8 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/billing.dart';
 
-/// Server-gateway for Qamar+. Paymob is the Egyptian collector — EGP, cards,
-/// Meeza, Vodafone Cash / Orange Cash. The app never holds a Paymob secret
+/// Server-gateway for Qamar+. Paymob is the Egyptian collector, in EGP; the
+/// rails it takes (card, Meeza, wallets) are the billing function's labelled
+/// integrations, which each quote names. The app never holds a Paymob secret
 /// and never marks someone Plus from a browser redirect.
 abstract class BillingGateway {
   Future<PlusQuote> quote({required String plan, String? promoCode});
