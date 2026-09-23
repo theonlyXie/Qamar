@@ -16,12 +16,26 @@ export function mentionsScore(text: string): boolean {
   return SCORE_WORDS.test(text);
 }
 
-/** The typed or spoken meal's note, priced from the food graph alone. */
-export function graphMealNote(lang: "ar" | "en", items: MealItem[]): string {
+/**
+ * The typed or spoken meal's note, priced from the food graph alone.
+ *
+ * When nothing matched, the way on is the one that works today, in the app's
+ * own words (AppState.notFoundReply): a photo while [photosLeft], since the
+ * free tier photographs three plates a day and a member more, and otherwise
+ * what is in it and how much, so no photo is offered that would meet the
+ * photo wall. It never says a photo is Qamar+: it is not. Where today's photos
+ * could not be read, [photosLeft] is false and the line offers no photo.
+ */
+export function graphMealNote(lang: "ar" | "en", items: MealItem[], photosLeft = false): string {
   if (items.length === 0) {
+    if (photosLeft) {
+      return lang === "ar"
+        ? "مقدرتش ألاقي الأكل ده. جرّب اسم أوضح، أو صوّر الطبق."
+        : "I could not match that food. Try a clearer name, or photograph the plate.";
+    }
     return lang === "ar"
-      ? "مقدرتش ألاقي الأكل ده في قاعدة البيانات. جرّب اسم أوضح. تصوير الطبق لـ Qamar+."
-      : "I could not match that to a food we know. Try a clearer name. Photographing a plate is Qamar+.";
+      ? "مقدرتش ألاقي الأكل ده. جرّب اسم أوضح، أو قوللي فيه إيه وقد إيه."
+      : "I could not match that food. Try a clearer name, or tell me what’s in it and how much.";
   }
   return lang === "ar"
     ? "الأرقام من قاعدة الأكل، مش من الموديل. ظبّط الكميات قبل ما تأكد."

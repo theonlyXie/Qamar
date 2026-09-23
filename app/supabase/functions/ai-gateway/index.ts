@@ -735,9 +735,13 @@ async function analyzeMealFromGraph(
   // Nothing was spent; report the photo bucket so the app can show what a
   // photo would cost next.
   let quota: Quota;
+  // Whether today's photos are known: a note offers a photo only when they
+  // are, and some are left (notes.ts).
+  let quotaKnown = true;
   try {
     quota = await quotaStatus(userId, "photo");
   } catch {
+    quotaKnown = false;
     quota = { bucket: "photo", allowed: true, used: 0, limit: 3, extra: 0, remaining: 3 };
   }
 
@@ -783,7 +787,7 @@ async function analyzeMealFromGraph(
 
   return json({
     items,
-    note: graphMealNote(lang, items),
+    note: graphMealNote(lang, items, quotaKnown && quota.remaining > 0),
     quota: quotaPayload(quota),
     sources,
     resolutions: toPacketFacts(resolved),

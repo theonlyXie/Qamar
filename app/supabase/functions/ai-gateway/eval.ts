@@ -106,7 +106,7 @@ function mealNoteCase(c: EvalCase): CaseOutcome {
   const lang = (c.input.lang as "ar" | "en") ?? "en";
   const shown = "note" in c.input
     ? modelMealNote(c.input.note as string | null)
-    : graphMealNote(lang, (c.input.items as MealItem[]) ?? []);
+    : graphMealNote(lang, (c.input.items as MealItem[]) ?? [], c.input.photos_left === true);
   const actual: Record<string, unknown> = { shown, dropped: shown === null, score_free: !mentionsScore(shown ?? "") };
   if (actual.score_free !== true) {
     return { passed: false, actual, detail: `the note speaks of the score: "${shown}"` };
