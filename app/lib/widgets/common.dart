@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -188,35 +187,59 @@ class QPrimaryButton extends StatelessWidget {
 }
 
 /// A [Problem] on a screen (O10): what happened, why when it is known, and
-/// the next step as a real button, with another way on beside it when there
+/// the next step as a real button, with another way on under it when there
 /// is one. The "what" line is always shown whole.
 ///
-/// Basic on purpose: seat 6 gives it its design — a glyph per [ProblemKind],
-/// its place in the free space — without changing this API.
+/// Its kind has a glyph, so the same words read as what they are at a
+/// glance: nothing here yet, something failed on our side, no connection,
+/// the phone has not allowed something, or a daily allowance used up (which
+/// is not a failure, and is not drawn as one). Centred, like every empty or
+/// error state, and meant to sit in the middle of the free space
+/// ([QStateArea]), not stuck to the top of it.
 class QStateCard extends StatelessWidget {
   final Problem problem;
   const QStateCard({super.key, required this.problem});
 
+  /// Each kind's glyph and tint.
+  static ({IconData icon, Color tint}) look(ProblemKind kind) => switch (kind) {
+        ProblemKind.empty => (icon: Icons.nightlight_round, tint: QColors.moonbeam),
+        ProblemKind.error => (icon: Icons.error_outline_rounded, tint: QColors.red),
+        ProblemKind.offline => (icon: Icons.cloud_off_rounded, tint: QColors.skyBlue),
+        ProblemKind.permission => (icon: Icons.lock_outline_rounded, tint: QColors.violetSoft),
+        ProblemKind.limit => (icon: Icons.hourglass_bottom_rounded, tint: QColors.amberSoft),
+      };
+
   @override
   Widget build(BuildContext context) {
     final p = problem;
+    final l = look(p.kind);
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
-        border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
+        gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [QColors.cardMid, QColors.cardDeep]),
+        border: Border.all(color: QColors.borderSoft),
         borderRadius: BorderRadius.circular(QRadii.xl),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(p.what, style: QText.body(size: 15, height: 22, weight: FontWeight.w600, color: QColors.textHigh)),
-          if (p.why != null && p.why!.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(p.why!, style: QText.body(size: 13, height: 20, color: QColors.textMuted)),
-          ],
+          Center(
+            child: Container(
+              key: ValueKey('state-glyph-${p.kind.name}'),
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: l.tint.withValues(alpha: 0.12), border: Border.all(color: l.tint.withValues(alpha: 0.35))),
+              child: Icon(l.icon, size: 22, color: l.tint),
+            ),
+          ),
           const SizedBox(height: 14),
+          Text(p.what, textAlign: TextAlign.center, style: QText.body(size: 16, height: 23, weight: FontWeight.w600, color: QColors.textHigh)),
+          if (p.why != null && p.why!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(p.why!, textAlign: TextAlign.center, style: QText.body(size: 14, height: 21, color: QColors.textMuted)),
+          ],
+          const SizedBox(height: 18),
           QPrimaryButton(label: p.action.label, onTap: p.action.onTap, height: 48),
           if (p.secondary != null) ...[
             const SizedBox(height: 8),
@@ -230,6 +253,17 @@ class QStateCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The free space a state card sits in (O10): it takes the height it is
+/// given and puts the card at its optical centre — a little above the middle,
+/// where the eye expects the middle to be.
+class QStateArea extends StatelessWidget {
+  final Widget child;
+  const QStateArea({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) => Align(alignment: const Alignment(0, -0.18), child: child);
 }
 
 /// A [Problem]'s compact form, for where something was asked that another
@@ -699,24 +733,14 @@ class _Segment extends StatelessWidget {
 
 /// Keeps a message list pinned to the newest message.
 ///
-/// For a list drawn bottom-up ([reversed], `ListView(reverse: true)` with the
-/// newest message first), the newest message is always at offset 0, however
-/// tall the content above it grows, so pinning is one step: back to 0 when
-/// something new arrives, unless the person has scrolled up to read back
-/// (O7, O10).
-///
-/// For a list drawn top-down a single post-frame `animateTo(maxScrollExtent)`
-/// is not enough: the extent is measured before tall content (the target
-/// card, a meal breakdown) has finished laying out, so the list stops short
-/// and the newest message stays off screen until the user scrolls by hand.
-/// This re-settles a moment later, and gets out of the way if the user has
-/// deliberately scrolled up to read back through the conversation.
+/// Both of the app's conversations are drawn from the bottom up
+/// (`ListView(reverse: true)`, newest first: O7, O10), so the newest message
+/// is always at offset 0, however tall the content above it grows. Pinning
+/// is one step: back to 0 when something new arrives, unless the person has
+/// scrolled up to read back. The top-down list needed a second pass for
+/// content that finished laying out late; this one does not.
 class ChatScroller {
   final ScrollController controller = ScrollController();
-  final bool reversed;
-  ChatScroller({this.reversed = false});
-
-  Timer? _settle;
   int _signature = -1;
 
   /// Distance from the newest message within which we still consider the
@@ -727,40 +751,18 @@ class ChatScroller {
   void sync(int signature) {
     if (signature == _signature) return;
     _signature = signature;
-    _schedule();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _go());
   }
 
-  void _schedule() {
-    WidgetsBinding.instance.addPostFrameCallback((_) => _go(animate: true));
-    if (reversed) return;
-    _settle?.cancel();
-    // Second pass once late-laid-out content has grown the extent.
-    _settle = Timer(const Duration(milliseconds: 240), () => _go(animate: false));
-  }
-
-  void _go({required bool animate}) {
+  void _go() {
     if (!controller.hasClients) return;
     final pos = controller.position;
-    if (reversed) {
-      // Never yank the view away from someone reading earlier messages.
-      if (pos.pixels > _stickyWindow || pos.pixels == 0) return;
-      controller.animateTo(0, duration: const Duration(milliseconds: 240), curve: Curves.easeOutCubic);
-      return;
-    }
     // Never yank the view away from someone reading earlier messages.
-    if (pos.pixels < pos.maxScrollExtent - _stickyWindow && !animate) return;
-    if (animate) {
-      controller.animateTo(pos.maxScrollExtent,
-          duration: const Duration(milliseconds: 240), curve: Curves.easeOut);
-    } else {
-      controller.jumpTo(pos.maxScrollExtent);
-    }
+    if (pos.pixels > _stickyWindow || pos.pixels == 0) return;
+    controller.animateTo(0, duration: const Duration(milliseconds: 240), curve: Curves.easeOutCubic);
   }
 
-  void dispose() {
-    _settle?.cancel();
-    controller.dispose();
-  }
+  void dispose() => controller.dispose();
 }
 
 /// Holds the height its child last had while the child is empty (O7): a

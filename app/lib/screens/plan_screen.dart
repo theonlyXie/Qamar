@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/plan.dart';
+import '../models/problem.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
@@ -42,20 +43,50 @@ class _PlanScreenState extends State<PlanScreen> {
     final meals = state.planMeals();
     final dayTotal = meals.fold(0, (sum, m) => sum + mealKcal(m));
 
+    final header = <Widget>[
+      Row(children: [
+        QBackButton(onTap: state.back, isAr: state.isAr),
+        const SizedBox(width: 6),
+        Expanded(child: Text(t.plan, style: QText.display(size: 30, height: 38, color: const Color(0xFFF5F7FF)))),
+      ]),
+      const SizedBox(height: 4),
+      Text(t.planSub, style: QText.body(size: 14, height: 22, color: QColors.textMuted)),
+      const SizedBox(height: 10),
+    ];
+
+    // No plan yet, or one that could not be written: the state sits in the
+    // middle of the free space under the header, not stuck to its top with
+    // the rest of the screen empty below (O10).
+    if (!state.hasPlan) {
+      return CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 56, 20, 0),
+            sliver: SliverList(delegate: SliverChildListDelegate(header)),
+          ),
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, QLayout.pageBottom),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: QStateArea(child: _PlanEmpty(state: state))),
+                  const SizedBox(height: 14),
+                  _DayChanged(state: state),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 56, 20, QLayout.pageBottom),
       children: [
-        Row(children: [
-          QBackButton(onTap: state.back, isAr: state.isAr),
-          const SizedBox(width: 6),
-          Expanded(child: Text(t.plan, style: QText.display(size: 30, height: 38, color: const Color(0xFFF5F7FF)))),
-        ]),
-        const SizedBox(height: 4),
-        Text(t.planSub, style: QText.body(size: 14, height: 22, color: QColors.textMuted)),
-        const SizedBox(height: 10),
-        if (!state.hasPlan) ...[
-          _PlanEmpty(state: state),
-        ] else ...[
+        ...header,
+        ...[
           // A rewrite that did not happen (the plan's cap, a failure, a
           // fasting switch it could not follow) is said above the plan it
           // left in place, never only where it was asked (O10).
@@ -84,34 +115,49 @@ class _PlanScreenState extends State<PlanScreen> {
             const SizedBox(height: 14),
           ],
         ],
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: QColors.violet.withValues(alpha: 0.1),
-            border: Border.all(color: QColors.violet.withValues(alpha: 0.4)),
-            borderRadius: BorderRadius.circular(QRadii.xl),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(t.dayChanged, style: QText.body(size: 15, weight: FontWeight.w500, color: const Color(0xFFE9ECFF))),
-              const SizedBox(height: 8),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(999),
-                  onTap: state.openChat,
-                  child: Ink(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                    decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(999))),
-                    child: Text(t.adjustRoute, style: QText.body(size: 13, weight: FontWeight.w600, color: Colors.white)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        _DayChanged(state: state),
       ],
+    );
+  }
+}
+
+/// "Day changed?" and the way to say so: the conversation adjusts the route.
+class _DayChanged extends StatelessWidget {
+  final AppState state;
+  const _DayChanged({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = state.t;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+      decoration: BoxDecoration(
+        color: QColors.violet.withValues(alpha: 0.1),
+        border: Border.all(color: QColors.violet.withValues(alpha: 0.4)),
+        borderRadius: BorderRadius.circular(QRadii.xl),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(t.dayChanged, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.textBrand)),
+          const SizedBox(height: 4),
+          // Drawn as a 40pt pill, touched across 48 (O11).
+          QTapArea(
+            onTap: state.openChat,
+            builder: (context, pressed) => AnimatedOpacity(
+              opacity: pressed ? 0.82 : 1,
+              duration: const Duration(milliseconds: 90),
+              child: Container(
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(gradient: QColors.brandGradient, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),
+                child: Text(t.adjustRoute, style: QText.body(size: 13, weight: FontWeight.w600, color: Colors.white)),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -132,36 +178,39 @@ class _PlanEmpty extends StatelessWidget {
     final problem = state.planProblem;
     if (problem != null && !busy && !state.generalGuidance) return QStateCard(problem: problem);
 
+    // Nothing written yet, and nothing wrong: an empty state, with the way
+    // on as its button. The same two sentences as before, as what and why.
+    if (!busy && !state.generalGuidance) {
+      return QStateCard(
+        problem: Problem(
+          what: isAr ? 'لسه مفيش خطة لليوم.' : 'No plan for today yet.',
+          why: isAr ? 'هبنيها على هدفك واللي بتتجنبه.' : 'I’ll build it around your target and what you avoid.',
+          action: ProblemAction(isAr ? 'اعملي خطة النهاردة' : 'Build today’s plan', () => state.ensurePlan(force: true)),
+          kind: ProblemKind.empty,
+        ),
+      );
+    }
+
+    // Writing, or the general-guidance note (no button: it could only be
+    // refused).
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep]),
-        border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
+        border: Border.all(color: QColors.borderSoft),
         borderRadius: BorderRadius.circular(QRadii.xl),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            state.generalGuidance
-                ? state.generalGuidancePlanNote
-                : busy
-                ? (isAr ? 'بكتب خطة اليوم…' : 'Writing today’s plan…')
-                : (isAr
-                    ? 'لسه مفيش خطة لليوم. هبنيها على هدفك واللي بتتجنبه.'
-                    : 'No plan for today yet. I’ll build it around your target and what you avoid.'),
+            state.generalGuidance ? state.generalGuidancePlanNote : (isAr ? 'بكتب خطة اليوم…' : 'Writing today’s plan…'),
             style: QText.body(size: 14, height: 22, color: QColors.textHigh),
           ),
-          // No button on the general-guidance route: it could only be refused.
-          if (!state.generalGuidance) ...[
+          if (busy && !state.generalGuidance) ...[
             const SizedBox(height: 14),
-            QPrimaryButton(
-              label: busy
-                  ? (isAr ? 'ثانية…' : 'One moment…')
-                  : (isAr ? 'اعملي خطة النهاردة' : 'Build today’s plan'),
-              onTap: busy ? null : () => state.ensurePlan(force: true),
-              height: 48,
-            ),
+            QPrimaryButton(label: isAr ? 'ثانية…' : 'One moment…', onTap: null, height: 48),
           ],
         ],
       ),

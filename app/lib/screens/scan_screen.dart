@@ -98,18 +98,21 @@ class _ScanScreenState extends State<ScanScreen> {
                         child: Image.file(File(photo), fit: BoxFit.cover),
                       ),
                     ),
-                  Positioned.fill(
-                    child: Padding(
-                      padding: const EdgeInsets.all(26),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: QColors.violet.withValues(alpha: 0.55), width: 2),
+                  // The frame to fit the page in; not while the camera is off,
+                  // when there is nothing to fit and the problem takes its place.
+                  if (state.scanProblem == null)
+                    Positioned.fill(
+                      child: Padding(
+                        padding: const EdgeInsets.all(26),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: QColors.violet.withValues(alpha: 0.55), width: 2),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  if (photo == null)
+                  if (photo == null && state.scanProblem == null)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 34),
                       child: Column(
@@ -128,12 +131,14 @@ class _ScanScreenState extends State<ScanScreen> {
                         ],
                       ),
                     ),
+                  // The problem takes the viewfinder's middle, in place of what
+                  // it would have shown; never laid over its words (O10).
                   if (state.scanProblem != null)
-                    Positioned(
-                      left: 16,
-                      right: 16,
-                      bottom: 16,
-                      child: QStateCard(problem: state.scanProblem!),
+                    Positioned.fill(
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: QStateArea(child: QStateCard(problem: state.scanProblem!)),
+                      ),
                     ),
                   if (state.scanReading)
                     ClipRRect(

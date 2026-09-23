@@ -45,6 +45,12 @@ bool _stillness(BuildContext context) => MediaQuery.disableAnimationsOf(context)
 
 class AskQamarOverlay extends StatefulWidget {
   const AskQamarOverlay({super.key});
+
+  /// The conversation, drawn from the bottom up (O10).
+  static const transcriptKey = ValueKey('chat-transcript');
+
+  /// The suggestion row's end fade.
+  static const suggestionFadeKey = ValueKey('chat-suggestion-fade');
   @override
   State<AskQamarOverlay> createState() => _AskQamarOverlayState();
 }
@@ -99,19 +105,25 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                 child: Column(
                   children: [
                     _Header(state: state),
+                    // Drawn from the bottom up (O10): a fresh conversation's
+                    // first line sits on the field, where the eye is, and the
+                    // space above it is sky instead of a gap under it.
                     Expanded(
                       child: ListView(
+                        key: AskQamarOverlay.transcriptKey,
                         controller: _chat.controller,
+                        reverse: true,
                         // Dragging the conversation puts the keyboard away, the
                         // way every messaging app on the phone already does.
                         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
                         children: [
-                          for (final c in state.chat) _ChatBubble(turn: c),
-                          if (state.chatState == ChatState.thinking) const _Thinking(),
+                          // Newest first.
                           // What the assistant read off the meal, waiting to be
                           // confirmed. Nothing is written until it is.
                           if (state.hasProposal) const _ProposalCard(),
+                          if (state.chatState == ChatState.thinking) const _Thinking(),
+                          for (final c in state.chat.reversed) _ChatBubble(turn: c),
                         ],
                       ),
                     ),
@@ -128,7 +140,11 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                           if (showSuggestions) ...[
                             SizedBox(
                               height: QLayout.minTap,
-                              child: ListView(
+                              // The row fades out at its end, where it runs
+                              // on past the screen: a clipped chip read as
+                              // broken; a fading one reads as "more this way".
+                              child: _EndFade(
+                                child: ListView(
                                 scrollDirection: Axis.horizontal,
                                 padding: const EdgeInsets.symmetric(horizontal: 2),
                                 children: [
@@ -138,6 +154,7 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                                       child: _Chip(label: sug, onTap: () => state.chatSuggestionTap(sug)),
                                     ),
                                 ],
+                              ),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -409,6 +426,31 @@ class _AppearState extends State<_Appear> with SingleTickerProviderStateMixin {
 /// The composer: a field, and the three things you can do with it. The icons
 /// are bare glyphs at reading size inside a 40pt target — small on the screen,
 /// still a thumb's worth of tappable.
+/// Fades its child out towards the end edge (the right in English, the left
+/// in Arabic): a row that runs on past the screen says so.
+class _EndFade extends StatelessWidget {
+  final Widget child;
+  const _EndFade({required this.child});
+
+  static const fade = 28.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    return ShaderMask(
+      key: AskQamarOverlay.suggestionFadeKey,
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (r) => LinearGradient(
+        begin: rtl ? Alignment.centerRight : Alignment.centerLeft,
+        end: rtl ? Alignment.centerLeft : Alignment.centerRight,
+        colors: const [Color(0xFFFFFFFF), Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+        stops: [0, 1 - fade / r.width, 1],
+      ).createShader(r),
+      child: child,
+    );
+  }
+}
+
 class _Composer extends StatelessWidget {
   final AppState state;
   final TextEditingController ctrl;

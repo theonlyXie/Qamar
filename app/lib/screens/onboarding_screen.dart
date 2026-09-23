@@ -29,7 +29,7 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  final _chat = ChatScroller(reversed: true);
+  final _chat = ChatScroller();
   final _draftCtrl = TextEditingController();
 
   @override

@@ -222,9 +222,8 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
               filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
               child: Container(
                 color: const Color(0xDC070C19),
-                alignment: Alignment.center,
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: GestureDetector(onTap: () {}, child: QStateCard(problem: problem)),
+                child: QStateArea(child: GestureDetector(onTap: () {}, child: QStateCard(problem: problem))),
               ),
             ),
           ),
