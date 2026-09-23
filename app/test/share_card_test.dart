@@ -3,9 +3,15 @@
 // shared as an image and this is where it came from, but as a sign-off:
 // under a hairline, led by a crescent, from the start edge, in a colour
 // that passes AA on the card; the run, when it is shown, takes the other
-// end. Both languages.
+// end. Both languages. And the crescent is lit on the side the seven day
+// moons are, the right in both languages, where the glyph was lit on the
+// left and read as their mirror (seat 3).
+
+import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qamar/models/review.dart';
@@ -63,5 +69,49 @@ void main() {
         expect(find.byType(QamarMoon), findsNWidgets(7), reason: 'the mark is not an eighth day');
       });
     }
+  }
+
+  // The glyph is drawn from the icon font; without it there is nothing to
+  // measure.
+  final iconFont = File('/opt/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf').existsSync();
+  for (final ar in [false, true]) {
+    testWidgets('the crescent is lit on the side the day moons are (${ar ? 'ar' : 'en'})', (tester) async {
+      final monday = DateTime(2026, 9, 21);
+      // A week of part-filled days, so every moon shows a lit side.
+      final week = [for (var i = 0; i < 7; i++) DayTotals(day: monday.add(Duration(days: i)), kcal: const [400, 900, 1300, 1900, 700, 2600, 1500][i], meals: 2)];
+      final review = WeekReview.build(week: week, lastWeek: const [], targetKcal: 2000, streak: Streak.none, iso: (x) => x, hasTarget: true);
+      const shot = ValueKey('shot');
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: Center(child: RepaintBoundary(key: shot, child: ReviewCard(review: review, isAr: ar, showNumbers: false, showStreak: false, footer: 'dr-qamar.com', iso: (x) => x)))),
+      ));
+      final origin = tester.getRect(find.byKey(shot)).topLeft;
+      final (width, pixels) = (await tester.runAsync(() async {
+        final image = await tester.renderObject<RenderRepaintBoundary>(find.byKey(shot)).toImage(pixelRatio: 3);
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+        return (image.width, bytes!);
+      }))!;
+
+      // Where the light is across [r]: the centre of what is lit, from the
+      // middle of the box, as a share of its width. Right is positive.
+      double litSide(Rect r) {
+        final box = r.shift(-origin);
+        double sum = 0, weight = 0;
+        for (var y = (box.top * 3).floor(); y < (box.bottom * 3).ceil(); y++) {
+          for (var x = (box.left * 3).floor(); x < (box.right * 3).ceil(); x++) {
+            final i = (y * width + x) * 4;
+            final luma = 0.2126 * pixels.getUint8(i) + 0.7152 * pixels.getUint8(i + 1) + 0.0722 * pixels.getUint8(i + 2);
+            final w = (luma - 60).clamp(0, 255).toDouble();
+            sum += w * ((x + 0.5) / 3 - (box.center.dx));
+            weight += w;
+          }
+        }
+        return weight == 0 ? 0 : sum / weight / r.width;
+      }
+
+      final moons = [for (final e in find.byType(QamarMoon).evaluate()) litSide(tester.getRect(find.byWidget(e.widget)))];
+      expect(moons, everyElement(greaterThan(0.03)), reason: 'the day moons are lit on the right: $moons');
+      final mark = litSide(tester.getRect(find.byKey(ReviewCard.markKey)));
+      expect(mark, greaterThan(0.03), reason: 'the crescent is lit on the right too, not their mirror ($mark)');
+    }, skip: !iconFont);
   }
 }

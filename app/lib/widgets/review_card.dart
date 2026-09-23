@@ -126,7 +126,12 @@ class ReviewCard extends StatelessWidget {
               children: [
                 // A mark, not an eighth day: the day moons are the only
                 // QamarMoons on the card (seat 4's orb_day_test counts them).
-                const Icon(Icons.nightlight_round, key: ReviewCard.markKey, size: 14, color: QColors.moonbeam),
+                // Turned to be lit on the right, as the seven moons above it
+                // are in both languages; the glyph itself is lit on the left.
+                Transform.flip(
+                  flipX: true,
+                  child: const Icon(Icons.nightlight_round, key: ReviewCard.markKey, size: 14, color: QColors.moonbeam),
+                ),
                 const SizedBox(width: 8),
                 Text(footer, key: ReviewCard.footerKey, textDirection: TextDirection.ltr, style: QText.number(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
                 const Spacer(),
