@@ -13,8 +13,8 @@ import 'moon.dart';
 /// A moon for each day of the week, brightened from the resting crescent as
 /// far as that day's intake reached the target (a day with nothing logged is
 /// the resting moon, faint, never dark); the sentence the person did not
-/// expect; the one change for next week. No weight, ever. Calories only when [showNumbers]. The footer
-/// carries the link the card travels with.
+/// expect; the one change for next week. No weight, ever. Calories only when
+/// [showNumbers]. The sign-off carries the link the card travels with.
 class ReviewCard extends StatelessWidget {
   final WeekReview review;
   final bool isAr;
@@ -35,6 +35,11 @@ class ReviewCard extends StatelessWidget {
     required this.footer,
     required this.iso,
   });
+
+  /// The sign-off row and the link in it, for tests.
+  static const signOffKey = ValueKey('review-sign-off');
+  static const footerKey = ValueKey('review-footer');
+  static const markKey = ValueKey('review-mark');
 
   @override
   Widget build(BuildContext context) {
@@ -107,18 +112,28 @@ class ReviewCard extends StatelessWidget {
                 style: QText.number(size: 11, color: QColors.textMuted),
               ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
+            // The card's sign-off: the link it travels with, under a hairline,
+            // led by a crescent, from the start edge. It used to
+            // stand alone at the far end of an empty row, which read as a
+            // stray watermark rather than as where the card came from. The
+            // run, when it is shown, takes the other end.
+            const Divider(color: QColors.borderSoft, height: 1),
+            const SizedBox(height: 12),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              key: ReviewCard.signOffKey,
               children: [
+                // A mark, not an eighth day: the day moons are the only
+                // QamarMoons on the card (seat 4's orb_day_test counts them).
+                const Icon(Icons.nightlight_round, key: ReviewCard.markKey, size: 14, color: QColors.moonbeam),
+                const SizedBox(width: 8),
+                Text(footer, key: ReviewCard.footerKey, textDirection: TextDirection.ltr, style: QText.number(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
+                const Spacer(),
                 if (showStreak && review.streak.current >= 2)
                   Text(
                     isAr ? '${iso('${review.streak.current}')} أيام ورا بعض' : '${review.streak.current} days in a row',
                     style: QText.body(size: 11, color: QColors.cyan),
-                  )
-                else
-                  const SizedBox.shrink(),
-                Text(footer, textDirection: TextDirection.ltr, style: QText.number(size: 11, color: QColors.textMuted)),
+                  ),
               ],
             ),
           ],
