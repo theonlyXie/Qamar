@@ -18,7 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// Unread before this test, left for their owners to use or retire.
 const _owed = {
   'restart', 'guestNote', 'walletSub', 'priceLabel', 'limitLabel', 'barcode', 'barcodeSub',
-  'labelSub', 'suEarned', 'logMeal', 'logSub', 'voiceSub', 'textSub', 'recent',
+  'labelSub', 'suEarned', 'logSub', 'voiceSub', 'textSub', 'recent',
   'recentSub', 'describeMeal', 'analyzing', 'sourcePreview',
   'uncertainNote', 'online', 'sIdle', 'sAnswer', 'tapPrompt',
 };
