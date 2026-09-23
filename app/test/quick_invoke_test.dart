@@ -38,6 +38,28 @@ void main() {
     expect(QuickInvoke.parseMap({'action': 'invite'}), isNull);
   });
 
+  test('a nutritionist\'s code link carries the code through the same doors, with p', () {
+    expect(QuickInvoke.parseUri(Uri.parse('https://dr-qamar.com/p/QMRSARA1'))?.kind, 'pro');
+    expect(QuickInvoke.parseUri(Uri.parse('https://dr-qamar.com/p/QMRSARA1'))?.text, 'QMRSARA1');
+    expect(QuickInvoke.parseUri(Uri.parse('https://www.dr-qamar.com/p/abc/'))?.text, 'abc');
+    expect(QuickInvoke.parseUri(Uri.parse('qamar://p/QMR1'))?.kind, 'pro');
+    expect(QuickInvoke.parseUri(Uri.parse('com.qamar.app://p/QMR2'))?.text, 'QMR2');
+    expect(QuickInvoke.parseUri(Uri.parse('https://dr-qamar.com/i/QMR-7H2K9'))?.kind, 'invite', reason: 'an invitation is still an invitation');
+    expect(QuickInvoke.parseUri(Uri.parse('https://evil.example/p/QMR1')), isNull, reason: 'only the site’s own host');
+    expect(QuickInvoke.parseMap({'action': 'pro', 'text': ' QMRSARA1 '})?.kind, 'pro');
+    expect(QuickInvoke.parseMap({'action': 'pro', 'text': ' QMRSARA1 '})?.text, 'QMRSARA1');
+    expect(QuickInvoke.parseMap({'action': 'pro'}), isNull);
+  });
+
+  test('a nutritionist\'s code before there is an account waits on the phone, and says so', () async {
+    final state = AppState()..setLang(AppLang.en);
+    QuickInvoke.apply(state, const QuickAction(kind: 'pro', text: 'qmrsara1'));
+    await Future<void>.delayed(Duration.zero);
+    expect(state.pendingProCode, 'QMRSARA1');
+    expect(state.proCodeWaiting, isTrue);
+    expect(state.proNotice, contains('kept on this phone'));
+  });
+
   test('a link before there is an account waits on the phone, with a word on Welcome', () async {
     final state = AppState()..setLang(AppLang.en);
     QuickInvoke.apply(state, const QuickAction(kind: 'invite', text: 'QMR-9'));

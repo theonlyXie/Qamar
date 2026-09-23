@@ -202,6 +202,20 @@ certificate's SHA-256) and `/.well-known/apple-app-site-association` (iOS,
 team id + bundle id, path `/i/*`), and the Runner target needs the Associated
 Domains capability attached in Xcode (`ios/Runner/Runner.entitlements`).
 
+**A nutritionist's code** (O12, migration 0069) comes the same two ways: typed
+in Me ("Your nutritionist's code"), or by `https://dr-qamar.com/p/<code>` /
+`qamar://p/<code>`. It waits on the phone exactly as an invitation does, and
+while it waits the seven-day week is not offered. `qamar_redeem_pro_code` puts
+the professional on the account (`pro_code_claims`, which checkout reads when no
+code is typed, so their 20% reaches them from the first payment) and, while the
+account's one trial is unused, starts `billing_config.pro_trial_days` (14) with
+`plus_trials.source = 'pro'`. Only a code the operator has confirmed starts the
+trial: every account gets an affiliate code the first time Me loads, so without
+the check anyone could hand out fourteen days. To confirm a professional:
+`update promo_codes set professional = true where code = '<their code>';`. For
+the https link to open the app, the site's `apple-app-site-association` must
+list `/p/*` beside `/i/*` (the Android filter is in the manifest).
+
 **Photos** are taken at one setting for the whole app (`lib/services/photos.dart`:
 1280 px, JPEG quality 72, roughly 200 KB) and the cached shot is deleted once
 its verdict is in. **Offline logging**: a meal, a glass or a walk that fails to
@@ -256,6 +270,21 @@ Without the key the SDK is never initialised. With it, three rules hold:
   pg_cron records them nightly into `kill_metrics_daily` for the last sixty
   days of sign-ups. Service role only. The phone's fourteen-day push window
   counts from the same server day 0 (`qamar_account_day0`).
+
+  Where a trial came from is written when it starts (0069): the free week
+  (`qamar_start_trial(uuid)`, reached by the paywall, the lock card and
+  onboarding's offer) writes `organic`, a nutritionist's code writes `pro`.
+  An invitation's fortnight is still attributed by the metric (0059).
+
+- **A refusal that can pass later needs its own SQLSTATE.** The phone keeps
+  a waiting invitation or nutritionist's code until the server has answered
+  it, and treats the redeem function's own refusal — a plain `raise
+  exception`, SQLSTATE P0001 — as final, clearing the code (all except
+  "not signed in", which is about the session). Every refusal in
+  `qamar_redeem_invitation` and `qamar_redeem_pro_code` is final today. A
+  temporary one added later (a rate limit, a maintenance window) must be
+  raised with another SQLSTATE, e.g. `raise exception '…' using errcode =
+  'QM001'`, or the app will delete a code that would have worked.
 
 Native auto-init is off in `AndroidManifest.xml` and `Info.plist`
 (`com.posthog.posthog.AUTO_INIT = false`), so the plugin cannot start itself

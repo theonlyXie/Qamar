@@ -90,6 +90,7 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="qamar" android:host="i"/>
+                <data android:scheme="qamar" android:host="p"/>
             </intent-filter>
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
@@ -97,6 +98,9 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="dr-qamar.com" android:pathPrefix="/i/"/>
                 <data android:scheme="https" android:host="www.dr-qamar.com" android:pathPrefix="/i/"/>
+                <!-- A nutritionist's code: https://dr-qamar.com/p/<code>. -->
+                <data android:scheme="https" android:host="dr-qamar.com" android:pathPrefix="/p/"/>
+                <data android:scheme="https" android:host="www.dr-qamar.com" android:pathPrefix="/p/"/>
             </intent-filter>
             <intent-filter>
                 <action android:name="com.qamar.app.QUICK_ASK"/>

@@ -4,10 +4,12 @@ import {
   PLANS,
   PRO_SHARE_MONTHS,
   PRO_SHARE_PERCENT,
+  chooseSavedPromo,
   isPlanId,
   normalizePromoCode,
   proShareCents,
   quotePlus,
+  savedProfessional,
   type Promo,
 } from "./pricing.ts";
 
@@ -88,4 +90,41 @@ Deno.test("a campaign code is the one thing that can move the price, and it neve
 
 Deno.test("promo codes are compared in uppercase without spaces", () => {
   assertEquals(normalizePromoCode(" qmr 7k2p "), "QMR7K2P");
+});
+
+Deno.test("a code redeemed before paying is read back as that professional's code", () => {
+  // The pro_code_claims row the billing function reads (0069), promo_codes embedded.
+  const claim = savedProfessional({
+    promo_code_id: "promo-sara",
+    affiliate_user_id: "dr-sara",
+    promo_codes: { code: "QMRSARA1", active: true },
+  });
+  assertEquals(claim?.kind, "affiliate");
+  assertEquals(claim?.ownerUserId, "dr-sara");
+  assertEquals(claim?.code, "QMRSARA1");
+  assertEquals(claim?.id, "promo-sara");
+  // Checkout with no typed code then pays the professional, at the same price.
+  const q = quotePlus({ plan: "monthly", firstPurchase: true, buyerUserId: "client", promo: claim });
+  assertEquals(q.amountCents, LIST_MONTHLY_CENTS);
+  assertEquals(q.pricingReason, "affiliate");
+  assertEquals(q.affiliateUserId, "dr-sara");
+  assertEquals(q.affiliateCommissionCents, 10_000);
+  // A row that names nobody attaches nothing.
+  assertEquals(savedProfessional(null), null);
+  assertEquals(savedProfessional({ promo_code_id: "x" }), null);
+  // A professional who has been switched off is read as inactive, and earns nothing.
+  const off = savedProfessional({ affiliate_user_id: "dr-sara", promo_codes: { code: "QMRSARA1", active: false } });
+  assertEquals(quotePlus({ plan: "monthly", firstPurchase: true, buyerUserId: "client", promo: off }).affiliateCommissionCents, 0);
+});
+
+Deno.test("with no typed code, the referral wins, and the claim is read only when there is none", async () => {
+  const referral: Promo = { ...PRO, ownerUserId: "dr-referral" };
+  const claim: Promo = { ...PRO, ownerUserId: "dr-claim" };
+  let claimReads = 0;
+  const readClaim = () => { claimReads++; return Promise.resolve(claim); };
+  assertEquals((await chooseSavedPromo(() => Promise.resolve(referral), readClaim))?.ownerUserId, "dr-referral");
+  assertEquals(claimReads, 0);
+  assertEquals((await chooseSavedPromo(() => Promise.resolve(null), readClaim))?.ownerUserId, "dr-claim");
+  assertEquals(claimReads, 1);
+  assertEquals(await chooseSavedPromo(() => Promise.resolve(null), () => Promise.resolve(null)), null);
 });

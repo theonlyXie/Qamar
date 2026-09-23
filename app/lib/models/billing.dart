@@ -264,6 +264,15 @@ class CheckoutSession {
 /// EGP cash owed to an affiliate. Separate from the Su Points wallet.
 class AffiliateWallet {
   final String? code;
+
+  /// The operator has confirmed this code as a nutritionist's, coach's or
+  /// clinic's (0069). Only then does a client who enters it get the free
+  /// trial; the share at payment does not depend on it.
+  final bool professional;
+
+  /// The trial a client who enters a confirmed code gets, in the server's
+  /// days (billing_config 'pro_trial_days', 0069); 0 when not stated.
+  final int clientTrialDays;
   final int balanceCents;
   final int lifetimeEarnedCents;
   final int pendingPayoutCents;
@@ -272,6 +281,8 @@ class AffiliateWallet {
 
   const AffiliateWallet({
     this.code,
+    this.professional = false,
+    this.clientTrialDays = 0,
     this.balanceCents = 0,
     this.lifetimeEarnedCents = 0,
     this.pendingPayoutCents = 0,
@@ -287,6 +298,8 @@ class AffiliateWallet {
   factory AffiliateWallet.fromJson(Map<String, dynamic> json) {
     return AffiliateWallet(
       code: json['code'] as String?,
+      professional: json['professional'] == true,
+      clientTrialDays: (json['client_trial_days'] as num?)?.toInt() ?? 0,
       balanceCents: (json['balance_cents'] as num?)?.toInt() ?? 0,
       lifetimeEarnedCents: (json['lifetime_earned_cents'] as num?)?.toInt() ?? 0,
       pendingPayoutCents: (json['pending_payout_cents'] as num?)?.toInt() ?? 0,

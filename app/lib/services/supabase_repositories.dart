@@ -50,6 +50,18 @@ class SupabaseInvitationRepository implements InvitationRepository {
       throw InvitationException(e.message, refused: e.code == 'P0001' && e.message != 'not signed in');
     }
   }
+
+  @override
+  Future<ProCodeRedemption> redeemPro(String userId, {required String code}) async {
+    try {
+      final raw = await _client.rpc('qamar_redeem_pro_code', params: {'p_code': code});
+      return ProCodeRedemption.fromJson(Map<String, dynamic>.from(raw as Map));
+    } on PostgrestException catch (e) {
+      // The same rule as an invitation: the function's own refusals (P0001)
+      // are final answers about the code; "not signed in" is about the session.
+      throw InvitationException(e.message, refused: e.code == 'P0001' && e.message != 'not signed in');
+    }
+  }
 }
 
 class SupabaseActivityRepository implements ActivityRepository {

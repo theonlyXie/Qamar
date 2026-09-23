@@ -64,6 +64,14 @@ class MainActivity : FlutterActivity() {
                 enqueue("invite", data.pathSegments[1])
             data != null && data.scheme == "com.qamar.app" && data.host == "i" && data.pathSegments.isNotEmpty() ->
                 enqueue("invite", data.pathSegments[0])
+            // A nutritionist's code: the same doors, with p instead of i.
+            data != null && (data.scheme == "qamar" || data.scheme == "com.qamar.app") &&
+                data.host == "p" && data.pathSegments.isNotEmpty() ->
+                enqueue("pro", data.pathSegments[0])
+            data != null && (data.scheme == "https" || data.scheme == "http") &&
+                (data.host == "dr-qamar.com" || data.host == "www.dr-qamar.com") &&
+                data.pathSegments.size >= 2 && data.pathSegments[0] == "p" ->
+                enqueue("pro", data.pathSegments[1])
             data != null && data.scheme == "com.qamar.app" -> {
                 val host = data.host ?: ""
                 val segs = data.pathSegments

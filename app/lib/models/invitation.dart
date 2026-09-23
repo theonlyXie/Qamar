@@ -110,3 +110,19 @@ class InvitationRedemption {
         trialDays: (j['trial_days'] as num?)?.toInt() ?? 0,
       );
 }
+
+/// What redeeming a nutritionist's code returns (qamar_redeem_pro_code, 0069):
+/// the professional's name, and the fortnight's days — 0 when the account's
+/// one free trial was already used or it has paid, when the code still puts
+/// the professional on the account for their share.
+class ProCodeRedemption {
+  final String professionalName;
+  final int trialDays;
+
+  const ProCodeRedemption({required this.professionalName, required this.trialDays});
+
+  factory ProCodeRedemption.fromJson(Map<String, dynamic> j) => ProCodeRedemption(
+        professionalName: j['professional_name'] as String? ?? '',
+        trialDays: (j['trial_days'] as num?)?.toInt() ?? 0,
+      );
+}

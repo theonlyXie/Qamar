@@ -11,7 +11,7 @@ import '../state/app_state.dart';
 class QuickAction {
   /// `ask` — open the companion and answer. `log` — treat speech/text as a
   /// meal. `plus` — back from Paymob. `invite` — an invitation code from a
-  /// link, in [text].
+  /// link, in [text]. `pro` — a nutritionist's code from a link, in [text].
   final String kind;
   final String? text;
   const QuickAction({required this.kind, this.text});
@@ -27,17 +27,24 @@ class QuickInvoke {
   /// The invitation code in a link, or null: `qamar://i/<code>`,
   /// `com.qamar.app://i/<code>`, or the site's `https://dr-qamar.com/i/<code>`
   /// that the shared message carries.
-  static String? inviteCode(Uri uri) {
+  static String? inviteCode(Uri uri) => _codeIn(uri, 'i');
+
+  /// A nutritionist's code in a link, or null: `qamar://p/<code>`,
+  /// `com.qamar.app://p/<code>`, or `https://dr-qamar.com/p/<code>` — the
+  /// same doors as an invitation, with their own letter.
+  static String? proCode(Uri uri) => _codeIn(uri, 'p');
+
+  static String? _codeIn(Uri uri, String door) {
     final segs = uri.pathSegments.where((s) => s.isNotEmpty).toList();
     final scheme = uri.scheme.toLowerCase();
     final host = uri.host.toLowerCase();
-    if ((scheme == 'qamar' || scheme == 'com.qamar.app') && host == 'i' && segs.isNotEmpty) {
+    if ((scheme == 'qamar' || scheme == 'com.qamar.app') && host == door && segs.isNotEmpty) {
       return segs.first.trim();
     }
     if ((scheme == 'https' || scheme == 'http') &&
         (host == 'dr-qamar.com' || host == 'www.dr-qamar.com') &&
         segs.length >= 2 &&
-        segs[0] == 'i') {
+        segs[0] == door) {
       return segs[1].trim();
     }
     return null;
@@ -47,6 +54,8 @@ class QuickInvoke {
   static QuickAction? parseUri(Uri uri) {
     final code = inviteCode(uri);
     if (code != null && code.isNotEmpty) return QuickAction(kind: 'invite', text: code);
+    final pro = proCode(uri);
+    if (pro != null && pro.isNotEmpty) return QuickAction(kind: 'pro', text: pro);
     if (uri.scheme != 'com.qamar.app') return null;
     final host = uri.host;
     final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
@@ -68,9 +77,9 @@ class QuickInvoke {
     if (raw is! Map) return null;
     final kind = raw['action']?.toString() ?? raw['kind']?.toString();
     if (kind == 'plus') return const QuickAction(kind: 'plus');
-    if (kind == 'invite') {
+    if (kind == 'invite' || kind == 'pro') {
       final code = (raw['text'] ?? raw['code'])?.toString().trim();
-      return code == null || code.isEmpty ? null : QuickAction(kind: 'invite', text: code);
+      return code == null || code.isEmpty ? null : QuickAction(kind: kind!, text: code);
     }
     if (kind != 'ask' && kind != 'log') return null;
     final text = raw['text']?.toString() ?? raw['q']?.toString();
@@ -85,6 +94,10 @@ class QuickInvoke {
     }
     if (action.kind == 'invite') {
       state.acceptInvitationLink(action.text ?? '');
+      return;
+    }
+    if (action.kind == 'pro') {
+      state.acceptProLink(action.text ?? '');
       return;
     }
     if (action.isLog) {

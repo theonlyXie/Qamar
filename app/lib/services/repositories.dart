@@ -117,6 +117,10 @@ abstract class InvitationRepository {
   Future<InvitationBook> mine(String userId);
   Future<Invitation> issue(String userId, {required String name});
   Future<InvitationRedemption> redeem(String userId, {required String code});
+
+  /// A nutritionist's or coach's code (0069): puts the professional on the
+  /// account and, while its one trial is unused, starts the fortnight.
+  Future<ProCodeRedemption> redeemPro(String userId, {required String code});
 }
 
 class InvitationException implements Exception {

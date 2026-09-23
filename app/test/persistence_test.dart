@@ -509,6 +509,20 @@ class FakeInvitationRepo implements InvitationRepository {
     redeemCodes.add(code);
     return redemption;
   }
+
+  // A nutritionist's code (0069).
+  final List<String> proCodes = [];
+  ProCodeRedemption proRedemption = const ProCodeRedemption(professionalName: 'Dr. Sara', trialDays: 14);
+  Object? proFailWith;
+  void Function()? onRedeemPro;
+
+  @override
+  Future<ProCodeRedemption> redeemPro(String userId, {required String code}) async {
+    if (proFailWith != null) throw proFailWith!;
+    proCodes.add(code);
+    onRedeemPro?.call();
+    return proRedemption;
+  }
 }
 
 AppState backed({
@@ -3317,6 +3331,129 @@ void main() {
       expect(state.pendingInvitationCode, isNull);
       expect(await prefs.getString('pending_invitation'), '');
       expect(state.invitationNotice, 'this invitation was already used');
+    });
+  });
+
+  // A nutritionist's code (O12, 0069): the fortnight, the professional on the
+  // account, and the same waiting rules as an invitation.
+  group('a nutritionist\'s code', () {
+    Future<void> toReveal(AppState state) async {
+      state.startOnboarding();
+      state.step = kOnboardingSteps.indexWhere((s) => s.id == 'food');
+      state.primarySubmit();
+      await Future<void>.delayed(const Duration(milliseconds: 2600));
+    }
+
+    test('a link with an account redeems at once: the professional\'s name and the server\'s days, in both languages', () async {
+      for (final lang in AppLang.values) {
+        final billing = FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: true);
+        final inv = FakeInvitationRepo()
+          ..onRedeemPro = () => billing.current = PlusEntitlement(
+                status: 'active',
+                plan: 'monthly',
+                periodEnd: DateTime.now().toUtc().add(const Duration(days: 14)),
+                provider: 'trial',
+              );
+        final prefs = MemoryDevicePrefs();
+        final state = backed(billing: billing, invitations: inv, prefs: prefs)..setLang(lang);
+        await settle();
+        await state.acceptProLink('qmr sara1');
+        await settle();
+        expect(inv.proCodes, ['QMRSARA1'], reason: 'normalised as the server compares it');
+        expect(state.proName, 'Dr. Sara');
+        expect(state.plusIsTrial, isTrue, reason: 'the entitlement is read again: the fortnight is on');
+        expect(state.pendingProCode, isNull);
+        expect(await prefs.getString('pending_pro_code'), '');
+        expect(await prefs.getString('pro_code_name'), 'Dr. Sara');
+        expect(
+          state.proNotice,
+          lang == AppLang.ar ? contains('\u2066١٤\u2069 يوم قمر+') : contains('14 days of Qamar+ are yours from now'),
+        );
+        expect(state.proNotice, lang == AppLang.ar ? contains('ومفيش حاجة بتتجدد لوحدها') : contains('nothing renews on its own'));
+      }
+    });
+
+    test('a code after the trial was used puts the professional on the account and promises no days', () async {
+      final inv = FakeInvitationRepo()..proRedemption = const ProCodeRedemption(professionalName: 'Dr. Sara', trialDays: 0);
+      final state = backed(invitations: inv)..setLang(AppLang.en);
+      await settle();
+      await state.enterProCode('QMRSARA1');
+      await settle();
+      expect(state.proNotice, 'Dr. Sara’s code is on your account. When you subscribe they get their share, at the same price.');
+      expect(state.proNotice, isNot(contains('days')));
+    });
+
+    test('while a code waits, no free week is offered: Start would spend the one trial its fortnight needs', () async {
+      final prefs = MemoryDevicePrefs();
+      await prefs.setString('pending_pro_code', 'QMRSARA1');
+      final billing = FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: true);
+      final inv = FakeInvitationRepo()..proFailWith = StateError('no signal');
+      final state = backed(billing: billing, invitations: inv, prefs: prefs);
+      await settle();
+      expect(state.proCodeWaiting, isTrue, reason: 'a redeem that could not reach the server keeps the code');
+      expect(await prefs.getString('pending_pro_code'), 'QMRSARA1');
+      expect(state.trialWaiting, isFalse, reason: 'so Me does not say "7 days" either');
+      await toReveal(state);
+      expect(state.msgs.any((m) => m.kind == ObKind.trialOffer), isFalse);
+      expect(billing.trialStarts, 0);
+
+      final ok = FakeInvitationRepo();
+      final next = backed(invitations: ok, prefs: prefs);
+      await settle();
+      expect(ok.proCodes, ['QMRSARA1'], reason: 'the next connected start tries again');
+      expect(next.proCodeWaiting, isFalse);
+      expect(await prefs.getString('pending_pro_code'), '');
+    });
+
+    test('a code the server refuses is an answer: cleared, and said in the person\'s language', () async {
+      for (final lang in AppLang.values) {
+        final prefs = MemoryDevicePrefs();
+        await prefs.setString('pending_pro_code', 'QMROMAR1');
+        final inv = FakeInvitationRepo()..proFailWith = const InvitationException("that code is not a nutritionist's", refused: true);
+        final state = backed(invitations: inv, prefs: prefs)..setLang(lang);
+        await settle();
+        expect(state.pendingProCode, isNull);
+        expect(await prefs.getString('pending_pro_code'), '');
+        expect(state.trialWaiting, isFalse, reason: 'the fake billing has no trial to offer; the point is the code no longer blocks one');
+        expect(
+          state.proNotice,
+          lang == AppLang.ar ? contains('الكود ده مش لأخصائي') : 'That code is not a nutritionist’s. If a friend gave it to you, enter it when you subscribe.',
+        );
+      }
+    });
+
+    test('"not signed in" is about the session, so the code is kept', () async {
+      final prefs = MemoryDevicePrefs();
+      await prefs.setString('pending_pro_code', 'QMRSARA1');
+      final inv = FakeInvitationRepo()..proFailWith = const InvitationException('not signed in');
+      final state = backed(invitations: inv, prefs: prefs);
+      await settle();
+      expect(state.pendingProCode, 'QMRSARA1');
+      expect(await prefs.getString('pending_pro_code'), 'QMRSARA1');
+    });
+
+    test('an invitation and a nutritionist\'s code both waiting: the invitation goes first, the code still attaches', () async {
+      final prefs = MemoryDevicePrefs();
+      await prefs.setString('pending_invitation', 'QMR-LATER');
+      await prefs.setString('pending_pro_code', 'QMRSARA1');
+      final inv = FakeInvitationRepo();
+      final state = backed(invitations: inv, prefs: prefs);
+      await settle();
+      expect(inv.redeemCodes, ['QMR-LATER']);
+      expect(inv.proCodes, ['QMRSARA1']);
+      expect(state.invitationWaiting || state.proCodeWaiting, isFalse);
+    });
+
+    test('signing out forgets the professional, not the phone\'s waiting code', () async {
+      final prefs = MemoryDevicePrefs();
+      final state = backed(invitations: FakeInvitationRepo(), prefs: prefs);
+      await settle();
+      await state.enterProCode('QMRSARA1');
+      await settle();
+      expect(state.proName, 'Dr. Sara');
+      state.restart();
+      expect(state.proName, isNull);
+      expect(await prefs.getString('pro_code_name'), '');
     });
   });
 

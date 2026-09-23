@@ -154,6 +154,8 @@ class YouScreen extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 14),
+        _ProCodeCard(state: state),
+        const SizedBox(height: 14),
         _AffiliateCard(state: state),
         if (state.proClients.isNotEmpty) ...[
           const SizedBox(height: 12),
@@ -595,6 +597,105 @@ class _InvitationsCardState extends State<_InvitationsCard> {
   }
 }
 
+/// A client's side of the professional programme: the code a nutritionist or
+/// coach gave them (O12). It puts the professional on the account, so their
+/// share reaches them at the first payment with no code typed at checkout,
+/// and starts the free trial while the account's one trial is unused. The
+/// length is the server's; this card never states a number the server can
+/// change, and the answer says the days actually given.
+class _ProCodeCard extends StatefulWidget {
+  final AppState state;
+  const _ProCodeCard({required this.state});
+
+  static const fieldKey = ValueKey('pro-code-field');
+  static const useKey = ValueKey('pro-code-use');
+
+  @override
+  State<_ProCodeCard> createState() => _ProCodeCardState();
+}
+
+class _ProCodeCardState extends State<_ProCodeCard> {
+  final _code = TextEditingController();
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final isAr = state.isAr;
+    final who = state.proName;
+    return Container(
+      key: const ValueKey('pro-code-card'),
+      padding: const EdgeInsets.all(16),
+      decoration: QDecor.card(color: QColors.cardDeep, border: QColors.borderFaint, radius: QRadii.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(isAr ? 'كود أخصائيك' : 'Your nutritionist’s code',
+              style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
+          const SizedBox(height: 4),
+          Text(
+            who != null
+                ? (isAr ? 'كود $who على حسابك. السعر زي ما هو، وبياخد نصيبه لما تشترك.' : '$who’s code is on your account. Your price is the same, and they get their share when you subscribe.')
+                : (isAr
+                    ? 'لو أخصائي تغذية أو مدرّب بعتك، اكتب الكود بتاعه. لو لسه ما خدتش التجربة المجانية، بتبدأ دلوقتي، وهو بياخد نصيبه لما تشترك. السعر مش بيتغير.'
+                    : 'If a nutritionist or coach sent you, enter their code. If you have not had your free trial yet, it starts now, and they get their share when you subscribe. Your price does not change.'),
+            style: QText.body(size: 12, height: 18, color: QColors.textMuted),
+          ),
+          if (who == null) ...[
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(
+                child: TextField(
+                  key: _ProCodeCard.fieldKey,
+                  controller: _code,
+                  // A code is Latin letters and digits: left to right in
+                  // both languages, or Arabic turns "QMR…" into "…QMR".
+                  textDirection: TextDirection.ltr,
+                  enabled: !state.proBusy,
+                  textCapitalization: TextCapitalization.characters,
+                  autocorrect: false,
+                  style: QText.number(size: 15, color: QColors.textHigh),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: 'QMR…',
+                    hintStyle: QText.body(size: 14, color: QColors.textFaint),
+                    filled: true,
+                    fillColor: QColors.cardMid,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              QOutlineButton(
+                key: _ProCodeCard.useKey,
+                label: isAr ? 'استخدم الكود' : 'Use the code',
+                height: 44,
+                color: QColors.cyan,
+                onTap: state.proBusy
+                    ? null
+                    : () async {
+                        await state.enterProCode(_code.text);
+                        if (state.proName != null) _code.clear();
+                      },
+              ),
+            ]),
+          ],
+          if (state.proNotice != null) ...[
+            const SizedBox(height: 8),
+            Text(state.proNotice!, style: QText.body(size: 12, height: 18, color: QColors.amberSoft)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _AffiliateCard extends StatelessWidget {
   final AppState state;
   const _AffiliateCard({required this.state});
@@ -615,9 +716,20 @@ class _AffiliateCard extends StatelessWidget {
               style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textHigh)),
           const SizedBox(height: 4),
           Text(
-            isAr
-                ? 'لو إنت أخصائي تغذية أو مدرّب: اديلي الكود ده لعميلك. يشترك بـ ٥٠٠ ج.م زي أي حد، وإنت يوصلك ١٠٠ ج.م كل شهر لمدة سنة. كاش بالجنيه، مش نقاط Su.'
-                : 'For nutritionists and coaches: give this code to a client. They subscribe at EGP 500 like anyone else, and you earn EGP 100 a month for a year. EGP cash, not Su Points.',
+            (isAr
+                    ? 'لو إنت أخصائي تغذية أو مدرّب: اديلي الكود ده لعميلك. يشترك بـ ٥٠٠ ج.م زي أي حد، وإنت يوصلك ١٠٠ ج.م كل شهر لمدة سنة. كاش بالجنيه، مش نقاط Su.'
+                    : 'For nutritionists and coaches: give this code to a client. They subscribe at EGP 500 like anyone else, and you earn EGP 100 a month for a year. EGP cash, not Su Points.') +
+                // The trial rides only on a code the operator has confirmed
+                // (0069), and its length is the server's.
+                (wallet.clientTrialDays <= 0
+                    ? ''
+                    : wallet.professional
+                        ? (isAr
+                            ? ' عميلك لما يكتبه في «حسابي» قبل ما يشترك بياخد ${state.iso('${wallet.clientTrialDays}')} يوم قمر+ ببلاش.'
+                            : ' A client who enters it in Me before subscribing also gets ${wallet.clientTrialDays} days of Qamar+ free.')
+                        : (isAr
+                            ? ' لما قمر يتأكد إنك أخصائي أو مدرّب، عميلك اللي يكتبه في «حسابي» بياخد كمان ${state.iso('${wallet.clientTrialDays}')} يوم قمر+ ببلاش.'
+                            : ' Once Qamar confirms you are a nutritionist or coach, a client who enters it in Me also gets ${wallet.clientTrialDays} days of Qamar+ free.')),
             style: QText.body(size: 12, height: 18, color: QColors.textMuted),
           ),
           const SizedBox(height: 10),

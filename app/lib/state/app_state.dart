@@ -192,9 +192,13 @@ class AppState extends ChangeNotifier {
       final asked = await p.getString(_kRamadanAsked);
       final weekSeen = await p.getString(_kWeekCardSeen);
       final invite = await p.getString(_kPendingInvite);
+      final proCode = await p.getString(_kPendingProCode);
+      final proWho = await p.getString(_kProName);
       if (_disposed) return;
       // A code from an earlier launch is still waiting to be redeemed.
       if (invite != null && invite.trim().isNotEmpty) pendingInvitationCode ??= invite.trim();
+      if (proCode != null && proCode.trim().isNotEmpty) pendingProCode ??= proCode.trim();
+      if (proWho != null && proWho.trim().isNotEmpty) proName ??= proWho.trim();
       if (asked != null) ramadanAskedFor = asked;
       if (weekSeen != null) _weekCardSeenDay = weekSeen;
       if (reviewNumbers != null) reviewShowNumbers = reviewNumbers;
@@ -559,6 +563,7 @@ class AppState extends ChangeNotifier {
       _notify();
       _rescheduleNudges();
       await _redeemPendingInvitation();
+      await _redeemPendingProCode();
     } catch (e) {
       syncError = 'load: $e';
       _notify();
@@ -1255,6 +1260,9 @@ class AppState extends ChangeNotifier {
     plusFirstPurchase = true;
     affiliateWallet = AffiliateWallet.empty;
     affiliateNotice = null;
+    proName = null;
+    proNotice = null;
+    _prefs?.setString(_kProName, '').catchError((_) {});
     if (improve) setImprove(false).ignore();
     // Whatever was waiting for an answer belonged to the session that ended,
     // and so did what the welcome has already counted.
@@ -2268,12 +2276,13 @@ class AppState extends ChangeNotifier {
   // nothing renews." — Start or Not now. Not now leaves it waiting in Me.
   // Offered only where it can actually start: a backed account, billing
   // configured, and a trial the server says is still unused. Never while an
-  // invitation code waits to be redeemed: the account's one trial is the
-  // invitation's fortnight, and Start would spend it on seven days.
+  // invitation code or a nutritionist's code waits to be redeemed: the
+  // account's one trial is that code's fortnight, and Start would spend it on
+  // seven days.
 
   /// The trial the reveal can offer: never used, not already on Qamar+, and
-  /// no invitation code waiting to bring its own fortnight.
-  bool get trialWaiting => plusTrialEligible && !plusActive && !invitationWaiting;
+  /// no invitation or nutritionist's code waiting to bring its own fortnight.
+  bool get trialWaiting => plusTrialEligible && !plusActive && !invitationWaiting && !proCodeWaiting;
 
   /// The offer's length, as the organic trial the server starts (0043).
   static const trialOfferDays = 7;
@@ -3138,6 +3147,147 @@ class AppState extends ChangeNotifier {
           : (isAr ? 'مقدرتش أفعّل الدعوة دلوقتي. جرّب تاني بعد شوية.' : 'Could not redeem the invitation just now. Try again in a moment.');
     }
     invitationBusy = false;
+    _notify();
+    return answered;
+  }
+
+  // ---- a nutritionist's code (O12) -------------------------------------------
+  //
+  // The blueprint's referred client: "Pro code → client installs, 14-day
+  // trial". A code arrives by link (qamar://p/<code>, dr-qamar.com/p/<code>)
+  // or is typed in Me. The server (qamar_redeem_pro_code, 0069) puts the
+  // professional on the account, so their share attaches to the first payment
+  // with no code typed at checkout, and starts the fortnight while the
+  // account's one trial is unused — only for a code the operator has
+  // confirmed as a professional's. It waits on the phone exactly as an
+  // invitation does: cleared only once the server has answered it, and while
+  // it waits the seven-day week is not offered, because Start would spend the
+  // one trial that the code's fortnight is.
+
+  static const _kPendingProCode = 'pending_pro_code';
+  static const _kProName = 'pro_code_name';
+
+  /// A nutritionist's code waiting on this phone to be redeemed.
+  String? pendingProCode;
+
+  bool get proCodeWaiting => pendingProCode?.trim().isNotEmpty ?? false;
+
+  /// The professional whose code is on this account, as the server named
+  /// them; null until a code has been redeemed here.
+  String? proName;
+
+  String? proNotice;
+  bool proBusy = false;
+
+  /// A code from a link. Kept on the phone until the server has answered it.
+  Future<void> acceptProLink(String code) => _takeProCode(code, via: 'link');
+
+  /// A code typed in Me. The same path as a link.
+  Future<void> enterProCode(String code) => _takeProCode(code, via: 'typed');
+
+  Future<void> _takeProCode(String code, {required String via}) async {
+    final c = PlusPricing.normalizeCode(code);
+    if (c.isEmpty) return;
+    _track('pro_code_received', {'via': via});
+    pendingProCode = c;
+    _prefs?.setString(_kPendingProCode, c).catchError((_) {});
+    if (isBacked && _invitationRepo != null) {
+      await _redeemPendingProCode();
+      return;
+    }
+    proNotice = isAr
+        ? 'الكود محفوظ على الموبايل، وهيتفعّل أول ما التطبيق يتوصل بحسابك.'
+        : 'The code is kept on this phone, and is used the moment the app is connected to your account.';
+    _notify();
+  }
+
+  Future<void> _redeemPendingProCode() async {
+    var code = pendingProCode;
+    if (code == null || code.trim().isEmpty) {
+      try {
+        code = await _prefs?.getString(_kPendingProCode);
+      } catch (_) {
+        code = null;
+      }
+    }
+    if (code == null || code.trim().isEmpty || _invitationRepo == null) return;
+    pendingProCode = code.trim();
+    final answered = await redeemProCode(code);
+    if (_disposed) return;
+    if (!answered) {
+      proNotice = isAr
+          ? 'مقدرتش أستخدم الكود دلوقتي. هو محفوظ على الموبايل، وهجرّب تاني أول ما تفتح التطبيق وانت متوصل.'
+          : 'I could not use the code just now. It is kept on this phone, and I will try again the next time you open the app with a connection.';
+      _notify();
+      return;
+    }
+    pendingProCode = null;
+    _prefs?.setString(_kPendingProCode, '').catchError((_) {});
+    _notify();
+  }
+
+  /// The server's refusals, in the person's language. Each is final for the
+  /// code (0069), so the waiting code is cleared on any of them.
+  String _proRefusal(String serverMessage) {
+    switch (serverMessage) {
+      case 'no nutritionist with that code':
+        return isAr ? 'مفيش أخصائي بالكود ده. اتأكد من الحروف.' : 'No nutritionist has that code. Check the letters.';
+      case 'that is your own code':
+        return isAr ? 'ده الكود بتاعك إنت.' : 'That is your own code.';
+      case "that code is not a nutritionist's":
+        return isAr
+            ? 'الكود ده مش لأخصائي. لو صاحبك اللي اداهولك، اكتبه لما تشترك.'
+            : 'That code is not a nutritionist’s. If a friend gave it to you, enter it when you subscribe.';
+      case "another nutritionist's code is already on this account":
+        return isAr
+            ? 'فيه كود أخصائي تاني على حسابك. لو عايز تغيّره، كلّم الدعم.'
+            : 'Another nutritionist’s code is already on your account. To change it, write to support.';
+      default:
+        return isAr ? 'مقدرتش أستخدم الكود ده.' : 'I could not use that code.';
+    }
+  }
+
+  /// Redeems [code]. True once the server has answered it — redeemed, or
+  /// refused — and false when it could not be asked, so a waiting code is
+  /// kept for another try.
+  Future<bool> redeemProCode(String code) async {
+    proNotice = null;
+    final repo = _invitationRepo;
+    final uid = _userId;
+    if (code.trim().isEmpty) return false;
+    if (repo == null || uid == null) {
+      proNotice = isAr
+          ? 'الكود بيتفعّل لما التطبيق يبقى متوصل بحسابك.'
+          : 'A nutritionist’s code is used once the app is connected to your account.';
+      _notify();
+      return false;
+    }
+    proBusy = true;
+    _notify();
+    var answered = false;
+    try {
+      final r = await repo.redeemPro(uid, code: code.trim());
+      answered = true;
+      final name = r.professionalName.trim();
+      proName = name.isEmpty ? (isAr ? 'أخصائيك' : 'Your nutritionist') : name;
+      _prefs?.setString(_kProName, proName!).catchError((_) {});
+      proNotice = r.trialDays > 0
+          ? (isAr
+              ? '$proName بعتك. ${iso('${r.trialDays}')} يوم قمر+ عليك من دلوقتي — من غير بطاقة، ومفيش حاجة بتتجدد لوحدها.'
+              : '$proName sent you. ${r.trialDays} days of Qamar+ are yours from now — no card, and nothing renews on its own.')
+          : (isAr
+              ? 'كود $proName على حسابك. لما تشترك، بياخد نصيبه والسعر زي ما هو.'
+              : '$proName’s code is on your account. When you subscribe they get their share, at the same price.');
+      _track('pro_code_redeemed', {'trial_days': r.trialDays});
+      await _refreshPlus();
+    } catch (e) {
+      final refused = e is InvitationException && e.refused;
+      answered = answered || refused;
+      proNotice = refused
+          ? _proRefusal(e.message)
+          : (isAr ? 'مقدرتش أستخدم الكود دلوقتي. جرّب تاني بعد شوية.' : 'I could not use the code just now. Try again in a moment.');
+    }
+    proBusy = false;
     _notify();
     return answered;
   }

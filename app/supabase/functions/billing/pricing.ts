@@ -86,6 +86,48 @@ export type Quote = {
   promoError: string | null;
 };
 
+/**
+ * A professional already on this person's account, read back from a
+ * pro_referrals row (written at the first payment that carried their code,
+ * 0039) or a pro_code_claims row (a code redeemed in Me or through a /p/ link
+ * before paying, 0069). Either row carries affiliate_user_id, promo_code_id
+ * and the embedded promo_codes(code, active). Null when it names nobody.
+ */
+export function savedProfessional(row: Record<string, unknown> | null | undefined): Promo | null {
+  if (!row || typeof row.affiliate_user_id !== "string") return null;
+  const code = row.promo_codes as { code?: unknown; active?: unknown } | null | undefined;
+  return {
+    id: typeof row.promo_code_id === "string" ? row.promo_code_id : undefined,
+    code: typeof code?.code === "string" ? code.code : "PRO",
+    kind: "affiliate",
+    ownerUserId: row.affiliate_user_id,
+    percentOff: null,
+    amountCents: null,
+    appliesToPlans: null,
+    // A professional who has been switched off stops earning, but the client
+    // is not asked to do anything about it.
+    active: code?.active !== false,
+    startsAt: null,
+    endsAt: null,
+    maxRedemptions: null,
+    redemptionCount: 0,
+  };
+}
+
+/**
+ * Which saved professional a checkout with no typed code attaches: the
+ * referral while it is inside its twelve months, otherwise the code the
+ * person redeemed before paying (0069), so the share reaches the professional
+ * without the client typing the code a second time. The claim is only looked
+ * up when there is no referral.
+ */
+export async function chooseSavedPromo(
+  referral: () => Promise<Promo | null>,
+  claim: () => Promise<Promo | null>,
+): Promise<Promo | null> {
+  return (await referral()) ?? (await claim());
+}
+
 function promoLive(promo: Promo, now: Date): boolean {
   if (!promo.active) return false;
   if (promo.startsAt && now < promo.startsAt) return false;

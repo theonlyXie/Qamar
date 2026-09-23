@@ -27,9 +27,11 @@ import { amountMatches, signedOrderId, txnObject, txnOutcome, type OrderRow } fr
 import {
   MIN_PAYOUT_CENTS,
   PLANS,
+  chooseSavedPromo,
   isPlanId,
   normalizePromoCode,
   quotePlus,
+  savedProfessional,
   type PlanId,
   type Promo,
   type Quote,
@@ -160,25 +162,21 @@ async function loadReferral(userId: string): Promise<Promo | null> {
   );
   if (!res.ok) return null;
   const rows = await res.json() as Array<Record<string, unknown>>;
-  const row = Array.isArray(rows) ? rows[0] : null;
-  if (!row || typeof row.affiliate_user_id !== "string") return null;
-  const code = row.promo_codes as { code?: unknown; active?: unknown } | null;
-  return {
-    id: typeof row.promo_code_id === "string" ? row.promo_code_id : undefined,
-    code: typeof code?.code === "string" ? code.code : "PRO",
-    kind: "affiliate",
-    ownerUserId: row.affiliate_user_id,
-    percentOff: null,
-    amountCents: null,
-    appliesToPlans: null,
-    // A professional who has been switched off stops earning, but the client
-    // is not asked to do anything about it.
-    active: code?.active !== false,
-    startsAt: null,
-    endsAt: null,
-    maxRedemptions: null,
-    redemptionCount: 0,
-  };
+  return savedProfessional(Array.isArray(rows) ? rows[0] : null);
+}
+
+/**
+ * The professional this person named before paying: a code redeemed in Me or
+ * through a /p/ link (qamar_redeem_pro_code, 0069). The first payment then
+ * carries their share, and pro_referrals starts its twelve months there.
+ */
+async function loadClaim(userId: string): Promise<Promo | null> {
+  const res = await db(
+    `pro_code_claims?user_id=eq.${userId}&select=promo_code_id,affiliate_user_id,promo_codes(code,active)&limit=1`,
+  );
+  if (!res.ok) return null;
+  const rows = await res.json() as Array<Record<string, unknown>>;
+  return savedProfessional(Array.isArray(rows) ? rows[0] : null);
 }
 
 async function buildQuote(userId: string, planRaw: unknown, codeRaw: unknown): Promise<Quote | Response> {
@@ -197,7 +195,7 @@ async function buildQuote(userId: string, planRaw: unknown, codeRaw: unknown): P
       return q;
     }
   } else {
-    promo = await loadReferral(userId);
+    promo = await chooseSavedPromo(() => loadReferral(userId), () => loadClaim(userId));
   }
   const first = await firstPurchase(userId);
   return quotePlus({ plan: planRaw, firstPurchase: first, buyerUserId: userId, promo });
