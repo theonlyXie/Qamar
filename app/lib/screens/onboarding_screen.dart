@@ -72,24 +72,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               const SizedBox(width: 2),
               const QamarMoon(size: 36),
               const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(t.brand, style: QText.display(size: 20, height: 24, color: const Color(0xFFF5F7FF))),
-                  Text(t.obSub, style: QText.body(size: 11, color: QColors.textMuted)),
-                ],
+              // Where the conversation is goes on the line under the name:
+              // a count, not a control, so it is words and not a pill that
+              // looks tappable.
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(t.brand, style: QText.display(size: 20, height: 24, color: const Color(0xFFF5F7FF))),
+                    Text('${t.obSub} · ${state.iso('${(state.step + 1).clamp(1, kOnboardingSteps.length)}/${kOnboardingSteps.length}')}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 11, color: QColors.textMuted)),
+                  ],
+                ),
               ),
-              const Spacer(),
               // Switchable mid-conversation: the questions re-render in the
               // other language and the answers already given are kept.
               QLangToggle(lang: state.lang, onChanged: state.setLang),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(border: Border.all(color: QColors.borderSoft), borderRadius: BorderRadius.circular(999)),
-                child: Text(state.iso('${(state.step + 1).clamp(1, kOnboardingSteps.length)}/${kOnboardingSteps.length}'),
-                    style: QText.number(size: 11, weight: FontWeight.w500, color: QColors.textMuted)),
-              ),
             ],
           ),
         ),

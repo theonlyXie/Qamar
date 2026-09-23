@@ -1,0 +1,148 @@
+// O11 in the shared controls themselves: what is drawn and what takes the
+// touch are separate. A control is drawn at its own size — a compact row
+// keeps its look — and takes at least 48 points each way; one with nothing
+// to do says so, to the eye and to a screen reader.
+
+import 'dart:ui' show SemanticsAction, Tristate;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+
+import 'package:qamar/l10n/strings.dart';
+import 'package:qamar/main.dart';
+import 'package:qamar/state/app_state.dart';
+import 'package:qamar/theme/colors.dart';
+import 'package:qamar/theme/layout.dart';
+import 'package:qamar/widgets/common.dart';
+
+import 'support/app_fonts.dart';
+
+Future<void> _pump(WidgetTester tester, Widget child) async {
+  await tester.pumpWidget(MaterialApp(home: Scaffold(body: Center(child: child))));
+}
+
+/// The drawn box of a control: the decoration that carries its border.
+Rect _drawn(WidgetTester tester, Finder control) {
+  final boxes = find.descendant(
+    of: control,
+    matching: find.byWidgetPredicate((w) => w is DecoratedBox && w.decoration is BoxDecoration && (w.decoration as BoxDecoration).border != null),
+  );
+  return tester.getRect(boxes.first);
+}
+
+BoxDecoration _decoration(WidgetTester tester, Finder control) => tester
+    .widgetList<DecoratedBox>(find.descendant(of: control, matching: find.byType(DecoratedBox)))
+    .map((d) => d.decoration)
+    .whereType<BoxDecoration>()
+    .firstWhere((d) => d.border != null || d.gradient != null || d.color != null);
+
+void main() {
+  setUpAll(() async {
+    await loadAppFonts();
+    for (final name in const ['com.qamar.app/quick_events', 'com.qamar.app/quick_invoke']) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(MethodChannel(name), (call) async => null);
+    }
+  });
+
+  testWidgets('"Why this number?" is drawn 30 points tall and takes the touch across 48', (tester) async {
+    var taps = 0;
+    await _pump(tester, QOutlineButton(label: 'Why this number?', onTap: () => taps++, height: 30));
+    final control = find.byType(QOutlineButton);
+    final touch = tester.getRect(control);
+    final drawn = _drawn(tester, control);
+    expect(drawn.height, 30, reason: 'a compact row keeps its look');
+    expect(touch.height, greaterThanOrEqualTo(QLayout.minTap));
+    expect(touch.width, greaterThanOrEqualTo(QLayout.minTap));
+    // A finger just above the outline, inside the touch, still presses it.
+    await tester.tapAt(Offset(drawn.center.dx, drawn.top - 7));
+    expect(taps, 1, reason: 'the band around the outline is part of the control');
+  });
+
+  testWidgets('a button asked to fill a column still fills it', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          width: 300,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            QPrimaryButton(label: 'Log a meal', onTap: () {}),
+            QOutlineButton(label: 'Try again', onTap: () {}),
+          ]),
+        ),
+      ),
+    ));
+    expect(_drawn(tester, find.byType(QOutlineButton)).width, 300);
+    final primary = tester.getRect(find.descendant(of: find.byType(QPrimaryButton), matching: find.byType(DecoratedBox)).first);
+    expect(primary.width, 300);
+  });
+
+  testWidgets('a round icon button is drawn at its size, touched at 48, and named', (tester) async {
+    await _pump(tester, QRoundIconButton(icon: Icons.add, onTap: () {}, size: 28, label: 'More'));
+    final control = find.byType(QRoundIconButton);
+    expect(_drawn(tester, control).size, const Size(28, 28));
+    expect(tester.getSize(control), const Size(48, 48));
+    expect(find.bySemanticsLabel('More'), findsOneWidget);
+  });
+
+  testWidgets('the language switch: each side is a whole touch, drawn inside a pill as tall as before', (tester) async {
+    for (final large in [false, true]) {
+      await _pump(tester, QLangToggle(lang: AppLang.ar, onChanged: (_) {}, large: large));
+      final pill = tester.getRect(find.descendant(
+        of: find.byType(QLangToggle),
+        matching: find.byWidgetPredicate((w) => w is DecoratedBox && (w.decoration as BoxDecoration).border != null),
+      ).first);
+      expect(pill.height, large ? 34 : 28);
+      for (final side in [find.bySemanticsLabel('العربية'), find.bySemanticsLabel('English')]) {
+        final r = tester.getRect(side);
+        expect(r.height, greaterThanOrEqualTo(48));
+        expect(r.width, greaterThanOrEqualTo(48));
+      }
+    }
+  });
+
+  group('a control with nothing to do says so', () {
+    testWidgets('an outline button: no touch, a faint edge, a muted label, not enabled', (tester) async {
+      final handle = tester.ensureSemantics();
+      await _pump(tester, const QOutlineButton(label: 'Redeem', onTap: null));
+      final control = find.byType(QOutlineButton);
+      expect((_decoration(tester, control).border! as Border).top.color, QDisabled.edge);
+      expect(tester.widget<Text>(find.text('Redeem')).style!.color, QDisabled.label);
+      final data = tester.getSemantics(find.descendant(of: control, matching: find.byType(Semantics)).first).getSemanticsData();
+      expect(data.flagsCollection.isEnabled, Tristate.isFalse, reason: 'a screen reader hears it as not enabled');
+      expect(data.hasAction(SemanticsAction.tap), isFalse);
+      handle.dispose();
+    });
+
+    testWidgets('the filled button: no gradient and no glow, a muted label', (tester) async {
+      await _pump(tester, const QPrimaryButton(label: 'One moment…', onTap: null));
+      final d = _decoration(tester, find.byType(QPrimaryButton));
+      expect(d.gradient, isNull);
+      expect(d.boxShadow, isNull);
+      expect(tester.widget<Text>(find.text('One moment…')).style!.color, QDisabled.label);
+      expect(QDisabled.label, QColors.textDisabled);
+    });
+
+    testWidgets('enabled, the same controls draw their own edge and label', (tester) async {
+      await _pump(tester, QOutlineButton(label: 'Redeem', onTap: () {}));
+      expect((_decoration(tester, find.byType(QOutlineButton)).border! as Border).top.color, QColors.borderSoft);
+      expect(tester.widget<Text>(find.text('Redeem')).style!.color, isNot(QDisabled.label));
+    });
+  });
+
+  testWidgets('in the tree a name is part of its circle: tapping "Plan" opens the plan', (tester) async {
+    tester.view.devicePixelRatio = 3;
+    tester.view.physicalSize = const Size(390, 844) * 3;
+    addTearDown(tester.view.reset);
+    final s = AppState()..setLang(AppLang.en);
+    s.dismissOrbTutorial();
+    s.go(AppScreen.today);
+    await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+    s.orbTap();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.text('Plan'));
+    await tester.pump();
+    expect(s.screen, AppScreen.plan, reason: 'the word under the circle opens what the circle opens');
+  });
+}

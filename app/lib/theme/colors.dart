@@ -21,6 +21,11 @@ class QColors {
   static const textMuted = Color(0xFF94A3B8);
   static const textFaint = Color(0xFF64748B);
 
+  /// The label of a control that has nothing to do (O11). Disabled controls
+  /// are the one place a label may sit below AA contrast: it is meant to read
+  /// as not available.
+  static const textDisabled = Color(0xFF64748B);
+
   static const cardDeep = Color(0xFF111827);
   static const cardMid = Color(0xFF141C2E);
   static const cardSlate = Color(0xFF0F172A);

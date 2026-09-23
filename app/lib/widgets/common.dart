@@ -1,13 +1,151 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../l10n/strings.dart';
 import '../models/problem.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/layout.dart';
 import '../theme/text_styles.dart';
+
+/// The touch rule every control here keeps (O11).
+///
+///  * At least [QLayout.minTap] points each way take the touch, whatever size
+///    is drawn: [builder] draws the control, centred in that area. A compact
+///    row keeps its look and the finger still gets a whole target.
+///  * The drawing answers on the press, not the release ([builder] is told
+///    when the finger is down).
+///  * A control with nothing to do ([onTap] null) says so: it takes no touch,
+///    and a screen reader hears it as not enabled. The drawing shows it too,
+///    with [QDisabled]'s faint edge and muted label.
+class QTapArea extends StatefulWidget {
+  final VoidCallback? onTap;
+  final Widget Function(BuildContext context, bool pressed) builder;
+
+  /// What a screen reader says, when the drawing has no words of its own (an
+  /// icon). Drawn words are read as they are.
+  final String? label;
+  final String? hint;
+  final bool link;
+  final double minWidth;
+  final double minHeight;
+
+  const QTapArea({
+    super.key,
+    required this.onTap,
+    required this.builder,
+    this.label,
+    this.hint,
+    this.link = false,
+    this.minWidth = QLayout.minTap,
+    this.minHeight = QLayout.minTap,
+  });
+
+  @override
+  State<QTapArea> createState() => _QTapAreaState();
+}
+
+class _QTapAreaState extends State<QTapArea> {
+  bool _down = false;
+
+  void _press(bool down) {
+    if (_down != down && mounted) setState(() => _down = down);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onTap != null;
+    return Semantics(
+      container: true,
+      button: !widget.link,
+      link: widget.link,
+      enabled: enabled,
+      label: widget.label,
+      hint: widget.hint,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: enabled ? (_) => _press(true) : null,
+        onTapUp: enabled ? (_) => _press(false) : null,
+        onTapCancel: enabled ? () => _press(false) : null,
+        onTap: widget.onTap,
+        child: _MinTap(minWidth: widget.minWidth, minHeight: widget.minHeight, child: widget.builder(context, enabled && _down)),
+      ),
+    );
+  }
+}
+
+/// Lays its child out exactly as its parent asks — so a button asked to fill
+/// a row still fills it — and is itself at least [minWidth] × [minHeight],
+/// with the child centred in the extra. The extra is part of the control:
+/// the GestureDetector around it takes touches across all of it.
+class _MinTap extends SingleChildRenderObjectWidget {
+  final double minWidth;
+  final double minHeight;
+  const _MinTap({required this.minWidth, required this.minHeight, required Widget super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderMinTap(minWidth, minHeight);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderMinTap renderObject) {
+    renderObject
+      ..minWidth = minWidth
+      ..minHeight = minHeight;
+  }
+}
+
+class _RenderMinTap extends RenderShiftedBox {
+  _RenderMinTap(this._minWidth, this._minHeight) : super(null);
+
+  double _minWidth;
+  set minWidth(double v) {
+    if (v == _minWidth) return;
+    _minWidth = v;
+    markNeedsLayout();
+  }
+
+  double _minHeight;
+  set minHeight(double v) {
+    if (v == _minHeight) return;
+    _minHeight = v;
+    markNeedsLayout();
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) => math.max(_minWidth, child?.getMinIntrinsicWidth(height) ?? 0);
+  @override
+  double computeMaxIntrinsicWidth(double height) => math.max(_minWidth, child?.getMaxIntrinsicWidth(height) ?? 0);
+  @override
+  double computeMinIntrinsicHeight(double width) => math.max(_minHeight, child?.getMinIntrinsicHeight(width) ?? 0);
+  @override
+  double computeMaxIntrinsicHeight(double width) => math.max(_minHeight, child?.getMaxIntrinsicHeight(width) ?? 0);
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    final c = child?.getDryLayout(constraints) ?? Size.zero;
+    return constraints.constrain(Size(math.max(c.width, _minWidth), math.max(c.height, _minHeight)));
+  }
+
+  @override
+  void performLayout() {
+    final c = child!;
+    c.layout(constraints, parentUsesSize: true);
+    size = constraints.constrain(Size(math.max(c.size.width, _minWidth), math.max(c.size.height, _minHeight)));
+    (c.parentData! as BoxParentData).offset = Offset((size.width - c.size.width) / 2, (size.height - c.size.height) / 2);
+  }
+}
+
+/// How a control with nothing to do is drawn, everywhere (O11): no press, a
+/// faint edge, a muted label, no fill or glow.
+abstract final class QDisabled {
+  static const edge = QColors.borderFaint;
+  static const label = QColors.textDisabled;
+  static const fill = QColors.cardDeep;
+}
 
 class QPrimaryButton extends StatelessWidget {
   final String label;
@@ -18,24 +156,31 @@ class QPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(QRadii.lg),
-          onTap: onTap == null
-              ? null
-              : () {
-                  HapticFeedback.lightImpact();
-                  onTap!();
-                },
-          child: Ink(
-            decoration: QDecor.gradientButton(gradient: gradient),
-            child: Center(
-              child: Text(label, style: QText.body(size: 16, weight: FontWeight.w600, color: Colors.white)),
-            ),
-          ),
+    final enabled = onTap != null;
+    return QTapArea(
+      onTap: enabled
+          ? () {
+              HapticFeedback.lightImpact();
+              onTap!();
+            }
+          : null,
+      builder: (context, pressed) => AnimatedOpacity(
+        opacity: pressed ? 0.82 : 1,
+        duration: const Duration(milliseconds: 90),
+        child: Container(
+          height: height,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: enabled
+              ? QDecor.gradientButton(gradient: gradient)
+              : BoxDecoration(
+                  color: QDisabled.fill,
+                  border: Border.all(color: QDisabled.edge),
+                  borderRadius: BorderRadius.circular(QRadii.lg),
+                ),
+          child: Text(label,
+              textAlign: TextAlign.center,
+              style: QText.body(size: 16, weight: FontWeight.w600, color: enabled ? Colors.white : QDisabled.label)),
         ),
       ),
     );
@@ -140,22 +285,36 @@ class QStateLine extends StatelessWidget {
 class QOutlineButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
+
+  /// The outline's drawn height. The touch takes at least [QLayout.minTap]
+  /// whatever this is (O11).
   final double height;
   final Color color;
   const QOutlineButton({super.key, required this.label, required this.onTap, this.height = 44, this.color = QColors.textMuted});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      child: OutlinedButton(
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: QColors.borderSoft),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(QRadii.md)),
-          backgroundColor: Colors.transparent,
+    final enabled = onTap != null;
+    return QTapArea(
+      onTap: onTap,
+      minWidth: 64,
+      builder: (context, pressed) => ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 64),
+        child: Container(
+          height: height,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: pressed ? QColors.moonlight.withValues(alpha: 0.06) : Colors.transparent,
+            border: Border.all(color: enabled ? QColors.borderSoft : QDisabled.edge),
+            borderRadius: BorderRadius.circular(QRadii.md),
+          ),
+          child: Center(
+            widthFactor: 1,
+            child: Text(label,
+                textAlign: TextAlign.center,
+                style: QText.body(size: 14, weight: FontWeight.w500, color: enabled ? color : QDisabled.label)),
+          ),
         ),
-        child: Text(label, style: QText.body(size: 14, weight: FontWeight.w500, color: color)),
       ),
     );
   }
@@ -169,23 +328,23 @@ class QPillChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(QRadii.pill),
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-          decoration: BoxDecoration(
-            color: selected ? QColors.violet.withOpacity(0.18) : QColors.cardDeep,
-            border: Border.all(color: selected ? QColors.violet : QColors.borderSoft),
-            borderRadius: BorderRadius.circular(QRadii.pill),
-          ),
-          child: Text(label, style: QText.body(size: 14, weight: FontWeight.w500, color: selected ? const Color(0xFFE9ECFF) : QColors.textMid)),
+    return QTapArea(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      builder: (context, pressed) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        decoration: BoxDecoration(
+          color: selected
+              ? QColors.violet.withValues(alpha: 0.18)
+              : pressed
+                  ? QColors.cardMid
+                  : QColors.cardDeep,
+          border: Border.all(color: selected ? QColors.violet : QColors.borderSoft),
+          borderRadius: BorderRadius.circular(QRadii.pill),
         ),
+        child: Text(label, style: QText.body(size: 14, weight: FontWeight.w500, color: selected ? QColors.textBrand : QColors.textMid)),
       ),
     );
   }
@@ -263,22 +422,29 @@ class QBackButton extends StatelessWidget {
 
 class QRoundIconButton extends StatelessWidget {
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+
+  /// The circle's drawn size; the touch takes at least [QLayout.minTap].
   final double size;
-  const QRoundIconButton({super.key, required this.icon, required this.onTap, this.size = 34});
+
+  /// What it does, for a screen reader: the icon has no words.
+  final String label;
+  const QRoundIconButton({super.key, required this.icon, required this.onTap, required this.label, this.size = 34});
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(side: BorderSide(color: QColors.borderSoft)),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: Icon(icon, size: size * 0.5, color: QColors.textMid),
+    final enabled = onTap != null;
+    return QTapArea(
+      onTap: onTap,
+      label: label,
+      builder: (context, pressed) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: pressed ? QColors.cardMid : Colors.transparent,
+          border: Border.all(color: enabled ? QColors.borderSoft : QDisabled.edge),
         ),
+        child: Icon(icon, size: size * 0.5, color: enabled ? QColors.textMid : QDisabled.label),
       ),
     );
   }
@@ -448,25 +614,41 @@ class QLangToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final h = large ? 34.0 : 28.0;
-    return Container(
-      height: h,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: QColors.cardDeep.withValues(alpha: 0.9),
-        border: Border.all(color: QColors.borderSoft),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      // Fixed left-to-right so the two options never swap places when the
-      // direction flips — a control that moves as you use it is disorienting.
-      child: Directionality(
-        textDirection: TextDirection.ltr,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _Segment(label: 'ع', selected: lang == AppLang.ar, large: large, onTap: () => onChanged(AppLang.ar)),
-            _Segment(label: 'EN', selected: lang == AppLang.en, large: large, onTap: () => onChanged(AppLang.en)),
-          ],
-        ),
+    // Drawn [h] tall; each side takes a whole touch (O11), so the switch
+    // sits in a band [QLayout.minTap] tall and the pill is drawn behind.
+    return SizedBox(
+      height: QLayout.minTap,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(
+            child: Center(
+              child: Container(
+                height: h,
+                decoration: BoxDecoration(
+                  color: QColors.cardDeep.withValues(alpha: 0.9),
+                  border: Border.all(color: QColors.borderSoft),
+                  borderRadius: BorderRadius.circular(QRadii.pill),
+                ),
+              ),
+            ),
+          ),
+          // Fixed left-to-right so the two options never swap places when the
+          // direction flips — a control that moves as you use it is disorienting.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _Segment(label: 'ع', spoken: 'العربية', selected: lang == AppLang.ar, height: h - 6, large: large, onTap: () => onChanged(AppLang.ar)),
+                  _Segment(label: 'EN', spoken: 'English', selected: lang == AppLang.en, height: h - 6, large: large, onTap: () => onChanged(AppLang.en)),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -474,29 +656,32 @@ class QLangToggle extends StatelessWidget {
 
 class _Segment extends StatelessWidget {
   final String label;
+  final String spoken;
   final bool selected;
   final bool large;
+  final double height;
   final VoidCallback onTap;
-  const _Segment({required this.label, required this.selected, required this.large, required this.onTap});
+  const _Segment({required this.label, required this.spoken, required this.selected, required this.large, required this.height, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: EdgeInsets.symmetric(horizontal: large ? 14 : 11),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            gradient: selected ? QColors.brandGradient : null,
-            borderRadius: BorderRadius.circular(999),
-          ),
+    return QTapArea(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      label: spoken,
+      builder: (context, pressed) => AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: height,
+        constraints: const BoxConstraints(minWidth: QLayout.minTap),
+        padding: EdgeInsets.symmetric(horizontal: large ? 14 : 11),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          gradient: selected ? QColors.brandGradient : null,
+          borderRadius: BorderRadius.circular(QRadii.pill),
+        ),
+        child: ExcludeSemantics(
           child: Text(
             label,
             style: QText.body(
@@ -575,7 +760,10 @@ class QLegalLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    // Small words, a whole touch (O11): the link takes [QLayout.minTap] each
+    // way however short its label.
+    return QTapArea(
+      link: true,
       onTap: () async {
         final uri = Uri.parse(url);
         // externalApplication: legal pages belong in the browser, where the
@@ -584,13 +772,13 @@ class QLegalLink extends StatelessWidget {
           await launchUrl(uri);
         }
       },
-      child: Text(
+      builder: (context, pressed) => Text(
         label,
         style: QText.body(
           size: size,
           weight: FontWeight.w500,
-          color: QColors.textMuted,
-        ).copyWith(decoration: TextDecoration.underline, decorationColor: QColors.textFaint),
+          color: pressed ? QColors.textMid : QColors.textMuted,
+        ).copyWith(decoration: TextDecoration.underline, decorationColor: QColors.textMuted),
       ),
     );
   }

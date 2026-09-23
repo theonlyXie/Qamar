@@ -28,6 +28,10 @@ const double _ringRadius = 118;
 const double _nodeSize = 58;
 const double _labelGap = 6;
 
+/// The width a ring circle and its name take as one control: wider than the
+/// circle, so the name under it is part of the touch.
+const double _slotWidth = 96;
+
 /// The moon at the middle of the tree.
 const double _orbSize = 76;
 
@@ -296,7 +300,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
                           if (!state.treeExpanded)
                             for (var i = 0; i < nodes.length; i++)
                               Positioned(
-                                left: nodes[i].topLeft.dx,
+                                left: nodes[i].center.dx - _slotWidth / 2,
                                 top: nodes[i].topLeft.dy,
                                 child: _RingButton(
                                   icon: nodes[i].icon,
@@ -388,7 +392,7 @@ class _TreeOverlayState extends State<TreeOverlay> with SingleTickerProviderStat
 
   Widget _placeSub(int i, int of, Widget child) {
     final c = treeSubCenter(i, of: of);
-    return Positioned(left: c.dx - _nodeSize / 2, top: c.dy - _nodeSize / 2, child: child);
+    return Positioned(left: c.dx - _slotWidth / 2, top: c.dy - _nodeSize / 2, child: child);
   }
 
   /// A meal name short enough to sit under a ring circle.
@@ -510,54 +514,70 @@ class _RingButtonState extends State<_RingButton> with SingleTickerProviderState
     super.dispose();
   }
 
+  bool _down = false;
+
   @override
   Widget build(BuildContext context) {
     final color = widget.color;
+    // The circle and its name are one control (O11): a finger on the words
+    // does what a finger on the circle does, and a screen reader hears the
+    // name as the button's. The slot is wider than the circle so the name has
+    // room; the circle stays centred where the ring puts it.
     final button = SizedBox(
-      width: _nodeSize,
-      height: _nodeSize,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          Material(
-            color: Colors.transparent,
-            shape: CircleBorder(side: BorderSide(color: color.withValues(alpha: 0.55))),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: widget.onTap,
-              child: Container(
-                width: _nodeSize,
-                height: _nodeSize,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xEB141C2E),
-                  boxShadow: [BoxShadow(color: color.withValues(alpha: 0.22), blurRadius: 22)],
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(widget.icon, size: 23, color: color),
-                    if (widget.locked)
-                      const Positioned(right: 8, bottom: 8, child: Icon(Icons.lock, size: 11, color: QColors.gold)),
-                  ],
-                ),
+      width: _slotWidth,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Semantics(
+          container: true,
+          button: true,
+          label: widget.label,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (_) => setState(() => _down = true),
+            onTapUp: (_) => setState(() => _down = false),
+            onTapCancel: () => setState(() => _down = false),
+            onTap: widget.onTap,
+            child: ExcludeSemantics(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedScale(
+                    scale: _down && !MediaQuery.disableAnimationsOf(context) ? 0.94 : 1,
+                    duration: const Duration(milliseconds: 90),
+                    child: Container(
+                      width: _nodeSize,
+                      height: _nodeSize,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _down ? const Color(0xF21A2338) : const Color(0xEB141C2E),
+                        border: Border.all(color: color.withValues(alpha: 0.55)),
+                        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.22), blurRadius: 22)],
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Icon(widget.icon, size: 23, color: color),
+                          if (widget.locked)
+                            const Positioned(right: 8, bottom: 8, child: Icon(Icons.lock, size: 11, color: QColors.gold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: _labelGap),
+                  Text(
+                    widget.label,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.visible,
+                    textAlign: TextAlign.center,
+                    style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMid),
+                  ),
+                ],
               ),
             ),
           ),
-          Positioned(
-            top: _nodeSize + _labelGap,
-            child: Text(
-              widget.label,
-              maxLines: 1,
-              softWrap: false,
-              overflow: TextOverflow.visible,
-              textAlign: TextAlign.center,
-              style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.textMid),
-            ),
-          ),
-        ],
+        ),
       ),
     );
     if (!widget.bob) return button;

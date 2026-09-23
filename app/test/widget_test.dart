@@ -4,6 +4,7 @@
 // no credentials (see app/README.md), so the whole shell is testable as-is.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -14,6 +15,7 @@ import 'package:qamar/screens/welcome_screen.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/explain.dart';
 
+import 'support/app_fonts.dart';
 import 'support/arabic_digits.dart';
 
 Widget _app(AppState state) => ChangeNotifierProvider.value(
@@ -22,6 +24,15 @@ Widget _app(AppState state) => ChangeNotifierProvider.value(
     );
 
 void main() {
+  // The app's own fonts: the guideline sweep below lays screens out at a
+  // phone's width, where the test font's full-em glyphs would overflow.
+  setUpAll(() async {
+    await loadAppFonts();
+    for (final name in const ['com.qamar.app/quick_events', 'com.qamar.app/quick_invoke']) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(MethodChannel(name), (call) async => null);
+    }
+  });
+
   testWidgets('boots to the welcome screen in Arabic/RTL', (tester) async {
     final state = AppState();
     await tester.pumpWidget(_app(state));
@@ -88,4 +99,46 @@ void main() {
       expectNoLatinDigits(tester, where: '$screen');
     }
   });
+
+  // O11: every control is a whole touch — 48 points each way on Android, 44
+  // on iOS — and says what it is, on every screen in both languages, then
+  // with the tree and the conversation open. The rule lives in the shared
+  // controls (QTapArea), so a screen that uses them keeps it.
+  for (final lang in AppLang.values) {
+    testWidgets('every control is a whole touch with a name, on every screen, the tree and the conversation (${lang.name})', (tester) async {
+      // A phone's width, tall enough that each screen's lists build to
+      // their end: controls that are not built cannot be checked.
+      tester.view.devicePixelRatio = 3;
+      tester.view.physicalSize = const Size(390, 2400) * 3;
+      tester.view.padding = const FakeViewPadding(top: 47 * 3, bottom: 34 * 3);
+      addTearDown(tester.view.reset);
+      final state = AppState()..setLang(lang);
+      state.profile = state.profile.copyWith(name: 'Basel');
+      state.meals.add(LoggedMeal(name: 'Koshary', sub: '', kcal: 640, p: 20, c: 100, f: 18, at: DateTime.now()));
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(_app(state));
+
+      Future<void> check(String where) async {
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(tester.takeException(), isNull, reason: where);
+        await expectLater(tester, meetsGuideline(androidTapTargetGuideline), reason: '48dp on $where');
+        await expectLater(tester, meetsGuideline(iOSTapTargetGuideline), reason: '44pt on $where');
+        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline), reason: 'every control named on $where');
+      }
+
+      for (final screen in AppScreen.values) {
+        state.go(screen);
+        await check('$screen');
+      }
+      state.go(AppScreen.today);
+      state.orbTap();
+      await check('the tree');
+      state.closeTree();
+      state.openChat();
+      await check('the conversation');
+      state.closeChat();
+      semantics.dispose();
+    });
+  }
 }

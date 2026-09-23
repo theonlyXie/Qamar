@@ -185,7 +185,7 @@ class _AccountSheetState extends State<AccountSheet> {
       Row(
         children: [
           Expanded(child: Text(title, style: QText.display(size: 24, height: 30, color: const Color(0xFFF5F7FF)))),
-          QRoundIconButton(icon: Icons.close, onTap: state.closeAuth, size: 34),
+          QRoundIconButton(icon: Icons.close, onTap: state.closeAuth, size: 34, label: state.isAr ? 'اقفل' : 'Close'),
         ],
       ),
       const SizedBox(height: 6),

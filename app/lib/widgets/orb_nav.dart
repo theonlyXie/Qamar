@@ -176,7 +176,18 @@ class _DraggableOrbState extends State<_DraggableOrb> {
     // One arena, three recognisers. A pan that moves past the touch slop wins
     // over the hold; a finger that rests wins the hold at 350 ms; a lift
     // before either is a tap. Same rules as before, one duration changed.
-    return RawGestureDetector(
+    // The moon has no words of its own: a screen reader hears its name and
+    // what its two gestures do from here (O11).
+    final t = state.t;
+    final tapDoes = state.screen == AppScreen.today
+        ? (state.isAr ? 'اضغط تفتح الشجرة' : 'Tap to open the tree')
+        : (state.isAr ? 'اضغط ترجع لـ${t.today}' : 'Tap to go back to ${t.today}');
+    return Semantics(
+      container: true,
+      button: true,
+      label: t.brand,
+      hint: state.isAr ? '$tapDoes، واستمر ضاغط تتكلم مع قمر' : '$tapDoes; hold to talk to Qamar',
+      child: RawGestureDetector(
       behavior: HitTestBehavior.translucent,
       gestures: <Type, GestureRecognizerFactory>{
         TapGestureRecognizer: GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
@@ -212,6 +223,7 @@ class _DraggableOrbState extends State<_DraggableOrb> {
         height: 56,
         child: Center(child: LivingOrb(size: 56, wander: true, sparks: true, state: state.orbState(), speaking: state.orbSpeaking)),
       ),
+    ),
     );
   }
 }

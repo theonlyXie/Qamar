@@ -118,22 +118,16 @@ class WelcomeScreen extends StatelessWidget {
                     style: QText.body(size: 12, height: 18, color: QColors.amberSoft)),
               ],
               const SizedBox(height: 4),
-              SizedBox(
-                height: 38,
-                child: TextButton(
-                  onPressed: state.openSignIn,
-                  child: Text(t.haveAccount, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textMuted)),
-                ),
+              TextButton(
+                onPressed: state.openSignIn,
+                child: Text(t.haveAccount, style: QText.body(size: 14, weight: FontWeight.w500, color: QColors.textMuted)),
               ),
               // The friend's side of the referral loop: a code from someone
               // who is already here. Their name is the first thing shown.
-              SizedBox(
-                height: 34,
-                child: TextButton(
-                  onPressed: state.invitationBusy ? null : () => _askInvitationCode(context, state),
-                  child: Text(state.isAr ? 'عندك دعوة؟' : 'Have an invitation?',
-                      style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.violetSoft)),
-                ),
+              TextButton(
+                onPressed: state.invitationBusy ? null : () => _askInvitationCode(context, state),
+                child: Text(state.isAr ? 'عندك دعوة؟' : 'Have an invitation?',
+                    style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.violetSoft)),
               ),
               if (state.invitationNotice != null) ...[
                 Text(state.invitationNotice!,

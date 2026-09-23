@@ -5,6 +5,7 @@ import '../models/meal.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/explain.dart';
@@ -83,7 +84,8 @@ class WalletScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         Container(
-          padding: const EdgeInsets.all(4),
+          // The tabs take the whole height as their touch (O11); the gold
+          // pill is drawn inside, as before.
           decoration: BoxDecoration(color: QColors.cardSlate, border: Border.all(color: QColors.borderFaint), borderRadius: BorderRadius.circular(999)),
           child: Row(children: [
             Expanded(child: _WalletTab(label: t.spendTab, active: state.walletTab == WalletTab.spend, onTap: state.showSpend)),
@@ -140,16 +142,18 @@ class _WalletTab extends StatelessWidget {
   const _WalletTab({required this.label, required this.active, required this.onTap});
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
+    return QTapArea(
+      onTap: onTap,
+      builder: (context, pressed) => Container(
+        height: QLayout.minTap,
+        padding: const EdgeInsets.all(5),
         child: Container(
-          height: 38,
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: active ? QColors.gold.withOpacity(0.16) : Colors.transparent, borderRadius: BorderRadius.circular(999)),
-          child: Text(label, style: QText.body(size: 13, weight: FontWeight.w600, color: active ? QColors.gold : QColors.textFaint)),
+          decoration: BoxDecoration(
+            color: active ? QColors.gold.withValues(alpha: 0.16) : (pressed ? QColors.cardMid : Colors.transparent),
+            borderRadius: BorderRadius.circular(QRadii.pill),
+          ),
+          child: Text(label, style: QText.body(size: 13, weight: FontWeight.w600, color: active ? QColors.gold : QColors.textMuted)),
         ),
       ),
     );

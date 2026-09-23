@@ -11,7 +11,9 @@ import '../models/messages.dart';
 import '../services/photos.dart';
 import '../models/problem.dart';
 import '../state/app_state.dart';
+import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
 
@@ -125,7 +127,7 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                         children: [
                           if (showSuggestions) ...[
                             SizedBox(
-                              height: 34,
+                              height: QLayout.minTap,
                               child: ListView(
                                 scrollDirection: Axis.horizontal,
                                 padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -138,7 +140,7 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 4),
                           ],
                           // Proof the camera actually fired: the shot the user
                           // just took, attached to the message about to be sent.
@@ -221,7 +223,7 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          _IconButton(icon: Icons.close_rounded, onTap: state.closeChat, glyph: 19),
+          _IconButton(icon: Icons.close_rounded, onTap: state.closeChat, glyph: 19, label: state.isAr ? 'اقفل المحادثة' : 'Close the conversation'),
         ],
       ),
     );
@@ -406,9 +408,9 @@ class _Composer extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 11),
-              child: TextField(
+            // The field itself is the touch, [QLayout.minTap] tall (O11):
+            // the padding that used to sit around it is inside it now.
+            child: TextField(
                 controller: ctrl,
                 minLines: 1,
                 maxLines: 5,
@@ -421,34 +423,38 @@ class _Composer extends StatelessWidget {
                   hintStyle: QText.body(size: 15.5, height: 21, color: QColors.textFaint),
                   border: InputBorder.none,
                   isDense: true,
-                  contentPadding: EdgeInsets.zero,
+                  contentPadding: const EdgeInsets.symmetric(vertical: (QLayout.minTap - 21) / 2 + 0.5),
                 ),
               ),
-            ),
           ),
-          if (!kIsWeb) _IconButton(icon: Icons.photo_camera_outlined, onTap: () => _photographMenu(context, state)),
+          if (!kIsWeb) _IconButton(icon: Icons.photo_camera_outlined, onTap: () => _photographMenu(context, state), label: state.isAr ? 'صوّر' : 'Take a photo'),
           _IconButton(
             icon: Icons.mic_none_rounded,
             onTap: state.tapOrbListen,
+            label: state.isAr ? 'اتكلم' : 'Speak',
             tint: state.chatState == ChatState.listening ? QColors.violetSoft : null,
           ),
-          _IconButton(icon: Icons.arrow_upward_rounded, onTap: state.sendChat, filled: true, dim: !ready, glyph: 17),
+          _IconButton(icon: Icons.arrow_upward_rounded, onTap: ready ? state.sendChat : null, filled: true, glyph: 17, label: state.isAr ? 'ابعت' : 'Send'),
         ],
       ),
     );
   }
 }
 
-/// A 40pt target with an 18pt glyph in it, which answers on the press rather
-/// than on the release.
+/// A whole touch ([QLayout.minTap]) with an 18pt glyph in it, which answers
+/// on the press rather than on the release. With nothing to do ([onTap]
+/// null) it takes no touch and says so: the filled one dims, and a screen
+/// reader hears it as not enabled.
 class _IconButton extends StatefulWidget {
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool filled;
-  final bool dim;
   final double glyph;
   final Color? tint;
-  const _IconButton({required this.icon, required this.onTap, this.filled = false, this.dim = false, this.glyph = 18, this.tint});
+
+  /// What it does, for a screen reader: the glyph has no words.
+  final String label;
+  const _IconButton({required this.icon, required this.onTap, required this.label, this.filled = false, this.glyph = 18, this.tint});
   @override
   State<_IconButton> createState() => _IconButtonState();
 }
@@ -459,42 +465,49 @@ class _IconButtonState extends State<_IconButton> {
   @override
   Widget build(BuildContext context) {
     final still = _stillness(context);
+    final enabled = widget.onTap != null;
     final Widget glyph = widget.filled
         ? Container(
             width: 30,
             height: 30,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: QColors.textMuted.withOpacity(widget.dim ? 0.28 : 1)),
-            child: Icon(widget.icon, size: widget.glyph, color: widget.dim ? QColors.textMid : QColors.cardNavy),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: enabled ? QColors.textMuted : QDisabled.edge),
+            child: Icon(widget.icon, size: widget.glyph, color: enabled ? QColors.cardNavy : QDisabled.label),
           )
-        : Icon(widget.icon, size: widget.glyph, color: widget.tint ?? QColors.textMuted);
+        : Icon(widget.icon, size: widget.glyph, color: enabled ? (widget.tint ?? QColors.textMuted) : QDisabled.label);
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _down = true),
-      onTapUp: (_) => setState(() => _down = false),
-      onTapCancel: () => setState(() => _down = false),
-      onTap: widget.onTap,
-      child: SizedBox(
-        width: 40,
-        height: 40,
-        child: Center(
-          child: still
-              ? Opacity(opacity: _down ? 0.6 : 1, child: glyph)
-              : AnimatedScale(
-                  scale: _down ? 0.9 : 1,
-                  duration: _press,
-                  curve: Curves.easeOut,
-                  child: glyph,
-                ),
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: enabled,
+      label: widget.label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: enabled ? (_) => setState(() => _down = true) : null,
+        onTapUp: enabled ? (_) => setState(() => _down = false) : null,
+        onTapCancel: enabled ? () => setState(() => _down = false) : null,
+        onTap: widget.onTap,
+        child: SizedBox(
+          width: QLayout.minTap,
+          height: QLayout.minTap,
+          child: Center(
+            child: still
+                ? Opacity(opacity: _down ? 0.6 : 1, child: glyph)
+                : AnimatedScale(
+                    scale: _down ? 0.9 : 1,
+                    duration: _press,
+                    curve: Curves.easeOut,
+                    child: glyph,
+                  ),
+          ),
         ),
       ),
     );
   }
 }
 
-/// One pill, used both for the suggestions under the field and for the single
-/// action an answer may offer. Same shape, same weight — nothing here is a
-/// call to action loud enough to pull the eye off the text.
+/// One chip for the conversation: the suggestions under the field, a
+/// turn's action, and a problem's ways on (O10). Drawn about 34 points tall,
+/// it takes a whole touch ([QLayout.minTap]) (O11).
 class _Chip extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
@@ -503,20 +516,22 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
+    return QTapArea(
+      onTap: onTap,
+      // Centred in its band: a row of chips hands each one the band's full
+      // height, and the chip is drawn at its own.
+      builder: (context, pressed) => Center(
+        widthFactor: 1,
+        heightFactor: 1,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: emphasis ? const Color(0x1AA78BFA) : _raised,
-            border: Border.all(color: emphasis ? QColors.violetSoft.withOpacity(0.4) : QColors.borderSoft),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(label, style: QText.body(size: 12.5, weight: emphasis ? FontWeight.w500 : FontWeight.w400, color: emphasis ? QColors.textHigh : QColors.textMid)),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: pressed ? QColors.cardMid : (emphasis ? const Color(0x1AA78BFA) : _raised),
+          border: Border.all(color: emphasis ? QColors.violetSoft.withValues(alpha: 0.4) : QColors.borderSoft),
+          borderRadius: BorderRadius.circular(QRadii.pill),
         ),
+        child: Text(label, style: QText.body(size: 13, weight: emphasis ? FontWeight.w500 : FontWeight.w400, color: emphasis ? QColors.textHigh : QColors.textMid)),
+      ),
       ),
     );
   }
@@ -550,7 +565,7 @@ class _Attachment extends StatelessWidget {
             Text(label, style: QText.body(size: 12, color: QColors.textMuted)),
             if (onRemove != null) ...[
               const SizedBox(width: 2),
-              _IconButton(icon: Icons.close_rounded, onTap: onRemove!, glyph: 15),
+              _IconButton(icon: Icons.close_rounded, onTap: onRemove!, glyph: 15, label: context.read<AppState>().isAr ? 'شيل الصورة' : 'Remove the photo'),
             ],
           ],
         ),
@@ -601,50 +616,14 @@ class _ProblemActions extends StatelessWidget {
     return Wrap(
       spacing: 8,
       children: [
-        _TallChip(action: problem.action, emphasis: true),
-        if (problem.secondary != null) _TallChip(action: problem.secondary!),
-        if (problem.also != null) _TallChip(action: problem.also!),
+        _Chip(label: problem.action.label, onTap: problem.action.onTap, emphasis: true),
+        if (problem.secondary != null) _Chip(label: problem.secondary!.label, onTap: problem.secondary!.onTap),
+        if (problem.also != null) _Chip(label: problem.also!.label, onTap: problem.also!.onTap),
       ],
     );
   }
 }
 
-class _TallChip extends StatelessWidget {
-  final ProblemAction action;
-  final bool emphasis;
-  const _TallChip({required this.action, this.emphasis = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: action.onTap,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
-            child: Align(
-              widthFactor: 1,
-              heightFactor: 1,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: emphasis ? const Color(0x1AA78BFA) : _raised,
-                  border: Border.all(color: emphasis ? QColors.violetSoft.withOpacity(0.4) : QColors.borderSoft),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(action.label,
-                    style: QText.body(size: 12.5, weight: emphasis ? FontWeight.w500 : FontWeight.w400, color: emphasis ? QColors.textHigh : QColors.textMid)),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 Widget _photoThumb(String path, double size) {
   return Image.file(
@@ -727,9 +706,9 @@ class _ProposalCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          QRoundIconButton(icon: Icons.remove, onTap: () => state.decQty(i), size: 28),
-                          SizedBox(width: 40, child: Text('${items[i].q}×', textAlign: TextAlign.center, style: QText.number(size: 14, weight: FontWeight.w600, color: QColors.textMid))),
-                          QRoundIconButton(icon: Icons.add, onTap: () => state.incQty(i), size: 28),
+                          QRoundIconButton(icon: Icons.remove, onTap: () => state.decQty(i), size: 28, label: isAr ? 'أقل' : 'Fewer'),
+                          SizedBox(width: 40, child: Text(isAr ? state.iso('${items[i].q}×') : '${items[i].q}×', textAlign: TextAlign.center, style: QText.number(size: 14, weight: FontWeight.w600, color: QColors.textMid))),
+                          QRoundIconButton(icon: Icons.add, onTap: () => state.incQty(i), size: 28, label: isAr ? 'أكتر' : 'More'),
                           const Spacer(),
                           Text(isAr ? '${state.iso('${items[i].def.kcal * items[i].q}')} سعر' : '${items[i].def.kcal * items[i].q} kcal',
                               style: QText.number(size: 14, weight: FontWeight.w600, color: QColors.cyan)),

@@ -12,6 +12,7 @@ import '../widgets/billing_moment_card.dart';
 import '../state/today_focus.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/explain.dart';
@@ -517,7 +518,7 @@ class _WaterAdd extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 44,
+      height: QLayout.minTap,
       child: Material(
         color: Colors.transparent,
         child: InkWell(

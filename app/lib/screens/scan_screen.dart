@@ -170,7 +170,11 @@ class _ScanScreenState extends State<ScanScreen> {
                       onTap: _busy ? null : () => _pick(ImageSource.gallery),
                     ),
                     const SizedBox(width: 26),
-                    GestureDetector(
+                    Semantics(
+                      button: true,
+                      enabled: !_busy,
+                      label: isAr ? 'صوّر التقرير' : 'Photograph the report',
+                      child: GestureDetector(
                       onTap: _busy ? null : () => _pick(ImageSource.camera),
                       child: Container(
                         width: 72,
@@ -188,6 +192,7 @@ class _ScanScreenState extends State<ScanScreen> {
                           size: 26,
                         ),
                       ),
+                    ),
                     ),
                     const SizedBox(width: 26),
                     _CircleAction(
