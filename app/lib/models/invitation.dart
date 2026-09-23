@@ -49,16 +49,25 @@ class Invitation {
   String get link => '${QamarConfig.site}/i/$code';
 
   /// The message the friend receives: their name, the sender's, what they
-  /// get, the code and the link. [sender] may be empty when the member
-  /// never gave a name.
-  String message({required bool ar, required String sender}) {
+  /// get, what the sender gets if they pay, the code and the link. [sender]
+  /// may be empty when the member never gave a name.
+  ///
+  /// The sender is paid in Su when the friend pays a first month, and the
+  /// friend is told so in the invitation itself: a recommendation that earns
+  /// the one making it says so, as the nutritionist's code already does on
+  /// the paywall. [senderGets] and [friendGets] are the amounts, drawn the
+  /// app's way (AppState.suAmount).
+  String message({required bool ar, required String sender, required String senderGets, required String friendGets}) {
     final from = sender.trim();
     if (ar) {
       final who = from.isEmpty ? 'صاحبك' : from;
-      return 'يا $name، $who بيعزمك على قمر — أخصائي التغذية اللي بيتكلم مصري. أسبوعين قمر+ ببلاش بالكود $code.\n$link';
+      return 'يا $name، $who بيعزمك على قمر — أخصائي التغذية اللي بيتكلم مصري. أسبوعين قمر+ ببلاش بالكود $code. '
+          'ولو كمّلت ودفعت أول شهر، $who بياخد $senderGets وإنت بتاخد $friendGets.\n$link';
     }
     final who = from.isEmpty ? 'A friend' : from;
-    return '$name, $who invited you to Qamar — the nutritionist that speaks Egyptian. Two weeks of Qamar+, free, with the code $code.\n$link';
+    final whoAgain = from.isEmpty ? 'your friend' : from;
+    return '$name, $who invited you to Qamar — the nutritionist that speaks Egyptian. Two weeks of Qamar+, free, with the code $code. '
+        'If you stay on and pay your first month, $whoAgain gets $senderGets and you get $friendGets.\n$link';
   }
 }
 

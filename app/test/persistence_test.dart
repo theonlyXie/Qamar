@@ -2605,6 +2605,33 @@ void main() {
       expect(a.named('invitation_sent').single['number'], 1);
     });
 
+    test('the invitation tells the friend what the sender gets if they pay, in both languages', () async {
+      for (final lang in AppLang.values) {
+        final sharer = MemorySharer();
+        final state = backed(invitations: FakeInvitationRepo(), sharer: sharer)
+          ..plusActive = true
+          ..setLang(lang);
+        state.profile = state.profile.copyWith(name: 'Basel');
+        await settle();
+        await state.issueInvitation('Omar');
+        final msg = sharer.texts.single.replaceAll(RegExp('[\u2066-\u2069]'), '');
+        if (lang == AppLang.en) {
+          expect(msg, contains('If you stay on and pay your first month, Basel gets 1,000 Su and you get 2,000 Su.'));
+        } else {
+          expect(msg, contains('ولو كمّلت ودفعت أول شهر، Basel بياخد ١٬٠٠٠ نقطة Su وإنت بتاخد ٢٬٠٠٠ نقطة Su.'));
+          expect(RegExp('[0-9]').hasMatch(msg.replaceAll(RegExp(r'QMR-[0-9A-Z]+|https://\S+'), '')), isFalse,
+              reason: 'the amounts in the app’s digits');
+        }
+      }
+    });
+
+    test('without a name, the friend still learns who gets what', () {
+      final inv = Invitation(id: 'i', number: 1, quarter: '2026Q3', name: 'Omar', code: 'QMR-1', createdAt: DateTime(2026, 9, 1));
+      final en = inv.message(ar: false, sender: ' ', senderGets: '1,000 Su', friendGets: '2,000 Su');
+      expect(en, startsWith('Omar, A friend invited you'));
+      expect(en, contains('your friend gets 1,000 Su and you get 2,000 Su'));
+    });
+
     test('three a quarter: the fourth is refused before the server is asked', () async {
       final repo = FakeInvitationRepo();
       final state = backed(invitations: repo, sharer: MemorySharer())..plusActive = true;

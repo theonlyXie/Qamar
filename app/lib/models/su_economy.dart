@@ -44,6 +44,12 @@ class SuEconomy {
   static const int waterSipLite = 5;
   static const int waterSipsPaidDaily = 8;
 
+  /// A named invitation whose friend pays a first month (migration 0049's
+  /// su_economy_config): this to the member who sent it, [invitationFriend]
+  /// to the friend. Both are said in the invitation itself.
+  static const int invitationSender = 1000;
+  static const int invitationFriend = 2000;
+
   /// The ring completes at day 7 and pays this, once per completed week.
   static const int streakWeek = 100;
 

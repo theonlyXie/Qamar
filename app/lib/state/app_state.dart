@@ -3026,7 +3026,12 @@ class AppState extends ChangeNotifier {
   Future<void> shareInvitation(Invitation inv) async {
     final s = _sharer;
     if (s == null) return;
-    await s.shareText(inv.message(ar: isAr, sender: profile.name));
+    await s.shareText(inv.message(
+      ar: isAr,
+      sender: profile.name,
+      senderGets: suAmount(SuEconomy.invitationSender),
+      friendGets: suAmount(SuEconomy.invitationFriend),
+    ));
   }
 
   /// The friend's side: a code typed on the welcome screen. The sender's

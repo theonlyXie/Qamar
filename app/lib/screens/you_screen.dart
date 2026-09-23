@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/billing.dart';
 import '../models/invitation.dart';
+import '../models/su_economy.dart';
 import '../services/config.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
@@ -494,8 +495,8 @@ class _InvitationsCardState extends State<_InvitationsCard> {
           const SizedBox(height: 4),
           Text(
             isAr
-                ? '${state.iso('${book.limit}')} دعوات بالاسم كل تلات شهور. صاحبك بياخد أسبوعين قمر+ واسمك بيظهرله من أول لحظة. لما يدفع أول شهر: إنت ${state.suAmount(1000)} وهو ${state.suAmount(2000)}.'
-                : '${book.limit} named invitations a quarter. Your friend gets two weeks of Qamar+ and sees your name from the first moment. When they pay their first month: ${state.suAmount(1000)} for you, ${state.suAmount(2000)} for them.',
+                ? '${state.iso('${book.limit}')} دعوات بالاسم كل تلات شهور. صاحبك بياخد أسبوعين قمر+ واسمك بيظهرله من أول لحظة. لما يدفع أول شهر: إنت ${state.suAmount(SuEconomy.invitationSender)} وهو ${state.suAmount(SuEconomy.invitationFriend)}.'
+                : '${book.limit} named invitations a quarter. Your friend gets two weeks of Qamar+ and sees your name from the first moment. When they pay their first month: ${state.suAmount(SuEconomy.invitationSender)} for you, ${state.suAmount(SuEconomy.invitationFriend)} for them.',
             style: QText.body(size: 12, height: 18, color: QColors.textMuted),
           ),
           if (!member) ...[
