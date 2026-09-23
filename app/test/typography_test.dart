@@ -1,11 +1,17 @@
 // Characters, seat 6's part: no copy carries an emoji, which the bundled
 // fonts do not draw (the Arabic greeting's 👋 rendered as a box at the start
-// of the first thing the app says), and a trailing "..." is the ellipsis
-// character, one glyph with its own spacing, not three full stops.
+// of the first thing the app says); a trailing "..." is the ellipsis
+// character, one glyph with its own spacing, not three full stops; and every
+// character of copy is one a bundled face draws, with body text falling back
+// to Inter for what Noto Sans Arabic lacks (You's arrows drew as boxes).
 
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+
+import 'package:qamar/theme/text_styles.dart';
+
+import 'support/font_cmap.dart';
 
 final _emoji = RegExp('[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]', unicode: true);
 final _literal = RegExp(r"'(?:[^'\\]|\\.)*'");
@@ -33,5 +39,30 @@ void main() {
   test('an ellipsis is one character', () {
     final found = [for (final (where, t) in _copy()) if (t.contains('...')) '$where: $t'];
     expect(found, isEmpty, reason: found.join('\n'));
+  });
+
+  test('every character of copy is drawn by a bundled face, and body text falls back to the one that has it', () {
+    final noto = fontCharacters('assets/fonts/NotoSansArabic-400.ttf');
+    final inter = fontCharacters('assets/fonts/Inter-400.ttf');
+    expect(QText.body(size: 14).fontFamilyFallback, contains('Inter'), reason: 'what Noto lacks is drawn by Inter');
+    expect(QText.number(size: 14).fontFamilyFallback, contains('Noto Sans Arabic'));
+    final escape = RegExp(r'\\u\{([0-9A-Fa-f]+)\}|\\u([0-9A-Fa-f]{4})');
+    final found = <String>[];
+    for (final (where, literal) in _copy()) {
+      final text = literal
+          .replaceAll(RegExp(r'\$\{[^}]*\}'), '')
+          .replaceAllMapped(escape, (m) => String.fromCharCode(int.parse(m.group(1) ?? m.group(2)!, radix: 16)))
+          .replaceAll(r'\n', ' ');
+      for (final c in text.runes) {
+        // Controls and bidi isolates are not drawn.
+        if (c < 0x20 || (c >= 0x200B && c <= 0x200F) || (c >= 0x2066 && c <= 0x2069) || c == 0xFFFC) continue;
+        if (!noto.contains(c) && !inter.contains(c)) found.add('$where: U+${c.toRadixString(16)} in $literal');
+      }
+    }
+    expect(found, isEmpty, reason: found.join('\n'));
+    // The arrows You uses are Inter's, not Noto's: the fallback is what
+    // draws them.
+    expect(noto.contains(0x2192), isFalse);
+    expect(inter.contains(0x2192), isTrue);
   });
 }

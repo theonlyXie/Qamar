@@ -80,7 +80,10 @@ class QText {
   }
 
   /// Noto Sans Arabic — primary bilingual body/UI text, renders both scripts.
-  /// Never tracked.
+  /// Never tracked. What Noto does not carry (the arrows in You's "Settings →
+  /// Accessibility" and its Arabic "←", which drew as boxes) falls back to
+  /// the bundled Inter.
+  static const _bodyFallback = ['Inter'];
   static TextStyle body({
     required double size,
     double? height,
@@ -90,6 +93,7 @@ class QText {
     assert(textSizes.contains(size), 'body at $size is off the scale: $textSizes');
     return TextStyle(
       fontFamily: 'Noto Sans Arabic',
+      fontFamilyFallback: _bodyFallback,
       fontSize: size,
       height: height != null ? height / size : null,
       fontWeight: weight,
