@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/words.dart';
 import '../models/profile.dart';
 import '../models/ramadan.dart';
 import '../state/app_state.dart';
@@ -33,7 +34,9 @@ class RamadanScreen extends StatelessWidget {
 
     final String subtitle;
     if (phase == SeasonPhase.before && until != null) {
-      subtitle = isAr ? 'أول يوم صيام بعد ${state.iso('$until')} ${until == 1 ? 'يوم' : 'أيام'}.' : 'The first fast is $until ${until == 1 ? 'day' : 'days'} away.';
+      subtitle = isAr
+          ? 'أول يوم صيام بعد ${Counted.day.of(until, ar: true, iso: state.iso)}.'
+          : 'The first fast is ${Counted.day.of(until, ar: false, iso: state.iso)} away.';
     } else if (day != null) {
       subtitle = isAr ? 'اليوم ${state.iso('$day')} من ${state.iso('${season.days}')}' : 'Day $day of ${season.days}';
     } else {
@@ -129,7 +132,10 @@ class RamadanScreen extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(
                 isAr
-                    ? 'سجّلت ${state.iso('${state.seasonDaysLogged}')} يوم من ${state.iso('${season.days}')}'
+                    // The noun counts the days logged, as Arabic counts
+                    // (one, two, three to ten, eleven on); in English the
+                    // month's days take it.
+                    ? 'سجّلت ${Counted.day.of(state.seasonDaysLogged, ar: true, iso: state.iso)} من ${state.iso('${season.days}')}'
                     : 'Logged ${state.seasonDaysLogged} of ${season.days} days',
                 style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.goldPale),
               ),

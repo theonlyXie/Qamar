@@ -654,7 +654,9 @@ class _FastingPrompt extends StatelessWidget {
     final until = state.season.daysUntil(state.clockNow());
     final lead = until == null
         ? (isAr ? 'رمضان كريم.' : 'Ramadan Kareem.')
-        : (isAr ? 'رمضان بعد ${state.iso('$until')} ${until == 1 ? 'يوم' : 'أيام'}.' : 'Ramadan is $until ${until == 1 ? 'day' : 'days'} away.');
+        : (isAr
+            ? 'رمضان بعد ${Counted.day.of(until, ar: true, iso: state.iso)}.'
+            : 'Ramadan is ${Counted.day.of(until, ar: false, iso: state.iso)} away.');
     // Within the slot's 120 points (O15), in both languages. The answers
     // are drawn 34 tall in a 48-point touch (O11), so the 7 points of touch
     // under each outline are the card's bottom margin, and the 7 above it

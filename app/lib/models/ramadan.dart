@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import '../l10n/words.dart';
 import '../services/repositories.dart';
 import 'days.dart';
 import 'water.dart';
@@ -247,7 +248,7 @@ class EidReport {
     final target = math.max(targetKcal, 1);
     final lines = <ReportLine>[
       (
-        ar: 'سجّلت ${iso('$daysLogged')} يوم من ${iso('${season.days}')}${daysLogged >= season.days ? ' — الشهر كله.' : '.'}',
+        ar: 'سجّلت ${Counted.day.of(daysLogged, ar: true, iso: iso)} من ${iso('${season.days}')}${daysLogged >= season.days ? ' — الشهر كله.' : '.'}',
         en: 'You logged $daysLogged of ${season.days} days${daysLogged >= season.days ? ' — the whole month.' : '.'}',
       ),
     ];
@@ -273,7 +274,7 @@ class EidReport {
             ));
     }
     if (best >= 3) {
-      lines.add((ar: 'أطول سلسلة: ${iso('$best')} يوم ورا بعض.', en: 'Longest run: $best days in a row.'));
+      lines.add((ar: 'أطول سلسلة: ${Counted.day.of(best, ar: true, iso: iso)} ورا بعض.', en: 'Longest run: ${Counted.day.of(best, ar: false, iso: iso)} in a row.'));
     }
     if (daysLogged == 0) {
       lines.add((ar: 'مفيش تسجيل في الشهر ده، فمفيش حاجة أقولها غير: كل سنة وإنت طيب.', en: 'Nothing was logged this month, so there is nothing to read back — Eid Mubarak all the same.'));
