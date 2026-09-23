@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/icons.dart';
 import '../theme/text_styles.dart';
 
 /// The words for the orb's hold, in one place: the Today tutorial card's
@@ -34,7 +35,7 @@ class HoldCoachMark extends StatelessWidget {
 
   static const double width = 230;
   static const _fill = QColors.surfaceRaised;
-  static final _edge = QColors.ink.withValues(alpha: 0.55);
+  static const _edge = QColors.hairlineStrong;
 
   /// The small point between the mark and the moon, its tip toward the moon:
   /// [up] when the mark sits below the orb.
@@ -67,13 +68,13 @@ class HoldCoachMark extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.mic_none, size: 16, color: QColors.inkSecondary),
+                const Icon(QIcons.mic, size: 18, color: QColors.ink),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(HoldCopy.line(isAr), style: QText.body(size: 13, height: 18, color: QColors.ink)),
+                  child: Text(HoldCopy.line(isAr), style: QText.body(size: 15, color: QColors.ink)),
                 ),
                 const SizedBox(width: 6),
-                const Icon(Icons.close, size: 14, color: QColors.inkTertiary),
+                const Icon(QIcons.close, size: 16, color: QColors.inkTertiary),
               ],
             ),
           ),

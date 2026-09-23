@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../models/profile.dart';
 import '../state/app_state.dart';
-import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
@@ -31,42 +30,44 @@ class WhySheet extends StatelessWidget {
       (
         t.whyAssume,
         state.isAr
-            ? '${state.iso('${p.age}')} سنة · ${p.gender == Gender.female ? 'أنثى' : 'ذكر'} · ${state.iso('${p.height}')} سم · ${state.iso('${p.weight}')} كجم · معامل نشاط ${state.iso('${p.activity}')}'
-            : '${p.age} yrs · ${p.gender == Gender.female ? 'female' : 'male'} · ${p.height} cm · ${p.weight} kg · activity factor ${p.activity}',
+            ? '${state.iso('${p.age}')} سنة · ${p.gender == Gender.female ? 'أنثى' : 'ذكر'} · ${state.iso('${p.height}')} سم · ${state.iso('${p.weight}')} كجم · نشاط ${state.iso('${p.activity}')}'
+            : '${p.age} years · ${p.gender == Gender.female ? 'female' : 'male'} · ${p.height} cm · ${p.weight} kg · activity ${p.activity}',
       ),
       (t.whySource, t.whySourceVal),
       (t.whyGuide, t.whyGuideVal),
-      (t.whyVersion, WhySheet.inOrder(state.iso('calc v2.0 · 2026-08-13'))),
     ];
 
+    // Plain words first, the working after: four short rows, each a label
+    // over its line, and the calculation's version as a footnote at the end,
+    // where it can be quoted and need never be read.
     return Positioned.fill(
       child: QSheetScrim(
         onDismiss: state.closeWhy,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(20, 22, 20, 34),
-          decoration: const BoxDecoration(
-            color: QColors.surface,
-            border: Border(top: BorderSide(color: QColors.hairlineStrong)),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
-          ),
+        child: QSheetPanel(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(child: Container(width: 38, height: 4, decoration: BoxDecoration(color: QColors.hairlineStrong, borderRadius: BorderRadius.circular(QRadii.pill)))),
-              const SizedBox(height: 12),
               Text(t.whyTitle, style: QText.display(size: 22, ar: QText.arabic(t.whyTitle), color: QColors.ink)),
-              for (final r in rows) ...[
-                const SizedBox(height: 11),
-                const Divider(color: QColors.hairline, height: 1),
-                const SizedBox(height: 11),
-                Text(r.$1, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.inkTertiary)),
-                const SizedBox(height: 4),
-                Text(r.$2, style: QText.body(size: 15, height: 22, color: QColors.ink)),
+              const SizedBox(height: 8),
+              for (final (i, r) in rows.indexed) ...[
+                if (i > 0) const Divider(color: QColors.hairline, height: 1),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(QText.eyebrowText(r.$1, ar: state.isAr), style: QText.eyebrow(ar: state.isAr)),
+                    const SizedBox(height: 4),
+                    Text(r.$2, style: QText.body(size: 15, color: QColors.ink)),
+                  ]),
+                ),
               ],
-              const SizedBox(height: 14),
-              QPrimaryButton(label: t.whyClose, onTap: state.closeWhy, height: 50),
+              Text(
+                WhySheet.inOrder(state.iso('calc v2.0 · 2026-08-13')),
+                semanticsLabel: '${t.whyVersion}: calc v2.0, 2026-08-13',
+                style: QText.body(size: 12, color: QColors.inkTertiary),
+              ),
+              const SizedBox(height: 16),
+              QPrimaryButton(label: t.whyClose, onTap: state.closeWhy),
             ],
           ),
         ),

@@ -15,6 +15,7 @@ import 'package:qamar/main.dart';
 import 'package:qamar/screens/you_screen.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/colors.dart';
+import 'package:qamar/theme/icons.dart';
 import 'package:qamar/theme/layout.dart';
 import 'package:qamar/widgets/common.dart';
 import 'package:qamar/widgets/glass.dart';
@@ -80,7 +81,7 @@ void main() {
   });
 
   testWidgets('a round icon button is drawn at its size, touched at 48, and named', (tester) async {
-    await _pump(tester, QRoundIconButton(icon: Icons.add, onTap: () {}, size: 28, label: 'More'));
+    await _pump(tester, QRoundIconButton(icon: QIcons.add, onTap: () {}, size: 28, label: 'More'));
     final control = find.byType(QRoundIconButton);
     expect(_drawn(tester, control).size, const Size(28, 28));
     expect(tester.getSize(control), const Size(48, 48));

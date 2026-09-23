@@ -11,6 +11,7 @@ import 'package:qamar/main.dart';
 import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/explain.dart';
+import 'package:qamar/theme/icons.dart';
 import 'package:qamar/widgets/hold_coach_mark.dart';
 import 'package:qamar/widgets/living_orb.dart';
 import 'package:qamar/widgets/orb_gesture_guide.dart';
@@ -182,8 +183,8 @@ void main() {
       s.go(AppScreen.today);
       _useTree(s, 2);
       await pump(tester, s);
-      final mic = tester.getCenter(find.descendant(of: find.byType(HoldCoachMark), matching: find.byIcon(Icons.mic_none)));
-      final close = tester.getCenter(find.descendant(of: find.byType(HoldCoachMark), matching: find.byIcon(Icons.close)));
+      final mic = tester.getCenter(find.descendant(of: find.byType(HoldCoachMark), matching: find.byIcon(QIcons.mic)));
+      final close = tester.getCenter(find.descendant(of: find.byType(HoldCoachMark), matching: find.byIcon(QIcons.close)));
       expect(mic.dx, greaterThan(close.dx));
     });
 

@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../models/activity.dart';
 import '../state/app_state.dart';
-import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
@@ -32,51 +31,47 @@ class _ActivitySheetState extends State<ActivitySheet> {
     if (kind == null) return const SizedBox.shrink();
     final name = ActivityCatalog.label(kind, ar: isAr);
 
+    // One question, answered in one tap: each length is a button that logs
+    // it, with the estimate it will write, so nothing on the card surprises.
     return Positioned.fill(
       child: QSheetScrim(
         onDismiss: state.cancelActivity,
-        blur: 8,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-          decoration: const BoxDecoration(
-            color: QColors.surface,
-            border: Border(top: BorderSide(color: QColors.hairlineStrong)),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
-          ),
+        child: QSheetPanel(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(isAr ? '$name — قد إيه؟' : '$name — how long?',
-                  style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
-              const SizedBox(height: 4),
+              Text(isAr ? '$name، قد إيه؟' : '$name, how long?', style: QText.display(size: 22, ar: isAr, color: QColors.ink)),
+              const SizedBox(height: 6),
               Text(
-                isAr ? 'تقدير على وزنك. بيتسجّل جنب الأكل.' : 'An estimate from your weight. Logged beside the food.',
-                style: QText.body(size: 12, height: 18, color: QColors.inkTertiary),
+                isAr ? 'تقدير على وزنك. بيتسجّل جنب الأكل.' : 'An estimate from your weight, logged beside the food.',
+                style: QText.body(size: 15, color: QColors.inkSecondary),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               Wrap(
-                spacing: 10,
-                runSpacing: 10,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   for (final m in ActivityCatalog.durations)
                     QOutlineButton(
                       label: isAr
-                          ? '${state.iso('$m')} د · ~${state.iso('${ActivityCatalog.kcalFor(kind, m, state.profile.weight)}')}'
-                          : '$m min · ~${ActivityCatalog.kcalFor(kind, m, state.profile.weight)}',
-                      height: 38,
-                      color: QColors.ink,
+                          ? '${state.iso('$m')} د · ${state.iso('${ActivityCatalog.kcalFor(kind, m, state.profile.weight)}')} سعر'
+                          : '$m min · ${ActivityCatalog.kcalFor(kind, m, state.profile.weight)} kcal',
+                      height: 44,
                       onTap: () => state.logActivity(m),
                     ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: TextButton(
-                  onPressed: state.cancelActivity,
-                  child: Text(isAr ? 'إلغاء' : 'Cancel', style: QText.body(size: 13, color: QColors.inkTertiary)),
+                alignment: AlignmentDirectional.centerStart,
+                child: QTapArea(
+                  onTap: state.cancelActivity,
+                  builder: (context, pressed) => qPressed(
+                    context,
+                    pressed: pressed,
+                    child: Text(isAr ? 'إلغاء' : 'Cancel', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkSecondary)),
+                  ),
                 ),
               ),
             ],

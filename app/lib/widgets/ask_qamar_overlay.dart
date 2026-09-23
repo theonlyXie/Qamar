@@ -51,6 +51,12 @@ class AskQamarOverlay extends StatefulWidget {
   /// The empty conversation's one line, for tests.
   static const emptyKey = ValueKey('chat-empty');
 
+  /// The line under the composer saying the answers come from AI.
+  static const disclosureKey = ValueKey('chat-disclosure');
+
+  /// The copy action under the latest reply.
+  static const copyKey = ValueKey('chat-copy');
+
   /// The conversation's ground at its top and bottom edges, for the shell
   /// to carry into the status bar and the home indicator's strips.
   static Color get groundTop => _ground;
@@ -158,7 +164,7 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                               // written until it is.
                               if (state.hasProposal) const _ProposalCard(),
                               if (state.chatState == ChatState.thinking) const _Thinking(),
-                              for (final c in state.chat.reversed) _ChatTurn(turn: c),
+                              for (final (i, c) in state.chat.reversed.indexed) _ChatTurn(turn: c, latest: i == 0),
                             ],
                           ),
                         ),
@@ -211,6 +217,18 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                             : state.loggingMeal
                                 ? t.mealPlaceholder
                                 : t.chatPlaceholder,
+                      ),
+                      // Said once and always there, quietly: the answers
+                      // come from AI and can be wrong (the HIG's generative
+                      // AI rules), and a health question is a doctor's.
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          state.isAr ? 'قمر ممكن يغلط. أي حاجة طبية راجعها مع دكتور.' : 'Qamar can make mistakes. Check anything medical with a doctor.',
+                          key: AskQamarOverlay.disclosureKey,
+                          textAlign: TextAlign.center,
+                          style: QText.body(size: 11, color: QColors.inkTertiary),
+                        ),
                       ),
                     ],
                   ),
@@ -323,7 +341,10 @@ class _TopFade extends StatelessWidget {
 /// conversation rather than a feed of cards.
 class _ChatTurn extends StatelessWidget {
   final ChatTurn turn;
-  const _ChatTurn({required this.turn});
+
+  /// The newest turn: a reply here carries the copy action under it.
+  final bool latest;
+  const _ChatTurn({required this.turn, this.latest = false});
 
   @override
   Widget build(BuildContext context) {
@@ -354,9 +375,11 @@ class _ChatTurn extends StatelessWidget {
         ),
       );
     }
+    // The newest answer's copy row is its own space below it.
+    final copy = latest && turn.problem == null;
     return _Appear(
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: EdgeInsets.only(bottom: copy ? 8 : 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -377,7 +400,54 @@ class _ChatTurn extends StatelessWidget {
                 child: _Chip(label: turn.action!, onTap: state.chatActionTap, emphasis: true),
               ),
             ],
+            // Under the newest answer, the one thing people do with an
+            // answer they like: copy it.
+            if (copy) _CopyReply(text: [turn.text, if (turn.sub != null && turn.sub!.isNotEmpty) turn.sub!].join('\n')),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Copy an answer: a quiet glyph at the answer's start, which turns into a
+/// tick for a moment once the words are on the clipboard.
+class _CopyReply extends StatefulWidget {
+  final String text;
+  const _CopyReply({required this.text});
+
+  @override
+  State<_CopyReply> createState() => _CopyReplyState();
+}
+
+class _CopyReplyState extends State<_CopyReply> {
+  bool _copied = false;
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.text));
+    HapticFeedback.selectionClick();
+    if (!mounted) return;
+    setState(() => _copied = true);
+    await Future.delayed(const Duration(milliseconds: 1600));
+    if (mounted) setState(() => _copied = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ar = context.read<AppState>().isAr;
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: QTapArea(
+        key: AskQamarOverlay.copyKey,
+        onTap: _copy,
+        label: _copied ? (ar ? 'اتنسخ' : 'Copied') : (ar ? 'انسخ الرد' : 'Copy the answer'),
+        builder: (context, pressed) => qPressed(
+          context,
+          pressed: pressed,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 150),
+            child: Icon(_copied ? QIcons.check : QIcons.copy, key: ValueKey(_copied), size: 18, color: QColors.inkTertiary),
+          ),
         ),
       ),
     );
@@ -536,7 +606,8 @@ class _Composer extends StatelessWidget {
               cursorColor: QColors.ink,
               style: QText.body(size: 17, height: 22, color: QColors.ink),
               decoration: InputDecoration(
-                hintText: placeholder,
+                // Listening, the field says so where the words will appear.
+                hintText: listening ? state.t.sListening : placeholder,
                 hintStyle: QText.body(size: 17, height: 22, color: QColors.inkTertiary),
                 border: InputBorder.none,
                 isDense: true,
@@ -825,10 +896,13 @@ class _ProposalCard extends StatelessWidget {
     final items = state.proposalItems();
     final totals = state.proposalTotals();
 
-    String confLabel(Confidence c) => switch (c) {
-          Confidence.high => isAr ? 'ثقة عالية' : 'High confidence',
-          Confidence.med => isAr ? 'ثقة متوسطة' : 'Medium confidence',
-          Confidence.low => isAr ? 'تقدير' : 'Estimate',
+    // How sure the reading is, said only where it matters and in plain
+    // words: a sure item says nothing, a guess says so, and a weak one asks
+    // to be looked at. Never a score.
+    String? doubt(Confidence c) => switch (c) {
+          Confidence.high => null,
+          Confidence.med => isAr ? 'تقريبي' : 'Best guess',
+          Confidence.low => isAr ? 'اتأكد منها' : 'Check this',
         };
 
     return _Appear(
@@ -863,7 +937,7 @@ class _ProposalCard extends StatelessWidget {
                               ],
                             ),
                           ),
-                          ConfidenceBadge(high: items[i].def.conf == Confidence.high, label: confLabel(items[i].def.conf)),
+                          if (doubt(items[i].def.conf) case final d?) ConfidenceBadge(check: items[i].def.conf == Confidence.low, label: d),
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -884,13 +958,14 @@ class _ProposalCard extends StatelessWidget {
             ],
             const Divider(height: 1, color: QColors.hairline),
             const SizedBox(height: 12),
+            // The one number the meal comes to; the macros are Today's.
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(t.approx, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkTertiary)),
+                Text(isAr ? 'الإجمالي' : 'Total', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkSecondary)),
                 Flexible(
-                  child: Text('${totals.kcal} kcal · P ${totals.p} · C ${totals.c} · F ${totals.f}',
-                      textAlign: TextAlign.end, style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink)),
+                  child: Text(isAr ? 'حوالي ${state.iso('${totals.kcal}')} سعر' : 'About ${totals.kcal} kcal',
+                      textAlign: TextAlign.end, style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.ink, ar: isAr)),
                 ),
               ],
             ),

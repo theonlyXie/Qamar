@@ -345,6 +345,46 @@ class _SheetExit extends InheritedWidget {
   bool updateShouldNotify(_SheetExit old) => old.closing != closing;
 }
 
+/// A sheet's panel (the mono-glass skill): the surface, its 32-point top
+/// corners over a strong hairline, and the grabber that says it can be pulled
+/// down. Every sheet is one of these inside a [QSheetScrim], so they all
+/// arrive, look and leave the same way.
+class QSheetPanel extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  const QSheetPanel({super.key, required this.child, this.padding = const EdgeInsets.fromLTRB(20, 10, 20, 28)});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: padding,
+        decoration: const BoxDecoration(
+          color: QColors.surface,
+          border: Border(top: BorderSide(color: QColors.hairlineStrong)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [const Center(child: QSheetGrabber()), const SizedBox(height: 14), child],
+        ),
+      );
+}
+
+/// The small bar at the top of a sheet: 36 by 5, the strong hairline.
+class QSheetGrabber extends StatelessWidget {
+  const QSheetGrabber({super.key});
+
+  @override
+  Widget build(BuildContext context) => const ExcludeSemantics(
+        child: SizedBox(
+          width: 36,
+          height: 5,
+          child: DecoratedBox(decoration: BoxDecoration(color: QColors.hairlineStrong, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill)))),
+        ),
+      );
+}
+
 /// A sheet's ground, and the sheet on it. The scrim fades in on the settle
 /// spring while the sheet ([child]) rises from below its own height on it;
 /// it leaves the same way, down and out. It can be dragged: it follows the
@@ -853,19 +893,20 @@ class _CoinPainter extends CustomPainter {
   bool shouldRepaint(_CoinPainter old) => old.color != color;
 }
 
-/// How sure the reading of a portion is. Sure is written in white inside the
-/// strong hairline; an estimate in the third ink inside the plain one. The
-/// word says which; the weight of the drawing agrees.
+/// A reading that is less than sure, said in words: a quiet outline for a
+/// best guess, the strong one — in white — for something to check. A sure
+/// reading carries no badge at all.
 class ConfidenceBadge extends StatelessWidget {
-  final bool high;
+  /// Something to look at, not just a guess.
+  final bool check;
   final String label;
-  const ConfidenceBadge({super.key, required this.high, required this.label});
+  const ConfidenceBadge({super.key, required this.check, required this.label});
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: QDecor.capsule(edge: high ? QColors.hairlineStrong : QColors.hairline),
-      child: Text(label, style: QText.body(size: 11, weight: FontWeight.w600, color: high ? QColors.ink : QColors.inkTertiary)),
+      decoration: QDecor.capsule(edge: check ? QColors.hairlineStrong : QColors.hairline),
+      child: Text(label, style: QText.body(size: 12, weight: FontWeight.w600, color: check ? QColors.ink : QColors.inkSecondary)),
     );
   }
 }

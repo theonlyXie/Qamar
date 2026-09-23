@@ -13,6 +13,8 @@ import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/hold_coach_mark.dart';
+import 'package:qamar/theme/icons.dart';
+import 'package:qamar/widgets/common.dart';
 import 'package:qamar/widgets/orb_gesture_guide.dart';
 import 'package:qamar/widgets/tree_overlay.dart';
 
@@ -42,7 +44,7 @@ void main() {
     expect(find.byType(OrbGestureGuide), findsOneWidget, reason: 'the tutorial, on Today');
 
     final gotIt = find.text('Got it');
-    final hit = tester.getSize(find.ancestor(of: gotIt, matching: find.byType(ConstrainedBox)).first);
+    final hit = tester.getSize(find.ancestor(of: gotIt, matching: find.byType(QTapArea)).first);
     expect(hit.height, greaterThanOrEqualTo(48), reason: 'small words, a full touch');
     await tester.tap(gotIt);
     await tester.pump();
@@ -94,12 +96,12 @@ void main() {
     s.go(AppScreen.today);
     await _pump(tester, s);
     final guide = find.byType(OrbGestureGuide);
-    expect(find.descendant(of: guide, matching: find.byIcon(Icons.check_circle)), findsNothing);
+    expect(find.descendant(of: guide, matching: find.byIcon(QIcons.done)), findsNothing);
     s.orbTap(); // the tree opens: the tap is learned
     s.closeTree();
     await tester.pump();
-    expect(find.descendant(of: guide, matching: find.byIcon(Icons.check_circle)), findsOneWidget);
-    expect(find.descendant(of: guide, matching: find.byIcon(Icons.mic_none)), findsOneWidget, reason: 'the hold, not yet');
+    expect(find.descendant(of: guide, matching: find.byIcon(QIcons.done)), findsOneWidget);
+    expect(find.descendant(of: guide, matching: find.byIcon(QIcons.mic)), findsOneWidget, reason: 'the hold, not yet');
     expect(find.descendant(of: guide, matching: find.textContaining('Tap it\u00A0— opens the tree')), findsOneWidget);
     expect(find.descendant(of: guide, matching: find.textContaining('Drag it onto a dotted number\u00A0— it explains itself')), findsOneWidget);
   });
@@ -112,8 +114,8 @@ void main() {
     s.go(AppScreen.you);
     await _pump(tester, s);
     final guide = find.byType(OrbGestureGuide);
-    expect(find.descendant(of: guide, matching: find.byIcon(Icons.check_circle)), findsOneWidget);
-    expect(find.descendant(of: guide, matching: find.byIcon(Icons.mic_none)), findsOneWidget, reason: 'the hold, not yet');
+    expect(find.descendant(of: guide, matching: find.byIcon(QIcons.done)), findsOneWidget);
+    expect(find.descendant(of: guide, matching: find.byIcon(QIcons.mic)), findsOneWidget, reason: 'the hold, not yet');
   });
 
   testWidgets('its photo line says the person’s own daily photos, in Eastern digits in Arabic', (tester) async {

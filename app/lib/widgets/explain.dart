@@ -5,9 +5,9 @@ import '../models/plan.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/icons.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
-import 'moon.dart';
 
 /// What the orb says about one piece of data.
 ///
@@ -272,21 +272,20 @@ class _ExplainableState extends State<Explainable> {
       key: _key,
       duration: const Duration(milliseconds: 160),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      // Under the orb it lifts: the raised surface and the strong edge, no
+      // glow — a lighter fill is the lift on black.
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(QRadii.inset),
-        color: hovered ? QColors.ink.withValues(alpha: 0.16) : Colors.transparent,
-        border: Border.all(
-          color: hovered ? QColors.ink.withValues(alpha: 0.85) : Colors.transparent,
-        ),
-        boxShadow: hovered ? [BoxShadow(color: QColors.ink.withValues(alpha: 0.35), blurRadius: 18)] : null,
+        color: hovered ? QColors.surfaceHigh : Colors.transparent,
+        border: Border.all(color: hovered ? QColors.ink : Colors.transparent),
       ),
       child: widget.child,
     );
   }
 }
 
-/// The mark that says "the orb explains this": a quiet dotted violet line
-/// under a value, the way a dotted underline marks a term with a definition.
+/// The mark that says "the orb explains this": a quiet dotted line under a
+/// value, the way a dotted underline marks a term with a definition.
 /// Drag-to-explain had no signifier at all — nothing on screen told the
 /// explainable numbers from the rest — so the gesture could only be learned
 /// from the tutorial. The tutorial now says "a dotted number".
@@ -351,87 +350,44 @@ class _ExplainSheetState extends State<ExplainSheet> {
     return Positioned.fill(
       child: QSheetScrim(
         onDismiss: state.closeExplain,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 34),
-          decoration: const BoxDecoration(
-            color: QColors.surface,
-            border: Border(top: BorderSide(color: QColors.hairlineStrong)),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(QRadii.sheet)),
-          ),
+        child: QSheetPanel(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
-                child: Container(
-                  width: 38,
-                  height: 4,
-                  decoration: BoxDecoration(color: QColors.hairlineStrong, borderRadius: BorderRadius.circular(QRadii.pill)),
+              Text(isAr ? ex.titleAr : ex.titleEn, style: QText.display(size: 22, ar: isAr, color: QColors.ink)),
+              const SizedBox(height: 8),
+              Text(isAr ? ex.bodyAr : ex.bodyEn, style: QText.body(size: 17, color: QColors.ink)),
+              const SizedBox(height: 16),
+              // What to do with it: one line, set apart on the raised surface.
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: QDecor.card(color: QColors.surfaceRaised, radius: QRadii.control),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(QIcons.idea, size: 18, color: QColors.ink),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(isAr ? ex.soWhatAr : ex.soWhatEn, style: QText.body(size: 15, color: QColors.inkSecondary))),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const QamarMoon(size: 40),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(isAr ? ex.titleAr : ex.titleEn,
-                            style: QText.display(size: 22, ar: isAr, color: QColors.ink)),
-                        const SizedBox(height: 6),
-                        Text(isAr ? ex.bodyAr : ex.bodyEn,
-                            style: QText.body(size: 15, height: 22, color: QColors.ink)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(13),
-                decoration: BoxDecoration(
-                  color: QColors.ink.withValues(alpha: 0.10),
-                  border: Border.all(color: QColors.ink.withValues(alpha: 0.35)),
-                  borderRadius: BorderRadius.circular(QRadii.control),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.lightbulb_outline, size: 16, color: QColors.inkSecondary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(isAr ? ex.soWhatAr : ex.soWhatEn,
-                          style: QText.body(size: 13, height: 20, color: QColors.inkSecondary)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(
                 children: [
                   Expanded(
                     child: QOutlineButton(
-                      label: isAr ? 'اسأل قمر عن ده' : 'Ask Qamar about this',
+                      label: isAr ? 'اسأل قمر' : 'Ask Qamar',
+                      icon: QIcons.voice,
                       onTap: () {
                         state.closeExplain();
                         state.openChat();
                       },
-                      height: 46,
-                      color: QColors.inkSecondary,
+                      height: 48,
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Expanded(
-                    child: QPrimaryButton(
-                      label: isAr ? 'فهمت' : 'Got it',
-                      onTap: state.closeExplain,
-                      height: 46,
-                    ),
-                  ),
+                  Expanded(child: QPrimaryButton(label: isAr ? 'فهمت' : 'Got it', onTap: state.closeExplain, height: 48)),
                 ],
               ),
             ],

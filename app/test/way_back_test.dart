@@ -14,6 +14,7 @@ import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
 import 'package:qamar/models/messages.dart';
 import 'package:qamar/state/app_state.dart';
+import 'package:qamar/theme/icons.dart';
 import 'package:qamar/widgets/common.dart';
 import 'package:qamar/widgets/explain.dart';
 import 'package:qamar/widgets/orb_nav.dart';
@@ -205,6 +206,6 @@ void main() {
   });
 
   test('the arrow turns with the language', () {
-    expect(Icons.arrow_back.matchTextDirection, isTrue);
+    expect(QIcons.back.matchTextDirection, isTrue);
   });
 }

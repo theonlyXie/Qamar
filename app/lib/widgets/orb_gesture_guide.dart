@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/icons.dart';
 import '../theme/text_styles.dart';
+import 'common.dart';
 import 'hold_coach_mark.dart';
 import 'tree_overlay.dart';
 
@@ -37,10 +39,10 @@ class OrbGestureGuide extends StatelessWidget {
     final ar = kTreeNodes.map((n) => n.labelAr).join(' · ');
     final en = kTreeNodes.map((n) => n.labelEn).join(' · ');
     return [
-        (OrbGesture.tap, Icons.touch_app_outlined, 'دوس على القمر', 'Tap the moon', 'تفتح الشجرة: $ar — ومن أي شاشة تانية ترجّعك للنهارده', 'opens the tree: $en — and from any other screen, it brings you back to Today'),
-        (OrbGesture.hold, Icons.mic_none, HoldCopy.doAr, HoldCopy.doEn, HoldCopy.whatAr, HoldCopy.whatEn),
+        (OrbGesture.tap, QIcons.tap, 'دوس على القمر', 'Tap the moon', 'تفتح الشجرة: $ar — ومن أي شاشة تانية ترجّعك للنهارده', 'opens the tree: $en — and from any other screen, it brings you back to Today'),
+        (OrbGesture.hold, QIcons.mic, HoldCopy.doAr, HoldCopy.doEn, HoldCopy.whatAr, HoldCopy.whatEn),
         // The explainable numbers carry a dotted line under them (ExplainMark).
-        (OrbGesture.explain, Icons.open_with, 'اسحبه على رقم تحته نقط', 'Drag it onto a dotted number', 'يشرحه لك: من فين جه وإيه معناه', 'and it explains itself: where it came from, what it means'),
+        (OrbGesture.explain, QIcons.move, 'اسحبه على رقم تحته نقط', 'Drag it onto a dotted number', 'يشرحه لك: من فين جه وإيه معناه', 'and it explains itself: where it came from, what it means'),
       ];
   }
 
@@ -115,11 +117,7 @@ class OrbGestureGuide extends StatelessWidget {
     final learned = state.gesturesLearned;
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-      decoration: BoxDecoration(
-        color: QColors.ink.withValues(alpha: 0.08),
-        border: Border.all(color: QColors.ink.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(QRadii.card),
-      ),
+      decoration: QDecor.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -135,15 +133,15 @@ class OrbGestureGuide extends StatelessWidget {
                       child: Padding(
                         padding: const EdgeInsetsDirectional.only(end: 4),
                         child: Icon(
-                          learned.contains(g) ? Icons.check_circle : icon,
+                          learned.contains(g) ? QIcons.done : icon,
                           size: 13,
-                          color: learned.contains(g) ? QColors.ink : QColors.inkSecondary,
+                          color: QColors.ink,
                         ),
                       ),
                     ),
                     TextSpan(text: cellText(g, isAr)),
                   ],
-                  style: QText.body(size: 11, height: 15, color: learned.contains(g) ? QColors.inkTertiary : QColors.inkSecondary),
+                  style: QText.body(size: 11, height: 15, color: learned.contains(g) ? QColors.inkTertiary : QColors.ink),
                 ),
             ];
             final letters = [for (final (g, _, _, _, _, _) in gestures) cellText(g, isAr).length];
@@ -162,8 +160,11 @@ class OrbGestureGuide extends StatelessWidget {
                         key: cellKey,
                         constraints: const BoxConstraints(minHeight: 48),
                         padding: const EdgeInsets.all(_cellPad),
+                        // Still to learn, raised; learned, it sinks back
+                        // to the card with its tick. No edge: an edge would
+                        // take its width from the words.
                         decoration: BoxDecoration(
-                          color: QColors.ink.withValues(alpha: learned.contains(gestures[i].$1) ? 0.04 : 0.1),
+                          color: learned.contains(gestures[i].$1) ? QColors.surface : QColors.surfaceRaised,
                           borderRadius: BorderRadius.circular(QRadii.inset),
                         ),
                         child: Text.rich(words[i]),
@@ -184,25 +185,19 @@ class OrbGestureGuide extends StatelessWidget {
           Expanded(
             child: Text(
               isAr ? 'القمر بيفهم تلات حركات' : 'The moon knows three gestures',
-              style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.inkSecondary),
+              style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.ink),
             ),
           ),
           if (dismissible)
             // Small words, a full 48-point touch.
-            Semantics(
-              button: true,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(QRadii.control),
-                onTap: state.dismissOrbTutorial,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                  child: Center(
-                    widthFactor: 1,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Text(isAr ? 'عارف' : 'Got it', style: QText.body(size: 12, color: QColors.inkTertiary)),
-                    ),
-                  ),
+            QTapArea(
+              onTap: state.dismissOrbTutorial,
+              builder: (context, pressed) => qPressed(
+                context,
+                pressed: pressed,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(isAr ? 'عارف' : 'Got it', style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkSecondary)),
                 ),
               ),
             ),
@@ -215,12 +210,8 @@ class OrbGestureGuide extends StatelessWidget {
     final learned = state.gesturesLearned;
     final photos = state.photoQuota.limit;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 4, 14, 11),
-      decoration: BoxDecoration(
-        color: QColors.ink.withValues(alpha: 0.08),
-        border: Border.all(color: QColors.ink.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(QRadii.card),
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+      decoration: QDecor.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -232,16 +223,15 @@ class OrbGestureGuide extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    learned.contains(g) ? Icons.check_circle : icon,
-                    size: 16,
-                    color: learned.contains(g) ? QColors.ink : QColors.inkSecondary,
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Icon(learned.contains(g) ? QIcons.done : icon, size: 18, color: QColors.ink),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       '${isAr ? doAr : doEn} — ${isAr ? whatAr : whatEn}',
-                      style: QText.body(size: 12, height: 18, color: learned.contains(g) ? QColors.inkTertiary : QColors.inkSecondary),
+                      style: QText.body(size: 15, color: learned.contains(g) ? QColors.inkTertiary : QColors.ink),
                     ),
                   ),
                 ],
@@ -253,7 +243,7 @@ class OrbGestureGuide extends StatelessWidget {
             isAr
                 ? 'الكتابة والصوت ببلاش على طول. الصور ${state.iso('$photos')} في اليوم.'
                 : 'Typing and speaking are always free. Photos, $photos a day.',
-            style: QText.body(size: 11, height: 16, color: QColors.inkTertiary),
+            style: QText.body(size: 13, color: QColors.inkTertiary),
           ),
         ],
       ),
