@@ -3,7 +3,9 @@
 // read alike as links, its fine print ends on no orphan word, and Google's
 // mark is Google's, in colour; on the paywall the lockup is centred and
 // balanced and the rest reads from the start, one plan has no radio, and
-// "included" is one mark in one colour in both columns.
+// "included" is one mark in one colour in both columns. And the welcome's
+// two ways in sit above and below the moon, never over it, on a tall phone
+// and a short one.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -20,6 +22,7 @@ import 'package:qamar/theme/colors.dart';
 import 'package:qamar/theme/text_styles.dart';
 import 'package:qamar/widgets/account_sheet.dart';
 import 'package:qamar/widgets/common.dart';
+import 'package:qamar/widgets/moon.dart';
 
 import 'support/app_fonts.dart';
 
@@ -105,6 +108,42 @@ void main() {
       expect(find.byType(GoogleMark), findsOneWidget, reason: 'Google’s own mark');
       expect(find.byIcon(Icons.g_mobiledata), findsNothing, reason: 'not the mobile-data glyph');
     });
+
+    for (final phone in const [Size(390, 844), Size(375, 667)]) {
+      testWidgets('the welcome’s ways in never sit on the moon, with room around them (${lang.name}, ${phone.width.toInt()}x${phone.height.toInt()})', (tester) async {
+        tester.view.devicePixelRatio = 3;
+        tester.view.physicalSize = phone * 3;
+        addTearDown(tester.view.reset);
+        final s = AppState()..setLang(lang);
+        await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(tester.takeException(), isNull);
+        final chat = tester.getRect(find.byKey(WelcomeScreen.chatPillKey));
+        final scan = tester.getRect(find.byKey(WelcomeScreen.scanPillKey));
+        final moon = find.descendant(of: find.byKey(WelcomeScreen.moonKey), matching: find.byType(QamarMoon));
+        if (phone.height >= 800) expect(moon, findsOneWidget, reason: 'a phone this tall has room for the moon');
+        if (moon.evaluate().isNotEmpty) {
+          final disc = tester.getRect(moon.first);
+          expect(chat.bottom, lessThanOrEqualTo(disc.top), reason: 'Chat with Qamar above the moon, not over it');
+          expect(scan.top, greaterThanOrEqualTo(disc.bottom), reason: 'the scan below it');
+          expect(disc.height, greaterThanOrEqualTo(64));
+        }
+        expect(chat.bottom, lessThanOrEqualTo(scan.top), reason: 'the two ways in never overlap');
+        final name = tester.getRect(find.text(s.t.brand));
+        expect(name.top - scan.bottom, greaterThanOrEqualTo(18), reason: 'room between the hero and the name');
+        for (final r in [chat, scan]) {
+          expect(r.left, greaterThanOrEqualTo(0));
+          expect(r.right, lessThanOrEqualTo(phone.width));
+        }
+        // The first way in hangs from the start edge, the second from the end.
+        if (lang == AppLang.ar) {
+          expect(chat.right, greaterThan(scan.right - 1), reason: 'mirrored in Arabic');
+        } else {
+          expect(chat.left, lessThan(scan.left + 1));
+        }
+      });
+    }
 
     testWidgets('the paywall: a centred, balanced lockup; the rest from the start; one plan, no radio; one mark for included (${lang.name})', (tester) async {
       final s = AppState()..setLang(lang);

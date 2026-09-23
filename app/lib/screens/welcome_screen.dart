@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -15,6 +14,9 @@ class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   static const boundaryKey = ValueKey('welcome-boundary');
+  static const chatPillKey = ValueKey('welcome-chat');
+  static const scanPillKey = ValueKey('welcome-scan');
+  static const moonKey = ValueKey('welcome-moon');
 
   @override
   Widget build(BuildContext context) {
@@ -38,46 +40,62 @@ class WelcomeScreen extends StatelessWidget {
           Expanded(
             child: Center(
               child: LayoutBuilder(builder: (context, box) {
-                // Was a fixed 300px Stack with the pills hung off its edges at
-                // left:-4 / right:-6. Stack clips by default, so on a narrower
-                // phone — or once the real Arabic font loads and the labels get
-                // wider than a fallback's tofu boxes — the pills were cut off
-                // at the sides. Size to the screen and let them overhang.
-                final side = math.min(box.maxWidth - 24, 320.0);
-                return SizedBox(
-                width: side,
-                height: side,
-                child: Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    LivingOrb(size: 132, wander: true, wanderDuration: const Duration(milliseconds: 9000), haloDuration: const Duration(milliseconds: 7000)),
-                    Positioned(
-                      top: 14,
-                      left: -4,
-                      child: _FloatingPill(
-                        label: t.chatDirect,
-                        sub: t.chatDirectSub,
-                        dot: QColors.violet,
-                        // Something real before the first question (O5): a
-                        // dish first. A consultation left part-way carries on.
-                        onTap: () => state.consultationPaused ? state.startOnboarding() : WelcomeDishes.show(context, state),
-                        emphasis: true,
-                      ),
+                // The moon between its two ways in, stacked, never under
+                // them: the pills used to hang off a fixed square at top 14
+                // and bottom 16, and where the screen was shorter than the
+                // square the "Chat with Qamar" pill sat over the top of the
+                // moon. The moon takes what height the pills leave, up to
+                // its full 132, and keeps 20 clear above and below, off the
+                // language toggle and the name. On a phone too short for a
+                // moon worth the name (under 64), the two ways in stand
+                // alone rather than on top of it.
+                const gap = 14.0, pills = 60.0 + 52.0, margin = 20.0;
+                final room = box.maxHeight - pills - 2 * gap - 2 * margin;
+                final moon = room < 64 ? 0.0 : room.clamp(64.0, 132.0);
+                // Shorter still (a landscape phone, a split screen), the pair
+                // scales down together rather than overflowing.
+                return FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: SizedBox(
+                    width: box.maxWidth,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: _FloatingPill(
+                            key: WelcomeScreen.chatPillKey,
+                            label: t.chatDirect,
+                            sub: t.chatDirectSub,
+                            dot: QColors.violet,
+                            // Something real before the first question (O5): a
+                            // dish first. A consultation left part-way carries on.
+                            onTap: () => state.consultationPaused ? state.startOnboarding() : WelcomeDishes.show(context, state),
+                            emphasis: true,
+                          ),
+                        ),
+                        const SizedBox(height: gap),
+                        if (moon > 0) ...[
+                          SizedBox(
+                            height: moon,
+                            child: Center(child: LivingOrb(key: WelcomeScreen.moonKey, size: moon, wander: true, wanderDuration: const Duration(milliseconds: 9000), haloDuration: const Duration(milliseconds: 7000))),
+                          ),
+                          const SizedBox(height: gap),
+                        ],
+                        Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: _FloatingPill(
+                            key: WelcomeScreen.scanPillKey,
+                            label: t.scanInbody,
+                            dot: null,
+                            onTap: state.openScan,
+                            emphasis: false,
+                          ),
+                        ),
+                      ],
                     ),
-                    Positioned(
-                      bottom: 16,
-                      right: -6,
-                      child: _FloatingPill(
-                        label: t.scanInbody,
-                        dot: null,
-                        onTap: state.openScan,
-                        emphasis: false,
-                      ),
-                    ),
-                  ],
-                ),
-              );
+                  ),
+                );
               }),
             ),
           ),
@@ -190,7 +208,7 @@ class _FloatingPill extends StatelessWidget {
   final Color? dot;
   final VoidCallback onTap;
   final bool emphasis;
-  const _FloatingPill({required this.label, this.sub, required this.dot, required this.onTap, required this.emphasis});
+  const _FloatingPill({super.key, required this.label, this.sub, required this.dot, required this.onTap, required this.emphasis});
 
   @override
   Widget build(BuildContext context) {
