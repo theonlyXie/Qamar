@@ -1,22 +1,49 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- image_picker launches the system camera/gallery via intents, so no
-         runtime permission is declared here on purpose: declaring CAMERA
-         would oblige us to request it and would break devices that only have
-         a gallery. Marked not-required so phones without a camera can still
-         install and use the typed onboarding path. -->
+    <!-- Two different kinds of camera use, and only one of them needs this.
+         image_picker (meal photos, nutrition panels) hands off to the system
+         camera app by intent and needs no permission of ours. Barcode
+         scanning is the one that does: mobile_scanner drives CameraX inside
+         our own process, so CAMERA is a real runtime permission the plugin
+         asks for when the scanner screen opens.
+         android:required="false" keeps the app installable on a phone with no
+         camera — typing and speaking a meal never open one, and BarcodeScreen
+         offers the printed digits as a way through. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <!-- Dictation. RECORD_AUDIO is requested at runtime by speech_to_text; the
          queries block is required on Android 11+ so the app can see that a
          speech recogniser exists at all. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <!-- Every call to Supabase and to the AI gateway needs this, and it was
+         only ever declared in src/debug/AndroidManifest.xml — the manifest
+         Flutter adds for hot reload, which is not merged into a release build.
+         So debug builds could reach the backend and release builds silently
+         could not: no crash, no permission prompt, just every network call
+         failing on a phone where the app otherwise looks fine. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Nudges: two questions a day at the person's meal times, for the
+         first fourteen days, scheduled locally — no push service. Inexact
+         timing on purpose, so SCHEDULE_EXACT_ALARM is not asked for. Boot
+         completed lets the schedule survive a restart. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:label="Qamar"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -63,6 +90,29 @@
                 <data android:scheme="com.qamar.app" android:host="log"/>
                 <data android:scheme="com.qamar.app" android:host="plus"/>
             </intent-filter>
+            <!-- Invitation links. The shared message carries
+                 https://dr-qamar.com/i/<code>; qamar://i/<code> is the same
+                 door for a QR code or a chat that strips links. The https
+                 filter is an App Link: the site must publish
+                 /.well-known/assetlinks.json naming this package and its
+                 signing certificate, or Android opens the browser instead. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="qamar" android:host="i"/>
+                <data android:scheme="qamar" android:host="p"/>
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="dr-qamar.com" android:pathPrefix="/i/"/>
+                <data android:scheme="https" android:host="www.dr-qamar.com" android:pathPrefix="/i/"/>
+                <!-- A nutritionist's code: https://dr-qamar.com/p/<code>. -->
+                <data android:scheme="https" android:host="dr-qamar.com" android:pathPrefix="/p/"/>
+                <data android:scheme="https" android:host="www.dr-qamar.com" android:pathPrefix="/p/"/>
+            </intent-filter>
             <intent-filter>
                 <action android:name="com.qamar.app.QUICK_ASK"/>
                 <action android:name="com.qamar.app.QUICK_LOG"/>
@@ -77,6 +127,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- PostHog is set up from Dart, and only after the person consents.
+             Auto-init would start it at launch with no key and no consent. -->
+        <meta-data
+            android:name="com.posthog.posthog.AUTO_INIT"
+            android:value="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

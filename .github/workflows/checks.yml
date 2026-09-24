@@ -1,15 +1,22 @@
-# Runs on every push. No secrets, no cost, no buttons to press.
+# Runs once per push to a pull request, and on main. No secrets, no buttons
+# to press.
 #
 # This is the one that has to stay green. It type-checks the gateway and runs
 # the whole test suite — the scope guard's refusal boundary, the verifier's
 # arithmetic, the evidence-packet extraction, and the eval dispatcher against
 # the real frozen cases. None of it calls a model or touches the database, so
-# it is free and gives the same answer every time.
+# it gives the same answer every time.
+#
+# It used to run on every push *and* on the pull request, which is the same
+# commit checked twice; on a private repository that spends the account's
+# Actions minutes twice for one answer. Branch pushes without a pull request
+# are not checked — open the PR, which is where the result is read anyway.
 
 name: Checks
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -28,7 +35,7 @@ jobs:
           deno-version: v2.x
 
       - name: Type check
-        run: deno check index.ts eval.ts ingest.ts ingest_usda.ts
+        run: deno check index.ts eval.ts ingest.ts ingest_usda.ts nightly.ts
 
       - name: Lint
         run: deno lint
@@ -50,10 +57,51 @@ jobs:
           deno-version: v2.x
 
       - name: Type check
-        run: deno check index.ts hmac.ts pricing.ts
+        run: deno check index.ts hmac.ts pricing.ts webhook.ts
 
       - name: Lint
         run: deno lint
 
       - name: Test
         run: deno test
+
+  # The app itself. 11,681 lines of Dart and the whole billing, quota and
+  # onboarding test surface never ran on push before this job existed — a
+  # file that did not compile reached main (d965702) and nothing said so.
+  # Pinned to the version README.md was verified against.
+  flutter:
+    name: Flutter analyze and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.0"
+          channel: stable
+          cache: true
+
+      - name: Dependencies
+        run: flutter pub get
+
+      # Infos (deprecations the SDK introduces between releases) do not fail
+      # the build; errors and warnings do.
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        run: flutter test
+
+      # Egypt moves its clocks: forward as the last Friday of April begins,
+      # back as the last Thursday of October ends. This runner keeps UTC,
+      # where every day is 24 hours, so the step above skips the scenarios
+      # that need a day of 23 or 25 (days_test.dart still fails anywhere if
+      # day arithmetic by duration comes back to lib/). Here they run on
+      # Cairo's clock, and REQUIRE_CAIRO fails the step if TZ does not take.
+      - name: Test in Cairo time
+        run: flutter test test/cairo_days_test.dart --dart-define=REQUIRE_CAIRO=true
+        env:
+          TZ: Africa/Cairo

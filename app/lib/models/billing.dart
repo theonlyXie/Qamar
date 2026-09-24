@@ -4,10 +4,11 @@
 /// charges. The paywall shows the pound figure. The server, not the phone,
 /// is the price list — the client only names the plan and, optionally, a code.
 ///
-/// List is 500 EGP a month. First purchase is 30% off (350). An affiliate
-/// code is 299 for the buyer and 50 EGP cash for the marketer (net 249).
-/// The 3-month pack and the 1-year plan are both 249 — the year is the one
-/// we push. Su Points are never part of this wallet.
+/// One plan, 500 EGP a month. Annual and family tiers wait on month-2
+/// retention; discount marketing is out. A professional's code does not
+/// change what the client pays — it sends 20% of each payment (EGP 100) to
+/// the nutritionist or coach for twelve months. Su Points are never part of
+/// this wallet.
 class PlusCatalog {
   PlusCatalog._();
 
@@ -15,12 +16,11 @@ class PlusCatalog {
   static const provider = 'paymob';
 
   static const listMonthlyCents = 50000;
-  static const firstUserOffPercent = 30;
-  static const firstUserMonthlyCents = 35000;
-  static const affiliateMonthlyCents = 29900;
-  static const affiliateCommissionCents = 5000;
-  static const affiliateNetCents = 24900;
-  static const packCents = 24900;
+
+  /// The professional's share of every payment their referral makes.
+  static const proSharePercent = 20;
+  static const proShareMonths = 12;
+  static const proShareCents = listMonthlyCents * proSharePercent ~/ 100;
   static const minPayoutCents = 5000;
 
   static const monthly = PlusProduct(
@@ -31,32 +31,9 @@ class PlusCatalog {
     nameEn: 'Qamar+ monthly',
   );
 
-  static const quarterly = PlusProduct(
-    id: 'quarterly',
-    amountCents: packCents,
-    periodDays: 90,
-    nameAr: 'قمر+ ٣ شهور',
-    nameEn: 'Qamar+ 3 months',
-  );
-
-  static const annual = PlusProduct(
-    id: 'annual',
-    amountCents: packCents,
-    periodDays: 365,
-    nameAr: 'قمر+ سنوي',
-    nameEn: 'Qamar+ 1 year',
-  );
-
-  static PlusProduct byId(String id) {
-    switch (id) {
-      case 'annual':
-        return annual;
-      case 'quarterly':
-        return quarterly;
-      default:
-        return monthly;
-    }
-  }
+  /// Only the monthly plan is sold; any other id falls back to it so an old
+  /// server answer cannot crash the paywall.
+  static PlusProduct byId(String id) => monthly;
 }
 
 class PlusProduct {
@@ -110,6 +87,17 @@ class PlusQuote {
   final String? promoNote;
   final String? promoError;
 
+  /// The rails checkout can take, as the billing function reads them from
+  /// its labelled Paymob integrations: 'card', 'meeza', 'wallet'. Empty when
+  /// the server has not said, and then the paywall names none.
+  final List<String> paymentMethods;
+
+  /// Why a typed professional's code is not the one paid, as the billing
+  /// function decided it: 'referral_ended' (their twelve months are over),
+  /// 'other_professional' (another professional is on the account), or
+  /// 'unchecked' (the account's referral could not be read). Null otherwise.
+  final String? promoNotice;
+
   const PlusQuote({
     required this.plan,
     required this.days,
@@ -122,6 +110,8 @@ class PlusQuote {
     this.affiliateCommissionCents = 0,
     this.promoNote,
     this.promoError,
+    this.paymentMethods = const [],
+    this.promoNotice,
   });
 
   int get amountPounds => amountCents ~/ 100;
@@ -138,9 +128,14 @@ class PlusQuote {
       firstPurchase: json['first_purchase'] == true,
       promoCode: json['promo_code'] as String?,
       promoKind: json['promo_kind'] as String?,
+      paymentMethods: [
+        for (final m in (json['payment_methods'] is List ? json['payment_methods'] as List : const []))
+          if (m is String && const {'card', 'meeza', 'wallet'}.contains(m)) m,
+      ],
       affiliateCommissionCents: (json['affiliate_commission_cents'] as num?)?.toInt() ?? 0,
       promoNote: json['promo_note'] as String?,
       promoError: json['promo_error'] as String?,
+      promoNotice: const {'referral_ended', 'other_professional', 'unchecked'}.contains(json['promo_notice']) ? json['promo_notice'] as String : null,
     );
   }
 }
@@ -161,16 +156,7 @@ class PlusPricing {
   }) {
     final product = PlusCatalog.byId(plan);
     var amount = product.amountCents;
-    var reason = plan == 'annual'
-        ? 'annual_half'
-        : plan == 'quarterly'
-            ? 'quarterly_pack'
-            : 'list';
-
-    if (plan == 'monthly' && firstPurchase) {
-      amount = PlusCatalog.firstUserMonthlyCents;
-      reason = 'first_user';
-    }
+    var reason = 'list';
 
     String? promoCode;
     String? promoKind;
@@ -184,14 +170,12 @@ class PlusPricing {
       promoKind = code.kind;
       if (code.isAffiliate) {
         if (code.ownerUserId != null && code.ownerUserId == buyerUserId) {
-          error = 'You cannot use your own affiliate code';
-        } else if (plan != 'monthly') {
-          note =
-              'Affiliate codes apply to monthly Plus at EGP 299. The 3-month and 1-year packs are already EGP 249.';
+          error = 'You cannot use your own code';
         } else {
-          amount = PlusCatalog.affiliateMonthlyCents;
+          // The price does not move; the professional's share comes out of it.
           reason = 'affiliate';
-          commission = PlusCatalog.affiliateCommissionCents;
+          commission = amount * PlusCatalog.proSharePercent ~/ 100;
+          note = 'Your nutritionist follows your plan and earns a share of this subscription. The price is the same.';
         }
       } else {
         final applies = code.appliesToPlans;
@@ -238,22 +222,46 @@ class PlusEntitlement {
   final String provider;
   final bool firstPurchase;
 
+  /// The free week can still be started: never taken, never paid, not Plus.
+  final bool trialEligible;
+
+  /// When the free week ended or ends. Null if it was never started.
+  final DateTime? trialEndsAt;
+
   const PlusEntitlement({
     required this.status,
     this.plan,
     this.periodEnd,
     this.provider = PlusCatalog.provider,
     this.firstPurchase = true,
+    this.trialEligible = false,
+    this.trialEndsAt,
   });
 
   static const free = PlusEntitlement(status: 'free');
 
-  bool get active {
+  /// Qamar+ right now is the free week, not a payment.
+  bool get isTrial => trialAt(DateTime.now());
+
+  /// Qamar+ right now is the earned month — the logged days the server asks
+  /// for in the first 30 — running on its own after the paid month lapsed.
+  bool get isEarned => earnedAt(DateTime.now());
+
+  bool get active => activeAt(DateTime.now());
+
+  /// Whether Qamar+ runs at [now]. The app asks with its own clock
+  /// (AppState.clockNow), so what it reads is the same whatever the wall
+  /// clock says — where a test's free week "ended" the day its date passed.
+  bool activeAt(DateTime now) {
     if (status != 'active') return false;
     final end = periodEnd;
     if (end == null) return true;
-    return !end.isBefore(DateTime.now().toUtc());
+    return !end.isBefore(now.toUtc());
   }
+
+  /// [isTrial] and [isEarned], at [now].
+  bool trialAt(DateTime now) => provider == 'trial' && activeAt(now);
+  bool earnedAt(DateTime now) => provider == 'earned' && activeAt(now);
 
   factory PlusEntitlement.fromJson(Map<String, dynamic> json) {
     final endRaw = json['period_end'] ?? json['periodEnd'];
@@ -263,6 +271,8 @@ class PlusEntitlement {
       periodEnd: endRaw is String ? DateTime.tryParse(endRaw)?.toUtc() : null,
       provider: (json['provider'] as String?) ?? PlusCatalog.provider,
       firstPurchase: json['first_purchase'] != false,
+      trialEligible: json['trial_eligible'] == true,
+      trialEndsAt: json['trial_ends_at'] is String ? DateTime.tryParse(json['trial_ends_at'] as String)?.toUtc() : null,
     );
   }
 }
@@ -281,6 +291,15 @@ class CheckoutSession {
 /// EGP cash owed to an affiliate. Separate from the Su Points wallet.
 class AffiliateWallet {
   final String? code;
+
+  /// The operator has confirmed this code as a nutritionist's, coach's or
+  /// clinic's (0069). Only then does a client who enters it get the free
+  /// trial; the share at payment does not depend on it.
+  final bool professional;
+
+  /// The trial a client who enters a confirmed code gets, in the server's
+  /// days (billing_config 'pro_trial_days', 0069); 0 when not stated.
+  final int clientTrialDays;
   final int balanceCents;
   final int lifetimeEarnedCents;
   final int pendingPayoutCents;
@@ -289,6 +308,8 @@ class AffiliateWallet {
 
   const AffiliateWallet({
     this.code,
+    this.professional = false,
+    this.clientTrialDays = 0,
     this.balanceCents = 0,
     this.lifetimeEarnedCents = 0,
     this.pendingPayoutCents = 0,
@@ -304,6 +325,8 @@ class AffiliateWallet {
   factory AffiliateWallet.fromJson(Map<String, dynamic> json) {
     return AffiliateWallet(
       code: json['code'] as String?,
+      professional: json['professional'] == true,
+      clientTrialDays: (json['client_trial_days'] as num?)?.toInt() ?? 0,
       balanceCents: (json['balance_cents'] as num?)?.toInt() ?? 0,
       lifetimeEarnedCents: (json['lifetime_earned_cents'] as num?)?.toInt() ?? 0,
       pendingPayoutCents: (json['pending_payout_cents'] as num?)?.toInt() ?? 0,
@@ -313,13 +336,147 @@ class AffiliateWallet {
   }
 }
 
-String formatEgp(int pounds, {required bool ar}) {
+String formatEgp(int pounds, {required bool ar, bool eastern = true}) {
   if (!ar) return 'EGP $pounds';
-  const western = '0123456789';
-  const eastern = '٠١٢٣٤٥٦٧٨٩';
+  if (!eastern) return '$pounds ج.م';
+  const westernDigits = '0123456789';
+  const easternDigits = '٠١٢٣٤٥٦٧٨٩';
   final mapped = pounds.toString().split('').map((c) {
-    final i = western.indexOf(c);
-    return i >= 0 ? eastern[i] : c;
+    final i = westernDigits.indexOf(c);
+    return i >= 0 ? easternDigits[i] : c;
   }).join();
   return '$mapped ج.م';
+}
+
+/// The earned-month promo, as the server computes it: [needed] logged days
+/// in the first [windowDays] of paid membership (20 of 30 at launch, in
+/// billing_config since 0058), and the next 30 days of Qamar+ are on us.
+/// Once per account. The phone never counts the days itself, and never
+/// states the rule with a number of its own: every sentence reads [needed]
+/// and [windowDays] from here.
+class EarnedMonth {
+  /// The window is running and nothing has been granted yet.
+  final bool open;
+  final int loggedDays;
+  final int needed;
+  final int windowDays;
+
+  /// Window days still to come, today excluded.
+  final int daysLeft;
+  final bool eligible;
+  final bool claimed;
+  final DateTime? grantedUntil;
+  final DateTime? windowStart;
+  final DateTime? windowEnd;
+
+  /// The server stated the rule: [needed] and [windowDays] came from
+  /// qamar_earned_month_status, not from the fallback below. A sentence that
+  /// states the rule is shown only when this is true.
+  final bool stated;
+
+  const EarnedMonth({
+    required this.open,
+    required this.loggedDays,
+    required this.needed,
+    required this.windowDays,
+    required this.daysLeft,
+    required this.eligible,
+    required this.claimed,
+    this.grantedUntil,
+    this.windowStart,
+    this.windowEnd,
+    this.stated = true,
+  });
+
+  /// Before the server has answered: the launch rule, not stated by anyone.
+  static const none = EarnedMonth(open: false, loggedDays: 0, needed: 20, windowDays: 30, daysLeft: 0, eligible: false, claimed: false, stated: false);
+
+  /// The promo can still be earned by this person: the server has stated the
+  /// rule, it has not been granted, and either no paid membership has begun
+  /// (the window opens on the first payment) or the window is running. After
+  /// the first 30 paid days, or once granted, it is not on offer.
+  bool get onOffer => stated && !claimed && (windowStart == null || open);
+
+  /// Still being earned: the window is open and the month is not yet reached.
+  bool get inProgress => open && !eligible && !claimed;
+
+  factory EarnedMonth.fromJson(Map<String, dynamic> json) {
+    int n(String k, int def) => json[k] is num ? (json[k] as num).round() : def;
+    DateTime? when(String k) => json[k] is String ? DateTime.tryParse(json[k] as String)?.toUtc() : null;
+    return EarnedMonth(
+      open: json['open'] == true,
+      loggedDays: n('logged_days', 0),
+      needed: n('needed', 20),
+      windowDays: n('window_days', 30),
+      daysLeft: n('days_left', 0),
+      eligible: json['eligible'] == true,
+      claimed: json['claimed'] == true,
+      grantedUntil: when('granted_until'),
+      windowStart: when('window_start'),
+      windowEnd: when('window_end'),
+      stated: json['needed'] is num && json['window_days'] is num,
+    );
+  }
+}
+
+/// What the claim returns: the entitlement with the month appended, and the
+/// promo now marked granted.
+class EarnedMonthClaim {
+  final PlusEntitlement entitlement;
+  final EarnedMonth earned;
+  const EarnedMonthClaim({required this.entitlement, required this.earned});
+
+  factory EarnedMonthClaim.fromJson(Map<String, dynamic> json) => EarnedMonthClaim(
+        entitlement: PlusEntitlement.fromJson((json['entitlement'] as Map?)?.cast<String, dynamic>() ?? const {}),
+        earned: EarnedMonth.fromJson((json['earned'] as Map?)?.cast<String, dynamic>() ?? const {}),
+      );
+}
+
+/// One client on a professional's dashboard: the week as the database saw
+/// it. Only clients who said yes to sharing appear, and only while their
+/// twelve months with this professional run.
+class ProClient {
+  final String name;
+  final DateTime? since;
+  final DateTime? until;
+
+  /// Distinct Cairo days with a meal in the last seven.
+  final int daysLogged;
+
+  /// Of those, days within 10% of the target.
+  final int onTargetDays;
+
+  /// Average kcal on the days that were logged; 0 when none were.
+  final int avgKcal;
+  final int? targetKcal;
+  final DateTime? lastLoggedAt;
+
+  const ProClient({
+    required this.name,
+    this.since,
+    this.until,
+    required this.daysLogged,
+    required this.onTargetDays,
+    required this.avgKcal,
+    this.targetKcal,
+    this.lastLoggedAt,
+  });
+
+  factory ProClient.fromJson(Map<String, dynamic> json) {
+    int n(String k) => json[k] is num ? (json[k] as num).round() : 0;
+    DateTime? when(String k) => json[k] is String ? DateTime.tryParse(json[k] as String)?.toUtc() : null;
+    return ProClient(
+      name: (json['name'] as String?)?.trim().isNotEmpty == true ? (json['name'] as String).trim() : '—',
+      since: when('since'),
+      until: when('until'),
+      daysLogged: n('days_logged'),
+      onTargetDays: n('on_target_days'),
+      avgKcal: n('avg_kcal'),
+      targetKcal: json['target_kcal'] is num ? (json['target_kcal'] as num).round() : null,
+      lastLoggedAt: when('last_logged_at'),
+    );
+  }
+
+  static List<ProClient> listFromJson(Map<String, dynamic> json) =>
+      ((json['clients'] as List?) ?? const []).whereType<Map>().map((e) => ProClient.fromJson(e.cast<String, dynamic>())).toList();
 }

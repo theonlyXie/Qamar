@@ -5,13 +5,20 @@
 // calls the model, and records what happened.
 //
 // Routes:
-//   POST /ai-gateway/chat/reply     { message, lang, date?, current_plan?, swapped_slots? }
+//   POST /ai-gateway/chat/reply     { message, lang, date?, current_plan?, swapped_slots?, imageBase64?, imageMediaType? }
 //   POST /ai-gateway/meal/analyze   { inputType, text?, imageBase64?, imageMediaType? }
-//     text/voice: food graph only — no model, no daily AI use
-//     photo: takeAiUse + vision model (Qamar+ on the client)
+//     text/voice: food graph only — no model, never counted
+//     photo: the photo bucket (3/day on Lite, more with Su) + vision model
 //   POST /ai-gateway/plan/generate  { date?, lang?, force?, instruction? }
+//   POST /ai-gateway/plan/nightly   {}   X-Qamar-Cron header, not a user JWT — the 22:00 job
+//     the plan bucket — a small cap for everyone
+//   POST /ai-gateway/scan/barcode   { barcode, lang, date?, grams? }
+//     the photo bucket: a camera use, like a meal photo
+//   POST /ai-gateway/scan/label     { imageBase64, imageMediaType, lang, barcode?, name?, grams? }
+//     the photo bucket + vision model — reads the nutrition table off a packet
 //   POST /ai-gateway/scan/read      { imageBase64, imageMediaType, lang }
-//   POST /ai-gateway/quota          {}
+//     the photo bucket + vision model
+//   POST /ai-gateway/quota          {}  → every bucket
 //
 // Secrets (supabase secrets set ...):
 //   ANTHROPIC_API_KEY   required
@@ -26,14 +33,29 @@ import {
   bodyScanSystemPrompt,
   callModel,
   chatSystemPrompt,
+  labelScanSystemPrompt,
+  scanPlacementSystemPrompt,
   mealAnalysisSystemPrompt,
   mealPhotoSystemPrompt,
   parseJson,
   planSystemPrompt,
   type ImageInput,
+  type Turn,
   type UserContext,
 } from "./model.ts";
 import { retrieve, type FoodFacts, type Passage, type Source } from "./retrieval.ts";
+import {
+  asFoodFacts,
+  eatenPortion,
+  lookupBarcode,
+  scaleTo,
+  type ScannedProduct,
+} from "./barcode.ts";
+import {
+  labelProblemText,
+  normaliseLabel,
+  type LabelReading,
+} from "./label.ts";
 import {
   identifyItems,
   itemsFromResolutions,
@@ -42,6 +64,7 @@ import {
   toPacketFacts,
   type Resolution,
 } from "./graph.ts";
+import { graphMealNote, modelMealNote } from "./notes.ts";
 import { classify, refusalText } from "./scope.ts";
 import {
   loadHardConstraints,
@@ -85,7 +108,21 @@ import {
   mergePlanUpdate,
   type PlanUpdate,
 } from "./plan_edit.ts";
-import { asQuota, quotaExceededMessage, quotaPayload, type Quota } from "./quota.ts";
+import { asQuota, quotaExceededMessage, quotaPayload, type Bucket, type Quota } from "./quota.ts";
+import {
+  cairoDatePlus,
+  cairoNow,
+  chunks,
+  dueMembers,
+  isNightlyWindow,
+  type NightlyReport,
+  nightSentence,
+  planKcal,
+  RETURN_DAYS,
+  returningAudience,
+  returnSentence,
+  RUN_BUDGET_MS,
+} from "./nightly.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -109,29 +146,42 @@ async function rpcJson(name: string, args: Record<string, unknown>): Promise<unk
   return await res.json();
 }
 
-/** Spends one of today's five (or extra) uses. Body scan never calls this. */
-async function consumeAi(userId: string): Promise<Quota> {
-  const q = asQuota(await rpcJson("qamar_ai_try_consume", { p_user_id: userId }));
+/** Spends one of today's uses in the named bucket. Typed and spoken logs never call this. */
+async function consumeAi(userId: string, bucket: Bucket): Promise<Quota> {
+  const q = asQuota(await rpcJson("qamar_ai_try_consume", { p_user_id: userId, p_bucket: bucket }), bucket);
   if (!q) throw new Error("quota consume returned nothing usable");
   return q;
 }
 
-async function refundAi(userId: string): Promise<void> {
+async function refundAi(userId: string, bucket: Bucket): Promise<void> {
   try {
-    await rpcJson("qamar_ai_refund_consume", { p_user_id: userId });
+    await rpcJson("qamar_ai_refund_consume", { p_user_id: userId, p_bucket: bucket });
   } catch (e) {
     console.error("ai-gateway refund", e);
   }
 }
 
-async function quotaStatus(userId: string): Promise<Quota> {
-  const q = asQuota(await rpcJson("qamar_ai_quota_snapshot", { p_user_id: userId }));
+/**
+ * Every bucket at once, as the database reports it: the flat fields are the
+ * chat bucket for anything reading the old shape, and `photo`, `chat`, `plan`
+ * carry each bucket in full. Passed to the app untouched.
+ */
+async function quotaSnapshot(userId: string): Promise<Record<string, unknown>> {
+  const raw = await rpcJson("qamar_ai_quota_snapshot", { p_user_id: userId });
+  if (!raw || typeof raw !== "object") throw new Error("quota snapshot returned nothing usable");
+  return raw as Record<string, unknown>;
+}
+
+/** One bucket out of the snapshot, for a response that spent nothing. */
+async function quotaStatus(userId: string, bucket: Bucket): Promise<Quota> {
+  const snap = await quotaSnapshot(userId);
+  const q = asQuota(snap[bucket], bucket);
   if (!q) throw new Error("quota snapshot returned nothing usable");
   return q;
 }
 
 function quotaDenied(lang: "ar" | "en", q: Quota): Response {
-  const message = quotaExceededMessage(lang);
+  const message = quotaExceededMessage(lang, q.bucket, q.plus === true);
   return json({
     error: message,
     reply: message,
@@ -141,9 +191,9 @@ function quotaDenied(lang: "ar" | "en", q: Quota): Response {
   }, 429);
 }
 
-async function takeAiUse(userId: string, lang: "ar" | "en"): Promise<Quota | Response> {
+async function takeAiUse(userId: string, lang: "ar" | "en", bucket: Bucket): Promise<Quota | Response> {
   try {
-    const q = await consumeAi(userId);
+    const q = await consumeAi(userId, bucket);
     if (!q.allowed) return quotaDenied(lang, q);
     return q;
   } catch (e) {
@@ -233,6 +283,8 @@ async function loadContext(
       goal: p?.goal ?? null,
       activityFactor: p?.activity_factor ?? null,
       exclusions: p?.food_exclusions ?? [],
+      // Ramadan mode (0050): the plan becomes iftar and suhoor.
+      fasting: p?.fasting_mode ?? "none",
       targetKcal,
       lang,
     },
@@ -337,6 +389,198 @@ function foodTerms(text: string): string[] {
     .slice(0, 8);
 }
 
+/**
+ * What Qamar says back to a hello.
+ *
+ * Written rather than generated: a greeting should be instant and free, and
+ * spending a model call plus one of five daily uses on "hi" would be the
+ * wrong trade in both directions. It ends with an invitation, so the next
+ * message is the one worth answering properly.
+ */
+function greetingText(lang: string): string {
+  return lang === "ar"
+    ? "أهلاً! أنا قمر. أنا هنا للأكل والتمرين — قولي أكلت إيه النهاردة، أو اسألني عن أي وجبة."
+    : "Hello. I am Qamar. I am here for food and training — tell me what you ate today, or ask me about any meal.";
+}
+
+/**
+ * What the day has already had.
+ *
+ * Deterministic on purpose. The model is told the answer rather than asked to
+ * work it out: subtraction is the one thing in this flow that must be right
+ * every time, and it is also the one thing a language model has no business
+ * doing.
+ */
+async function todaySoFar(userId: string, day: string): Promise<number> {
+  const next = new Date(`${day}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  const to = next.toISOString().slice(0, 10);
+  const res = await db(
+    `meal_logs?user_id=eq.${userId}&logged_at=gte.${day}&logged_at=lt.${to}&select=kcal`,
+  );
+  if (!res.ok) return 0;
+  const rows = await res.json() as { kcal: number }[];
+  return rows.reduce((n, r) => n + (Number(r.kcal) || 0), 0);
+}
+
+/** How many earlier exchanges Qamar is allowed to remember. */
+const HISTORY_TURNS = 6;
+
+/**
+ * How far back a conversation reaches before it is a different conversation.
+ *
+ * Someone who opens the app at breakfast and again at dinner is starting
+ * again, not continuing; carrying the morning into the evening would make
+ * Qamar answer questions nobody had just asked.
+ */
+const HISTORY_WINDOW_MINUTES = 120;
+
+/**
+ * The last few turns of this person's conversation, oldest first.
+ *
+ * Read from the database rather than accepted from the request. The client
+ * could send anything, and "what did this user say a minute ago" is not a
+ * thing a client should get to assert — it decides what Qamar treats as
+ * already established.
+ *
+ * Both kinds are included because both appear in the same conversation on
+ * screen: `chat` is asking Qamar something, `meal_analysis` is typing a meal
+ * into the same box. Splitting them is what produced the original bug —
+ * somebody typed "kasam", then "and I got", and the second message was judged
+ * with no knowledge of the first because the first was filed under a different
+ * kind.
+ */
+async function loadRecentTurns(userId: string): Promise<Turn[]> {
+  const since = new Date(Date.now() - HISTORY_WINDOW_MINUTES * 60_000).toISOString();
+  try {
+    const res = await db(
+      `ai_interactions?user_id=eq.${userId}` +
+        `&kind=in.(chat,meal_analysis)` +
+        `&created_at=gte.${since}` +
+        `&select=kind,question,answer,in_scope,refusal_reason,created_at` +
+        `&order=created_at.desc&limit=${HISTORY_TURNS}`,
+    );
+    if (!res.ok) return [];
+    const rows = await res.json() as {
+      kind: string;
+      question: string | null;
+      answer: string | null;
+      in_scope: boolean;
+      refusal_reason: string | null;
+    }[];
+
+    const turns: Turn[] = [];
+    for (const r of rows.reverse()) {
+      const q = (r.question ?? "").trim();
+      if (!q) continue;
+      turns.push({ user: q, assistant: assistantSideOf(r) });
+    }
+    return turns;
+  } catch {
+    // Memory is an improvement, not a precondition. A conversation with no
+    // history is the behaviour this app had until now.
+    return [];
+  }
+}
+
+/**
+ * What Qamar said back, or an honest note about what happened when it said
+ * nothing.
+ *
+ * A refusal stored no sentence, and a meal reading stored a JSON array of
+ * items. Replaying either verbatim would be worse than useless: an empty
+ * content block is rejected outright, and `[]` invites the model to interpret
+ * punctuation as an answer. The note says what took place instead, which is
+ * the part that carries meaning into the next turn.
+ */
+function assistantSideOf(
+  r: { kind: string; answer: string | null; in_scope: boolean; refusal_reason: string | null },
+): string {
+  const a = (r.answer ?? "").trim();
+  if (r.refusal_reason) return `[declined: ${r.refusal_reason}]`;
+  if (r.kind === "meal_analysis") {
+    return a === "" || a === "[]"
+      ? "[could not read that meal]"
+      : "[read the meal and offered the items to confirm]";
+  }
+  if (!a || a.startsWith("[") || a.startsWith("{")) return "[no reply recorded]";
+  return a;
+}
+
+/**
+ * Writes a scanned product into the graph so the next person who scans it
+ * pays nothing and gets its micronutrients.
+ *
+ * Marked unreviewed and ranked below the curated catalogue, like every other
+ * imported food. The barcode goes in food_source_links, which is what makes
+ * the second scan a local hit.
+ */
+async function rememberProduct(p: ScannedProduct): Promise<string | null> {
+  try {
+    const slug = `barcode_${p.barcode}`;
+    const name = p.brand ? `${p.brand} ${p.name}` : p.name;
+    const created = await db("foods?on_conflict=slug", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify({
+        slug,
+        name_en: name,
+        food_state: "unspecified",
+        is_recipe: false,
+        source_rank: 10,
+        confidence: 0.75,
+        human_reviewed: false,
+      }),
+    });
+    const foodId = (await created.json())[0]?.qamar_food_id as string | undefined;
+    if (!foodId) return null;
+
+    // The barcode itself is an alias, so typing the digits finds it too.
+    await db("food_aliases?on_conflict=qamar_food_id,alias,lang", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify([
+        { qamar_food_id: foodId, alias: name.toLowerCase(), lang: "en", priority: 10 },
+        { qamar_food_id: foodId, alias: p.barcode, lang: "en", priority: 10 },
+      ]),
+    });
+
+    const rows = Object.entries(p.per100g).map(([code, amount]) => ({
+      qamar_food_id: foodId,
+      nutrient_code: code,
+      amount,
+      per_basis: "per_100g",
+      source_id: p.source === "usda_branded" ? "usda_fdc" : "open_food_facts",
+      nutrient_definition_version: "barcode-2026-08",
+      confidence: 0.8,
+    }));
+    if (rows.length) {
+      await db("food_nutrients?on_conflict=qamar_food_id,nutrient_code,per_basis", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates" },
+        body: JSON.stringify(rows),
+      });
+    }
+
+    await db("food_source_links?on_conflict=qamar_food_id,source_id,external_id", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify({
+        qamar_food_id: foodId,
+        source_id: p.source === "usda_branded" ? "usda_fdc" : "open_food_facts",
+        external_id: p.barcode,
+        external_type: "barcode",
+        url: p.sourceUrl,
+      }),
+    });
+    return foodId;
+  } catch (e) {
+    // A caching failure must never cost the user their scan.
+    console.error("ai-gateway rememberProduct", e);
+    return null;
+  }
+}
+
 function asString(v: unknown): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
@@ -351,6 +595,13 @@ interface SavedPlan {
   rationale_en?: string | null;
   sources?: unknown;
   model?: string | null;
+}
+
+/** Whether this account is on Qamar+ right now, by the rule the database uses. */
+async function isPlusMember(userId: string): Promise<boolean> {
+  const res = await db("rpc/qamar_is_plus", { method: "POST", body: JSON.stringify({ p_user_id: userId }) });
+  if (!res.ok) return false;
+  return (await res.json()) === true;
 }
 
 /** The menu already written for this person today, or null if none. */
@@ -400,12 +651,57 @@ function mealsFromBody(plan: unknown): Meal[] | null {
 
 // ---- routes -------------------------------------------------------------
 
+/** The question a menu photo asks when the person typed nothing with it. */
+function menuQuestion(lang: "ar" | "en"): string {
+  return lang === "ar" ? "أطلب إيه من هنا؟" : "What should I order from this menu?";
+}
+
 async function chatReply(userId: string, body: Record<string, unknown>): Promise<Response> {
-  const message = (asString(body.message) ?? "").trim();
   const lang = asString(body.lang) === "ar" ? "ar" : "en";
   const day = (asString(body.date) ?? new Date().toISOString().slice(0, 10));
 
-  const verdict = classify(message);
+  // A photo in the conversation — a restaurant menu, a label, a plate on the
+  // table — rides the same route as a question. It is metered as a photo,
+  // because that is what costs the model call, and the words with it may be
+  // empty: the question is implied.
+  const image = readImage(body as { imageBase64?: string; imageMediaType?: string });
+  if (typeof image === "string") return json({ error: image }, 400);
+  const typed = (asString(body.message) ?? "").trim();
+  const message = typed || (image ? menuQuestion(lang) : "");
+  const bucket: Bucket = image ? "photo" : "chat";
+
+  // The safety gate reads the words either way.
+  let verdict = classify(message);
+
+  // Someone said hello. Answer, and spend nothing doing it: no retrieval, no
+  // model, no daily use. The first real conversation this app ever had opened
+  // with "ازيك" and was told Qamar only covers food and training.
+  if (verdict.allowed && "greeting" in verdict) {
+    if (!image) {
+      await record(userId, "chat", { inScope: true, question: message, model: "greeting" });
+      return json({ reply: greetingText(lang), greeting: true });
+    }
+    // A hello with a photo is a question about the photo.
+    verdict = { allowed: true, domain: "nutrition" };
+  }
+
+  // off_topic is now a hint, not a verdict.
+  //
+  // A keyword allowlist cannot hold a conversation. It refused "ازيك", it
+  // refused "أنا تعبان النهاردة", and it refused someone saying they had eaten
+  // koshary — because a list of thirty words is not a nutritionist's sense of
+  // what belongs in their consulting room. The safety refusals below stay
+  // deterministic and stay in front of the model, because those must never be
+  // a matter of judgement. Deciding whether a message is about food is exactly
+  // the kind of thing judgement is for, so it goes to the model, which then
+  // answers or declines in one warm sentence. A menu photo with "what do I
+  // order here" carries no food term at all, and the picture is the food.
+  //
+  // An off-topic message still costs nothing: if the model says it was out of
+  // scope, the use (a question, or a photo) is refunded below.
+  const topicUncertain = !verdict.allowed && verdict.reason === "off_topic";
+  if (topicUncertain) verdict = { allowed: true, domain: "nutrition" };
+
   if (!verdict.allowed) {
     const id = await record(userId, "chat", {
       inScope: false,
@@ -432,42 +728,80 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
     ? JSON.stringify({ date: day, meals: currentMeals, swapped_slots: swapped })
     : "";
 
+  const domain = verdict.domain;
   const [passages, retrievalMs] = await timed(() =>
-    retrieve(SUPABASE_URL, SERVICE_KEY, message, verdict.domain)
+    retrieve(
+      SUPABASE_URL,
+      SERVICE_KEY,
+      image ? `${message} — choosing from a restaurant menu, eating out, portion size` : message,
+      domain,
+    )
   );
-  if (passages.length === 0) {
-    // No grounding, no answer. This is the rule that stops the assistant
-    // becoming a general chatbot the moment retrieval is empty.
-    const reply = lang === "ar"
-      ? "معنديش مصدر موثوق يجاوب على ده دلوقتي، ومش هألّف. جرّب تسأل بطريقة تانية أو عن حاجة أقرب للأكل والتمرين."
-      : "I do not have a grounded source for that right now, and I will not make one up. Try asking differently, or about something closer to food and training.";
-    await record(userId, "chat", { inScope: true, refusal: "no_grounding", question: message, answer: reply });
-    return json({ reply, refused: true, reason: "no_grounding" });
-  }
+  // Empty retrieval used to end the conversation here. It should not: a
+  // corpus of ten documents cannot cover everything a person says, and
+  // "عدّل العشا" — change my dinner — was refused for want of a citation when
+  // it is an instruction about their own plan, not a claim needing a source.
+  //
+  // Grounding now constrains what may be *asserted*, which the prompt states
+  // and the verifier enforces on the numbers. It no longer decides whether
+  // Qamar is allowed to speak.
 
   const lookup = [...foodTerms(message), ...foodTermsFromMeals(currentMeals)].slice(0, 16);
   const [resolved, resolveMs] = await timed(() =>
     resolveFoods(SUPABASE_URL, SERVICE_KEY, lookup)
   );
-  const taken = await takeAiUse(userId, lang);
+  // What was already said. Loaded before the use is taken so a fragment like
+  // "and I got" is judged as the continuation it is, not as a sentence about
+  // nothing.
+  const history = await loadRecentTurns(userId);
+
+  // The fourth question of the day is the paywall; a photo spends a photo.
+  const taken = await takeAiUse(userId, lang, bucket);
   if (taken instanceof Response) return taken;
   const quota = taken;
 
   let called: Awaited<ReturnType<typeof callModel>>;
   try {
     called = await callModel({
-      system: chatSystemPrompt(ctx, passages, renderResolutions(resolved), menuJson),
+      system: chatSystemPrompt(ctx, passages, renderResolutions(resolved), menuJson, { photo: image !== null }),
       user: message,
       maxTokens: 1600,
       prefill: "{",
+      history,
+      ...(image ? { image } : {}),
     });
   } catch (e) {
-    await refundAi(userId);
+    await refundAi(userId, bucket);
     throw e;
   }
   const { text, model, usage, latencyMs } = called;
 
-  const parsed = parseJson<{ reply?: string; action?: string; plan_update?: PlanUpdate | null }>(text);
+  const parsed = parseJson<{
+    reply?: string;
+    in_scope?: boolean;
+    action?: string;
+    plan_update?: PlanUpdate | null;
+  }>(text);
+
+  // The model judged this out of scope. Record it as the refusal it is, and
+  // give the daily use back — someone who asked Qamar about football should
+  // not lose one of five nutrition questions for it. The reply is the model's
+  // own sentence, so the decline is in their language and in character rather
+  // than a canned line about keywords.
+  if (parsed?.in_scope === false) {
+    await refundAi(userId, bucket);
+    const declined = (parsed.reply ?? "").trim() || refusalText("off_topic", lang);
+    const id = await record(userId, "chat", {
+      inScope: false,
+      refusal: "off_topic",
+      question: image ? `[photo] ${message}` : message,
+      answer: declined,
+      model,
+    });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "off_topic", message);
+    return json({ reply: declined, refused: true, reason: "off_topic" });
+  }
+
   let reply: string;
   if (parsed && typeof parsed.reply === "string" && parsed.reply.trim()) {
     reply = parsed.reply.trim();
@@ -535,9 +869,11 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
   }
 
   const sources = resolvedSources(passages, resolved);
+  // The audit row notes that a photo was attached; the photo itself is never
+  // stored.
   const id = await record(userId, "chat", {
     inScope: true,
-    question: message,
+    question: image ? `[photo] ${message}` : message,
     answer: reply,
     sources,
     model,
@@ -570,7 +906,8 @@ async function chatReply(userId: string, body: Record<string, unknown>): Promise
     excludedRules: rules.excluded,
     candidateDecision: {
       reply: reply.slice(0, 2000),
-      domain: verdict.domain,
+      domain,
+      input: image ? "photo" : "text",
       sources,
       plan_update: planUpdate,
     },
@@ -640,17 +977,6 @@ function mealClaims(items: MealItem[]): unknown[] {
   }));
 }
 
-function graphMealNote(lang: "ar" | "en", items: MealItem[]): string {
-  if (items.length === 0) {
-    return lang === "ar"
-      ? "مقدرتش ألاقي الأكل ده في قاعدة البيانات. جرّب اسم أوضح. تصوير الطبق لـ Qamar+."
-      : "I could not match that to a food we know. Try a clearer name. Photographing a plate is Qamar+.";
-  }
-  return lang === "ar"
-    ? "الأرقام من قاعدة الأكل، مش من الموديل. ظبّط الكميات قبل ما تأكد."
-    : "These numbers come from the food database, not the model. Adjust the amounts before you confirm.";
-}
-
 /**
  * Prices a typed or spoken meal from the food graph only.
  *
@@ -672,11 +998,17 @@ async function analyzeMealFromGraph(
   const sources = resolvedSources([], resolved);
   const verification = verifyMeal(items);
 
+  // Nothing was spent; report the photo bucket so the app can show what a
+  // photo would cost next.
   let quota: Quota;
+  // Whether today's photos are known: a note offers a photo only when they
+  // are, and some are left (notes.ts).
+  let quotaKnown = true;
   try {
-    quota = await quotaStatus(userId);
+    quota = await quotaStatus(userId, "photo");
   } catch {
-    quota = { allowed: true, used: 0, limit: 5, extra: 0, remaining: 5 };
+    quotaKnown = false;
+    quota = { bucket: "photo", allowed: true, used: 0, limit: 3, extra: 0, remaining: 3 };
   }
 
   const id = await record(userId, "meal_analysis", {
@@ -721,7 +1053,7 @@ async function analyzeMealFromGraph(
 
   return json({
     items,
-    note: graphMealNote(lang, items),
+    note: graphMealNote(lang, items, quotaKnown && quota.remaining > 0),
     quota: quotaPayload(quota),
     sources,
     resolutions: toPacketFacts(resolved),
@@ -790,7 +1122,9 @@ async function analyzeMeal(
     : described;
 
   const foodBlock = renderResolutions(resolved);
-  const taken = await takeAiUse(userId, lang);
+  // A photo is the photo bucket: three a day on Lite, more with Su, and never
+  // a paywall on its own.
+  const taken = await takeAiUse(userId, lang, "photo");
   if (taken instanceof Response) return taken;
   const quota = taken;
 
@@ -806,7 +1140,7 @@ async function analyzeMeal(
       image: image ?? undefined,
     });
   } catch (e) {
-    await refundAi(userId);
+    await refundAi(userId, "photo");
     throw e;
   }
   const { text, model, usage, latencyMs } = called;
@@ -828,7 +1162,7 @@ async function analyzeMeal(
       candidateDecision: { parse_failed: true, raw: text.slice(0, 1000) },
       uncertainty: { parse: "model did not return the requested JSON" },
     }, stages);
-    await refundAi(userId);
+    await refundAi(userId, "photo");
     return json({ error: "could not analyse" }, 502);
   }
 
@@ -938,15 +1272,11 @@ async function analyzeMeal(
     claimsToVerify: mealClaims(items),
   }, stages, verifications);
 
-  let shown = quota;
-  if (items.length === 0) {
-    await refundAi(userId);
-    try {
-      shown = await quotaStatus(userId);
-    } catch {
-      shown = { ...quota, used: Math.max(quota.used - 1, 0), remaining: quota.remaining + 1, allowed: true };
-    }
-  }
+  // An empty item list is a real answer the model was paid for — a photo too
+  // dark to read, or not food. It used to be refunded, which made "send a
+  // black image" a free, unbounded vision call. The use stands; only a
+  // parse failure above, which is our fault, is refunded.
+  const shown = quota;
 
   return json({
     // These carry qamar_food_id and grams. The app must persist them onto
@@ -956,7 +1286,8 @@ async function analyzeMeal(
     // How much of this meal the log will actually be able to speak for. The
     // confirmation screen should say so when it is not all of it.
     identified: identities.filter((x) => x.qamarFoodId && x.grams).length,
-    note: (lang === "ar" ? parsed.note_ar : parsed.note_en) ?? null,
+    // Never about the score: a note that talks points is dropped (notes.ts).
+    note: modelMealNote(lang === "ar" ? parsed.note_ar : parsed.note_en),
     quota: quotaPayload(shown),
     sources,
     // What the graph made of each phrase: the canonical food, the portion it
@@ -992,6 +1323,490 @@ function plausible(v: unknown, min: number, max: number, decimals = 0): number |
   return n >= min && n <= max ? n : null;
 }
 
+/**
+ * A scanned barcode, placed into the day.
+ *
+ * The flow the product asks for: point the camera at a packet of crisps and
+ * have it counted and the rest of the day adjusted, without typing anything.
+ *
+ * Order matters here. The graph is asked first so a packet somebody has
+ * already scanned costs nothing. The arithmetic — pack weight, the item's
+ * kcal, what is left of the target — is all done here, deterministically, and
+ * handed to the model as fact. The model is left with the judgement: does this
+ * still work, and if not, what on the menu should move.
+ */
+async function scanBarcode(
+  userId: string,
+  body: { barcode?: string; lang?: string; date?: string; grams?: number },
+): Promise<Response> {
+  const lang = asString(body.lang) === "ar" ? "ar" : "en";
+  const day = asString(body.date) ?? new Date().toISOString().slice(0, 10);
+  const code = (asString(body.barcode) ?? "").replace(/\D/g, "");
+  if (!code) return json({ error: "no barcode" }, 400);
+
+  const { ctx, blocked, target } = await loadContext(userId, lang);
+  if (blocked) {
+    const id = await record(userId, "meal_analysis", {
+      inScope: false,
+      refusal: "minor",
+      question: `[barcode] ${code}`,
+    });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", `[barcode] ${code}`);
+    return json({ error: "not eligible" }, 403);
+  }
+
+  const [product, lookupMs] = await timed(() => lookupBarcode(code));
+  if (!product) {
+    // A local Egyptian brand nobody has catalogued. Saying so and offering the
+    // label scan is the honest answer; inventing a plausible packet is not.
+    await record(userId, "meal_analysis", {
+      inScope: true,
+      question: `[barcode] ${code}`,
+      answer: "",
+      model: "barcode",
+    });
+    return json({
+      found: false,
+      barcode: code,
+      reply: lang === "ar"
+        ? "المنتج ده مش في أي قاعدة بيانات لسه. صوّرلي جدول القيم الغذائية اللي ورا العلبة وأنا أقراه."
+        : "That product is not in any database yet. Photograph the nutrition table on the back and I will read it.",
+    }, 200);
+  }
+
+  await rememberProduct(product);
+
+  // What was eaten, and what it came to.
+  const asked = typeof body.grams === "number" && body.grams > 0 && body.grams <= 3000
+    ? { grams: body.grams, label: `${body.grams} g`, assumed: false }
+    : eatenPortion(product);
+  const totals = scaleTo(product.per100g, asked.grams);
+  const kcal = Math.round(totals.energy_kcal ?? 0);
+
+  const eaten = await todaySoFar(userId, day);
+  const targetKcal = ctx.targetKcal ?? null;
+  const remaining = targetKcal == null ? null : targetKcal - eaten;
+
+  const saved = await loadSavedPlan(userId, day);
+  const currentMeals = saved?.meals ?? null;
+  const menuJson = currentMeals ? JSON.stringify({ date: day, meals: currentMeals }) : "";
+
+  const name = product.brand ? `${product.brand} ${product.name}` : product.name;
+  const itemLine =
+    `${name} — ${asked.label}${asked.assumed ? " (portion assumed, ask them)" : ""}: ` +
+    `${kcal} kcal, P ${Math.round(totals.protein_g ?? 0)} g, ` +
+    `C ${Math.round(totals.carbs_g ?? 0)} g, F ${Math.round(totals.fat_g ?? 0)} g`;
+
+  // A barcode is a camera use, and spends a photo like a meal photo does.
+  const taken = await takeAiUse(userId, lang, "photo");
+  if (taken instanceof Response) return taken;
+  const quota = taken;
+
+  let called: Awaited<ReturnType<typeof callModel>>;
+  try {
+    called = await callModel({
+      system: scanPlacementSystemPrompt(
+        ctx,
+        { targetKcal, eatenKcal: eaten, remainingKcal: remaining, menuJson },
+        itemLine,
+        renderFoodLine(product),
+      ),
+      user: name,
+      maxTokens: 900,
+      prefill: "{",
+    });
+  } catch (e) {
+    await refundAi(userId, "photo");
+    throw e;
+  }
+  const { text, model, usage, latencyMs } = called;
+
+  const parsed = parseJson<{ reply?: string; fits?: boolean; plan_update?: PlanUpdate | null }>(text);
+  const reply = (parsed?.reply ?? "").trim() ||
+    (lang === "ar" ? `${name}: ${kcal} سعرة.` : `${name}: ${kcal} kcal.`);
+
+  // Apply whatever the model decided the menu should do, through the same
+  // merge the chat route uses — one place where a plan is edited, not two.
+  //
+  // And through the same verification. A scan that rewrites dinner is a plan
+  // change like any other, so it goes past the allergy check before it is
+  // saved: the shortest path to putting sesame on somebody's menu would be a
+  // route that edits the plan without the guard the other route has.
+  let plan: { meals: Meal[] } | undefined;
+  let rebuildNeeded: string | undefined;
+  const verifications: Verification[] = [];
+  if (parsed?.plan_update && currentMeals) {
+    const merged = mergePlanUpdate(currentMeals, parsed.plan_update);
+    if (merged?.kind === "rebuild") {
+      // The day needs re-planning rather than patching. Say so; do not invent
+      // the new meals here.
+      rebuildNeeded = merged.instruction || name;
+    } else if (merged && (merged.kind === "replace_slot" || merged.kind === "replace_day")) {
+      const constraints = await loadHardConstraints(SUPABASE_URL, SERVICE_KEY, userId);
+      const planCheck = verifyPlan(merged.meals, targetKcal, constraints);
+      verifications.push(planCheck);
+      if (blocks(planCheck).length > 0) {
+        await recordHardBlock(
+          SUPABASE_URL, SERVICE_KEY, userId, null, "restricted_food_in_generated_plan",
+          { failures: blocks(planCheck), stage: "scan_plan_update" },
+        );
+      } else {
+        await saveMealPlan(
+          userId, day, merged.meals, targetKcal ?? 0,
+          saved?.rationale_ar ?? null, saved?.rationale_en ?? null,
+          saved?.sources ?? null, model,
+        );
+        plan = { meals: merged.meals };
+      }
+    }
+  }
+
+  const id = await record(userId, "meal_analysis", {
+    inScope: true,
+    question: `[barcode] ${code} ${name}`,
+    answer: reply,
+    model,
+  });
+  await recordAllowed(
+    SUPABASE_URL, SERVICE_KEY, userId, id, "general_wellness", [], ["scan_barcode"],
+  );
+
+  const stages: StageCost[] = [
+    { stage: "food_resolver", externalCalls: 1, latencyMs: lookupMs },
+    { stage: "reasoner", model, usage, latencyMs },
+  ];
+  await trace(userId, id, "meal_analysis", {
+    calculatedTargets: targetsFrom(ctx, target),
+    candidateDecision: {
+      barcode: code,
+      product: name,
+      grams: asked.grams,
+      portion_assumed: asked.assumed,
+      totals,
+      eaten_before: eaten,
+      remaining_before: remaining,
+      fits: parsed?.fits ?? null,
+      plan_changed: plan != null,
+    },
+    uncertainty: {
+      portion_assumed: asked.assumed,
+      source: product.source,
+    },
+    claimsToVerify: [{
+      claim: "item kcal scaled from the product table",
+      grams: asked.grams,
+      kcal,
+      check: "per_100g_times_weight",
+    }],
+  }, stages, verifications);
+
+  return json({
+    found: true,
+    barcode: code,
+    name,
+    brand: product.brand,
+    grams: asked.grams,
+    portionLabel: asked.label,
+    portionAssumed: asked.assumed,
+    per100g: product.per100g,
+    totals,
+    kcal,
+    // The app writes the log; these are the keys meal_logs.items needs so the
+    // scan counts towards micronutrients like anything else.
+    item: {
+      name,
+      qamar_food_id: null,
+      grams: asked.grams,
+      kcal,
+      protein_g: Math.round(totals.protein_g ?? 0),
+      carbs_g: Math.round(totals.carbs_g ?? 0),
+      fat_g: Math.round(totals.fat_g ?? 0),
+    },
+    targetKcal,
+    eatenKcal: eaten,
+    remainingKcal: remaining == null ? null : remaining - kcal,
+    fits: parsed?.fits ?? null,
+    reply,
+    plan,
+    rebuildNeeded,
+    source: product.source,
+    sourceUrl: product.sourceUrl,
+    quota: quotaPayload(quota),
+  });
+}
+
+/** One line of food data for the placement prompt. */
+function renderFoodLine(p: ScannedProduct): string {
+  const f = asFoodFacts(p);
+  return `${f.name}: per 100 g — ${f.per100g.kcal} kcal, P ${f.per100g.protein} g, ` +
+    `C ${f.per100g.carbs} g, F ${f.per100g.fat} g (${f.source})`;
+}
+
+/**
+ * The nutrition table on the back of a packet.
+ *
+ * This is the answer to the barcode route's own dead end: a local Egyptian
+ * brand that no database has ever catalogued still has its figures printed on
+ * it, and a photograph of that panel is better data than anything a model
+ * could infer from the product's name.
+ *
+ * The model transcribes; label.ts decides whether the transcription can be
+ * trusted and converts it to per 100 g. Everything after that is the barcode
+ * route's path exactly — the same placement prompt, the same plan merge, the
+ * same allergy check — because "how much of my day did this take" does not
+ * depend on whether the product arrived by barcode or by camera.
+ */
+async function scanLabel(
+  userId: string,
+  body: {
+    imageBase64?: string;
+    imageMediaType?: string;
+    lang?: string;
+    date?: string;
+    barcode?: string;
+    name?: string;
+    grams?: number;
+  },
+): Promise<Response> {
+  const lang = asString(body.lang) === "ar" ? "ar" : "en";
+  const day = asString(body.date) ?? new Date().toISOString().slice(0, 10);
+  const barcode = (asString(body.barcode) ?? "").replace(/\D/g, "");
+
+  const image = readImage(body);
+  if (typeof image === "string") return json({ error: image }, 413);
+  if (!image) return json({ error: "no image" }, 400);
+
+  const { ctx, blocked, target } = await loadContext(userId, lang);
+  if (blocked) {
+    const id = await record(userId, "meal_analysis", {
+      inScope: false,
+      refusal: "minor",
+      question: "[label]",
+    });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", "[label]");
+    return json({ error: "not eligible" }, 403);
+  }
+
+  // Reading a panel is a photo read by the vision model: a photo.
+  const taken = await takeAiUse(userId, lang, "photo");
+  if (taken instanceof Response) return taken;
+  const quota = taken;
+
+  let read: Awaited<ReturnType<typeof callModel>>;
+  try {
+    read = await callModel({
+      system: labelScanSystemPrompt(lang),
+      user: lang === "ar" ? "اقرا الجدول ده." : "Read this panel.",
+      maxTokens: 700,
+      prefill: "{",
+      image,
+    });
+  } catch (e) {
+    await refundAi(userId, "photo");
+    throw e;
+  }
+
+  const parsed = parseJson<LabelReading & { productName?: string | null }>(read.text);
+  if (!parsed) {
+    await refundAi(userId, "photo");
+    await trace(userId, null, "meal_analysis", {
+      candidateDecision: { parse_failed: true, raw: read.text.slice(0, 500) },
+      uncertainty: { parse: "model did not return the requested JSON" },
+    }, [{ stage: "extractor", model: read.model, usage: read.usage, latencyMs: read.latencyMs }]);
+    return json({ error: "could not read the panel" }, 502);
+  }
+
+  const normalised = normaliseLabel(parsed);
+  if (!normalised.ok) {
+    // A panel that cannot be trusted is worth less than nothing, so the use is
+    // given back and the person is told what to do differently.
+    await refundAi(userId, "photo");
+    const id = await record(userId, "meal_analysis", {
+      inScope: true,
+      question: "[label]",
+      answer: normalised.problem,
+      model: read.model,
+    });
+    await trace(userId, id, "meal_analysis", {
+      candidateDecision: { label_rejected: normalised.problem, reading: parsed },
+      uncertainty: { label: normalised.problem, note: parsed.note ?? null },
+    }, [{ stage: "extractor", model: read.model, usage: read.usage, latencyMs: read.latencyMs }]);
+    return json({
+      found: false,
+      problem: normalised.problem,
+      reply: labelProblemText(normalised.problem, lang),
+      quota: quotaPayload(quota),
+    });
+  }
+
+  const label = normalised.value;
+  const name = (asString(body.name) ?? parsed.productName ?? "").trim() ||
+    (lang === "ar" ? "المنتج" : "the product");
+
+  // A panel photographed after a barcode miss is the missing catalogue entry.
+  // Saving it means nobody has to photograph that packet again.
+  const product: ScannedProduct = {
+    barcode: barcode || `label_${Date.now()}`,
+    name,
+    brand: null,
+    per100g: label.per100g,
+    packGrams: null,
+    servingGrams: label.servingGrams,
+    packLabel: null,
+    source: "open_food_facts",
+    sourceUrl: null,
+  };
+  if (barcode) await rememberProduct({ ...product, barcode });
+
+  const asked = typeof body.grams === "number" && body.grams > 0 && body.grams <= 3000
+    ? { grams: body.grams, label: `${body.grams} g`, assumed: false }
+    : eatenPortion(product);
+  const totals = scaleTo(label.per100g, asked.grams);
+  const kcal = Math.round(totals.energy_kcal ?? 0);
+
+  const eaten = await todaySoFar(userId, day);
+  const targetKcal = ctx.targetKcal ?? null;
+  const remaining = targetKcal == null ? null : targetKcal - eaten;
+
+  const saved = await loadSavedPlan(userId, day);
+  const currentMeals = saved?.meals ?? null;
+  const menuJson = currentMeals ? JSON.stringify({ date: day, meals: currentMeals }) : "";
+
+  const itemLine =
+    `${name} — ${asked.label}${asked.assumed ? " (portion assumed, ask them)" : ""}: ` +
+    `${kcal} kcal, P ${Math.round(totals.protein_g ?? 0)} g, ` +
+    `C ${Math.round(totals.carbs_g ?? 0)} g, F ${Math.round(totals.fat_g ?? 0)} g` +
+    (label.basis === "per_serving" ? " (panel was per serving; converted)" : "") +
+    (label.energyFromKj ? " (energy converted from kJ)" : "");
+
+  let placed: Awaited<ReturnType<typeof callModel>>;
+  try {
+    placed = await callModel({
+      system: scanPlacementSystemPrompt(
+        ctx,
+        { targetKcal, eatenKcal: eaten, remainingKcal: remaining, menuJson },
+        itemLine,
+        `${name}: per 100 g — ${Math.round(label.per100g.energy_kcal ?? 0)} kcal (read off the packet)`,
+      ),
+      user: name,
+      maxTokens: 900,
+      prefill: "{",
+    });
+  } catch (e) {
+    // The reading itself succeeded; the placement is the part that failed, and
+    // the person should still get their numbers.
+    console.error("ai-gateway label placement", e);
+    placed = { text: "", model: read.model, usage: null, latencyMs: 0 };
+  }
+
+  const decision = parseJson<{ reply?: string; fits?: boolean; plan_update?: PlanUpdate | null }>(
+    placed.text,
+  );
+  const reply = (decision?.reply ?? "").trim() ||
+    (lang === "ar" ? `${name}: ${kcal} سعرة.` : `${name}: ${kcal} kcal.`);
+
+  const verifications: Verification[] = [];
+  let plan: { meals: Meal[] } | undefined;
+  let rebuildNeeded: string | undefined;
+  if (decision?.plan_update && currentMeals) {
+    const merged = mergePlanUpdate(currentMeals, decision.plan_update);
+    if (merged?.kind === "rebuild") {
+      rebuildNeeded = merged.instruction || name;
+    } else if (merged && (merged.kind === "replace_slot" || merged.kind === "replace_day")) {
+      const constraints = await loadHardConstraints(SUPABASE_URL, SERVICE_KEY, userId);
+      const planCheck = verifyPlan(merged.meals, targetKcal, constraints);
+      verifications.push(planCheck);
+      if (blocks(planCheck).length > 0) {
+        await recordHardBlock(
+          SUPABASE_URL, SERVICE_KEY, userId, null, "restricted_food_in_generated_plan",
+          { failures: blocks(planCheck), stage: "label_plan_update" },
+        );
+      } else {
+        await saveMealPlan(
+          userId, day, merged.meals, targetKcal ?? 0,
+          saved?.rationale_ar ?? null, saved?.rationale_en ?? null,
+          saved?.sources ?? null, placed.model,
+        );
+        plan = { meals: merged.meals };
+      }
+    }
+  }
+
+  const id = await record(userId, "meal_analysis", {
+    inScope: true,
+    question: `[label] ${name}`,
+    answer: reply,
+    model: read.model,
+  });
+  await recordAllowed(
+    SUPABASE_URL, SERVICE_KEY, userId, id, "general_wellness", [], ["scan_label"],
+  );
+
+  await trace(userId, id, "meal_analysis", {
+    calculatedTargets: targetsFrom(ctx, target),
+    candidateDecision: {
+      source: "label",
+      barcode: barcode || null,
+      product: name,
+      basis: label.basis,
+      serving_grams: label.servingGrams,
+      grams: asked.grams,
+      totals,
+      eaten_before: eaten,
+      fits: decision?.fits ?? null,
+      plan_changed: plan != null,
+    },
+    uncertainty: {
+      portion_assumed: asked.assumed,
+      energy_from_kj: label.energyFromKj,
+      converted_from_serving: label.basis === "per_serving",
+      note: parsed.note ?? null,
+    },
+    claimsToVerify: [{
+      claim: "per-100g figures transcribed from the printed panel",
+      basis: label.basis,
+      kcal_per_100g: label.per100g.energy_kcal,
+      check: "label_transcription",
+    }],
+  }, [
+    { stage: "extractor", model: read.model, usage: read.usage, latencyMs: read.latencyMs },
+    { stage: "reasoner", model: placed.model, usage: placed.usage, latencyMs: placed.latencyMs },
+  ], verifications);
+
+  return json({
+    found: true,
+    name,
+    barcode: barcode || null,
+    basis: label.basis,
+    servingGrams: label.servingGrams,
+    energyFromKj: label.energyFromKj,
+    per100g: label.per100g,
+    grams: asked.grams,
+    portionLabel: asked.label,
+    portionAssumed: asked.assumed,
+    totals,
+    kcal,
+    item: {
+      name,
+      qamar_food_id: null,
+      grams: asked.grams,
+      kcal,
+      protein_g: Math.round(totals.protein_g ?? 0),
+      carbs_g: Math.round(totals.carbs_g ?? 0),
+      fat_g: Math.round(totals.fat_g ?? 0),
+    },
+    targetKcal,
+    eatenKcal: eaten,
+    remainingKcal: remaining == null ? null : remaining - kcal,
+    fits: decision?.fits ?? null,
+    reply,
+    plan,
+    rebuildNeeded,
+    note: parsed.note ?? null,
+    quota: quotaPayload(quota),
+  });
+}
+
 async function readBodyScan(
   userId: string,
   body: { imageBase64?: string; imageMediaType?: string; lang?: string },
@@ -1001,13 +1816,35 @@ async function readBodyScan(
   if (typeof image === "string") return json({ error: image }, 413);
   if (!image) return json({ error: "no image supplied" }, 400);
 
-  const { text, model, usage, latencyMs } = await callModel({
-    system: bodyScanSystemPrompt(lang),
-    user: lang === "ar" ? "اقرا الأرقام اللي في التقرير ده." : "Read the figures on this report.",
-    maxTokens: 400,
-    prefill: "{",
-    image,
-  });
+  // Same gates as every other model route. This one used to have neither: any
+  // anonymous sign-up could loop vision calls through it at no cost to them
+  // and full cost to us, and a blocked profile could reach the model here when
+  // it could not anywhere else. A body scan is one use of the day, like a
+  // meal photo — it is the same call to the same model.
+  const { blocked } = await loadContext(userId, lang);
+  if (blocked) {
+    const id = await record(userId, "body_scan", { inScope: false, refusal: "minor", question: "[body scan]" });
+    await recordRefusal(SUPABASE_URL, SERVICE_KEY, userId, id, "minor", "[body scan]");
+    return json({ error: "not eligible" }, 403);
+  }
+  const taken = await takeAiUse(userId, lang, "photo");
+  if (taken instanceof Response) return taken;
+  const quota = taken;
+
+  let called: Awaited<ReturnType<typeof callModel>>;
+  try {
+    called = await callModel({
+      system: bodyScanSystemPrompt(lang),
+      user: lang === "ar" ? "اقرا الأرقام اللي في التقرير ده." : "Read the figures on this report.",
+      maxTokens: 400,
+      prefill: "{",
+      image,
+    });
+  } catch (e) {
+    await refundAi(userId, "photo");
+    throw e;
+  }
+  const { text, model, usage, latencyMs } = called;
   const stages: StageCost[] = [{ stage: "extractor", model, usage, latencyMs }];
 
   const parsed = parseJson<BodyScanShape>(text);
@@ -1016,6 +1853,8 @@ async function readBodyScan(
       candidateDecision: { parse_failed: true, raw: text.slice(0, 1000) },
       uncertainty: { parse: "model did not return the requested JSON" },
     }, stages);
+    // Unusable output is our failure, not a use of theirs.
+    await refundAi(userId, "photo");
     return json({ error: "could not read the report" }, 502);
   }
 
@@ -1055,7 +1894,7 @@ async function readBodyScan(
     },
     safetyFlags: dropped.length ? ["body_scan_value_rejected"] : [],
   }, stages);
-  return json(result);
+  return json({ ...result, quota: quotaPayload(quota) });
 }
 
 interface PlanShape {
@@ -1064,11 +1903,35 @@ interface PlanShape {
   rationale_en?: string;
 }
 
-async function generatePlan(userId: string, body: Record<string, unknown>): Promise<Response> {
+/**
+ * Writes (or returns) the day's plan. [opts.metered] is false only for the
+ * night job: tomorrow's plan is what Qamar+ is paid for, not a use of the
+ * member's own daily plan bucket.
+ */
+async function generatePlan(
+  userId: string,
+  body: Record<string, unknown>,
+  opts: { metered?: boolean } = {},
+): Promise<Response> {
+  const meter = opts.metered !== false;
   const lang = asString(body.lang) === "ar" ? "ar" : "en";
   const day = asString(body.date) ?? new Date().toISOString().slice(0, 10);
   const force = truthy(body.force);
   const instruction = (asString(body.instruction) ?? "").trim();
+
+  // Paywall four: tomorrow. The night job (unmetered) writes it for everyone
+  // who was active today; a member opens it; the free tier reads the night
+  // sentence and finds the plan behind it locked. Today and the past stay
+  // free — those plans were built on request.
+  if (meter && day > cairoNow(new Date()).date && !(await isPlusMember(userId))) {
+    return json({
+      error: lang === "ar"
+        ? "بكرة موجود لما تكمل — خطة بكرة من قمر+."
+        : "Tomorrow is there when you continue — tomorrow’s plan is Qamar+.",
+      locked: true,
+      reason: "tomorrow_locked",
+    }, 403);
+  }
 
   const { ctx, blocked, lifeStage, target } = await loadContext(userId, lang);
   if (blocked) {
@@ -1102,9 +1965,9 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
   if (!force && !instruction) {
     const existing = await loadSavedPlan(userId, day);
     if (existing) {
-      let quota: Record<string, number> | undefined;
+      let quota: Record<string, unknown> | undefined;
       try {
-        quota = quotaPayload(await quotaStatus(userId));
+        quota = quotaPayload(await quotaStatus(userId, "plan"));
       } catch {
         // A saved day still belongs on the screen even if the counter is down.
       }
@@ -1183,7 +2046,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
   // to generate is the wrong order.
   const [gaps, gapsMs] = await timed(() => nutrientGaps(SUPABASE_URL, SERVICE_KEY, userId, 7));
 
-  const taken = await takeAiUse(userId, lang);
+  const taken = meter ? await takeAiUse(userId, lang, "plan") : null;
   if (taken instanceof Response) return taken;
   const quota = taken;
 
@@ -1196,7 +2059,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
       prefill: "{",
     });
   } catch (e) {
-    await refundAi(userId);
+    if (meter) await refundAi(userId, "plan");
     throw e;
   }
   const { text, model, usage, latencyMs } = called;
@@ -1213,7 +2076,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
       candidateDecision: { parse_failed: true, raw: text.slice(0, 1000) },
       uncertainty: { parse: "model did not return the requested JSON" },
     }, stages);
-    await refundAi(userId);
+    if (meter) await refundAi(userId, "plan");
     return json({ error: "could not generate a plan" }, 502);
   }
 
@@ -1272,7 +2135,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
       safetyFlags: [...flags, "restricted_food_in_output"],
       uncertainty: { staples_withheld: excludedFoods },
     }, stages, verifications);
-    await refundAi(userId);
+    if (meter) await refundAi(userId, "plan");
     return json({
       error: lang === "ar"
         ? "الخطة اللي اتولدت فيها حاجة مش مفروض تاكلها، فمنفعش أعرضهالك. جرّب تاني من فضلك."
@@ -1293,7 +2156,7 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
     model,
   );
   if (!saved.ok) {
-    await refundAi(userId);
+    if (meter) await refundAi(userId, "plan");
     return json({ error: `could not save plan: ${await saved.text()}` }, 500);
   }
 
@@ -1364,8 +2227,190 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
     date: day,
     sources,
     verification: verificationSummary(verification),
-    quota: quotaPayload(quota),
+    ...(quota ? { quota: quotaPayload(quota) } : {}),
   });
+}
+
+
+// ---- the night job --------------------------------------------------------
+
+/**
+ * Tomorrow's plan and the night sentence. Fired by pg_cron (see
+ * 0044_nightly_plan_cron.sql) with a shared secret rather than a user JWT;
+ * accepted only in the 22:00–23:59 Cairo window unless [force] is set for a
+ * manual run.
+ *
+ * The audience is every Qamar+ member, then every free-tier account that
+ * logged today: the blueprint's night step generates tomorrow from today's
+ * log for everyone and writes one sentence for the morning — a member opens
+ * the plan behind it, the free tier finds it locked (paywall four). Members
+ * come first so a long night never costs a paying member their morning.
+ * Sequential on purpose: one model call per person, stopping at the
+ * wall-clock budget and reporting how many are left for the next slot.
+ */
+async function nightlyPlans(now: Date, force: boolean): Promise<NightlyReport> {
+  const date = cairoDatePlus(now, 1);
+  const today = cairoNow(now).date;
+  const report: NightlyReport = {
+    date, ran: false, plus: 0, lite: 0, written: 0, noted: 0, returning: 0, skipped: 0, failed: 0, remaining: 0, failures: [],
+  };
+  if (!force && !isNightlyWindow(now)) {
+    report.reason = "outside the 22:00 Cairo window";
+    return report;
+  }
+  report.ran = true;
+
+  const nowIso = now.toISOString();
+  const membersRes = await db(
+    `entitlements?status=eq.active&or=(period_end.is.null,period_end.gte.${encodeURIComponent(nowIso)})` +
+      `&select=user_id&order=updated_at.asc&limit=1000`,
+  );
+  if (!membersRes.ok) throw new Error(`entitlements: ${membersRes.status} ${await membersRes.text()}`);
+  const members = (await membersRes.json() as Array<{ user_id: string }>).map((r) => r.user_id);
+
+  const activeRes = await db("rpc/qamar_active_today", { method: "POST", body: "{}" });
+  const active = activeRes.ok ? (await activeRes.json() as string[]) : [];
+  const plusSet = new Set(members);
+  const lite = active.filter((id) => !plusSet.has(id));
+  report.plus = members.length;
+  report.lite = lite.length;
+  // Anyone who logged this week but not today wakes to a line too, with no
+  // plan behind it: no model call, so members keep the run's budget.
+  report.returning = await writeReturningNotes(date, members, active);
+  const audience = [...members, ...lite];
+  if (audience.length === 0) return report;
+
+  const planned: string[] = [];
+  const noted = new Set<string>();
+  for (const group of chunks(audience)) {
+    const plannedRes = await db(`meal_plans?plan_date=eq.${date}&user_id=in.(${group.join(",")})&select=user_id`);
+    if (plannedRes.ok) {
+      for (const r of await plannedRes.json() as Array<{ user_id: string }>) planned.push(r.user_id);
+    }
+    const notedRes = await db(`night_notes?day=eq.${date}&user_id=in.(${group.join(",")})&select=user_id`);
+    if (notedRes.ok) {
+      for (const r of await notedRes.json() as Array<{ user_id: string }>) noted.add(r.user_id);
+    }
+  }
+  report.skipped = planned.length;
+
+  // A plan already there (a member who asked for tomorrow, an earlier slot
+  // that stopped before the sentence) still owes the morning its line.
+  for (const userId of planned) {
+    if (noted.has(userId)) continue;
+    const saved = await loadSavedPlan(userId, date);
+    if (saved && await writeNightNote(userId, date, today, saved.meals)) report.noted++;
+  }
+
+  const due = dueMembers(audience, planned);
+  const started = Date.now();
+  for (let i = 0; i < due.length; i++) {
+    if (Date.now() - started > RUN_BUDGET_MS) {
+      report.remaining = due.length - i;
+      break;
+    }
+    const userId = due[i];
+    try {
+      const res = await generatePlan(userId, { date, lang: "ar" }, { metered: false });
+      if (res.ok) {
+        report.written++;
+        const meals = mealsFromBody((await res.json())?.plan);
+        if (meals && await writeNightNote(userId, date, today, meals)) report.noted++;
+      } else {
+        // 403/409 are the gateway's own refusals (blocked, life stage, no
+        // target yet): not failures of the job, but the member gets no plan
+        // and the report says why.
+        report.failed++;
+        let error: string | undefined;
+        try {
+          const j = await res.json();
+          error = typeof j?.error === "string" ? j.error.slice(0, 200) : undefined;
+        } catch { /* body was not JSON */ }
+        report.failures.push({ user: userId, status: res.status, error });
+      }
+    } catch (e) {
+      report.failed++;
+      report.failures.push({ user: userId, status: 500, error: e instanceof Error ? e.message.slice(0, 200) : "error" });
+    }
+  }
+  return report;
+}
+
+/**
+ * The returning lines (0062): one batched write, no plan and no model call.
+ * A note already written for [date] is never overwritten; plan_kcal 0 tells
+ * the phone there is no plan behind the sentence. Returns how many were
+ * written.
+ */
+async function writeReturningNotes(date: string, members: string[], active: string[]): Promise<number> {
+  const res = await db("rpc/qamar_returning", { method: "POST", body: JSON.stringify({ p_days: RETURN_DAYS }) });
+  if (!res.ok) {
+    console.error("ai-gateway returning audience", res.status, await res.text());
+    return 0;
+  }
+  const returning = await res.json() as Array<{ user_id: string; meal_name: string }>;
+  if (returning.length === 0) return 0;
+  const noted: string[] = [];
+  for (const group of chunks(returning.map((r) => r.user_id))) {
+    const notedRes = await db(`night_notes?day=eq.${date}&user_id=in.(${group.join(",")})&select=user_id`);
+    if (notedRes.ok) for (const r of await notedRes.json() as Array<{ user_id: string }>) noted.push(r.user_id);
+  }
+  const due = returningAudience(returning, members, active, noted);
+  if (due.length === 0) return 0;
+  const rows = due.map((r) => {
+    const s = returnSentence(r.meal_name);
+    return { user_id: r.user_id, day: date, sentence_ar: s.ar, sentence_en: s.en, plan_kcal: 0, today_kcal: 0 };
+  });
+  const write = await db("night_notes?on_conflict=user_id,day", {
+    method: "POST",
+    headers: { Prefer: "resolution=ignore-duplicates" },
+    body: JSON.stringify(rows),
+  });
+  if (!write.ok) {
+    console.error("ai-gateway returning notes", write.status, await write.text());
+    return 0;
+  }
+  return rows.length;
+}
+
+/**
+ * Tomorrow against today, in one sentence, for the morning (night_notes,
+ * migration 0048). Today's calories come from the database in Cairo time so
+ * the comparison is the day the person lived, not the UTC one.
+ */
+async function writeNightNote(userId: string, day: string, today: string, meals: Meal[]): Promise<boolean> {
+  const kcalRes = await db("rpc/qamar_day_kcal", {
+    method: "POST",
+    body: JSON.stringify({ p_user_id: userId, p_day: today }),
+  });
+  const todayKcal = kcalRes.ok ? Number(await kcalRes.json()) || 0 : 0;
+  const plan = planKcal(meals);
+  const s = nightSentence({ planKcal: plan, todayKcal, meals: meals.length });
+  const res = await db("night_notes?on_conflict=user_id,day", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({
+      user_id: userId,
+      day,
+      sentence_ar: s.ar,
+      sentence_en: s.en,
+      plan_kcal: plan,
+      today_kcal: todayKcal,
+    }),
+  });
+  if (!res.ok) console.error("ai-gateway night note", userId, res.status, await res.text());
+  return res.ok;
+}
+
+/** True when the request carries the job's shared secret. Constant-time compare. */
+function cronAuthorized(req: Request): boolean | "unset" {
+  const expected = Deno.env.get("QAMAR_CRON_SECRET");
+  if (!expected) return "unset";
+  const given = req.headers.get("X-Qamar-Cron") ?? "";
+  if (given.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= given.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
 }
 
 // ---- entry --------------------------------------------------------------
@@ -1373,6 +2418,27 @@ async function generatePlan(userId: string, body: Record<string, unknown>): Prom
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
+
+  const route = new URL(req.url).pathname.replace(/^\/ai-gateway/, "").replace(/\/$/, "");
+
+  // The night job is the scheduler, not a person: a shared secret instead of
+  // a JWT, checked before anything else and never reachable with a user token.
+  if (route === "/plan/nightly") {
+    const ok = cronAuthorized(req);
+    if (ok === "unset") return json({ error: "QAMAR_CRON_SECRET is not set" }, 503);
+    if (!ok) return json({ error: "unauthorized" }, 401);
+    let force = false;
+    try {
+      const b = await req.json();
+      force = truthy(b?.force);
+    } catch { /* empty body */ }
+    try {
+      return json(await nightlyPlans(new Date(), force));
+    } catch (e) {
+      console.error("ai-gateway nightly", e);
+      return json({ error: "nightly error" }, 500);
+    }
+  }
 
   const userId = await authenticate(req);
   if (!userId) return json({ error: "unauthorized" }, 401);
@@ -1384,7 +2450,6 @@ Deno.serve(async (req) => {
     return json({ error: "invalid JSON" }, 400);
   }
 
-  const route = new URL(req.url).pathname.replace(/^\/ai-gateway/, "").replace(/\/$/, "");
   try {
     switch (route) {
       case "/chat/reply":
@@ -1399,6 +2464,23 @@ Deno.serve(async (req) => {
         });
       case "/plan/generate":
         return await generatePlan(userId, body);
+      case "/scan/barcode":
+        return await scanBarcode(userId, body as {
+          barcode?: string;
+          lang?: string;
+          date?: string;
+          grams?: number;
+        });
+      case "/scan/label":
+        return await scanLabel(userId, body as {
+          imageBase64?: string;
+          imageMediaType?: string;
+          lang?: string;
+          date?: string;
+          barcode?: string;
+          name?: string;
+          grams?: number;
+        });
       case "/scan/read":
         return await readBodyScan(userId, body as {
           imageBase64?: string;
@@ -1406,7 +2488,7 @@ Deno.serve(async (req) => {
           lang?: string;
         });
       case "/quota":
-        return json(quotaPayload(await quotaStatus(userId)));
+        return json(await quotaSnapshot(userId));
       default:
         return json({ error: `unknown route ${route}` }, 404);
     }

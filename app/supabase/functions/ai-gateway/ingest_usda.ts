@@ -52,7 +52,7 @@ const NUTRIENT_MAP: Record<number, string> = {
   1106: "vitamin_a_ug",
   1100: "iodine_ug",
   1051: "water_g",
-  // Added with the DRI seed in 0031. A target with no food values behind it is
+  // Added with the DRI seed in 0032. A target with no food values behind it is
   // a number the app can display and never act on, so the importer has to reach
   // these before the gap report means anything.
   1090: "magnesium_mg",

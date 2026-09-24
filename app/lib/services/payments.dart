@@ -5,8 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/billing.dart';
 
-/// Server-gateway for Qamar+. Paymob is the Egyptian collector — EGP, cards,
-/// Meeza, Vodafone Cash / Orange Cash. The app never holds a Paymob secret
+/// Server-gateway for Qamar+. Paymob is the Egyptian collector, in EGP; the
+/// rails it takes (card, Meeza, wallets) are the billing function's labelled
+/// integrations, which each quote names. The app never holds a Paymob secret
 /// and never marks someone Plus from a browser redirect.
 abstract class BillingGateway {
   Future<PlusQuote> quote({required String plan, String? promoCode});
@@ -18,8 +19,24 @@ abstract class BillingGateway {
     String? firstName,
   });
   Future<PlusEntitlement> entitlement();
+
+  /// Starts the free week. The server refuses a second one; the message
+  /// in the [BillingException] says why.
+  Future<PlusEntitlement> startTrial();
+
+  /// Where the earned month stands: logged days in the first 30 of membership.
+  Future<EarnedMonth> earnedMonth();
+
+  /// Grants the earned month once the days the server asks for are logged
+  /// (EarnedMonth.needed). The server re-checks;
+  /// the [BillingException] says why when it refuses.
+  Future<EarnedMonthClaim> claimEarnedMonth();
   Future<AffiliateWallet> affiliate();
   Future<AffiliateWallet> requestAffiliatePayout({int? amountCents});
+
+  /// The professional's clients who said yes to sharing, with this week's
+  /// adherence. Empty for anyone who is not a professional.
+  Future<List<ProClient>> affiliateClients();
 }
 
 class HttpBillingGateway implements BillingGateway {
@@ -103,6 +120,56 @@ class HttpBillingGateway implements BillingGateway {
   }
 
   @override
+  Future<PlusEntitlement> startTrial() async {
+    final res = await _client.post(
+      Uri.parse('$baseUrl/trial/start'),
+      headers: _headers,
+      body: jsonEncode({}),
+    );
+    if (res.statusCode != 200) {
+      String reason = 'trial failed: ${res.statusCode}';
+      try {
+        final body = jsonDecode(utf8.decode(res.bodyBytes));
+        if (body is Map && body['error'] is String) reason = body['error'] as String;
+      } catch (_) {}
+      throw BillingException(reason);
+    }
+    return PlusEntitlement.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<EarnedMonth> earnedMonth() async {
+    final res = await _client.post(Uri.parse('$baseUrl/earned'), headers: _headers, body: jsonEncode({}));
+    if (res.statusCode != 200) {
+      throw BillingException('earned month failed: ${res.statusCode} ${res.body}');
+    }
+    return EarnedMonth.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<EarnedMonthClaim> claimEarnedMonth() async {
+    final res = await _client.post(Uri.parse('$baseUrl/earned/claim'), headers: _headers, body: jsonEncode({}));
+    if (res.statusCode != 200) {
+      String reason = 'earned month claim failed: ${res.statusCode}';
+      try {
+        final body = jsonDecode(utf8.decode(res.bodyBytes));
+        if (body is Map && body['error'] is String) reason = body['error'] as String;
+      } catch (_) {}
+      throw BillingException(reason);
+    }
+    return EarnedMonthClaim.fromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<List<ProClient>> affiliateClients() async {
+    final res = await _client.post(Uri.parse('$baseUrl/affiliate/clients'), headers: _headers, body: jsonEncode({}));
+    if (res.statusCode != 200) {
+      throw BillingException('clients failed: ${res.statusCode} ${res.body}');
+    }
+    return ProClient.listFromJson(jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
+  }
+
+  @override
   Future<AffiliateWallet> affiliate() async {
     final res = await _client.post(
       Uri.parse('$baseUrl/affiliate'),
@@ -133,6 +200,12 @@ class HttpBillingGateway implements BillingGateway {
 
 /// Opens Paymob's hosted checkout in the system browser.
 Future<bool> openPaymobCheckout(String url) {
+  return launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+}
+
+/// Opens a partner's page in the system browser or their app — the grocery
+/// basket, for one. Same posture as checkout: the person sees the address.
+Future<bool> openExternalUrl(String url) {
   return launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
 }
 

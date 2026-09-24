@@ -7,19 +7,29 @@ import 'dart:ui' show Offset, Rect;
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:qamar/models/activity.dart';
+import 'package:qamar/models/basket.dart';
+import 'package:qamar/models/pending_write.dart';
+import 'package:qamar/models/plan.dart';
+import 'package:qamar/models/meal.dart';
 import 'package:qamar/models/messages.dart';
 import 'package:qamar/models/onboarding.dart';
-import 'package:qamar/models/plan.dart';
 import 'package:qamar/models/profile.dart';
+import 'package:qamar/models/quest.dart';
+import 'package:qamar/models/streak.dart';
 import 'package:qamar/models/su_economy.dart';
 import 'package:qamar/models/billing.dart';
 import 'package:qamar/models/water.dart';
 import 'package:qamar/services/ai_gateway.dart';
+import 'package:qamar/services/device_prefs.dart';
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/state/chat_replies.dart';
 import 'package:qamar/widgets/explain.dart';
-import 'package:qamar/widgets/tree_overlay.dart';
+import 'package:qamar/theme/colors.dart';
+import 'package:qamar/widgets/living_orb.dart';
+import 'package:qamar/widgets/log_sheet.dart';
+import 'package:qamar/widgets/tab_bar.dart';
 
 /// Long enough for answerStep's 260ms hand-off plus a margin.
 Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 500));
@@ -56,6 +66,8 @@ class PlanOnlyGateway extends HttpAiGateway {
 }
 
 void main() {
+  basketTests();
+  pendingWriteTests();
   group('Mifflin-St Jeor', () {
     test('applies the sex-specific constant', () {
       final male = AppState()..profile = const Profile(gender: Gender.male);
@@ -88,9 +100,10 @@ void main() {
   });
 
   group('Su Points scale', () {
-    test('a new wallet is level 1, a 2,500 signup is already level 3', () {
+    test('a new wallet is level 1, and signing up does not buy a level', () {
       expect(SuEconomy.levelFor(0), 1);
-      expect(SuEconomy.levelFor(SuEconomy.signupBonus), 3);
+      expect(SuEconomy.levelFor(SuEconomy.signupBonus), 1);
+      expect(SuEconomy.levelFor(SuEconomy.onboarding + SuEconomy.firstMeal + SuEconomy.mealLogged * 5), 3);
       expect(SuEconomy.levelFor(99 * SuEconomy.levelXp), 99);
       expect(SuEconomy.levelFor(200000), SuEconomy.maxLevel);
     });
@@ -99,72 +112,78 @@ void main() {
       expect(SuEconomy.dailyQuest, greaterThanOrEqualTo(100));
       expect(SuEconomy.mealLogged, greaterThanOrEqualTo(100));
       expect(SuEconomy.extraAiUse, greaterThanOrEqualTo(SuEconomy.mealLogged));
-      expect(SuEconomy.signupBonus, greaterThanOrEqualTo(1000));
+      expect(SuEconomy.signupBonus, 100, reason: 'the signup trigger (migration 0004) pays 100; the phone mirrors the ledger');
+    });
+  });
+
+  group('daily quest', () {
+    test('the phone has no way to pay the quest: nothing credits it, however often the card is used', () {
+      // The loop that used to mint (accept, replace, accept…) has no
+      // equivalent now: the card's only control puts the quest away, and the
+      // server pays it from the meal or glass that meets it (0061).
+      final state = AppState();
+      state.quest = DayQuest(kind: QuestKind.lunchBy16, done: false, expiresAt: DateTime.now().add(const Duration(hours: 2)));
+      final start = state.suAvailable;
+      for (var i = 0; i < 5; i++) {
+        state.skipQuest();
+      }
+      expect(state.suAvailable, start);
+      expect(state.ledger(), isEmpty);
+      expect(state.questDue, isFalse, reason: 'put away for the day');
+      state.dispose();
     });
   });
 
   group('Qamar+ Egypt billing', () {
-    test('is priced in EGP for Paymob, not a foreign store', () {
+    test('is priced in EGP for Paymob, one plan, 500 a month', () {
       expect(PlusCatalog.currency, 'EGP');
       expect(PlusCatalog.provider, 'paymob');
       expect(PlusCatalog.monthly.amountPounds, 500);
       expect(PlusCatalog.monthly.amountCents, 50000);
-      expect(PlusCatalog.quarterly.amountPounds, 249);
-      expect(PlusCatalog.annual.amountPounds, 249);
-      expect(PlusCatalog.annual.periodDays, 365);
-      expect(PlusCatalog.quarterly.periodDays, 90);
+      expect(PlusCatalog.monthly.periodDays, 30);
+      expect(PlusPlan.values, [PlusPlan.monthly]);
+      expect(PlusCatalog.byId('annual'), PlusCatalog.monthly);
     });
 
-    test('first users get 30% off the 500 list', () {
-      expect(PlusCatalog.firstUserOffPercent, 30);
-      expect(PlusCatalog.firstUserMonthlyCents, (PlusCatalog.listMonthlyCents * 0.7).round());
+    test('a first purchase costs the same as every other one', () {
       final q = PlusPricing.quote(plan: 'monthly', firstPurchase: true);
-      expect(q.amountPounds, 350);
-      expect(q.pricingReason, 'first_user');
+      expect(q.amountPounds, 500);
+      expect(q.pricingReason, 'list');
+      expect(q.discounted, isFalse);
     });
 
-    test('an affiliate code is 299 in, 50 to the marketer, 249 net', () {
+    test("a professional's code leaves the price alone and sends them 20% for 12 months", () {
       final q = PlusPricing.quote(
         plan: 'monthly',
         firstPurchase: true,
-        promo: const PlusPromo(code: 'QMR7K2P', kind: 'affiliate', ownerUserId: 'friend'),
-        buyerUserId: 'buyer',
+        promo: const PlusPromo(code: 'QMR7K2P', kind: 'affiliate', ownerUserId: 'dr-sara'),
+        buyerUserId: 'client',
       );
-      expect(q.amountPounds, 299);
-      expect(q.affiliateCommissionCents, 5000);
-      expect(q.amountCents - q.affiliateCommissionCents, PlusCatalog.affiliateNetCents);
-      expect(PlusCatalog.affiliateNetCents, PlusCatalog.packCents);
+      expect(q.amountPounds, 500);
+      expect(q.discounted, isFalse);
       expect(q.pricingReason, 'affiliate');
+      expect(q.affiliateCommissionCents, 10000);
+      expect(PlusCatalog.proShareCents, 10000);
+      expect(PlusCatalog.proShareMonths, 12);
+      expect(q.promoError, isNull);
     });
 
-    test('1 year is 50% off and matches the 3-month cash price', () {
-      final year = PlusPricing.quote(plan: 'annual', firstPurchase: false);
-      final three = PlusPricing.quote(plan: 'quarterly', firstPurchase: false);
-      expect(year.amountPounds, 249);
-      expect(three.amountPounds, 249);
-      expect(year.pricingReason, 'annual_half');
-      expect(three.pricingReason, 'quarterly_pack');
-    });
-
-    test('you cannot use your own affiliate code', () {
+    test('you cannot use your own code', () {
       final q = PlusPricing.quote(
         plan: 'monthly',
         firstPurchase: true,
         promo: const PlusPromo(code: 'QMR7K2P', kind: 'affiliate', ownerUserId: 'me'),
         buyerUserId: 'me',
       );
-      expect(q.amountPounds, 350);
+      expect(q.amountPounds, 500);
       expect(q.affiliateCommissionCents, 0);
       expect(q.promoError, isNotNull);
     });
 
-    test('affiliate cash is not Su Points', () {
+    test('the professional is paid in EGP, not Su Points', () {
       expect(AffiliateWallet.empty.currency, 'EGP');
       expect(AffiliateWallet.empty.canRedeem, isFalse);
-      expect(
-        const AffiliateWallet(balanceCents: 5000).canRedeem,
-        isTrue,
-      );
+      expect(const AffiliateWallet(balanceCents: 5000).canRedeem, isTrue);
     });
   });
 
@@ -241,31 +260,42 @@ void main() {
   });
 
   group('eligibility gate', () {
+    final dob = kOnboardingSteps.indexWhere((s) => s.id == 'dob');
+    final targetInputs = ['gender', 'body', 'activity'].map((id) => kOnboardingSteps.indexWhere((s) => s.id == id));
+
+    test('the date of birth comes after the goal and before every question that feeds the target', () {
+      expect(dob, greaterThan(kOnboardingSteps.indexWhere((s) => s.id == 'goal')));
+      for (final i in targetInputs) {
+        expect(dob, lessThan(i), reason: 'the 18+ gate runs before any target input');
+      }
+    });
+
     test('an under-18 birth date blocks before any target is calculated', () async {
       final state = AppState();
-      expect(kOnboardingSteps.first.id, 'dob');
-
+      state.step = dob;
       state.profile = state.profile.copyWith(age: 15);
       state.primarySubmit();
       await settle();
 
       expect(state.blocked, isTrue);
       expect(state.minor, isTrue);
-      expect(state.step, 0, reason: 'must not advance past the gate');
+      expect(state.step, dob, reason: 'must not advance past the gate');
     });
 
     test('an adult birth date advances', () async {
       final state = AppState();
+      state.step = dob;
       state.profile = state.profile.copyWith(age: 30);
       state.primarySubmit();
       await settle();
 
       expect(state.blocked, isFalse);
-      expect(state.step, 1);
+      expect(state.step, dob + 1);
     });
 
     test('exactly 18 is allowed', () async {
       final state = AppState();
+      state.step = dob;
       state.profile = state.profile.copyWith(age: 18);
       state.primarySubmit();
       await settle();
@@ -293,6 +323,8 @@ void main() {
   });
 
   secondRound();
+  streakAndOrb();
+  gesturesAndDigits();
   languageTests();
 
   group('explain registry', () {
@@ -312,9 +344,193 @@ void main() {
     test('every explainable id used in the UI has copy behind it', () {
       // Guards against wiring up an Explainable whose id has no entry, which
       // would open an empty sheet.
-      for (final id in ['kcal_remaining', 'protein', 'carbs', 'fat', 'su_points', 'level', 'plan_total', 'target_kcal', 'water']) {
+      for (final id in ['kcal_remaining', 'protein', 'carbs', 'fat', 'su_points', 'level', 'plan_total', 'target_kcal', 'water', 'streak']) {
         expect(kExplanations[id], isNotNull, reason: 'missing explanation for "$id"');
       }
+    });
+  });
+}
+
+void gesturesAndDigits() {
+  group('three gestures, taught by doing', () {
+    test('the card stays until each gesture has actually been made', () async {
+      final state = AppState();
+      expect(state.orbTutorialDone, isFalse);
+      expect(state.gesturesLearned, isEmpty);
+
+      state.orbTap();
+      expect(state.gesturesLearned, {OrbGesture.tap});
+      expect(state.orbTutorialDone, isFalse);
+
+      await state.holdOrb();
+      expect(state.gesturesLearned, containsAll([OrbGesture.tap, OrbGesture.hold]));
+      expect(state.orbTutorialDone, isFalse);
+
+      state.openExplain(kExplanations['protein']!);
+      expect(state.orbTutorialDone, isTrue);
+    });
+
+    test('“Got it” dismisses it without pretending the gestures were learned', () {
+      final state = AppState();
+      state.dismissOrbTutorial();
+      expect(state.orbTutorialDone, isTrue);
+      expect(state.gesturesLearned, isEmpty);
+    });
+
+    test('a phone remembers that it has been taught', () async {
+      final prefs = MemoryDevicePrefs();
+      final first = AppState(prefs: prefs);
+      first.orbTap();
+      await first.holdOrb();
+      first.openExplain(kExplanations['protein']!);
+      await Future<void>.delayed(Duration.zero);
+
+      final second = AppState(prefs: prefs);
+      await Future<void>.delayed(Duration.zero);
+      expect(second.orbTutorialDone, isTrue, reason: 'the same phone, a new launch');
+
+      expect(AppState(prefs: MemoryDevicePrefs()).orbTutorialDone, isFalse, reason: 'a different phone starts fresh');
+    });
+  });
+
+  group('digits', () {
+    test('Arabic draws ٠١٢ by default and can switch to 012; English is untouched', () async {
+      final state = AppState();
+      expect(state.isAr, isTrue);
+      expect(state.iso('82'), '\u2066٨٢\u2069');
+      expect(state.formatSu(2500), '٢٬٥٠٠');
+
+      state.setEasternDigits(false);
+      expect(state.iso('82'), '\u206682\u2069');
+      expect(state.formatSu(2500), '2,500');
+
+      state.setLang(AppLang.en);
+      state.setEasternDigits(true);
+      expect(state.iso('82'), '\u206682\u2069', reason: 'the preference is Arabic-only');
+    });
+
+    test('the choice survives a relaunch on the same phone', () async {
+      final prefs = MemoryDevicePrefs();
+      AppState(prefs: prefs).setEasternDigits(false);
+      await Future<void>.delayed(Duration.zero);
+      final again = AppState(prefs: prefs);
+      await Future<void>.delayed(Duration.zero);
+      expect(again.easternDigits, isFalse);
+    });
+
+    test('EGP follows the same preference', () {
+      expect(formatEgp(500, ar: true), '٥٠٠ ج.م');
+      expect(formatEgp(500, ar: true, eastern: false), '500 ج.م');
+      expect(formatEgp(500, ar: false), 'EGP 500');
+    });
+  });
+}
+
+void streakAndOrb() {
+  final today = DateTime(2026, 9, 20);
+  DateTime ago(int d) => today.subtract(Duration(days: d));
+
+  group('streak', () {
+    test('consecutive logged days count back from yesterday when today is empty', () {
+      final s = Streak.fromDays([ago(1), ago(2), ago(3)], today: today);
+      expect(s.current, 3);
+      expect(s.todayCounted, isFalse);
+      expect(s.atRisk, isTrue);
+    });
+
+    test('today counts as soon as it has a meal', () {
+      final s = Streak.fromDays([today, ago(1)], today: today);
+      expect(s.current, 2);
+      expect(s.todayCounted, isTrue);
+      expect(s.atRisk, isFalse);
+    });
+
+    test('a gap two days ago ends the run there, but the old run is still the best', () {
+      final s = Streak.fromDays([today, ago(1), ago(3), ago(4), ago(5), ago(6)], today: today);
+      expect(s.current, 2);
+      expect(s.best, 4);
+    });
+
+    test('a frozen day bridges the gap; the client never invents one', () {
+      final s = Streak.fromDays([today, ago(1), ago(3)], today: today, frozenDays: [ago(2)]);
+      expect(s.current, 4);
+      expect(s.frozenDays, [ago(2)]);
+      expect(Streak.fromDays([today, ago(1), ago(3)], today: today).current, 2);
+    });
+
+    test('nothing logged is zero, not at risk', () {
+      final s = Streak.fromDays(const [], today: today);
+      expect(s.current, 0);
+      expect(s.atRisk, isFalse);
+    });
+
+    test('the server snapshot parses', () {
+      final s = Streak.fromJson({'current': 4, 'best': 9, 'today_counted': true, 'freezes_available': 1, 'frozen_days': ['2026-09-17']});
+      expect(s.current, 4);
+      expect(s.best, 9);
+      expect(s.todayCounted, isTrue);
+      expect(s.freezesAvailable, 1);
+      expect(s.frozenDays.single, DateTime(2026, 9, 17));
+    });
+  });
+
+  group('orb state', () {
+    test('an empty day is unknown: the moon at rest, never a dark crescent, and no meals counted', () {
+      final o = OrbState.derive(consumedKcal: 0, targetKcal: 2000, mealsToday: 0, planSlots: 3, streak: Streak.none);
+      expect(o.day, OrbDay.unknown);
+      expect(o.fill, 0);
+      expect(o.glow, 0);
+      expect(o.over, isFalse);
+      expect(o.moonPhase, isNull, reason: 'the resting drift, as on every screen not reading a day; it used to pin 0.92, near dark');
+    });
+
+    test('a day at target is a near-full moon', () {
+      final o = OrbState.derive(consumedKcal: 2000, targetKcal: 2000, mealsToday: 3, planSlots: 3, streak: Streak.none);
+      expect(o.fill, 1);
+      expect(o.glow, 1);
+      expect(o.moonPhase, closeTo(0.06, 1e-9));
+      expect(o.over, isFalse);
+    });
+
+    test('running over the target warms the glow instead of filling further', () {
+      final o = OrbState.derive(consumedKcal: 2600, targetKcal: 2000, mealsToday: 4, planSlots: 3, streak: Streak.none);
+      expect(o.fill, 1);
+      expect(o.over, isTrue);
+    });
+
+    test('without a plan the glow reads meals against three', () {
+      final o = OrbState.derive(consumedKcal: 600, targetKcal: 2000, mealsToday: 1, planSlots: 0, streak: Streak.none);
+      expect(o.glow, closeTo(1 / 3, 1e-9));
+    });
+
+    test('the state follows the app: logging a meal fills the moon and starts the ring', () {
+      final state = AppState();
+      final before = state.orbState();
+      expect(before.fill, 0);
+      expect(before.streak.current, 0);
+
+      state.meals.add(const LoggedMeal(name: 'Koshary', sub: 'typed', kcal: 700, p: 16, c: 120, f: 10));
+      final after = state.orbState();
+      expect(after.fill, greaterThan(0));
+      expect(after.streak.current, 1);
+      expect(after.streak.todayCounted, isTrue);
+    });
+  });
+
+  group('streak ring', () {
+    test('fills one segment a day and closes at seven', () {
+      expect(StreakRingPainter.fraction(0), 0);
+      expect(StreakRingPainter.fraction(1), closeTo(1 / 7, 1e-9));
+      expect(StreakRingPainter.fraction(7), 1);
+      expect(StreakRingPainter.fraction(8), closeTo(1 / 7, 1e-9));
+      expect(StreakRingPainter.fraction(14), 1);
+    });
+
+    test('the ring thickens with the run, in the one burgundy (no colour warms)', () {
+      expect({for (final n in [1, 3, 7, 30]) StreakRingPainter.colorFor(n)}, {QColors.accentInk});
+      expect(StreakRingPainter.weightScale(1), lessThan(StreakRingPainter.weightScale(3)));
+      expect(StreakRingPainter.weightScale(3), lessThan(StreakRingPainter.weightScale(7)));
+      expect(StreakRingPainter.weightScale(7), StreakRingPainter.weightScale(30));
     });
   });
 }
@@ -414,50 +630,75 @@ void secondRound() {
     });
   });
 
-  group('orb radial menu', () {
-    test('hold opens the menu and clears any stale hover', () {
-      final state = AppState();
-      state.openTreeHold();
-      expect(state.treeOpen, isTrue);
-      expect(state.treeHold, isTrue);
-      expect(state.treeHoverNode, isNull);
-      expect(state.treeLogExpanded, isFalse);
+  group('the orb and the Log sheet', () {
+    test('tapping the orb on Today opens the Log sheet, and again closes it', () {
+      final state = AppState()..go(AppScreen.today);
+      state.orbTap();
+      expect(state.logOpen, isTrue);
+      state.orbTap();
+      expect(state.logOpen, isFalse);
     });
 
-    test('ending the hold tears down all menu state', () {
-      final state = AppState()..openTreeHold();
-      state.setTreeHover(1, null);
-      state.expandTreeLog(1);
-      state.endTreeHold();
+    test('on every tab the tap is the Log sheet, over the page it is on: the tabs are the way between pages', () {
+      for (final s in AppState.tabScreens) {
+        final state = AppState()..go(s);
+        state.orbTap();
+        expect(state.screen, s, reason: 'from $s: no page changes');
+        expect(state.logOpen, isTrue, reason: 'from $s');
+      }
+    });
 
-      expect(state.treeHold, isFalse);
-      expect(state.treeHoverNode, isNull);
-      expect(state.treeHoverSub, isNull);
-      expect(state.treeLogExpanded, isFalse);
+    test('holding the orb opens the conversation and tries to listen for real', () async {
+      // No Dictation injected — the device has no recogniser, as far as this
+      // AppState is concerned.
+      final state = AppState()..go(AppScreen.today);
+      state.toggleLog();
+      await state.holdOrb();
+
+      expect(state.chatOpen, isTrue);
+      expect(state.logOpen, isFalse, reason: 'the menu folds when the conversation opens');
+      // It must NOT pretend to listen: it reports that dictation is unavailable
+      // and leaves typing open, and nothing is said on the user's behalf.
+      expect(state.chatState, ChatState.idle);
+      expect(state.dictationError, isNotNull);
+      expect(state.chat.any((c) => c.who == ChatWho.u), isFalse);
+    });
+
+    test('the Log sheet holds every way to log at once, nothing a level down', () {
+      expect(kLogMethods.map((m) => m.kind).toList(), [QuickLog.voice, QuickLog.text, QuickLog.photo]);
+      expect(kWaterChoices.map((c) => c.unit).toSet(), WaterUnit.values.toSet());
+      expect(kActivityChoices.map((a) => a.kind).toSet(), ActivityKind.values.toSet());
+      final state = AppState()..toggleLog();
+      state.closeLog();
+      expect(state.logOpen, isFalse);
+    });
+
+    test('one tap on a water unit logs it and closes the sheet', () {
+      final state = AppState()..toggleLog();
+      final before = state.screen;
+      state.quickWater(WaterUnit.tea);
+      expect(state.logOpen, isFalse);
+      expect(state.water.ml, Water.teaMl);
+      expect(state.screen, before, reason: 'water never pushes a page');
+      expect(kWaterChoices.map((c) => c.unit).toSet(), WaterUnit.values.toSet());
     });
 
     test('quick logging opens the conversation and never changes screen', () {
-      final state = AppState()..openTreeHold();
+      final state = AppState()..toggleLog();
       final before = state.screen;
       state.quickLog(QuickLog.text);
 
-      expect(state.treeOpen, isFalse);
-      expect(state.treeHold, isFalse);
+      expect(state.logOpen, isFalse);
       expect(state.chatOpen, isTrue);
       expect(state.screen, before, reason: 'logging must not push a page');
     });
 
     test('speaking opens the conversation and tries to listen for real', () async {
-      // No Dictation injected — the device has no recogniser, as far as this
-      // AppState is concerned.
-      final state = AppState()..openTreeHold();
+      final state = AppState()..toggleLog();
       state.quickLog(QuickLog.voice);
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
       expect(state.chatOpen, isTrue);
-      // It must NOT pretend to listen. The old implementation sat in
-      // `listening` for 1.5s and then inserted a scripted sentence; the real
-      // one reports that dictation is unavailable and leaves typing open.
       expect(state.chatState, ChatState.idle);
       expect(state.dictationError, isNotNull);
       expect(state.chat.any((c) => c.who == ChatWho.u), isFalse,
@@ -489,38 +730,30 @@ void secondRound() {
       expect(state.chat.any((c) => c.who == ChatWho.u), isTrue);
     });
 
-    test('photographing a meal without Qamar+ opens the paywall', () {
+    test('photographing a meal needs no Qamar+: Lite gets three a day', () {
       final state = AppState();
       state.setLang(AppLang.en);
+      expect(state.plusActive, isFalse);
+      expect(state.photoQuota.remaining, SuEconomy.litePhotoDaily);
+
       state.quickLog(QuickLog.photo);
 
-      expect(state.screen, AppScreen.subscription);
-      expect(state.plusNotice, contains('Qamar+'));
-      expect(state.chatOpen, isFalse);
-      expect(state.lastMealPhotoPath, isNull);
+      expect(state.screen, isNot(AppScreen.subscription));
+      expect(state.plusNotice, isNull);
     });
 
-    test('the log methods sit on distinct ring positions', () {
-      final seen = <Offset>{};
-      for (var i = 0; i < kLogMethods.length; i++) {
-        final c = TreeGeometry.localSubCenter(1, i);
-        for (final other in seen) {
-          // Overlapping circles were why only one of them could be tapped.
-          expect((c - other).distance, greaterThan(60), reason: 'methods overlap');
-        }
-        seen.add(c);
-      }
-      expect(seen.length, kLogMethods.length);
+    test('the three ways to say a meal are the blueprint’s speak, type and photo; the movements are the ones people name', () {
+      expect(kLogMethods.map((m) => m.labelEn).toList(), ['Speak', 'Type', 'Photo']);
+      expect(kActivityChoices.map((a) => a.kind).toSet(), ActivityKind.values.toSet());
+      expect(ActivityCatalog.kcalFor(ActivityKind.football, 30, 82), 287, reason: '7 MET × 82 kg × 0.5 h');
+      expect(ActivityCatalog.kcalFor(ActivityKind.walk, 60, 70), 245);
     });
 
-    test('exactly one node is the log action, and it has no destination', () {
-      final logs = kTreeNodes.where((n) => n.action == TreeAction.log).toList();
-      expect(logs.length, 1);
-      expect(logs.single.screen, isNull, reason: 'logging must not open a page');
-    });
-
-    test('the tree still reaches the wallet', () {
-      expect(kTreeNodes.any((n) => n.screen == AppScreen.wallet), isTrue);
+    test('the tabs are Today, Progress, Plan and Me, each named by its page; the wallet lives under Me', () {
+      final state = AppState()..setLang(AppLang.en);
+      expect(kTabs.map((t) => t.screen).toList(), [AppScreen.today, AppScreen.progress, AppScreen.plan, AppScreen.you]);
+      expect(kTabs.map((t) => t.label(state)).toList(), ['Today', 'Progress', 'Plan', 'Me']);
+      expect(kTabs.any((t) => t.screen == AppScreen.wallet), isFalse);
     });
   });
 
@@ -570,6 +803,7 @@ void languageTests() {
 
     test('switching mid-onboarding keeps answers and position', () async {
       final state = AppState();
+      state.step = kOnboardingSteps.indexWhere((s) => s.id == 'dob');
       state.profile = state.profile.copyWith(age: 30);
       state.primarySubmit();
       await settle();
@@ -596,14 +830,22 @@ void languageTests() {
       }
     });
 
-    test('tree and log labels are translated', () {
-      for (final n in kTreeNodes) {
-        expect(n.label(true).trim(), isNotEmpty);
-        expect(n.label(false).trim(), isNotEmpty);
-        expect(n.label(true), isNot(n.label(false)));
+    test('the tabs and the Log sheet are translated', () {
+      final ar = AppState()..setLang(AppLang.ar);
+      final en = AppState()..setLang(AppLang.en);
+      for (final t in kTabs) {
+        expect(t.label(ar).trim(), isNotEmpty);
+        expect(t.label(en).trim(), isNotEmpty);
+        expect(t.label(ar), isNot(t.label(en)));
       }
       for (final m in kLogMethods) {
         expect(m.label(true), isNot(m.label(false)));
+      }
+      for (final w in kWaterChoices) {
+        expect(w.label(true), isNot(w.label(false)));
+      }
+      for (final a in kActivityChoices) {
+        expect(a.label(true), isNot(a.label(false)));
       }
     });
 
@@ -615,6 +857,83 @@ void languageTests() {
         expect(e.value.soWhatAr.trim(), isNotEmpty, reason: e.key);
         expect(e.value.soWhatEn.trim(), isNotEmpty, reason: e.key);
       }
+    });
+  });
+}
+
+void basketTests() {
+  const koshary = (ar: 'كشري', en: 'Koshary', amountAr: 'طبق', amountEn: '1 bowl', kcal: 520);
+  const salad = (ar: 'سلطة', en: 'Salad', amountAr: 'طبق صغير', amountEn: '1 small plate', kcal: 60);
+  const chicken = (ar: 'فراخ مشوية', en: 'Grilled chicken', amountAr: 'ربع', amountEn: '1/4', kcal: 290);
+  const lunch = (
+    id: 'lunch', slotAr: 'غدا', slotEn: 'Lunch', nameAr: 'كشري', nameEn: 'Koshary', noteAr: '', noteEn: '',
+    portions: <PlanPortion>[koshary, salad],
+  );
+  const dinner = (
+    id: 'dinner', slotAr: 'عشا', slotEn: 'Dinner', nameAr: 'فراخ', nameEn: 'Chicken', noteAr: '', noteEn: '',
+    portions: <PlanPortion>[chicken, salad],
+  );
+
+  group('shop this plan', () {
+    test('the basket is every distinct portion of the day, first occurrence wins', () {
+      final b = GroceryBasket.fromMeals(const [lunch, dinner]);
+      expect(b.lines.map((l) => l.en).toList(), ['Koshary', 'Salad', 'Grilled chicken']);
+      expect(b.count, 3);
+      expect(b.lines[1].amount(ar: true), 'طبق صغير');
+    });
+
+    test('a template with placeholders is filled and encoded; one without gets query parameters', () {
+      final b = GroceryBasket.fromMeals(const [lunch]);
+      const templated = GroceryPartner(url: 'https://partner.example/basket?q={items}&aff={ref}&l={lang}', name: 'Breadfast', ref: 'qamar aff');
+      final u = b.link(templated, ar: false);
+      expect(u.toString(), 'https://partner.example/basket?q=Koshary%2CSalad&aff=qamar%20aff&l=en');
+
+      const plain = GroceryPartner(url: 'https://partner.example/basket?src=qamar', name: 'Rabbit', ref: 'QMR');
+      final v = b.link(plain, ar: true);
+      expect(v.queryParameters['src'], 'qamar', reason: 'the partner’s own parameters are kept');
+      expect(v.queryParameters['items'], 'كشري,سلطة');
+      expect(v.queryParameters['ref'], 'QMR');
+      expect(v.queryParameters['lang'], 'ar');
+    });
+
+    test('no partner, no shopping', () {
+      expect(GroceryPartner.none.enabled, isFalse);
+      expect(const GroceryPartner(url: '  ', name: 'x', ref: '').enabled, isFalse);
+    });
+  });
+}
+
+void pendingWriteTests() {
+  group('the queue’s wire shape', () {
+    test('every durable write round-trips through JSON', () {
+      final meal = LoggedMeal(name: 'Koshary', sub: 'Lunch', kcal: 520, p: 14, c: 90, f: 10, at: DateTime.utc(2026, 9, 21, 13));
+      final item = const ConfirmItemDef(ar: 'كشري', en: 'Koshary', portionAr: 'طبق', portionEn: '1 bowl', conf: Confidence.high, kcal: 520, p: 14, c: 90, f: 10, qamarFoodId: 'food-1', grams: 350, portionMatched: true);
+      final sip = WaterSip(unit: WaterUnit.tea, ml: 150, at: DateTime.utc(2026, 9, 21, 9));
+      final act = ActivityLog(kind: ActivityKind.run, minutes: 25, kcal: 290, at: DateTime.utc(2026, 9, 21, 18));
+
+      final writes = [
+        PendingWrite(kind: PendingKind.meal, payload: {'meal': meal.toJson(), 'items': [{'def': item.toJson(), 'qty': 2}], 'input': 'text', 'raw': 'koshary'}, at: DateTime.utc(2026, 9, 21, 13)),
+        PendingWrite(kind: PendingKind.water, payload: sip.toJson(), at: DateTime.utc(2026, 9, 21, 9), attempts: 2),
+        PendingWrite(kind: PendingKind.activity, payload: act.toJson(), at: DateTime.utc(2026, 9, 21, 18)),
+      ];
+      final back = PendingWrite.decode(PendingWrite.encode(writes));
+      expect(back.map((w) => w.kind).toList(), [PendingKind.meal, PendingKind.water, PendingKind.activity]);
+      expect(back[1].attempts, 2);
+
+      final m = LoggedMeal.fromJson((back[0].payload['meal'] as Map).cast<String, dynamic>());
+      expect((m.name, m.kcal, m.at), ('Koshary', 520, DateTime.utc(2026, 9, 21, 13)));
+      final d = ConfirmItemDef.fromJson(((back[0].payload['items'] as List).first['def'] as Map).cast<String, dynamic>());
+      expect((d.en, d.conf, d.qamarFoodId, d.grams, d.portionMatched), ('Koshary', Confidence.high, 'food-1', 350.0, true));
+      final w = WaterSip.fromJson(back[1].payload);
+      expect((w.unit, w.ml), (WaterUnit.tea, 150));
+      final a = ActivityLog.fromJson(back[2].payload);
+      expect((a.kind, a.minutes, a.kcal), (ActivityKind.run, 25, 290));
+    });
+
+    test('garbage in the preferences is an empty queue, not a crash', () {
+      expect(PendingWrite.decode(null), isEmpty);
+      expect(PendingWrite.decode('not json'), isEmpty);
+      expect(PendingWrite.decode('[{"kind":"teleport","payload":{},"at":"2026-09-21T00:00:00Z"}]'), isEmpty);
     });
   });
 }

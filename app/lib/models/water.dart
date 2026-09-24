@@ -12,15 +12,22 @@ class Water {
   /// A small bottle. Two glasses, six bottles to the 3 L goal.
   static const bottleMl = 500;
 
+  /// A glass of tea — the Egyptian one, not a mug. Counts toward the total:
+  /// tea is water with leaves in it, whatever the sugar does elsewhere.
+  static const teaMl = 200;
+
   /// Starting point from Qamar's hydration note: two to three litres a day
   /// for an adult; Egypt heat sits at the top of that range.
   static const goalMl = 3000;
 
-  static int mlFor(WaterUnit unit) =>
-      unit == WaterUnit.glass ? glassMl : bottleMl;
+  static int mlFor(WaterUnit unit) => switch (unit) {
+        WaterUnit.glass => glassMl,
+        WaterUnit.bottle => bottleMl,
+        WaterUnit.tea => teaMl,
+      };
 }
 
-enum WaterUnit { glass, bottle }
+enum WaterUnit { glass, bottle, tea }
 
 class WaterSip {
   final String? id;
@@ -35,6 +42,14 @@ class WaterSip {
     required this.at,
   });
 
+  Map<String, dynamic> toJson() => {'unit': unit.name, 'ml': ml, 'at': at.toIso8601String()};
+
+  factory WaterSip.fromJson(Map<String, dynamic> j) => WaterSip(
+        unit: WaterUnit.values.asNameMap()[j['unit']?.toString()] ?? WaterUnit.glass,
+        ml: (j['ml'] as num?)?.round() ?? 0,
+        at: DateTime.tryParse(j['at']?.toString() ?? '') ?? DateTime.now(),
+      );
+
   WaterSip copyWith({String? id}) => WaterSip(
         id: id ?? this.id,
         unit: unit,
@@ -46,14 +61,16 @@ class WaterSip {
 /// Four numbers the Today card shows. All derived from millilitres.
 class WaterStatus {
   final int ml;
-  const WaterStatus(this.ml);
+
+  /// The day's goal: three litres, or the fasting day's two.
+  final int goalMl;
+  const WaterStatus(this.ml, {this.goalMl = Water.goalMl});
 
   double get litres => ml / 1000;
-  double get litresLeft =>
-      ((Water.goalMl - ml).clamp(0, Water.goalMl)) / 1000;
+  double get litresLeft => ((goalMl - ml).clamp(0, goalMl)) / 1000;
   double get glasses => ml / Water.glassMl;
   double get bottles => ml / Water.bottleMl;
-  double get progress => (ml / Water.goalMl).clamp(0, 1).toDouble();
+  double get progress => (ml / goalMl).clamp(0, 1).toDouble();
   bool get isEmpty => ml <= 0;
 
   /// 3, 1.5, 0.25 — no trailing zeros.

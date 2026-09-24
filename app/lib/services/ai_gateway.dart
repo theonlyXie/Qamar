@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -52,6 +53,102 @@ class ChatResult {
   bool get changedPlan => plan != null || (rebuildInstruction != null && rebuildInstruction!.trim().isNotEmpty);
 }
 
+/// What came back from scanning a packet — either its barcode or its printed
+/// nutrition panel.
+///
+/// Both routes answer in the same shape on purpose. A barcode miss is answered
+/// by photographing the panel, so the app hands the two results to the same
+/// screen and the person never learns there were two mechanisms.
+///
+/// [found] false is a real answer, not a failure: the packet is not in any
+/// catalogue yet, or the panel could not be read. [reply] then says what to do
+/// instead, and there are no numbers to show — which is the point. An invented
+/// packet is worse than an admitted gap.
+class ScanResult {
+  final bool found;
+
+  /// Why the panel was rejected, when it was: `blurry`, `partial`,
+  /// `implausible_energy`, `macros_disagree`. Null for a barcode miss.
+  final String? problem;
+
+  final String reply;
+  final String? barcode;
+  final String? name;
+  final String? brand;
+
+  /// How much of it was eaten, and how that was decided. [portionAssumed] is
+  /// the honest flag: the packet named no weight, 100 g was used, and the app
+  /// should ask rather than assert.
+  final int grams;
+  final String? portionLabel;
+  final bool portionAssumed;
+
+  final int kcal;
+  final int proteinG;
+  final int carbsG;
+  final int fatG;
+
+  /// The day's arithmetic, all of it done on the server.
+  final int? targetKcal;
+  final int? eatenKcal;
+  final int? remainingKcal;
+
+  /// Qamar's judgement on whether the rest of the day still works.
+  final bool? fits;
+
+  /// A menu the gateway has already saved, and already checked against the
+  /// person's allergies. Present only when Qamar decided something should move.
+  final DayPlan? plan;
+  final String? rebuildInstruction;
+
+  /// Panel-reading provenance: `per_100g` or `per_serving`, and whether the
+  /// energy figure was converted from kilojoules. Worth showing, because a
+  /// converted number is a number somebody may want to check.
+  final String? basis;
+  final bool energyFromKj;
+  final String? note;
+
+  const ScanResult({
+    required this.found,
+    required this.reply,
+    this.problem,
+    this.barcode,
+    this.name,
+    this.brand,
+    this.grams = 0,
+    this.portionLabel,
+    this.portionAssumed = false,
+    this.kcal = 0,
+    this.proteinG = 0,
+    this.carbsG = 0,
+    this.fatG = 0,
+    this.targetKcal,
+    this.eatenKcal,
+    this.remainingKcal,
+    this.fits,
+    this.plan,
+    this.rebuildInstruction,
+    this.basis,
+    this.energyFromKj = false,
+    this.note,
+  });
+
+  /// What to put on the log line. Brand first when there is one, because that
+  /// is how the packet is recognised on a shelf.
+  String get displayName {
+    final n = (name ?? '').trim();
+    if (n.isEmpty) return '';
+    return n;
+  }
+
+  bool get changedPlan =>
+      plan != null || (rebuildInstruction != null && rebuildInstruction!.trim().isNotEmpty);
+
+  /// True when the panel was read but the portion is a guess. The screen turns
+  /// this into a question instead of printing a number as though it were known.
+  bool get needsPortion => found && portionAssumed;
+}
+
 /// A generated day of eating, plus why it was built that way.
 class DayPlan {
   /// Each slot's meal and the alternative offered for it, in slot order.
@@ -81,16 +178,48 @@ abstract class AiGateway {
     String lang = 'ar',
   });
 
+  /// [imagePath] is a photo taken inside the conversation — a restaurant
+  /// menu, a label, a plate — read alongside the words. The gateway meters it
+  /// as a photo, not a question, and [message] may be empty with it.
   Future<ChatResult> chatReply({
     required String message,
     required String lang,
     String? date,
     Map<String, dynamic>? currentPlan,
     List<String>? swappedSlots,
+    String? imagePath,
   });
 
   /// Reads an InBody or similar body-composition printout.
   Future<BodyScan> readBodyScan({required String imagePath, required String lang});
+
+  /// Reads the printed nutrition panel on a packet.
+  ///
+  /// [grams] is how much was eaten. Leave it null on the first call: the
+  /// gateway works out a portion from the pack weight or serving size printed
+  /// on the packaging and says whether it had to assume. Send it on the second
+  /// call, once the person has answered.
+  ///
+  /// [barcode] is optional and worth sending when the scan followed a barcode
+  /// miss — the panel then becomes the catalogue entry for that code, and
+  /// nobody has to photograph that packet again.
+  Future<ScanResult> scanLabel({
+    required String imagePath,
+    required String lang,
+    String? date,
+    String? barcode,
+    String? name,
+    int? grams,
+  });
+
+  /// Looks a packet up by its barcode: the food graph first, then Open Food
+  /// Facts, then USDA Branded.
+  Future<ScanResult> scanBarcode({
+    required String barcode,
+    required String lang,
+    String? date,
+    int? grams,
+  });
 
   /// Builds the day's meals around the person's target and exclusions.
   /// [date] is ISO yyyy-MM-dd; the gateway stores the result against it.
@@ -103,8 +232,8 @@ abstract class AiGateway {
     String? instruction,
   });
 
-  /// Remaining shared uses for chat, photographing a meal, and the plan today.
-  Future<AiQuota> quotaStatus();
+  /// Every bucket's counters for today: photos, questions, plan rebuilds.
+  Future<AiQuotas> quotaStatus();
 }
 
 /// Talks to your own server gateway (supabase/functions/ai-gateway). The
@@ -194,8 +323,10 @@ class HttpAiGateway implements AiGateway {
     String? date,
     Map<String, dynamic>? currentPlan,
     List<String>? swappedSlots,
+    String? imagePath,
   }) async {
     final day = date ?? DateTime.now().toIso8601String().substring(0, 10);
+    final (data: imageBase64, mediaType: imageMediaType) = await _encode(imagePath);
     final res = await _client.post(
       Uri.parse('$baseUrl/chat/reply'),
       headers: _headers,
@@ -205,6 +336,8 @@ class HttpAiGateway implements AiGateway {
         'date': day,
         if (currentPlan != null) 'current_plan': currentPlan,
         if (swappedSlots != null && swappedSlots.isNotEmpty) 'swapped_slots': swappedSlots,
+        if (imageBase64 != null) 'imageBase64': imageBase64,
+        if (imageMediaType != null) 'imageMediaType': imageMediaType,
       }),
     );
     if (res.statusCode == 429) {
@@ -240,6 +373,126 @@ class HttpAiGateway implements AiGateway {
   }
 
   static int? _nullableInt(Object? v) => v is num ? v.round() : null;
+
+  @override
+  Future<ScanResult> scanLabel({
+    required String imagePath,
+    required String lang,
+    String? date,
+    String? barcode,
+    String? name,
+    int? grams,
+  }) async {
+    final (data: imageBase64, mediaType: imageMediaType) = await _encode(imagePath);
+    if (imageBase64 == null) {
+      throw AiGatewayException('scanLabel needs a photo of the panel');
+    }
+    final day = date ?? DateTime.now().toIso8601String().substring(0, 10);
+    final res = await _client.post(
+      Uri.parse('$baseUrl/scan/label'),
+      headers: _headers,
+      body: jsonEncode({
+        'imageBase64': imageBase64,
+        'imageMediaType': imageMediaType,
+        'lang': lang,
+        'date': day,
+        if (barcode != null && barcode.isNotEmpty) 'barcode': barcode,
+        if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+        if (grams != null && grams > 0) 'grams': grams,
+      }),
+    );
+    return _scanFrom(res, 'scanLabel', lang: lang, date: day);
+  }
+
+  @override
+  Future<ScanResult> scanBarcode({
+    required String barcode,
+    required String lang,
+    String? date,
+    int? grams,
+  }) async {
+    final day = date ?? DateTime.now().toIso8601String().substring(0, 10);
+    final res = await _client.post(
+      Uri.parse('$baseUrl/scan/barcode'),
+      headers: _headers,
+      body: jsonEncode({
+        'barcode': barcode,
+        'lang': lang,
+        'date': day,
+        if (grams != null && grams > 0) 'grams': grams,
+      }),
+    );
+    return _scanFrom(res, 'scanBarcode', lang: lang, date: day);
+  }
+
+  /// Both scan routes answer in one shape, so they are parsed in one place.
+  ///
+  /// A 200 carrying `found: false` is not an error and must not be thrown —
+  /// "that packet is not catalogued, photograph the panel" is the useful
+  /// answer, and turning it into an exception would lose it.
+  ScanResult _scanFrom(
+    http.Response res,
+    String what, {
+    required String lang,
+    required String date,
+  }) {
+    if (res.statusCode == 429) {
+      throw AiQuotaException.fromBody(res.bodyBytes);
+    }
+    if (res.statusCode != 200) {
+      throw AiGatewayException('$what failed: ${res.statusCode} ${res.body}');
+    }
+    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    _absorbQuota(json);
+
+    if (json['found'] != true) {
+      return ScanResult(
+        found: false,
+        problem: json['problem'] as String?,
+        reply: (json['reply'] as String?) ?? '',
+        barcode: json['barcode'] as String?,
+      );
+    }
+
+    final item = (json['item'] as Map<String, dynamic>?) ?? const {};
+
+    // The scan routes return the bare `{meals: [...]}`, while dayPlanFromJson
+    // takes the wrapper the chat route sends. Wrap it rather than teaching the
+    // parser two shapes.
+    DayPlan? plan;
+    final planRaw = json['plan'];
+    if (planRaw is Map && ((planRaw['meals'] as List?)?.isNotEmpty ?? false)) {
+      plan = dayPlanFromJson(
+        {'plan': Map<String, dynamic>.from(planRaw), 'date': date},
+        lang,
+        date,
+      );
+    }
+
+    return ScanResult(
+      found: true,
+      reply: (json['reply'] as String?) ?? '',
+      barcode: json['barcode'] as String?,
+      name: json['name'] as String?,
+      brand: json['brand'] as String?,
+      grams: _int(json['grams']),
+      portionLabel: json['portionLabel'] as String?,
+      portionAssumed: json['portionAssumed'] == true,
+      kcal: _int(json['kcal']),
+      proteinG: _int(item['protein_g']),
+      carbsG: _int(item['carbs_g']),
+      fatG: _int(item['fat_g']),
+      targetKcal: _nullableInt(json['targetKcal']),
+      eatenKcal: _nullableInt(json['eatenKcal']),
+      remainingKcal: _nullableInt(json['remainingKcal']),
+      fits: json['fits'] is bool ? json['fits'] as bool : null,
+      plan: plan,
+      rebuildInstruction: json['rebuildNeeded'] as String?,
+      basis: json['basis'] as String?,
+      energyFromKj: json['energyFromKj'] == true,
+      note: json['note'] as String?,
+    );
+  }
 
   @override
   Future<DayPlan> generatePlan({
@@ -308,7 +561,7 @@ class HttpAiGateway implements AiGateway {
   }
 
   @override
-  Future<AiQuota> quotaStatus() async {
+  Future<AiQuotas> quotaStatus() async {
     final res = await _client.post(
       Uri.parse('$baseUrl/quota'),
       headers: _headers,
@@ -318,12 +571,22 @@ class HttpAiGateway implements AiGateway {
       throw AiGatewayException('quotaStatus failed: ${res.statusCode} ${res.body}');
     }
     final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-    lastQuota = AiQuota.fromJson(json);
-    return lastQuota!;
+    return AiQuotas.fromJson(json);
   }
 }
 
 /// Today's five uses are gone. The wallet is how they buy another, not a paywall.
+/// What a failed call was, from the person's side (O10): no connection, a
+/// connection too slow to answer, or something on our side. It decides the
+/// words and the next step; the exception itself is never shown.
+enum Failure { offline, slow, ours }
+
+Failure failureOf(Object e) {
+  if (e is TimeoutException) return Failure.slow;
+  if (e is SocketException || e is HandshakeException || e is http.ClientException) return Failure.offline;
+  return Failure.ours;
+}
+
 class AiQuotaException implements Exception {
   final String message;
   final AiQuota quota;
@@ -354,6 +617,9 @@ const _slotLabels = {
   'lunch': ('غدا', 'Lunch'),
   'dinner': ('عشا', 'Dinner'),
   'snack': ('سناك', 'Snack'),
+  // A fasting day's two meals (Ramadan mode).
+  'iftar': ('الإفطار', 'Iftar'),
+  'suhoor': ('السحور', 'Suhoor'),
 };
 
 int _jsonInt(Object? v) => v is num ? v.round() : 0;

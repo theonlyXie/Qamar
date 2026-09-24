@@ -10,6 +10,15 @@ import 'common.dart';
 class WhySheet extends StatelessWidget {
   const WhySheet({super.key});
 
+  /// A code set left to right in either language, in its own order. The
+  /// version line "calc v2.0 · 2026-08-13", in Arabic digits, drew as
+  /// "calc v١٣-٠٨-٢٠٢٦ · ٢.٠": the bidi algorithm treats Arabic-Indic
+  /// digits with the dots and hyphens between them as one right-to-left
+  /// run, even inside iso()'s left-to-right isolate, so the version and
+  /// the date swapped and the date read backwards. A left-to-right mark
+  /// either side of every separator holds each run of digits in its place.
+  static String inOrder(String code) => code.replaceAllMapped(RegExp('[^\u0660-\u06690-9\u2066\u2069]+'), (m) => '\u200E${m[0]}\u200E');
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -21,50 +30,47 @@ class WhySheet extends StatelessWidget {
       (
         t.whyAssume,
         state.isAr
-            ? '${state.iso('${p.age}')} سنة · ${p.gender == Gender.female ? 'أنثى' : 'ذكر'} · ${state.iso('${p.height}')} سم · ${state.iso('${p.weight}')} كجم · معامل نشاط ${state.iso('${p.activity}')}'
-            : '${p.age} yrs · ${p.gender == Gender.female ? 'female' : 'male'} · ${p.height} cm · ${p.weight} kg · activity factor ${p.activity}',
+            // "،" where English has "·": beside Arabic digits a middle dot
+            // reads as a zero.
+            ? '${state.iso('${p.age}')} سنة، ${p.gender == Gender.female ? 'أنثى' : 'ذكر'}، ${state.iso('${p.height}')} سم، ${state.iso('${p.weight}')} كجم، نشاط ${state.iso('${p.activity}')}'
+            : '${p.age} years · ${p.gender == Gender.female ? 'female' : 'male'} · ${p.height} cm · ${p.weight} kg · activity ${p.activity}',
       ),
       (t.whySource, t.whySourceVal),
       (t.whyGuide, t.whyGuideVal),
-      (t.whyVersion, state.iso('calc v2.0 · 2026-08-13')),
     ];
 
+    // Plain words first, the working after: four short rows, each a label
+    // over its line, and the calculation's version as a footnote at the end,
+    // where it can be quoted and need never be read.
     return Positioned.fill(
-      child: GestureDetector(
-        onTap: state.closeWhy,
-        child: Container(
-          color: const Color(0xB8050810),
-          alignment: Alignment.bottomCenter,
-          child: GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 34),
-              decoration: const BoxDecoration(
-                color: QColors.cardSlate,
-                border: Border(top: BorderSide(color: QColors.borderStrong)),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(child: Container(width: 38, height: 4, decoration: BoxDecoration(color: QColors.borderStrong, borderRadius: BorderRadius.circular(999)))),
-                  const SizedBox(height: 12),
-                  Text(t.whyTitle, style: QText.display(size: 26, height: 32, color: const Color(0xFFF5F7FF))),
-                  for (final r in rows) ...[
-                    const SizedBox(height: 11),
-                    const Divider(color: QColors.borderFaint, height: 1),
-                    const SizedBox(height: 11),
-                    Text(r.$1, style: QText.body(size: 11, weight: FontWeight.w500, color: QColors.textMuted, letterSpacing: 0.4)),
+      child: QSheetScrim(
+        onDismiss: state.closeWhy,
+        child: QSheetPanel(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(t.whyTitle, style: QText.display(size: 24, ar: QText.arabic(t.whyTitle), color: QColors.ink)),
+              const SizedBox(height: 8),
+              for (final (i, r) in rows.indexed) ...[
+                if (i > 0) const Divider(color: QColors.hairline, height: 1),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(QText.eyebrowText(r.$1, ar: state.isAr), style: QText.eyebrow(ar: state.isAr)),
                     const SizedBox(height: 4),
-                    Text(r.$2, style: QText.body(size: 14, height: 22, color: QColors.textHigh)),
-                  ],
-                  const SizedBox(height: 14),
-                  QPrimaryButton(label: t.whyClose, onTap: state.closeWhy, height: 50),
-                ],
+                    Text(r.$2, style: QText.body(size: 15, color: QColors.ink)),
+                  ]),
+                ),
+              ],
+              Text(
+                WhySheet.inOrder(state.iso('calc v2.0 · 2026-08-13')),
+                semanticsLabel: '${t.whyVersion}: calc v2.0, 2026-08-13',
+                style: QText.body(size: 12, color: QColors.inkTertiary),
               ),
-            ),
+              const SizedBox(height: 16),
+              QPrimaryButton(label: t.whyClose, onTap: state.closeWhy),
+            ],
           ),
         ),
       ),
