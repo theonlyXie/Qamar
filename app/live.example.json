@@ -1,0 +1,5 @@
+{
+  "SUPABASE_URL": "https://stqirjlqzchcoeegumoq.supabase.co",
+  "SUPABASE_ANON_KEY": "paste the publishable (anon) key here: Supabase, Project Settings, API Keys",
+  "AI_GATEWAY_URL": "https://stqirjlqzchcoeegumoq.supabase.co/functions/v1/ai-gateway"
+}

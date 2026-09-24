@@ -1,0 +1,5 @@
+{
+  // VS Code offers to install these when the folder is opened. Flutter brings
+  // the Dart extension with it.
+  "recommendations": ["Dart-Code.flutter"]
+}

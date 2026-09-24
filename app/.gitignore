@@ -54,3 +54,6 @@ app.*.map.json
 !.env.example
 supabase/.env
 supabase/.temp/
+# The live server's settings for a run from VS Code (live.example.json is
+# the template). Only the anon key is in it, but keys stay out of git.
+/live.json

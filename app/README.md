@@ -20,6 +20,31 @@ Verified against **Flutter 3.47.0 / Dart 3.13.0**: `flutter analyze` is
 error-free, `flutter test` passes, and both `flutter build web` and
 `flutter build apk --debug` succeed.
 
+### Run it from VS Code
+
+1. Install Flutter (3.47 or newer) and open the repository's top folder in
+   VS Code, not `app/`, so it finds `.vscode/`. Accept its offer to install
+   the Flutter extension.
+2. Pick a device in the status bar, bottom right. Chrome needs nothing more;
+   an Android phone needs the Android SDK (it comes with Android Studio) and
+   USB debugging on; an iPhone or the iOS Simulator needs a Mac with Xcode.
+3. Open Run and Debug (Ctrl+Shift+D, or ⇧⌘D on a Mac), choose one of these
+   and press F5:
+   - **Qamar · demo (no server)** needs nothing. Every screen and gesture
+     works, but there is no account, each run starts from the welcome, and a
+     meal can't be read: the chat says it isn't connected.
+   - **Qamar · live server** uses the Supabase project. Copy
+     `live.example.json` to `live.json` (both in `app/`) and paste the
+     project's publishable (anon) key into it, from Supabase → Project
+     Settings → API Keys. `live.json` is git-ignored.
+   - **Qamar · live server, full speed** is a release build: no hot reload
+     and no debugger, but the motion runs as it will in the store build,
+     which a debug run doesn't. Not on the iOS Simulator.
+
+In Chrome the app fills the window: press F12, then Ctrl+Shift+M (⇧⌘M on a
+Mac) for a phone-sized frame. The Testing panel (the flask) runs `app/test`,
+the same tests CI runs.
+
 `NSCameraUsageDescription` / `NSPhotoLibraryUsageDescription` are set in
 `ios/Runner/Info.plist`, and the Android manifest declares the camera as
 optional hardware. No runtime `CAMERA` permission is declared on purpose:
@@ -32,17 +57,15 @@ to request it and would break devices that only have a gallery.
 a true elliptical terminator, foreshortened craters, earthshine on the night
 side — so it stays sharp at every size from the 34px chat avatar to the
 welcome hero. `assets/images/qamar_orb*.png` are no longer referenced by the
-app. [LivingOrb] still owns the breathing, halo, wander and spark motion; the
-only motion inside the moon itself is a very slow phase drift.
+app. [LivingOrb] makes it the orb in the middle of the tab bar: it breathes,
+its halo glows, and it waxes from a crescent toward today's target as the
+day's meals are logged. Nothing drifts or sparkles.
 
-### Fonts need network on first launch
+### Fonts are bundled
 
-`google_fonts` fetches Cormorant Garamond / Noto Sans Arabic / Inter from
-`fonts.gstatic.com` at runtime rather than bundling them. On a device with
-no network — or behind a filtered one — Arabic text renders as tofu boxes
-while Latin text falls back cleanly. Since Arabic is the default locale,
-consider vendoring the font files into `assets/fonts/` and declaring them
-in `pubspec.yaml` before shipping.
+Space Grotesk (Latin), Noto Sans Arabic and Inter (the last fallback) are in
+`assets/fonts/` and declared in `pubspec.yaml`, so the Arabic UI renders on a
+phone with no network.
 
 ## What's implemented
 
@@ -59,11 +82,13 @@ rebuilt as real Flutter screens rather than copying the prototype's DOM:
   safety gates, target card, save-progress prompt), Today, Log, Analyzing,
   Confirm, Plan, Progress, You, Su Points wallet (Spend/History), Why/Source
   sheet.
-- **Ask Qamar**: companion overlay (`lib/widgets/ask_qamar_overlay.dart`) —
-  backdrop blur, orb docked to the side, messages on a moonbeam.
-- **Orb + tree nav**: `lib/widgets/living_orb.dart` (breathing/halo/wander/
-  orbiting sparks), `lib/widgets/orb_nav.dart` (drag-anywhere, tap-to-open),
-  `lib/widgets/tree_overlay.dart` (radial nav with animated branches).
+- **Ask Qamar**: the conversation (`lib/widgets/ask_qamar_overlay.dart`),
+  laid out like a chat with an assistant: Qamar's words across the page, the
+  person's in a bubble, one field at the foot for a photo, words or the
+  microphone.
+- **Tab bar and orb**: `lib/widgets/tab_bar.dart` (Today, Progress, the orb,
+  Plan, Me), `lib/widgets/living_orb.dart` (the moon) and
+  `lib/widgets/log_sheet.dart` (every way to log, on the orb's tap).
 - **i18n**: `lib/l10n/strings.dart` is the full AR/EN string table from the
   prototype; `main.dart` flips `Directionality` live. The `QLangToggle`
   control sits on the welcome screen, in the onboarding header, on the scan
@@ -156,13 +181,10 @@ rewrite.
   real numbers needs the AI gateway. Camera failures (no camera, refused
   permission, unsupported platform) surface on screen and the typed path
   stays available, so a missing camera never dead-ends onboarding.
-- The orb is the primary navigation and logging surface. Hold it to open the
-  radial menu, sweep to a destination and release; choosing Log swaps the ring
-  for its three input methods. All three act in place — speak starts the moon
-  listening, type opens the conversation, photo opens the camera — so logging
-  never pushes a page. Tapping still opens the menu the sticky way.
-- The ring follows the *mangata*, the moon's road on water: one cool white
-  light at varying strength rather than a colour per destination.
+- The orb has three gestures. A tap raises the Log sheet: speak, type or
+  photo, repeat a recent meal, water, movement, or ask Qamar, one tap each. A
+  hold talks: the moon listens at once. A drag takes the moon over a dotted
+  number and explains it.
 - The orb's data explanations (`lib/widgets/explain.dart`) are static copy
   keyed by metric, except planned meals, whose explanation is built from the
   meal's own portions. The interaction is real — drag the orb over a value and
