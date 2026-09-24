@@ -56,6 +56,11 @@ abstract final class QIcons {
   static const share = IconsaxPlusLinear.export;
   static const swap = IconsaxPlusLinear.refresh_2;
   static const scan = IconsaxPlusLinear.scan;
+  static const barcode = IconsaxPlusLinear.scan_barcode;
+
+  // The torch, over the camera: bold while it is on.
+  static const torch = IconsaxPlusLinear.flash_1;
+  static const torchOn = IconsaxPlusBold.flash_1;
 
   // The tabs and the day. A tab's glyph is linear at rest and bold when it
   // is the page the person is on ([onFor]).

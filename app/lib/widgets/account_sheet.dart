@@ -402,9 +402,11 @@ class _ProviderButton extends StatelessWidget {
 class AccountSheet extends StatefulWidget {
   const AccountSheet({super.key});
 
-  /// The email and code fields, for tests.
+  /// The email, code and password fields, and the password toggle, for tests.
   static const emailKey = ValueKey('account-email');
   static const codeKey = ValueKey('account-code');
+  static const passwordKey = ValueKey('account-password');
+  static const passwordToggleKey = ValueKey('account-password-toggle');
 
   @override
   State<AccountSheet> createState() => _AccountSheetState();
@@ -415,11 +417,13 @@ class _AccountSheetState extends State<AccountSheet> {
   // would be sent to, so the field starts with it.
   late final _email = TextEditingController(text: context.read<AppState>().authEmail);
   final _code = TextEditingController();
+  final _password = TextEditingController();
 
   @override
   void dispose() {
     _email.dispose();
     _code.dispose();
+    _password.dispose();
     super.dispose();
   }
 
@@ -463,18 +467,27 @@ class _AccountSheetState extends State<AccountSheet> {
     final sent = state.authCodeSent;
     final busy = state.authBusy;
     final emailBusy = busy && state.authProvider == null;
+    // A second way in, for an account that already has a password: it asks
+    // nobody to send anything, so it works on a day the mail server cannot.
+    // Never for linking a guest account, which has to prove the address.
+    final password = state.authUsePassword && !state.authLinking;
     return SheetPanel(
       title: _title(state),
       onClose: state.closeAuth,
-      primary: QPrimaryButton(
-        label: emailBusy
-            ? (sent ? (isAr ? 'بتأكد من الكود…' : 'Checking the code…') : (isAr ? 'بابعت الكود…' : 'Sending the code…'))
-            : sent
-                ? (isAr ? 'أكّد الكود' : 'Confirm the code')
-                : (isAr ? 'ابعتلي كود' : 'Send me a code'),
-        onTap: busy ? null : (sent ? state.verifyAuthCode : state.sendAuthCode),
-      ),
-      footer: sent
+      primary: password
+          ? QPrimaryButton(
+              label: emailBusy ? (isAr ? 'بدخّلك…' : 'Signing you in…') : (isAr ? 'ادخل' : 'Sign in'),
+              onTap: busy ? null : state.signInWithPassword,
+            )
+          : QPrimaryButton(
+              label: emailBusy
+                  ? (sent ? (isAr ? 'بتأكد من الكود…' : 'Checking the code…') : (isAr ? 'بابعت الكود…' : 'Sending the code…'))
+                  : sent
+                      ? (isAr ? 'أكّد الكود' : 'Confirm the code')
+                      : (isAr ? 'ابعتلي كود' : 'Send me a code'),
+              onTap: busy ? null : (sent ? state.verifyAuthCode : state.sendAuthCode),
+            ),
+      footer: sent && !password
           ? Center(
               child: QTapArea(
                 onTap: busy ? null : state.sendAuthCode,
@@ -513,12 +526,27 @@ class _AccountSheetState extends State<AccountSheet> {
           enabled: !sent && !busy,
           keyboardType: TextInputType.emailAddress,
           autofill: AutofillHints.email,
-          action: TextInputAction.send,
+          action: password ? TextInputAction.next : TextInputAction.send,
           // One request at a time, whichever key or button sent it.
-          onSubmitted: (_) => state.authBusy ? null : state.sendAuthCode(),
+          onSubmitted: (_) => state.authBusy || password ? null : state.sendAuthCode(),
           onChanged: state.onAuthEmailChanged,
         ),
-        if (sent) ...[
+        if (password) ...[
+          const SizedBox(height: QSpace.md),
+          SheetField(
+            key: AccountSheet.passwordKey,
+            controller: _password,
+            label: isAr ? 'كلمة السر' : 'Password',
+            hint: isAr ? 'اكتب كلمة السر' : 'Enter your password',
+            enabled: !busy,
+            keyboardType: TextInputType.visiblePassword,
+            autofill: AutofillHints.password,
+            action: TextInputAction.done,
+            obscure: true,
+            onSubmitted: (_) => state.authBusy ? null : state.signInWithPassword(),
+            onChanged: state.onAuthPasswordChanged,
+          ),
+        ] else if (sent) ...[
           const SizedBox(height: QSpace.md),
           Text(isAr ? 'شوف الإيميل: هتلاقي فيه كود من ٦ أرقام.' : 'Check your inbox for a six-digit code.', style: QText.body(size: 13, color: QColors.inkSecondary)),
           const SizedBox(height: QSpace.sm),
@@ -535,6 +563,22 @@ class _AccountSheetState extends State<AccountSheet> {
             formatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
             onSubmitted: (_) => state.authBusy ? null : state.verifyAuthCode(),
             onChanged: (v) => _codeChanged(state, v),
+          ),
+        ],
+        if (!state.authLinking) ...[
+          const SizedBox(height: QSpace.md),
+          Center(
+            child: QTapArea(
+              key: AccountSheet.passwordToggleKey,
+              onTap: busy ? null : state.toggleAuthPassword,
+              builder: (context, pressed) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: QSpace.md),
+                child: Text(
+                  state.authUsePassword ? (isAr ? 'ابعتلي كود على الإيميل' : 'Email me a code instead') : (isAr ? 'عندي كلمة سر' : 'I have a password'),
+                  style: QText.body(size: 15, weight: FontWeight.w500, color: busy ? QDisabled.label : (pressed ? QColors.ink : QColors.inkSecondary)),
+                ),
+              ),
+            ),
           ),
         ],
         if (state.authError != null) ...[
@@ -563,6 +607,9 @@ class SheetField extends StatelessWidget {
   final String? autofill;
   final bool number;
   final bool characters;
+
+  /// Hides what is typed. Only the password field sets it.
+  final bool obscure;
   const SheetField({
     super.key,
     required this.controller,
@@ -577,6 +624,7 @@ class SheetField extends StatelessWidget {
     this.autofill,
     this.number = false,
     this.characters = false,
+    this.obscure = false,
   });
 
   @override
@@ -599,6 +647,8 @@ class SheetField extends StatelessWidget {
       textInputAction: action,
       autofillHints: autofill == null ? null : [autofill!],
       autocorrect: false,
+      obscureText: obscure,
+      enableSuggestions: !obscure,
       textCapitalization: characters ? TextCapitalization.characters : TextCapitalization.none,
       textDirection: TextDirection.ltr,
       onChanged: onChanged,

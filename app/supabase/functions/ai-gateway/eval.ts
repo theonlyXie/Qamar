@@ -66,9 +66,14 @@ export function runCase(c: EvalCase): CaseOutcome {
 
 function scopeCase(c: EvalCase): CaseOutcome {
   const verdict = classify(c.input.question as string);
-  const actual: Record<string, unknown> = verdict.allowed
-    ? { refused: false, domain: verdict.domain }
-    : { refused: true, reason: verdict.reason };
+  const actual: Record<string, unknown> = !verdict.allowed
+    ? { refused: true, reason: verdict.reason }
+    // A greeting is allowed and has no domain. Reported as its own thing
+    // rather than folded into nutrition, so an eval case can tell the
+    // difference between "answered as a food question" and "said hello back".
+    : "greeting" in verdict
+    ? { refused: false, domain: "greeting" }
+    : { refused: false, domain: verdict.domain };
 
   if (actual.refused !== c.expected.refused) {
     return {

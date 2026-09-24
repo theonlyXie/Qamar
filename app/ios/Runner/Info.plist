@@ -73,7 +73,7 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Qamar turns what you say into text so it can log the meal you describe.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Qamar uses the camera so you can photograph your InBody report and your meals instead of typing the numbers in.</string>
+	<string>Qamar uses the camera so you can photograph your InBody report, your meals and a packet's nutrition table, and scan its barcode, instead of typing the numbers in.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Qamar needs access to your photos so you can pick an existing picture of your InBody report or a meal.</string>
 	<key>UILaunchStoryboardName</key>

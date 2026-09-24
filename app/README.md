@@ -47,9 +47,10 @@ the same tests CI runs.
 
 `NSCameraUsageDescription` / `NSPhotoLibraryUsageDescription` are set in
 `ios/Runner/Info.plist`, and the Android manifest declares the camera as
-optional hardware. No runtime `CAMERA` permission is declared on purpose:
-`image_picker` goes through system intents, and declaring it would oblige us
-to request it and would break devices that only have a gallery.
+optional hardware. Meal photos and nutrition panels go through `image_picker`,
+which hands off to the system camera by intent and needs no permission of
+ours. Barcode scanning is the one that does: `mobile_scanner` drives the camera
+inside the app, so `CAMERA` is declared and asked for when the scanner opens.
 
 ### The moon is drawn, not an asset
 

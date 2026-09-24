@@ -610,8 +610,18 @@ class SupabaseWalletRepository implements WalletRepository {
   @override
   Future<List<LedgerEntry>> ledger(String userId) async {
     final rows = await _client.from('su_point_ledger').select().eq('user_id', userId).order('created_at', ascending: false).limit(50);
-    return (rows as List)
-        .map((r) => LedgerEntry(label: r['reason'] as String, amount: r['delta'] as int, when: (r['created_at'] as String)))
-        .toList();
+    return (rows as List).map((r) {
+      final reason = r['reason'] as String;
+      final at = DateTime.tryParse(r['created_at'] as String);
+      // `label` stays the raw reason as a last resort; the wallet screen calls
+      // displayLabel(), which translates it.
+      return LedgerEntry(
+        label: reason,
+        amount: r['delta'] as int,
+        when: r['created_at'] as String,
+        reason: reason,
+        at: at,
+      );
+    }).toList();
   }
 }

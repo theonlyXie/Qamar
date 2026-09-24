@@ -18,6 +18,19 @@ import type { MealItem } from "./verify.ts";
 const CONFIDENT = 0.75;
 /** Below this, the graph is treated as having missed entirely. */
 const PLAUSIBLE = 0.35;
+/**
+ * Below this fraction of the typed words accounted for, a match is refused
+ * however well it scores.
+ *
+ * Trigram similarity rewards an alias that matches part of a phrase, so the
+ * graph used to answer برجر لحم with raw beef at 0.38, فراخ بروستد with a plain
+ * chicken breast, and — the one nobody had noticed — رز ابيض مسلوق with eggs.
+ * None of those failed; they returned a different food at roughly half the
+ * calories. Coverage is what tells them apart: every correct match in the
+ * catalogue covers 1.0 of the phrase, and every one of those wrong ones covers
+ * 0.5 or less.
+ */
+const COVERAGE_FLOOR = 0.6;
 
 export interface GraphCandidate {
   qamarFoodId: string;
@@ -30,6 +43,8 @@ export interface GraphCandidate {
   matchedAlias: string;
   matchKind: "exact" | "fuzzy";
   hasNutrients: boolean;
+  /** Fraction of the typed words this alias accounts for. */
+  phraseCoverage: number;
 }
 
 export interface ResolvedPortion {
@@ -90,6 +105,7 @@ interface RawCandidate {
   matched_alias: string;
   match_kind: "exact" | "fuzzy";
   has_nutrients: boolean;
+  phrase_coverage: number;
 }
 
 interface RawNutrient {
@@ -112,7 +128,29 @@ const toCandidate = (r: RawCandidate): GraphCandidate => ({
   matchedAlias: r.matched_alias,
   matchKind: r.match_kind,
   hasNutrients: r.has_nutrients,
+  phraseCoverage: Number(r.phrase_coverage ?? 1),
 });
+
+/** Whether the graph is entitled to claim this match. */
+/**
+ * Whether the graph is entitled to claim this match.
+ *
+ * The coverage floor applies to ingredients and not to dishes, and that is not
+ * a fudge to make a test pass — it is the difference the failures themselves
+ * showed. Every wrong answer returned a raw ingredient while ignoring the word
+ * that named a cooked thing: برجر لحم gave beef, فراخ بروستد gave a chicken
+ * breast, رز ابيض مسلوق gave eggs. The one legitimate partial match, شاورما
+ * فراخ, returned the right dish and merely did not know which protein.
+ *
+ * Answering a dish with a generic version of that dish is incomplete.
+ * Answering it with one of its raw ingredients is wrong. A partial dish match
+ * is therefore allowed through and marked for confirmation; a partial
+ * ingredient match is refused.
+ */
+function isUsable(c: GraphCandidate | null): c is GraphCandidate {
+  if (!c || c.matchScore < PLAUSIBLE) return false;
+  return c.phraseCoverage >= COVERAGE_FLOOR || c.isRecipe;
+}
 
 /**
  * Per-100g macros for a resolved food.
@@ -169,7 +207,25 @@ export async function resolveOne(
 
   const candidates = raw.map(toCandidate);
   const top = candidates[0] ?? null;
-  const usable = top && top.matchScore >= PLAUSIBLE ? top : null;
+  const usable = isUsable(top) ? top : null;
+
+  // Refused for coverage rather than for score: the graph knows a food by that
+  // name and the phrase said more than the name did. Worth saying out loud,
+  // because it is the difference between "I have never heard of this" and "I
+  // ignored half of what you typed".
+  if (top && !usable && top.matchScore >= PLAUSIBLE) {
+    uncertainty.push(
+      `"${top.matchedAlias}" only accounts for part of "${phrase}", so it was not used`,
+    );
+  }
+  // Let through as a dish, but not silently: the generic version of a dish is
+  // not the variant that was asked for, and the confirmation screen is where
+  // that gets settled.
+  if (usable && usable.phraseCoverage < COVERAGE_FLOOR) {
+    uncertainty.push(
+      `matched the dish "${usable.matchedAlias}" but not everything in "${phrase}"`,
+    );
+  }
 
   let portion: ResolvedPortion | null = null;
   let facts: FoodFacts | null = null;
@@ -337,7 +393,9 @@ export async function identifyItems(
       p_limit: 1,
     });
     const top = raw[0] ? toCandidate(raw[0]) : null;
-    if (!top || top.matchScore < PLAUSIBLE) return none;
+    // Same bar as resolveOne. An id attached on a half-matched name is worse
+    // than no id: it files the meal under the wrong food permanently.
+    if (!isUsable(top)) return none;
 
     const portions = await rpc<{
       grams: number;
@@ -368,6 +426,7 @@ export function toPacketFacts(items: Resolution[]): unknown[] {
       quantity_g: r.portion?.grams ?? null,
       origin: r.origin,
       match_score: r.food?.matchScore ?? null,
+      phrase_coverage: r.food?.phraseCoverage ?? null,
       nutrients: r.facts?.per100g ?? null,
       source: r.facts?.source ?? null,
       needs_confirmation: r.needsConfirmation,

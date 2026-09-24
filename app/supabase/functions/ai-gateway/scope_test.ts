@@ -5,7 +5,7 @@
 // coverage of the implementation.
 
 import { assertEquals } from "jsr:@std/assert@1";
-import { classify, refusalText, type RefusalReason } from "./scope.ts";
+import { classify, isGreeting, refusalText, type RefusalReason } from "./scope.ts";
 
 function refused(q: string, reason: RefusalReason) {
   const v = classify(q);
@@ -16,7 +16,17 @@ function refused(q: string, reason: RefusalReason) {
 function allowed(q: string, domain: "nutrition" | "training") {
   const v = classify(q);
   assertEquals(v.allowed, true, `expected to allow: ${q}`);
-  if (v.allowed) assertEquals(v.domain, domain, `wrong domain for: ${q}`);
+  if (v.allowed && "domain" in v) {
+    assertEquals(v.domain, domain, `wrong domain for: ${q}`);
+  } else {
+    throw new Error(`expected a topic verdict, got a greeting for: ${q}`);
+  }
+}
+
+function greeted(q: string) {
+  const v = classify(q);
+  assertEquals(v.allowed, true, `expected to allow greeting: ${q}`);
+  assertEquals(v.allowed && "greeting" in v, true, `expected a greeting for: ${q}`);
 }
 
 Deno.test("answers nutrition questions", () => {
@@ -117,4 +127,48 @@ Deno.test("every refusal has real copy in both languages", () => {
   }
   // The two languages must actually differ.
   assertEquals(refusalText("medical", "ar") === refusalText("medical", "en"), false);
+});
+
+// The first seven real messages this app ever received are the reason these
+// exist. Five were refused as off-topic, and two of those were "ازيك".
+
+Deno.test("a greeting is answered, not refused", () => {
+  greeted("ازيك");
+  greeted("إزيك");
+  greeted("السلام عليكم");
+  greeted("صباح الخير");
+  greeted("hi");
+  greeted("hello");
+  greeted("good morning");
+  greeted("شكراً");
+});
+
+Deno.test("a greeting carrying a real question is treated as the question", () => {
+  allowed("hi, how much protein should I eat?", "nutrition");
+  allowed("ازيك، كام سعرة في الفول؟", "nutrition");
+  allowed("hello, how many rest days between workouts?", "training");
+});
+
+Deno.test("a greeting never overrides a refusal", () => {
+  // The opener must not become a way in. Each of these would be allowed if the
+  // greeting check ran before the refusals instead of after them.
+  refused("hi, I want to lose weight while pregnant", "pregnancy");
+  refused("hello, should I stop taking metformin?", "medical");
+  refused("hi, I want to starve myself", "eating_disorder");
+});
+
+Deno.test("only an opener counts as one", () => {
+  assertEquals(isGreeting("hi"), true);
+  assertEquals(isGreeting("ازيك"), true);
+  // Content, not an opener.
+  assertEquals(isGreeting("كام سعرة في الفول؟"), false);
+  // Long enough to be a real message: judged on content, not on its first word.
+  assertEquals(
+    isGreeting(
+      "hi there, I have been feeling very tired and I wondered whether my diet " +
+        "might be the reason for it lately",
+    ),
+    false,
+  );
+  assertEquals(isGreeting(""), false);
 });

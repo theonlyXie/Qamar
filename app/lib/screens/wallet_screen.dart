@@ -307,8 +307,10 @@ class _History extends StatelessWidget {
               child: Row(children: [
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(entry.label, style: QText.body(size: 16, color: QColors.ink)),
-                    Text(entry.when, style: QText.body(size: 13, height: 18, color: QColors.inkSecondary)),
+                    // A server row carries a reason code and a timestamp; these
+                    // turn them into words and a time in the person's language.
+                    Text(entry.displayLabel(isAr), style: QText.body(size: 16, color: QColors.ink)),
+                    Text(state.iso(entry.displayWhen(isAr, now: state.clockNow())), style: QText.body(size: 13, height: 18, color: QColors.inkSecondary)),
                   ]),
                 ),
                 const SizedBox(width: QSpace.md),

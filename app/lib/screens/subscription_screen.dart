@@ -35,6 +35,9 @@ class SubscriptionScreen extends StatelessWidget {
   /// The screen's one primary, and the way to a code.
   static const primaryKey = ValueKey('paywall-primary');
   static const buyKey = ValueKey('paywall-buy');
+
+  /// Said where the payment would be while Qamar+ is not on sale yet.
+  static const soonKey = ValueKey('paywall-soon');
   static const codeToggleKey = ValueKey('paywall-code-toggle');
 
   /// The billing function's reason a typed professional's code is not the
@@ -116,7 +119,10 @@ class SubscriptionScreen extends StatelessWidget {
     // month, and nothing while a paid month is running (there is nothing to
     // renew and nothing to cancel).
     final trialOffer = !state.plusActive && state.plusTrialEligible;
-    final canBuy = !state.plusActive || state.plusIsTrial;
+    // Paying waits for Paymob (AppState.plusOnSale); the free week does not.
+    final canBuy = state.plusOnSale && (!state.plusActive || state.plusIsTrial);
+    // Where a payment would have been offered, it says it is coming instead.
+    final soon = !state.plusOnSale && !trialOffer && (!state.plusActive || state.plusIsTrial);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(QSpace.page, QLayout.pageTop, QSpace.page, QSpace.xxxl),
@@ -160,7 +166,7 @@ class SubscriptionScreen extends StatelessWidget {
         ),
         const SizedBox(height: QSpace.md),
 
-        _PlanCard(state: state, quote: quote, buyHere: trialOffer),
+        _PlanCard(state: state, quote: quote, buyHere: trialOffer && state.plusOnSale),
         const SizedBox(height: QSpace.lg),
 
         if (state.plusNotice != null) ...[
@@ -181,7 +187,12 @@ class SubscriptionScreen extends StatelessWidget {
             style: QText.body(size: 13, height: 18, color: QColors.inkTertiary),
           ),
         ] else if (canBuy)
-          QPrimaryButton(key: SubscriptionScreen.primaryKey, label: SubscriptionScreen.buyLabel(state, quote), onTap: state.startPlusPurchase),
+          QPrimaryButton(key: SubscriptionScreen.primaryKey, label: SubscriptionScreen.buyLabel(state, quote), onTap: state.startPlusPurchase)
+        else if (soon)
+          QStateLine(
+            key: SubscriptionScreen.soonKey,
+            line: isAr ? 'الدفع لسه مش متاح. قريب.' : 'Paying for Qamar+ isn’t open yet. Soon.',
+          ),
 
         const SizedBox(height: QSpace.xxl),
         _FeatureTable(state: state),

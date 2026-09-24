@@ -10,6 +10,7 @@ import '../models/meal.dart';
 import '../models/messages.dart';
 import '../services/photos.dart';
 import '../models/problem.dart';
+import '../services/scan_flow.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
@@ -53,6 +54,12 @@ class AskQamarOverlay extends StatefulWidget {
 
   /// The empty conversation's one line, for tests.
   static const emptyKey = ValueKey('chat-empty');
+
+  /// The offer to photograph a packet's nutrition table, for tests.
+  static const panelPromptKey = ValueKey('chat-panel-prompt');
+
+  /// The line on a scanned reading that says its portion was assumed.
+  static const portionAssumedKey = ValueKey('chat-portion-assumed');
 
   /// The line under the composer saying the answers come from AI.
   static const disclosureKey = ValueKey('chat-disclosure');
@@ -174,9 +181,12 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                             padding: const EdgeInsets.fromLTRB(QSpace.page, 16, QSpace.page, 16),
                             children: [
-                              // Newest first. What the assistant read off the
-                              // meal, waiting to be confirmed: nothing is
-                              // written until it is.
+                              // Newest first. The barcode found nothing, or
+                              // the panel could not be read: the next move is
+                              // a photo of the panel, one tap from here.
+                              if (state.awaitingLabelPhoto) const _PanelPrompt(),
+                              // What the assistant read off the meal, waiting
+                              // to be confirmed: nothing is written until it is.
                               if (state.hasProposal) const _ProposalCard(),
                               if (state.chatState == ChatState.thinking) const _Thinking(),
                               // Keyed by place in the conversation, oldest
@@ -930,6 +940,58 @@ Widget _photoThumb(String path, double size) {
   );
 }
 
+/// Offered when a barcode found nothing, or a panel could not be read.
+///
+/// A packet that is in no database is the normal case for an Egyptian brand,
+/// not an error, and the answer to it is the nutrition table printed on the
+/// back. The camera is one tap from here, and the photo is filed under the
+/// barcode that missed, so the next person to scan that packet finds it.
+class _PanelPrompt extends StatelessWidget {
+  const _PanelPrompt();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final isAr = state.isAr;
+    return _Appear(
+      child: Container(
+        key: AskQamarOverlay.panelPromptKey,
+        margin: const EdgeInsets.only(bottom: 20),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+        decoration: QDecor.card(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(isAr ? 'صوّرلي جدول القيم الغذائية' : 'Photograph the nutrition table', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
+            const SizedBox(height: 4),
+            Text(
+              isAr
+                  ? 'اللي ورا العلبة. هقراه وأحسبه، وأي حد يمسح العلبة دي بعد كده هيلاقيها.'
+                  : 'The one on the back. I will read it and count it, and anyone who scans this packet after you will find it.',
+              style: QText.body(size: 15, color: QColors.inkSecondary),
+            ),
+            const SizedBox(height: 12),
+            QPrimaryButton(
+              label: isAr ? 'افتح الكاميرا' : 'Open the camera',
+              icon: QIcons.camera,
+              onTap: state.scanBusy ? null : () => photographPanel(context, state),
+            ),
+            Center(
+              child: QTapArea(
+                onTap: state.dismissScanNotice,
+                builder: (context, pressed) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: QSpace.md),
+                  child: Text(isAr ? 'مش دلوقتي' : 'Not now', style: QText.body(size: 15, weight: FontWeight.w500, color: pressed ? QColors.ink : QColors.inkSecondary)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// The meal the assistant read, offered for confirmation inside the
 /// conversation. This is the whole confirm step — there is no confirm page —
 /// and the meal reaches the day's totals only when the button is pressed.
@@ -971,6 +1033,28 @@ class _ProposalCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(t.nothingWrites, style: QText.body(size: 13, color: QColors.inkSecondary)),
             ),
+            // The packet named no weight, so 100 g was used. Saying so turns a
+            // number that looks measured into a question, which is the honest
+            // shape of it: the portion is what every other figure multiplies.
+            if (state.scanPortionAssumed) ...[
+              const SizedBox(height: 8),
+              Padding(
+                key: AskQamarOverlay.portionAssumedKey,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Padding(padding: EdgeInsets.only(top: 1), child: QIcon(QIcons.info, size: 16, color: QColors.inkSecondary)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      isAr
+                          ? 'العلبة مكتوبش عليها وزن، فحسبتها على ${state.iso('100')} جرام. لو أكلت غير كده، قوللي وأنا أعدّلها.'
+                          : 'The packet gave no weight, so this is per 100 g. If you ate a different amount, tell me and I will redo it.',
+                      style: QText.body(size: 13, color: QColors.inkSecondary),
+                    ),
+                  ),
+                ]),
+              ),
+            ],
             const SizedBox(height: 10),
             Row(children: [
               Expanded(

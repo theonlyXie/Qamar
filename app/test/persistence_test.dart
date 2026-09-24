@@ -208,6 +208,12 @@ class FakeWaterRepo implements WaterRepository {
   Future<List<WaterSip>> sipsForDay(String userId, DateTime day) async => today;
 }
 
+/// Stands in for the database, and behaves the way it does.
+///
+/// The point of this fake is that the *server* owns the balance. It keeps its
+/// own ledger keyed by idempotency string, exactly as `su_point_ledger` does
+/// with its unique (user_id, idempotency_key) constraint, so a replayed award
+/// pays nothing here for the same reason it pays nothing in Postgres.
 class FakeWalletRepo implements WalletRepository {
   ({int available, int lifetime}) stored = (available: 0, lifetime: 0);
   final List<String> redemptions = [];
@@ -219,6 +225,19 @@ class FakeWalletRepo implements WalletRepository {
   /// Today's quest as the server has it. A test sets it, and marks it done
   /// the way the real earn trigger would when a row meets it.
   DayQuest? todaysQuest;
+
+  /// Rows the server's ledger holds, newest first, and the keys it has
+  /// seen: [award] is a server-side credit, as a trigger would make it.
+  final List<LedgerEntry> rows = [];
+  final Set<String> keys = {};
+
+  void award(int amount, String reason, String key) {
+    if (!keys.add(key)) return;
+    stored = (available: stored.available + amount, lifetime: stored.lifetime + amount);
+    rows.insert(0, LedgerEntry(
+      label: reason, amount: amount, when: 'now', reason: reason, at: DateTime.now(),
+    ));
+  }
 
   @override
   Future<({int available, int lifetime})> balance(String userId) async {
@@ -283,7 +302,7 @@ class FakeWalletRepo implements WalletRepository {
   Future<int?> questionPrice() async => questionPriceValue;
 
   @override
-  Future<List<LedgerEntry>> ledger(String userId) async => [];
+  Future<List<LedgerEntry>> ledger(String userId) async => List.of(rows);
 }
 
 /// Stands in for the gateway. It returns what a real one returns — items to
@@ -375,6 +394,69 @@ class FakeGateway implements AiGateway {
     return scan;
   }
 
+  /// What the next scan returns. Defaults to a packet that was found, with a
+  /// portion the packet itself named — the ordinary case.
+  ScanResult scanResult = const ScanResult(
+    found: true,
+    reply: 'A 25 g bag. It fits — dinner still works as written.',
+    barcode: '6221033000011',
+    name: 'Chipsy Salt',
+    grams: 25,
+    portionLabel: '25 g',
+    kcal: 134,
+    proteinG: 2,
+    carbsG: 14,
+    fatG: 8,
+    targetKcal: 2000,
+    eatenKcal: 600,
+    remainingKcal: 1266,
+    fits: true,
+  );
+
+  final List<String> scannedBarcodes = [];
+  final List<String> scannedLabels = [];
+  int? lastScanGrams;
+
+  /// The barcode sent alongside a panel photo, if any. This is how a panel
+  /// scanned after a failed lookup becomes the catalogue entry for that code.
+  String? lastLabelBarcode;
+
+  @override
+  Future<ScanResult> scanLabel({
+    required String imagePath,
+    required String lang,
+    String? date,
+    String? barcode,
+    String? name,
+    int? grams,
+  }) async {
+    scannedLabels.add(imagePath);
+    lastLabelBarcode = barcode;
+    lastScanGrams = grams;
+    // Reading a panel is a vision call, so it spends one of the day's photos
+    // like a meal photo — but a panel too blurry to trust gives the photo
+    // back, which is what the gateway does rather than charging for an answer
+    // it will not give.
+    if (scanResult.found) _usePhoto();
+    return scanResult;
+  }
+
+  @override
+  Future<ScanResult> scanBarcode({
+    required String barcode,
+    required String lang,
+    String? date,
+    int? grams,
+  }) async {
+    scannedBarcodes.add(barcode);
+    lastScanGrams = grams;
+    // A lookup that misses never reaches the model, so it costs nothing. The
+    // real route returns before takeAiUse for exactly this reason; a packet it
+    // finds spends from the photo bucket, as the label route does.
+    if (scanResult.found) _usePhoto();
+    return scanResult;
+  }
+
   String? lastInstruction;
   bool? lastForce;
 
@@ -442,6 +524,30 @@ class FakeAccount implements Account {
   Future<void> confirmLink({required String email, required String token}) async {
     if (failWith != null) throw failWith!;
     linked = true;
+  }
+
+  /// What the fake accepts. A real project holds this in auth.users; here it
+  /// is one pair, which is enough to tell a right password from a wrong one.
+  String knownEmail = 'tester@dr-qamar.com';
+  String knownPassword = 'QamarTest!2026';
+  final List<String> passwordSignIns = [];
+  String? passwordSet;
+
+  @override
+  Future<void> signInWithPassword({required String email, required String password}) async {
+    passwordSignIns.add(email);
+    if (email != knownEmail || password != knownPassword) {
+      // Matches the string Supabase returns, because that is what
+      // _authMessage reads to decide what the person is told.
+      throw Exception('Invalid login credentials');
+    }
+    linked = true;
+  }
+
+  @override
+  Future<void> setPassword(String password) async {
+    if (failWith != null) throw failWith!;
+    passwordSet = password;
   }
 
   @override
@@ -1224,14 +1330,223 @@ void main() {
     expect(state.weightHistory, isEmpty);
   });
 
+  group('scanning a packet', () {
+    test('a scanned packet becomes an ordinary proposal and writes an ordinary meal', () async {
+      final ai = FakeGateway();
+      final meals = FakeMealRepo();
+      final state = backed(ai: ai, meals: meals);
+      await settle();
+
+      await state.scanLabelPhoto('/tmp/panel.jpg');
+
+      expect(ai.scannedLabels, ['/tmp/panel.jpg']);
+      expect(state.hasProposal, isTrue, reason: 'nothing is written until confirmed');
+      expect(meals.saved, isEmpty);
+
+      final item = state.proposalItems().single.def;
+      expect(item.en, 'Chipsy Salt');
+      expect(item.kcal, 134);
+      expect(item.grams, 25);
+      expect(item.portionMatched, isTrue, reason: 'the packet named 25 g');
+
+      state.confirmProposal();
+      await settle();
+
+      // The whole point: a scan lands in meal_logs like anything else, so it
+      // counts towards the day, the micronutrient gaps and the Su award.
+      expect(meals.saved.length, 1);
+      expect(meals.saved.single.kcal, 134);
+    });
+
+    test('an assumed portion is carried through and flagged, not printed as fact', () async {
+      final ai = FakeGateway()
+        ..scanResult = const ScanResult(
+          found: true,
+          reply: 'Per 100 g, since the packet gave no weight.',
+          name: 'Baladi biscuits',
+          grams: 100,
+          portionLabel: '100 g',
+          portionAssumed: true,
+          kcal: 480,
+          proteinG: 7,
+          carbsG: 62,
+          fatG: 22,
+        );
+      final state = backed(ai: ai);
+      await settle();
+      state.setLang(AppLang.en);
+
+      await state.scanLabelPhoto('/tmp/panel.jpg');
+
+      expect(state.scanPortionAssumed, isTrue);
+      expect(state.proposalItems().single.def.portionMatched, isFalse);
+      expect(state.chat.last.sub, contains('portion assumed'));
+
+      state.confirmProposal();
+      // High confidence off a printed panel, but the amount is still a guess —
+      // the log has to say so.
+      expect(state.meals.last.sub, contains('estimate'));
+    });
+
+    test('a packet nobody has catalogued is a real answer, not a failure', () async {
+      final ai = FakeGateway()
+        ..scanResult = const ScanResult(
+          found: false,
+          barcode: '6221033000011',
+          reply: 'That product is not in any database yet. Photograph the nutrition table.',
+        );
+      final state = backed(ai: ai);
+      await settle();
+
+      await state.scanPacketBarcode('6221033000011');
+
+      expect(ai.scannedBarcodes, ['6221033000011']);
+      expect(state.hasProposal, isFalse, reason: 'there are no numbers to confirm');
+      expect(state.scanNotice, contains('Photograph the nutrition table'));
+      expect(state.chat.last.text, contains('not in any database'));
+    });
+
+    test('the barcode from a miss is carried into the panel scan that follows', () async {
+      final ai = FakeGateway()
+        ..scanResult = const ScanResult(found: false, barcode: '6221033000011', reply: 'not catalogued');
+      final state = backed(ai: ai);
+      await settle();
+
+      await state.scanPacketBarcode('6221033000011');
+      await state.scanLabelPhoto('/tmp/panel.jpg');
+
+      // The panel becomes the catalogue entry for that code, so the next
+      // person to scan that packet pays nothing and gets its micronutrients.
+      expect(ai.scannedLabels, ['/tmp/panel.jpg']);
+      expect(ai.lastLabelBarcode, '6221033000011');
+    });
+
+    test('a scan installs a menu Qamar already saved and already checked', () async {
+      final ai = FakeGateway()
+        ..scanResult = ScanResult(
+          found: true,
+          reply: 'Counted. I moved dinner down to make room.',
+          name: 'Chipsy Salt',
+          grams: 25,
+          kcal: 134,
+          plan: const DayPlan(date: '2026-08-23', slots: []),
+        );
+      final state = backed(ai: ai);
+      await settle();
+
+      await state.scanLabelPhoto('/tmp/panel.jpg');
+
+      expect(state.planDate, '2026-08-23');
+    });
+
+    test('a packet it finds spends one of the day’s photos, and a miss spends nothing', () async {
+      final ai = FakeGateway();
+      final state = backed(ai: ai);
+      await settle();
+      final before = state.photoQuota.remaining;
+
+      // The camera is not behind the paywall: a scan is one of the ways to
+      // log, and a packet found spends from the same three photos a day a
+      // plate photo does.
+      await state.scanPacketBarcode('6221033000011');
+      expect(state.hasProposal, isTrue);
+      expect(state.photoQuota.remaining, before - 1);
+      expect(state.plusNotice, isNull);
+
+      // A code nobody has catalogued never reaches the model.
+      ai.scanResult = const ScanResult(found: false, barcode: '6221033000028', reply: 'not catalogued');
+      await state.scanPacketBarcode('6221033000028');
+      expect(state.photoQuota.remaining, before - 1);
+    });
+
+    test('with the day’s photos gone, a scan meets the photo wall, not an error', () async {
+      final ai = FakeGateway()
+        ..quotas = AiQuotas.empty.replacing(
+          const AiQuota(bucket: 'photo', used: 3, limit: 3, extra: 0, remaining: 0),
+        );
+      final state = backed(ai: ai);
+      await settle();
+
+      await state.scanLabelPhoto('/tmp/panel.jpg');
+
+      expect(state.hasProposal, isFalse);
+      expect(state.scanNotice, isNull, reason: 'the wall says it, not a scan failure');
+      expect(state.photoQuota.remaining, 0);
+      expect(state.scanBusy, isFalse);
+    });
+  });
+
   test('the ledger records points as they are earned, not reconstructed', () async {
-    final state = backed(ai: FakeGateway());
+    final wallet = FakeWalletRepo();
+    final state = backed(ai: FakeGateway(), wallet: wallet);
     await settle();
     expect(state.ledger(), isEmpty, reason: 'a new user has earned nothing');
 
     state.repeatMeal(LoggedMeal(name: 'Koshary', sub: '', kcal: 520, p: 16, c: 96, f: 9, at: DateTime.now()));
     expect(state.ledger().single.amount, SuEconomy.firstMeal);
     expect(state.suAvailable, SuEconomy.firstMeal);
+  });
+
+  test('the wallet shows the server balance and its rows, not an optimistic copy', () async {
+    final wallet = FakeWalletRepo();
+    // The database already holds a signup bonus this session knows nothing of.
+    wallet.award(SuEconomy.signupBonus, 'signup_bonus', 'signup:user-1');
+    final state = backed(ai: FakeGateway(), wallet: wallet);
+    await settle();
+    expect(state.suAvailable, SuEconomy.signupBonus);
+    expect(state.ledger().single.reason, 'signup_bonus');
+    expect(state.ledger().single.displayLabel(false), 'Signup bonus');
+  });
+
+  test('server ledger reasons are shown in the user language, not as codes', () {
+    const e = LedgerEntry(label: 'first_meal', amount: 500, when: 'x', reason: 'first_meal');
+    expect(e.displayLabel(true), 'أول وجبة');
+    expect(e.displayLabel(false), 'First meal logged');
+
+    // Every reason the server writes has words, in both languages.
+    for (final r in const ['signup_bonus', 'onboarding', 'first_meal', 'meal_logged', 'meal_log', 'daily_quest', 'water', 'streak_week', 'activity_logged', 'season_full_log', 'invitation_sender_reward', 'invitation_friend_reward']) {
+      final row = LedgerEntry(label: r, amount: 1, when: 'x', reason: r);
+      expect(row.displayLabel(true), isNot(r), reason: r);
+      expect(row.displayLabel(false), isNot(r), reason: r);
+    }
+
+    // A redemption is named after what was bought.
+    const freeze = LedgerEntry(label: 'x', amount: -600, when: 'x', reason: 'redemption:streak_freeze');
+    expect(freeze.displayLabel(false), kSpendCatalog.firstWhere((i) => i.id == 'streak_freeze').nameEn);
+    const question = LedgerEntry(label: 'x', amount: -800, when: 'x', reason: 'redemption:chat_extra');
+    expect(question.displayLabel(true), kQuestionExtra.nameAr);
+
+    // An optimistic row is already translated and must be left alone.
+    const local = LedgerEntry(label: 'مهمة اليوم', amount: 250, when: 'دلوقتي');
+    expect(local.displayLabel(true), 'مهمة اليوم');
+
+    // A reason nobody has translated shows as itself rather than as a guess.
+    const unknown = LedgerEntry(label: 'x', amount: 1, when: 'x', reason: 'referral_bonus');
+    expect(unknown.displayLabel(true), 'referral_bonus');
+  });
+
+  test('a ledger row says when on the app’s clock, and past a day counts calendar days', () {
+    final now = DateTime(2026, 9, 24, 8, 30);
+    LedgerEntry at(DateTime t) => LedgerEntry(label: 'x', amount: 1, when: 'server', at: t);
+    String en(DateTime t) => at(t).displayWhen(false, now: now);
+    String ar(DateTime t) => at(t).displayWhen(true, now: now);
+
+    expect(en(now.subtract(const Duration(seconds: 20))), 'Just now');
+    expect(en(now.subtract(const Duration(minutes: 5))), '5m ago');
+    expect(ar(now.subtract(const Duration(minutes: 1))), 'من دقيقة');
+    expect(ar(now.subtract(const Duration(minutes: 2))), 'من دقيقتين');
+    expect(ar(now.subtract(const Duration(minutes: 5))), 'من 5 دقايق');
+    expect(ar(now.subtract(const Duration(minutes: 40))), 'من 40 دقيقة');
+    // Last night at 23:00 is hours ago, not "yesterday".
+    expect(en(DateTime(2026, 9, 23, 23)), '9h ago');
+    expect(ar(DateTime(2026, 9, 23, 23)), 'من 9 ساعات');
+    expect(en(DateTime(2026, 9, 23, 7)), 'Yesterday');
+    expect(ar(DateTime(2026, 9, 23, 7)), 'امبارح');
+    expect(en(DateTime(2026, 9, 20, 12)), '4d ago');
+    expect(ar(DateTime(2026, 9, 22, 12)), 'من يومين');
+    expect(en(DateTime(2026, 9, 10, 12)), '10/09');
+    // An optimistic row keeps the words it was written with.
+    expect(const LedgerEntry(label: 'x', amount: 1, when: 'دلوقتي').displayWhen(true, now: now), 'دلوقتي');
   });
 
   test('the fourth question in a day is refused, and Qamar+ is the way out', () async {
@@ -1271,6 +1586,104 @@ void main() {
   });
 
   group('account', () {
+    test('a mail server that refuses Supabase is explained, not dumped raw', () async {
+      // What a real phone showed: 'AuthRetryableFetchException(message:
+      // {"code":"unexpected_failure","message":"Error sending email change
+      // email"}, statusCode: 500)' — English, Latin, monospace, at somebody
+      // reading Arabic. The cause is the project's SMTP server answering
+      // 535 Invalid username, which is nothing the person did.
+      final auth = FakeAccount()
+        ..failWith = Exception(
+          '{"code":"unexpected_failure","message":"Error sending email change email"}, statusCode: 500');
+      final state = backed(auth: auth);
+      await settle();
+      state.setLang(AppLang.en);
+      state.openLinkAccount();
+      state.onAuthEmailChanged('nour@example.com');
+
+      await state.sendAuthCode();
+
+      expect(state.authError, isNotNull);
+      expect(state.authError, contains('server setting'));
+      expect(state.authError, contains('still here'));
+      expect(state.authError, isNot(contains('AuthRetryableFetchException')));
+      expect(state.authError, isNot(contains('statusCode')));
+    });
+
+    test('an unrecognised failure is not taken for the mail server, and is said from the person’s side', () async {
+      // Only the mail server's own words ("Error sending", unexpected_failure)
+      // mean nobody can get a code; any other 500 is ours to say plainly
+      // (O10). Its raw text goes to the debug log, never the sheet.
+      final auth = FakeAccount()..failWith = Exception('some novel backend problem, statusCode: 500');
+      final state = backed(auth: auth);
+      await settle();
+      state.setLang(AppLang.en);
+      state.openLinkAccount();
+      state.onAuthEmailChanged('nour@example.com');
+
+      await state.sendAuthCode();
+
+      expect(state.authError, 'Something went wrong on our side. Try again in a moment.');
+      expect(state.authError, isNot(contains('some novel backend problem')));
+    });
+
+    test('a password signs in without anybody sending an email', () async {
+      final auth = FakeAccount();
+      final state = backed(auth: auth);
+      await settle();
+      state.setLang(AppLang.en);
+      state.openSignIn();
+      state.toggleAuthPassword();
+      state.onAuthEmailChanged('tester@dr-qamar.com');
+      state.onAuthPasswordChanged('QamarTest!2026');
+
+      await state.signInWithPassword();
+
+      expect(auth.passwordSignIns, ['tester@dr-qamar.com']);
+      expect(auth.linkStarts, isEmpty, reason: 'no code was requested');
+      expect(auth.signInStarts, isEmpty, reason: 'no email was sent');
+      expect(state.authError, isNull);
+      expect(state.authDone, contains('tester@dr-qamar.com'));
+    });
+
+    test('a wrong password is told apart from a broken mail server', () async {
+      final auth = FakeAccount();
+      final state = backed(auth: auth);
+      await settle();
+      state.setLang(AppLang.en);
+      state.openSignIn();
+      state.toggleAuthPassword();
+      state.onAuthEmailChanged('tester@dr-qamar.com');
+      state.onAuthPasswordChanged('not-the-password');
+
+      await state.signInWithPassword();
+
+      expect(state.authError, 'That email or password is not right.');
+      expect(state.authDone, isNull);
+    });
+
+    test('the password never outlives the sheet', () async {
+      final state = backed(auth: FakeAccount());
+      await settle();
+      state.openSignIn();
+      state.toggleAuthPassword();
+      state.onAuthPasswordChanged('QamarTest!2026');
+      expect(state.authPassword, isNotEmpty);
+
+      state.closeAuth();
+      expect(state.authPassword, isEmpty);
+    });
+
+    test('linking a guest account is never offered a password', () async {
+      // A password proves you know a secret. Linking has to prove the address
+      // is yours, which is a different claim and needs the code.
+      final state = backed(auth: FakeAccount());
+      await settle();
+      state.openLinkAccount();
+      expect(state.authLinking, isTrue);
+      expect(state.authUsePassword, isFalse);
+    });
+
     test('linking sends a code and only then attaches the email', () async {
       final auth = FakeAccount();
       final state = backed(auth: auth);
@@ -1565,6 +1978,7 @@ void main() {
     final state = AppState(
       userId: 'user-1',
       billing: billing,
+      sellsPlus: true,
       openCheckout: (url) async {
         opened.add(url);
         return true;
@@ -1586,6 +2000,7 @@ void main() {
     final state = AppState(
       userId: 'user-1',
       billing: billing,
+      sellsPlus: true,
       openCheckout: (url) async => true,
     )..setLang(AppLang.en);
     await settle();
@@ -1641,7 +2056,7 @@ void main() {
         periodEnd: DateTime.now().toUtc().add(const Duration(days: 5)),
       );
     final opened = <String>[];
-    final state = AppState(userId: 'user-1', billing: billing, openCheckout: (url) async { opened.add(url); return true; })
+    final state = AppState(userId: 'user-1', billing: billing, sellsPlus: true, openCheckout: (url) async { opened.add(url); return true; })
       ..setLang(AppLang.en);
     await settle();
     expect(state.plusIsTrial, isTrue);
@@ -1666,19 +2081,34 @@ void main() {
     expect(PlusEntitlement.fromJson({'status': 'free'}).trialEligible, isFalse, reason: 'an old server never offers a trial');
   });
 
-  test('coming back from Paymob reads the server entitlement', () async {
-    final billing = FakeBilling()
-      ..current = PlusEntitlement(
-        status: 'active',
-        plan: 'monthly',
-        periodEnd: DateTime.now().toUtc().add(const Duration(days: 30)),
-      );
-    final state = AppState(userId: 'user-1', billing: billing)..setLang(AppLang.en);
+  test('while Qamar+ is not on sale it takes no money, and the free week still starts', () async {
+    final billing = FakeBilling()..current = const PlusEntitlement(status: 'free', trialEligible: true);
+    final opened = <String>[];
+    final state = AppState(
+      userId: 'user-1',
+      billing: billing,
+      sellsPlus: false,
+      openCheckout: (url) async {
+        opened.add(url);
+        return true;
+      },
+    )..setLang(AppLang.en);
     await settle();
 
-    await state.onReturnedFromPaymob();
+    await state.startPlusPurchase();
+
+    // No checkout that cannot take money, and nobody marked a member.
+    expect(billing.lastPlan, isNull, reason: 'no checkout was asked for');
+    expect(opened, isEmpty);
+    expect(state.plusActive, isFalse);
+    expect(state.plusNotice, 'Paying for Qamar+ isn’t open yet. Soon.');
+
+    // The switch gates money and nothing else: the week is the server's to
+    // grant, and it grants it.
+    await state.startPlusTrial();
+    expect(billing.trialStarts, 1);
     expect(state.plusActive, isTrue);
-    expect(state.screen, AppScreen.subscription);
+    expect(state.plusIsTrial, isTrue);
   });
 
   group('analytics, behind consent', () {
@@ -2033,6 +2463,7 @@ void main() {
         userId: 'user-1',
         billing: billing,
         analytics: a,
+        sellsPlus: true,
         openCheckout: (url) async {
           opened.add(url);
           return true;
@@ -4028,8 +4459,15 @@ class FakeBilling implements BillingGateway {
     );
   }
 
+  /// Counted so a test can assert the app did not call a billing function
+  /// that is not deployed.
+  int entitlementCalls = 0;
+
   @override
-  Future<PlusEntitlement> entitlement() async => current;
+  Future<PlusEntitlement> entitlement() async {
+    entitlementCalls++;
+    return current;
+  }
 
   int trialStarts = 0;
 

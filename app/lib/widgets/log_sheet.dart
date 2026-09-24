@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/activity.dart';
 import '../models/water.dart';
 import '../services/photos.dart';
+import '../services/scan_flow.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
@@ -73,6 +74,8 @@ const kWaterChoices = [
 ///
 ///  * the three ways to say a meal — speak, type, photograph — as the kit's
 ///    pastel tiles;
+///  * a packet: its barcode, or its nutrition table when no catalogue knows
+///    it (a camera use, like a photo);
 ///  * "Repeat": the recent meals, one tap to log one again;
 ///  * water, a glass, a bottle or a tea;
 ///  * movement, the kind, then how long;
@@ -88,6 +91,7 @@ class LogSheet extends StatelessWidget {
   static Key waterKey(WaterUnit u) => ValueKey('log-water-${u.name}');
   static Key activityKey(ActivityKind k) => ValueKey('log-activity-${k.name}');
   static const repeatKey = ValueKey('log-repeat');
+  static const scanKey = ValueKey('log-scan');
   static const askKey = ValueKey('log-ask');
 
   @override
@@ -150,6 +154,8 @@ class _Choices extends StatelessWidget {
             ],
           ],
         ),
+        const SizedBox(height: 10),
+        _ScanRow(state: state),
         if (repeat.isNotEmpty) ...[
           const SizedBox(height: 20),
           // Named as the night note names it ("under Log → Repeat").
@@ -359,6 +365,50 @@ class _RoundChoice extends StatelessWidget {
           ),
         ),
       );
+}
+
+/// A packet: the camera reads its barcode, and when no catalogue knows it,
+/// the nutrition table on the back is photographed and read (scan_flow.dart).
+/// A camera use, so it spends one of the day's photos, and shows the photo
+/// tile's lock when they are gone; the server's answer then offers one more.
+class _ScanRow extends StatelessWidget {
+  final AppState state;
+  const _ScanRow({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final locked = state.photoQuota.exhausted;
+    return QTapArea(
+      key: LogSheet.scanKey,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        startPacketScan(context, state);
+      },
+      builder: (context, pressed) => qPressed(
+        context,
+        pressed: pressed,
+        child: QSurface(
+          pressed: pressed,
+          padding: const EdgeInsetsDirectional.fromSTEB(14, 12, 12, 12),
+          child: Row(children: [
+            const QIcon(QIcons.barcode, size: 22, color: QColors.ink),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(isAr ? 'امسح علبة' : 'Scan a packet', style: QText.body(size: 16, weight: FontWeight.w500, color: QColors.ink)),
+                Text(
+                  isAr ? 'الباركود، أو جدول القيم الغذائية' : 'The barcode, or the nutrition table',
+                  style: QText.body(size: 13, color: QColors.inkSecondary),
+                ),
+              ]),
+            ),
+            QIcon(locked ? QIcons.locked : QIcons.forward, size: 20, color: QColors.inkSecondary),
+          ]),
+        ),
+      ),
+    );
+  }
 }
 
 /// Asking, not logging: the conversation, ready for typing. Under it, once,

@@ -1,3 +1,4 @@
+import 'days.dart';
 import 'su_economy.dart';
 
 class Target {
@@ -156,7 +157,100 @@ class LedgerEntry {
   final String label;
   final int amount; // negative for spends
   final String when;
-  const LedgerEntry({required this.label, required this.amount, required this.when});
+
+  /// The database's `su_point_ledger.reason` when this row came from the
+  /// server — `first_meal`, `daily_quest`, `signup_bonus`. Null for rows the
+  /// app wrote optimistically, which already carry a translated [label].
+  final String? reason;
+
+  /// The raw `created_at`, when there is one, so the wallet can render a time
+  /// instead of an ISO string.
+  final DateTime? at;
+
+  const LedgerEntry({
+    required this.label,
+    required this.amount,
+    required this.when,
+    this.reason,
+    this.at,
+  });
+
+  /// What to actually put on screen.
+  ///
+  /// A server row arrives as a snake_case reason code. Printing it puts
+  /// `economy_v2_signup_topup` in front of an Arabic-first user, which is how
+  /// it read until this existed. Anything unrecognised falls back to the code
+  /// rather than to a wrong guess — a reason nobody has translated yet should
+  /// look untranslated, not look like something else.
+  String displayLabel(bool isAr) {
+    final r = reason;
+    if (r == null) return label;
+    // A redemption is 'redemption:<catalog id>' (qamar_wallet_redeem): named
+    // after what was bought.
+    if (r.startsWith('redemption:')) {
+      final id = r.substring('redemption:'.length);
+      for (final item in [...kSpendCatalog, kQuestionExtra]) {
+        if (item.id == id) return isAr ? item.nameAr : item.nameEn;
+      }
+      return isAr ? 'استبدال' : 'Redemption';
+    }
+    return switch (r) {
+      'signup_bonus' => isAr ? 'هدية التسجيل' : 'Signup bonus',
+      'economy_v2_signup_topup' => isAr ? 'تعويض رصيد البداية' : 'Starting balance top-up',
+      'onboarding' => isAr ? 'إكمال التهيئة' : 'Onboarding completed',
+      'first_meal' => isAr ? 'أول وجبة' : 'First meal logged',
+      'meal_log' || 'meal_logged' => isAr ? 'تأكيد وجبة' : 'Meal confirmed',
+      'daily_quest' => isAr ? 'مهمة اليوم' : 'Primary daily quest',
+      'water' => isAr ? 'كوباية مية' : 'A glass of water',
+      'streak_week' => isAr ? 'أسبوع كامل ورا بعض' : 'A week in a row',
+      'activity_logged' => isAr ? 'حركة' : 'Activity logged',
+      'season_full_log' => isAr ? 'رمضان كله متسجّل' : 'All of Ramadan logged',
+      'invitation_sender_reward' => isAr ? 'صاحبك اشترك' : 'Your friend subscribed',
+      'invitation_friend_reward' => isAr ? 'هدية الدعوة' : 'Your invitation gift',
+      _ => r.startsWith('redeem_') || r == 'redeem'
+          ? (isAr ? 'استبدال' : 'Redemption')
+          : r,
+    };
+  }
+
+  /// A short, local rendering of [at], seen at [now] (the app's clock).
+  /// Falls back to [when] for optimistic rows, which set it to "just now" in
+  /// the right language already. Past the first day it counts calendar days
+  /// ([Days]), not 24-hour spans, so the day the clocks change is one day.
+  String displayWhen(bool isAr, {DateTime? now}) {
+    final t = at;
+    if (t == null) return when;
+    final seen = now ?? DateTime.now();
+    final d = seen.difference(t);
+    if (d.inMinutes < 1) return isAr ? 'دلوقتي' : 'Just now';
+    if (d.inHours < 1) {
+      final m = d.inMinutes;
+      return isAr ? 'من ${_arCount(m, 'دقيقة', 'دقيقتين', 'دقايق')}' : '${m}m ago';
+    }
+    final days = Days.between(t.toLocal(), seen.toLocal());
+    if (days < 1 || d.inHours < 24) {
+      final h = d.inHours;
+      return isAr ? 'من ${_arCount(h, 'ساعة', 'ساعتين', 'ساعات')}' : '${h}h ago';
+    }
+    if (days < 7) {
+      if (days == 1) return isAr ? 'امبارح' : 'Yesterday';
+      return isAr ? 'من ${_arCount(days, 'يوم', 'يومين', 'أيام')}' : '${days}d ago';
+    }
+    final l = t.toLocal();
+    final mm = l.month.toString().padLeft(2, '0');
+    final dd = l.day.toString().padLeft(2, '0');
+    return '$dd/$mm';
+  }
+
+  /// "دقيقة", "دقيقتين", "٣ دقايق", "١١ دقيقة": one and two are words, three
+  /// to ten take the plural, and eleven on the singular again. Digits stay
+  /// Western here; the screen passes the line through its own [AppState.iso].
+  static String _arCount(int n, String one, String two, String few) => switch (n) {
+        1 => one,
+        2 => two,
+        >= 3 && <= 10 => '$n $few',
+        _ => '$n $one',
+      };
 }
 
 class SpendItemDef {

@@ -47,6 +47,9 @@ dependencies:
   share_plus: ^13.3.0
   posthog_flutter: ^5.44.2
 
+  # Reading the barcode on a packet with the camera (lib/screens/barcode_screen.dart).
+  mobile_scanner: ^7.4.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

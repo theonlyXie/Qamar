@@ -29,8 +29,10 @@ EarnedMonth _stated({int needed = 20, int window = 30, bool claimed = false, Dat
       windowStart: windowStart,
     );
 
-AppState _lite(AppLang lang, {EarnedMonth? earned, PlusQuote? quote}) {
-  final s = AppState()..setLang(lang);
+/// The paywall as it reads once Qamar+ is on sale; [onSale] false is the
+/// build that ships until Paymob is live (AppState.plusOnSale).
+AppState _lite(AppLang lang, {EarnedMonth? earned, PlusQuote? quote, bool onSale = true}) {
+  final s = AppState(sellsPlus: onSale)..setLang(lang);
   if (earned != null) s.earnedMonth = earned;
   if (quote != null) s.plusQuote = quote;
   return s;
@@ -288,6 +290,32 @@ void main() {
         expect(find.byKey(SubscriptionScreen.buyKey), findsNothing);
         expect(text.replaceAll(RegExp('[\u2066-\u2069]'), ''), contains(ar ? 'شهرك شغال · لحد ٢٠/١٠' : 'Your month · until 20/10'));
         expect(find.byKey(SubscriptionScreen.codeToggleKey), findsNothing, reason: 'a code rides on a payment, and there is none to make');
+      });
+    }
+  });
+
+  // Until Paymob is live the build sells nothing (BILLING_ENABLED false),
+  // and the paywall says so where the payment would be. Only the money waits:
+  // the free week is still one tap.
+  group('while paying is not open yet', () {
+    for (final lang in AppLang.values) {
+      final ar = lang == AppLang.ar;
+      final soon = ar ? 'الدفع لسه مش متاح. قريب.' : 'Paying for Qamar+ isn’t open yet. Soon.';
+
+      testWidgets('the free week is still the button, with no month to pay for under it (${lang.name})', (tester) async {
+        final s = _lite(lang, earned: _stated(), onSale: false)..plusTrialEligible = true;
+        await _paywall(tester, s);
+        expect(tester.widget<QPrimaryButton>(find.byKey(SubscriptionScreen.primaryKey)).label, ar ? 'ابدأ الأسبوع المجاني' : 'Start the free week');
+        expect(find.byKey(SubscriptionScreen.buyKey), findsNothing);
+        expect(find.byKey(SubscriptionScreen.codeToggleKey), findsNothing, reason: 'a code rides on a payment');
+      });
+
+      testWidgets('with the week used, it says paying is coming, and offers nothing to press (${lang.name})', (tester) async {
+        await _paywall(tester, _lite(lang, earned: _stated(), onSale: false));
+        expect(find.byType(QPrimaryButton), findsNothing);
+        expect(find.byKey(SubscriptionScreen.buyKey), findsNothing);
+        expect(find.descendant(of: find.byKey(SubscriptionScreen.soonKey), matching: find.text(soon)), findsOneWidget);
+        expect(find.byKey(SubscriptionScreen.codeToggleKey), findsNothing);
       });
     }
   });

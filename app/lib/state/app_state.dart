@@ -23,12 +23,12 @@ import '../services/ai_gateway.dart';
 import '../services/analytics.dart';
 import '../services/auth_service.dart';
 import '../services/device_prefs.dart';
+import '../services/config.dart';
 import '../services/dictation.dart';
 import '../services/nudger.dart';
 import '../services/photos.dart';
 import '../services/settings_link.dart' as settings_link;
 import '../services/sharer.dart';
-import '../services/config.dart';
 import '../services/payments.dart';
 import '../services/repositories.dart';
 import '../models/activity.dart';
@@ -94,7 +94,9 @@ class AppState extends ChangeNotifier {
     Analytics? analytics,
     DateTime Function()? clock,
     Future<bool> Function()? openSettings,
-  })  : _profileRepo = profileRepo,
+    bool? sellsPlus,
+  })  : plusOnSale = sellsPlus ?? QamarConfig.billingEnabled,
+        _profileRepo = profileRepo,
         _mealRepo = mealRepo,
         _waterRepo = waterRepo,
         _walletRepo = walletRepo,
@@ -1317,6 +1319,10 @@ class AppState extends ChangeNotifier {
     _askedQuestion = null;
     lastMealPhotoPath = null;
     chatPhotoPath = null;
+    scanPortionAssumed = false;
+    scanNotice = null;
+    scanBusy = false;
+    awaitingLabelPhoto = false;
     scanned = false;
     scanReading = false;
     suAvailable = 0;
@@ -2704,6 +2710,7 @@ class AppState extends ChangeNotifier {
     _logStart = null;
     discardPhoto(lastMealPhotoPath);
     lastMealPhotoPath = null;
+    scanPortionAssumed = false;
     _notify();
   }
 
@@ -2711,6 +2718,9 @@ class AppState extends ChangeNotifier {
   /// confirmation. Never writes anything by itself.
   Future<void> _analyseMeal({required String inputType, String? text, String? imagePath}) async {
     final gateway = _ai;
+    // Not a scan: clear the packet caveat so it cannot linger onto the next
+    // proposal and label a typed meal as an assumed portion.
+    scanPortionAssumed = false;
     proposalInput = inputType;
     proposalRaw = text;
     // The reading belongs to the log that began it and takes that log's
@@ -2809,9 +2819,16 @@ class AppState extends ChangeNotifier {
     final how = switch (proposalInput) {
       'photo' => isAr ? 'بالصورة' : 'by photo',
       'voice' => isAr ? 'بالصوت' : 'by voice',
+      'scan' => isAr ? 'من العلبة' : 'off the packet',
       _ => isAr ? 'بالكتابة' : 'by text',
     };
-    final anyLow = items.any((it) => it.def.conf != Confidence.high);
+    // Two separate ways a logged number can be softer than it looks: the food
+    // itself was not identified confidently, or it was — off a printed panel,
+    // even — but nobody knows how much of it was eaten. A scanned packet is
+    // always high confidence and can still be a guess about the portion, and
+    // the portion is the figure everything else multiplies.
+    final anyLow = items.any((it) => it.def.conf != Confidence.high) ||
+        items.any((it) => !it.def.portionMatched);
     final sub = isAr
         ? 'مسجّل $how${anyLow ? ' · تقدير' : ''}'
         : 'Logged $how${anyLow ? ' · estimate' : ''}';
@@ -2860,6 +2877,7 @@ class AppState extends ChangeNotifier {
     // The verdict is in and acted on; the picture has no further use here.
     discardPhoto(lastMealPhotoPath);
     lastMealPhotoPath = null;
+    scanPortionAssumed = false;
     _notify();
     _rescheduleNudges();
 
@@ -3599,6 +3617,13 @@ class AppState extends ChangeNotifier {
     _notify();
   }
 
+  /// Whether Qamar+ can be paid for yet (QamarConfig.billingEnabled): off
+  /// until Paymob is live. It gates taking money and nothing else — the free
+  /// week, an invitation's or a nutritionist's fortnight, the day's limits and
+  /// Su all work while it is off — so a checkout that cannot take money is
+  /// never opened, and nobody is marked a member who has not become one.
+  final bool plusOnSale;
+
   /// Opens Paymob's checkout for the selected plan. Qamar+ is not flipped
   /// here — Paymob tells the server, and the next entitlement read does.
   Future<void> startPlusPurchase() async {
@@ -3609,6 +3634,15 @@ class AppState extends ChangeNotifier {
       plusNotice = isAr
           ? '${until == null ? 'شهرك شغال' : 'شهرك شغال لحد ${iso(when)}'}، ومفيش حاجة بتتجدد لوحدها. لما يخلص، تقدر تدفع الشهر اللي بعده من هنا.'
           : '${until == null ? 'Your month is on' : 'Your month runs until $when'}, and nothing renews on its own. When it ends, you can pay for the next one here.';
+      _notify();
+      return;
+    }
+    // Guarded here as well as on the screen, so a stale widget or a deep
+    // link cannot open a checkout that cannot take money.
+    if (!plusOnSale) {
+      plusNotice = isAr
+          ? 'الدفع لسه مش متاح. قريب.'
+          : 'Paying for Qamar+ isn’t open yet. Soon.';
       _notify();
       return;
     }
@@ -4197,11 +4231,14 @@ class AppState extends ChangeNotifier {
   /// happens — see [_credit]. Nothing is reconstructed from the balance.
   List<LedgerEntry> ledger() => serverLedger.isNotEmpty ? serverLedger : ledgerExtra;
 
-  /// Records points earned, and the reason, at the moment it is earned.
+  /// Shows points the moment they are earned, so the screen does not wait on a
+  /// round trip.
   ///
-  /// The balance is still the server's to decide — crediting is server-side
-  /// only (see SupabaseWalletRepository.credit) — so this is the local view
-  /// until the next hydrate replaces it with the database's.
+  /// This is a display, not a decision. Nothing here reaches the database —
+  /// `SupabaseWalletRepository.credit` throws on purpose — and every call site
+  /// that is backed by a real project follows the write with
+  /// [_refreshWallet]. Until that landed, these two integers were the *only*
+  /// record of a meal award anywhere, and they were gone by the next launch.
   void _credit(int amount, {required String ar, required String en}) {
     suAvailable += amount;
     suLifetime += amount;
@@ -4379,6 +4416,8 @@ class AppState extends ChangeNotifier {
 
   void closeAuth() {
     authOpen = false;
+    // A typed password does not outlive the sheet it was typed into.
+    authPassword = '';
     _notify();
   }
 
@@ -4387,6 +4426,8 @@ class AppState extends ChangeNotifier {
     authBusy = false;
     authProvider = null;
     authCode = '';
+    authPassword = '';
+    authUsePassword = false;
     authError = null;
     authDone = null;
     _notify();
@@ -4402,6 +4443,75 @@ class AppState extends ChangeNotifier {
     authCode = v.trim();
     authError = null;
     _notify();
+  }
+
+  /// The password typed into the account sheet. Never stored, never logged,
+  /// and cleared the moment the sheet closes.
+  String authPassword = '';
+
+  /// True when the sheet is showing the password field instead of the code
+  /// field. Not a preference — a second way in, for the days the first one
+  /// cannot deliver a message.
+  bool authUsePassword = false;
+
+  void onAuthPasswordChanged(String v) {
+    authPassword = v;
+    authError = null;
+    _notify();
+  }
+
+  void toggleAuthPassword() {
+    authUsePassword = !authUsePassword;
+    authCodeSent = false;
+    authCode = '';
+    authError = null;
+    _notify();
+  }
+
+  /// Signs in with an email and password, which asks nobody to send anything.
+  ///
+  /// Deliberately never offered as the way to *link* a guest account: linking
+  /// an address has to prove the address belongs to you, and a password
+  /// proves nothing of the kind. This is for an account that already exists.
+  Future<void> signInWithPassword() async {
+    final auth = _auth;
+    if (auth == null) {
+      authError = isAr
+          ? 'الحسابات محتاجة اتصال بالسيرفر، والتطبيق شغال أوفلاين دلوقتي.'
+          : 'Accounts need a server connection, and the app is running offline.';
+      _notify();
+      return;
+    }
+    if (!authEmailValid) {
+      authError = isAr ? 'الإيميل ده مش مظبوط.' : 'That email does not look right.';
+      _notify();
+      return;
+    }
+    if (authPassword.length < 6) {
+      authError = isAr
+          ? 'كلمة السر ٦ حروف على الأقل.'
+          : 'A password is at least six characters.';
+      _notify();
+      return;
+    }
+    authBusy = true;
+    authError = null;
+    _notify();
+    try {
+      await auth.signInWithPassword(email: authEmail, password: authPassword);
+      if (_disposed) return;
+      authDone = isAr ? 'أهلاً. دخلت بـ $authEmail.' : 'Welcome back — signed in as $authEmail.';
+      authPassword = '';
+      authBusy = false;
+      _notify();
+      // A different account is a different set of rows.
+      await hydrate();
+    } catch (e) {
+      if (_disposed) return;
+      authError = _authMessage(e);
+      authBusy = false;
+      _notify();
+    }
   }
 
   static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s.]+\.[^@\s]+$');
@@ -4486,6 +4596,24 @@ class AppState extends ChangeNotifier {
       return isAr ? 'طلبات كتير على بعض. استنى شوية.' : 'Too many attempts. Wait a minute and try again.';
     }
     debugPrint('auth: $raw');
+    // The project's mail server is refusing Supabase's credentials, so no code
+    // can be delivered. This showed up on a real phone as the raw Dart
+    // exception, in English, to somebody reading Arabic. The person needs to
+    // know it is not their fault, that nothing they logged is lost, and what
+    // still works: a password, when the account has one. Only the mail
+    // server's own words say it is the mail server; a bare 500 from the auth
+    // server could be anything, and is said as ours, below.
+    if (raw.contains('Error sending') || raw.contains('unexpected_failure')) {
+      return isAr
+          ? 'مش قادر أبعت إيميلات دلوقتي — ده إعداد على السيرفر، مش حاجة منك. '
+            'كل اللي سجلته موجود على الموبايل زي ما هو. تقدر تدخل بكلمة سر لو عندك واحدة.'
+          : 'I cannot send email right now — that is a server setting, not '
+            'anything you did. Everything you have logged is still here on '
+            'this phone. You can sign in with a password if you have one.';
+    }
+    if (raw.contains('Invalid login credentials')) {
+      return isAr ? 'الإيميل أو كلمة السر غلط.' : 'That email or password is not right.';
+    }
     return failureOf(e) == Failure.ours
         ? (isAr ? 'حصلت مشكلة عندنا. جرّب تاني بعد شوية.' : 'Something went wrong on our side. Try again in a moment.')
         : (isAr ? 'مفيش نت دلوقتي. جرّب تاني لما يرجع.' : 'You’re offline right now. Try again when you’re back.');
@@ -5670,6 +5798,231 @@ class AppState extends ChangeNotifier {
     } else {
       logOpen = true;
     }
+    _notify();
+  }
+
+  // ---- scanning a packet ------------------------------------------------
+  //
+  // Two ways in, one way out. A barcode is looked up; a nutrition panel is
+  // photographed and read. Both come back in the same shape and both end as an
+  // ordinary proposal, so confirming a scanned packet writes the same meal_logs
+  // row as typing one — which is what makes it count towards the day, the
+  // micronutrient gaps and the Su award, instead of being a separate feature
+  // with its own half of the app.
+  //
+  // Nothing is written until the user confirms. That rule does not bend for
+  // scanning: a misread panel costs a tap.
+
+  /// The barcode whose lookup just failed, so a panel photographed next is
+  /// filed under it. Null at every other moment.
+  String? _pendingBarcode;
+
+  /// Set when Qamar had to guess how much of the packet was eaten. The sheet
+  /// turns this into a question rather than printing the number as though the
+  /// packet had said so.
+  bool scanPortionAssumed = false;
+
+  /// The last thing a scan said that was not a proposal — a packet nobody has
+  /// catalogued, or a panel too blurry to trust.
+  String? scanNotice;
+
+  bool scanBusy = false;
+
+  /// True when the next useful thing is a photograph of the nutrition panel:
+  /// the barcode was not in any catalogue, or the panel that was photographed
+  /// could not be read and is worth another try.
+  bool awaitingLabelPhoto = false;
+
+  /// Says the camera or the picker itself failed, without pretending the scan
+  /// found nothing — those are different, and only one of them is worth
+  /// retrying with a better photo.
+  void reportScanProblem(String detail) {
+    scanNotice = isAr
+        ? 'مقدرتش أفتح الكاميرا.'
+        : 'I could not open the camera.';
+    syncError = 'scan: $detail';
+    _notify();
+  }
+
+  /// Reads the nutrition panel on a packet.
+  ///
+  /// [barcode] is passed automatically when this follows a failed lookup; the
+  /// panel then becomes the catalogue entry for that code and the next person
+  /// to scan it pays nothing.
+  Future<void> scanLabelPhoto(String path, {String? barcode}) async {
+    await _scan(
+      inputLabel: isAr ? 'صوّرت جدول القيم الغذائية' : 'I photographed the nutrition panel',
+      run: (gateway) => gateway.scanLabel(
+        imagePath: path,
+        lang: lang.code,
+        date: _today(),
+        barcode: barcode ?? _pendingBarcode,
+      ),
+    );
+  }
+
+  /// Looks a packet up by the code on it.
+  Future<void> scanPacketBarcode(String code) async {
+    final digits = code.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return;
+    await _scan(
+      inputLabel: isAr ? 'مسحت الباركود ده' : 'I scanned this barcode',
+      run: (gateway) => gateway.scanBarcode(
+        barcode: digits,
+        lang: lang.code,
+        date: _today(),
+      ),
+      barcode: digits,
+    );
+  }
+
+  Future<void> _scan({
+    required String inputLabel,
+    required Future<ScanResult> Function(AiGateway gateway) run,
+    String? barcode,
+  }) async {
+    final gateway = _ai;
+    if (gateway == null) {
+      scanNotice = isAr
+          ? 'المسح محتاج اتصال بالمساعد.'
+          : 'Scanning needs a connection to the assistant.';
+      _notify();
+      return;
+    }
+
+    // A scan is a way to log, like the Log sheet's others: its start is
+    // captured now (what prompted it, 0059), and the sheet gives way to the
+    // conversation, where the reading arrives.
+    _logStart ??= _logStartNow();
+    _collapseLog();
+    openChat();
+    scanNotice = null;
+    scanPortionAssumed = false;
+    awaitingLabelPhoto = false;
+    scanBusy = true;
+    chatState = ChatState.thinking;
+    chat.add(ChatTurn(who: ChatWho.u, text: inputLabel));
+    _notify();
+
+    try {
+      final res = await run(gateway);
+      if (_disposed) return;
+      await _pullQuota(gateway);
+      chatState = ChatState.idle;
+
+      if (!res.found) {
+        // A packet nobody has catalogued, or a panel that could not be
+        // trusted. Both are real answers with no numbers attached, and the
+        // reply already says what to do instead.
+        // A barcode miss remembers the code so the panel photographed next is
+        // filed under it. A rejected panel keeps whatever code was already
+        // pending — the packet has not changed just because the photo was bad.
+        _pendingBarcode = res.problem == null ? (barcode ?? res.barcode) : _pendingBarcode;
+        // Either way the next useful move is the same: photograph the panel.
+        awaitingLabelPhoto = true;
+        scanNotice = res.reply;
+        proposal = null;
+        proposalQty = [];
+        chat.add(ChatTurn(who: ChatWho.q, text: res.reply));
+        scanBusy = false;
+        _notify();
+        return;
+      }
+
+      _pendingBarcode = null;
+      awaitingLabelPhoto = false;
+      _proposalStart = _takeLogStart();
+      proposalInput = 'scan';
+      proposalRaw = res.barcode;
+      scanPortionAssumed = res.portionAssumed;
+      _mealAskAt = null;
+
+      final name = res.displayName;
+      final portion = res.portionLabel ?? '${res.grams} g';
+      proposal = MealAnalysis([
+        ConfirmItemDef(
+          ar: name,
+          en: name,
+          portionAr: portion,
+          portionEn: portion,
+          // The figures were transcribed off the printed panel or read from a
+          // catalogue entry, not estimated from a photograph of a plate.
+          conf: Confidence.high,
+          kcal: res.kcal,
+          p: res.proteinG,
+          c: res.carbsG,
+          f: res.fatG,
+          grams: res.grams.toDouble(),
+          portionMatched: !res.portionAssumed,
+        ),
+      ]);
+      proposalQty = [1];
+
+      chat.add(ChatTurn(
+        who: ChatWho.q,
+        text: res.reply,
+        sub: _scanSub(res),
+      ));
+
+      // Qamar may have moved the rest of the day to make room. The gateway has
+      // already saved that menu and already checked it against this person's
+      // allergies, so the app installs it rather than asking for it again.
+      if (res.plan != null) {
+        _installPlan(res.plan!);
+      } else if (res.rebuildInstruction != null && res.rebuildInstruction!.trim().isNotEmpty) {
+        unawaited(ensurePlan(force: true, instruction: res.rebuildInstruction));
+      }
+    } on AiQuotaException catch (e) {
+      if (_disposed) return;
+      _onQuotaHit(e);
+    } catch (e) {
+      if (_disposed) return;
+      chatState = ChatState.idle;
+      // What failed, from the person's side (O10), never the exception itself.
+      scanNotice = switch (failureOf(e)) {
+        Failure.offline => isAr
+            ? 'مفيش نت دلوقتي، فمقدرتش أقرأ العلبة. جرّب تاني لما النت يرجع.'
+            : 'You’re offline, so I couldn’t read the packet. Try again once you’re back online.',
+        Failure.slow => isAr
+            ? 'النت بطيء دلوقتي، فمقدرتش أقرأ العلبة. جرّب تاني بعد شوية.'
+            : 'The connection is too slow to read the packet right now. Try again in a moment.',
+        Failure.ours => isAr
+            ? 'مقدرتش أوصل للمساعد عشان أقرأ العلبة. جرّب تاني بعد شوية.'
+            : 'I could not reach the assistant to read the packet. Try again in a moment.',
+      };
+      chat.add(ChatTurn(who: ChatWho.q, text: scanNotice!));
+    }
+    scanBusy = false;
+    _notify();
+  }
+
+  /// The line under Qamar's reply: where the numbers came from, and what is
+  /// still a guess. Both are things somebody might want to check.
+  String? _scanSub(ScanResult res) {
+    final parts = <String>[];
+    if (res.portionAssumed) {
+      parts.add(isAr
+          ? 'الكمية تقدير — العلبة مكتوبش عليها وزن'
+          : 'portion assumed — the packet gave no weight');
+    }
+    if (res.basis == 'per_serving') {
+      parts.add(isAr ? 'الجدول للحصة، حوّلته' : 'panel was per serving, converted');
+    }
+    if (res.energyFromKj) {
+      parts.add(isAr ? 'الطاقة محوّلة من كيلوجول' : 'energy converted from kJ');
+    }
+    if (res.remainingKcal != null) {
+      parts.add(isAr
+          ? 'باقي ${res.remainingKcal} سعرة النهارده'
+          : '${res.remainingKcal} kcal left today');
+    }
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  /// Puts the scan's notice away and stops asking for a panel photo.
+  void dismissScanNotice() {
+    scanNotice = null;
+    awaitingLabelPhoto = false;
     _notify();
   }
 
