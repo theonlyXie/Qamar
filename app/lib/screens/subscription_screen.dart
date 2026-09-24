@@ -12,11 +12,14 @@ import '../theme/icons.dart';
 import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
-import '../widgets/moon.dart';
+import '../widgets/review_card.dart';
+import '../widgets/kit.dart';
+import '../widgets/mascot.dart';
 
-/// Qamar+ and its paywall: what it is for, the price and the one thing to do,
-/// then what is in each tier, and the fine print. Calm and short, and every
-/// clause true for the person reading it.
+/// Qamar+ and its paywall (the kit's Premium page): what it is for on the
+/// lavender card, the one plan and its price on the lime card, the one thing
+/// to do, then what is in each tier, and the fine print. Calm and short, and
+/// every clause true for the person reading it.
 ///
 /// Prices here match the Paymob catalog (EGP). The charge itself is stamped
 /// server-side; this screen only names the plan and, optionally, a promo code.
@@ -118,35 +121,44 @@ class SubscriptionScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(QSpace.page, QLayout.pageTop, QSpace.page, QSpace.xxxl),
       children: [
-        Row(children: [
-          QBackButton(onTap: state.back, isAr: isAr),
-          const Spacer(),
-          if (state.plusActive) const _ActiveChip(),
-        ]),
-
-        // The lockup: the moon, the name and the one sentence it is for, centred.
-        const SizedBox(height: QSpace.sm),
-        const Center(child: ExcludeSemantics(child: QamarMoon(size: 72))),
+        // The kit's Premium header: the way back and the name beside it.
+        QPageTitle(
+          title: 'Qamar+',
+          isAr: false,
+          back: state.back,
+          trailing: [if (state.plusActive) const _ActiveChip()],
+        ),
         const SizedBox(height: QSpace.lg),
-        Center(child: Text('Qamar+', textDirection: TextDirection.ltr, style: QText.display(size: 34, ar: false))),
-        const SizedBox(height: QSpace.sm),
-        // What Qamar+ is for, first: the answer to "what do I eat?" The night
-        // job writes tomorrow's plan for every member at 22:00 Cairo.
-        QBalancedText(
-          isAr ? 'قمر+ بيقولك تاكل إيه بكرة: بيكتبلك الخطة بالليل، بأكل مصري.' : 'Qamar+ tells you what to eat tomorrow: it writes the plan at night, in Egyptian dishes.',
-          textKey: SubscriptionScreen.leadKey,
-          style: QText.body(size: 17, height: 24, weight: FontWeight.w600, color: QColors.ink),
+
+        // What Qamar+ is for, first, on the lavender card, the moon beside
+        // it: the answer to "what do I eat?" The night job writes tomorrow's
+        // plan for every member at 22:00 Cairo.
+        PastelCard(
+          color: QColors.lavender,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                // From the start, and never ending on a word alone.
+                BalancedStartText(
+                  isAr ? 'قمر+ بيقولك تاكل إيه بكرة: بيكتبلك الخطة بالليل، بأكل مصري.' : 'Qamar+ tells you what to eat tomorrow: it writes the plan at night, in Egyptian dishes.',
+                  textKey: SubscriptionScreen.leadKey,
+                  style: QText.body(size: 18, height: 27, weight: FontWeight.w600, color: QColors.onPastel),
+                ),
+                const SizedBox(height: QSpace.sm),
+                Text(
+                  isAr
+                      ? 'ومن غيره قمر شغال برضه: خطة النهارده، تلات صور وتلات أسئلة كل يوم، والكتابة والصوت بلا حد.'
+                      : 'Without it Qamar still works: today’s plan, three photos and three questions a day, and unlimited typing and speaking.',
+                  key: SubscriptionScreen.withoutKey,
+                  style: QText.body(size: 15, color: QColors.onPastelSecondary),
+                ),
+              ]),
+            ),
+            const SizedBox(width: QSpace.md),
+            const MoonMascot(size: 56, mood: MoonMood.joy),
+          ]),
         ),
         const SizedBox(height: QSpace.md),
-        // What follows reads from the start, like the rest of the screen.
-        Text(
-          isAr
-              ? 'ومن غيره قمر شغال برضه: خطة النهارده، تلات صور وتلات أسئلة كل يوم، والكتابة والصوت بلا حد.'
-              : 'Without it Qamar still works: today’s plan, three photos and three questions a day, and unlimited typing and speaking.',
-          key: SubscriptionScreen.withoutKey,
-          style: QText.body(size: 15, color: QColors.inkSecondary),
-        ),
-        const SizedBox(height: QSpace.xxl),
 
         _PlanCard(state: state, quote: quote, buyHere: trialOffer),
         const SizedBox(height: QSpace.lg),
@@ -186,7 +198,7 @@ class SubscriptionScreen extends StatelessWidget {
             builder: (context, pressed) => Padding(
               padding: const EdgeInsets.symmetric(horizontal: QSpace.md),
               child: Text(isAr ? 'استرجع الاشتراك' : 'Restore purchase',
-                  style: QText.body(size: 15, weight: FontWeight.w500, color: pressed ? QColors.ink : QColors.inkSecondary)),
+                  style: QText.body(size: 15, weight: FontWeight.w600, color: pressed ? QColors.ink : QColors.accentInk)),
             ),
           ),
         ),
@@ -221,12 +233,12 @@ class _Dot extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: QSpace.xs),
-        child: Text('·', style: QText.body(size: 13, color: QColors.inkTertiary)),
+        child: Text('·', style: QText.body(size: 13, color: QColors.inkSecondary)),
       );
 }
 
-/// "Active", beside the back control while Qamar+ is on: a check and the
-/// word, inside the strong edge.
+/// "Active", at the end of the header while Qamar+ is on: a check and the
+/// word, on the kit's mint.
 class _ActiveChip extends StatelessWidget {
   const _ActiveChip();
 
@@ -235,19 +247,20 @@ class _ActiveChip extends StatelessWidget {
     final isAr = Directionality.of(context) == TextDirection.rtl;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: QSpace.md, vertical: 6),
-      decoration: QDecor.capsule(),
+      decoration: QDecor.capsule(edge: QColors.mint, fill: QColors.mint),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(QIcons.check, size: 15, color: QColors.ink),
+        const QIcon(QIcons.done, size: 16, color: QColors.onPastel),
         const SizedBox(width: 6),
-        Text(isAr ? 'مفعّل' : 'Active', style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.ink)),
+        Text(isAr ? 'مفعّل' : 'Active', style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onPastel)),
       ]),
     );
   }
 }
 
-/// The one plan: its name and price, the line under them, the agreed banner,
-/// and — while the free week is the primary — the way to pay for a month.
-/// One plan, so no radio: a single option is not a choice.
+/// The one plan, on the kit's lime plan card: its name and price, the line
+/// under them, the agreed banner, and — while the free week is the primary —
+/// the way to pay for a month. One plan, so no radio: a single option is not
+/// a choice.
 class _PlanCard extends StatelessWidget {
   final AppState state;
   final PlusQuote quote;
@@ -274,34 +287,39 @@ class _PlanCard extends StatelessWidget {
                         ? (isAr ? '٣٠ يوم · بكود أخصائيك' : '30 days · with your nutritionist’s code')
                         : (isAr ? '٣٠ يوم · مفيش حاجة بتتجدد لوحدها' : '30 days · nothing renews on its own');
 
-    return Container(
-      padding: const EdgeInsets.all(QSpace.xl),
-      decoration: QDecor.card(),
+    return PastelCard(
+      color: QColors.lime,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text(isAr ? 'شهري' : 'Monthly Plan', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.onPastel)),
+          const SizedBox(height: QSpace.xs),
           Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-            Expanded(child: Text(isAr ? 'شهري' : 'Monthly', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink))),
+            Text(formatEgp(quote.amountPounds, ar: isAr, eastern: state.easternDigits), style: QText.number(size: 28, weight: FontWeight.w700, color: QColors.onPastel, ar: isAr)),
+            const SizedBox(width: QSpace.xs),
+            Text(isAr ? '/ شهر' : '/month', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.onPastelSecondary)),
             // A campaign code is the one thing that can lower the price; when
             // it has, show what it came down from.
             if (quote.discounted) ...[
+              const SizedBox(width: QSpace.sm),
               Text(
                 formatEgp(quote.listPounds, ar: isAr, eastern: state.easternDigits),
-                style: QText.number(size: 15, color: QColors.inkTertiary, ar: isAr).copyWith(decoration: TextDecoration.lineThrough, decorationColor: QColors.inkTertiary),
+                style: QText.number(size: 15, color: QColors.onPastelSecondary, ar: isAr).copyWith(decoration: TextDecoration.lineThrough, decorationColor: QColors.onPastelSecondary),
               ),
-              const SizedBox(width: QSpace.sm),
             ],
-            Text(formatEgp(quote.amountPounds, ar: isAr, eastern: state.easternDigits), style: QText.number(size: 20, weight: FontWeight.w600, ar: isAr)),
           ]),
           const SizedBox(height: 2),
-          Text(sub, style: QText.body(size: 13, height: 18, color: QColors.inkSecondary)),
-          const SizedBox(height: QSpace.lg),
-          const Divider(height: 1, thickness: 1, color: QColors.hairline),
-          const SizedBox(height: QSpace.lg),
-          Text(SubscriptionScreen.priceBanner(state, quote), key: SubscriptionScreen.bannerKey, style: QText.body(size: 15, color: QColors.inkSecondary)),
+          Text(sub, style: QText.body(size: 13, height: 18, color: QColors.onPastelSecondary)),
+          const SizedBox(height: QSpace.md),
+          const Divider(height: 1, thickness: 1, color: QColors.pastelTrack),
+          const SizedBox(height: QSpace.md),
+          Text(SubscriptionScreen.priceBanner(state, quote), key: SubscriptionScreen.bannerKey, style: QText.body(size: 15, color: QColors.onPastel)),
           if (buyHere) ...[
             const SizedBox(height: QSpace.lg),
-            QOutlineButton(key: SubscriptionScreen.buyKey, label: SubscriptionScreen.buyLabel(state, quote), height: 44, onTap: state.startPlusPurchase),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: QPastelButton(key: SubscriptionScreen.buyKey, label: SubscriptionScreen.buyLabel(state, quote), height: 44, onTap: state.startPlusPurchase),
+            ),
           ],
         ],
       ),
@@ -347,11 +365,11 @@ class _CodeSectionState extends State<_CodeSection> {
                 key: SubscriptionScreen.codeToggleKey,
                 onTap: () => setState(() => _open = true),
                 builder: (context, pressed) => Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(QIcons.add, size: 17, color: pressed ? QColors.ink : QColors.inkSecondary),
+                  QIcon(QIcons.add, size: 18, color: pressed ? QColors.ink : QColors.accentInk),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(isAr ? 'معاك كود أخصائي أو مدرّب؟' : 'Have a nutritionist’s or coach’s code?',
-                        style: QText.body(size: 15, weight: FontWeight.w500, color: pressed ? QColors.ink : QColors.inkSecondary)),
+                        style: QText.body(size: 15, weight: FontWeight.w600, color: pressed ? QColors.ink : QColors.accentInk)),
                   ),
                 ]),
               ),
@@ -377,7 +395,7 @@ class _CodeSectionState extends State<_CodeSection> {
                             : (isAr
                                 ? 'لو أخصائي أو مدرّب بعتك، اكتب الكود هنا. السعر مش بيتغير — الكود بيربط خطتك بيه وبيديه نصيب من الاشتراك.'
                                 : 'If a nutritionist or coach sent you, enter their code. The price does not change — the code links your plan to them and pays them a share.')),
-                    style: QText.body(size: 13, height: 18, color: QColors.inkTertiary),
+                    style: QText.body(size: 13, height: 18, color: QColors.inkSecondary),
                   ),
                 ),
                 if (quote.promoError != null) ...[
@@ -425,7 +443,7 @@ class _ShareSwitch extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   isAr ? 'أيام التسجيل والمتوسط مقابل الهدف، ومفيش حاجة غيرهم.' : 'Days logged and the average against your target, nothing else.',
-                  style: QText.body(size: 13, height: 18, color: QColors.inkTertiary),
+                  style: QText.body(size: 13, height: 18, color: QColors.inkSecondary),
                 ),
               ]),
             ),
@@ -462,7 +480,6 @@ class _PromoFieldState extends State<_PromoField> {
 
   @override
   Widget build(BuildContext context) {
-    const shape = BorderRadius.all(Radius.circular(QRadii.control));
     return TextField(
       controller: _controller,
       textCapitalization: TextCapitalization.characters,
@@ -475,13 +492,8 @@ class _PromoFieldState extends State<_PromoField> {
       decoration: InputDecoration(
         hintText: 'QMR…',
         hintTextDirection: TextDirection.ltr,
+        // The kit's field (the theme's): the ground in a grey edge.
         hintStyle: QText.body(size: 17, color: QColors.inkTertiary),
-        filled: true,
-        fillColor: QColors.surfaceRaised,
-        contentPadding: const EdgeInsets.symmetric(horizontal: QSpace.lg, vertical: 15),
-        border: const OutlineInputBorder(borderRadius: shape, borderSide: BorderSide.none),
-        enabledBorder: const OutlineInputBorder(borderRadius: shape, borderSide: BorderSide.none),
-        focusedBorder: const OutlineInputBorder(borderRadius: shape, borderSide: BorderSide(color: QColors.hairlineStrong, width: 1.5)),
       ),
     );
   }
@@ -519,7 +531,7 @@ class _FeatureTable extends StatelessWidget {
 
     Widget mark(bool on) => SizedBox(
           width: _column,
-          child: Icon(on ? QIcons.check : QIcons.remove, size: 18, color: on ? QColors.ink : QColors.inkTertiary),
+          child: Center(child: QIcon(on ? QIcons.done : QIcons.remove, size: 20, color: on ? QColors.ink : QColors.inkTertiary)),
         );
 
     return Container(

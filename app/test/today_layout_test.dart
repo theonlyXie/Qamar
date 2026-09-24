@@ -42,7 +42,7 @@ import 'package:qamar/theme/layout.dart';
 import 'package:qamar/widgets/ask_qamar_overlay.dart';
 import 'package:qamar/widgets/common.dart';
 import 'package:qamar/widgets/living_orb.dart';
-import 'package:qamar/widgets/orb_nav.dart';
+import 'package:qamar/widgets/tab_bar.dart';
 import 'package:qamar/widgets/quest_card.dart';
 
 import 'support/app_fonts.dart';
@@ -102,13 +102,13 @@ const _statusBar = 47.0;
 const _homeIndicator = 34.0;
 
 /// The top of the orb's band inside the safe area.
-const insetFold = 844 - _homeIndicator - QLayout.orbBand;
+const insetFold = 844 - _homeIndicator - QLayout.tabBand;
 
 /// Nothing that must be seen may reach under the orb: not the top of its
 /// band inside the safe area, and not the orb's own top wherever it really
 /// rests. Keyed to the orb's rect, so it keeps holding when the orb moves.
 void expectAboveFold(WidgetTester tester, Finder what, String name) {
-  final orb = find.byKey(OrbNav.orbKey);
+  final orb = find.byKey(QTabBar.orbKey);
   expect(orb, findsOneWidget, reason: 'the orb is on Today');
   final bottom = tester.getRect(what).bottom;
   expect(bottom, lessThanOrEqualTo(insetFold), reason: '$name stays above the orb’s band ($insetFold), whatever is due');
@@ -136,7 +136,7 @@ void expectBudgets(WidgetTester tester, TodayCard? card, String label) {
   }
   if (card == null) return;
   final slot = zone(TodayZone.slot)!;
-  final orbTop = tester.getRect(find.byKey(OrbNav.orbKey)).top;
+  final orbTop = tester.getRect(find.byKey(QTabBar.orbKey)).top;
   expect(slot.height, lessThanOrEqualTo(budgets.slot), reason: '$card keeps to the slot’s ${budgets.slot} points ($label)');
   expect(slot.bottom, lessThanOrEqualTo(insetFold), reason: 'the slot’s card is whole above the band: $card ($label)');
   expect(slot.bottom, lessThanOrEqualTo(orbTop), reason: 'and above the orb: $card ($label)');
@@ -204,7 +204,7 @@ void _expectScore(WidgetTester tester, bool score) {
   final name = tester.getRect(find.text('Basel'));
   expect(header.bottom, moreOrLessEquals(name.bottom, epsilon: 0.5), reason: 'the header closes up under the name');
   final qamar = tester.getRect(find.byKey(TodayScreen.zoneKey(TodayZone.qamar)));
-  expect(qamar.top - header.bottom, moreOrLessEquals(14, epsilon: 0.5), reason: 'Qamar’s card follows at the usual gap, nothing held open');
+  expect(qamar.top - header.bottom, moreOrLessEquals(TodayScreen.gap, epsilon: 0.5), reason: 'Qamar’s card follows at the usual gap, nothing held open');
 }
 
 void main() {
@@ -245,7 +245,7 @@ void main() {
     test('the tutorial keeps the slot until the first hold, then waits below', () {
       final s = _state(AppLang.en, due: [TodayCard.tutorial]);
       s.orbTap(); // the tap is learned; the tree opens
-      s.closeTree();
+      s.closeLog();
       expect(todayFocus(s), TodayCard.tutorial, reason: 'a tap does not end it');
       s.holdOrb();
       expect(todayFocus(s), isNull, reason: 'the hold does');
@@ -439,7 +439,7 @@ void main() {
       await _pump(tester, s, _phone);
       await tester.tap(find.byKey(QamarCard.logKey));
       await tester.pump();
-      expect(s.treeOpen, isFalse, reason: 'straight to the question: no menu asking how first');
+      expect(s.logOpen, isFalse, reason: 'straight to the question: no menu asking how first');
       expect(s.chatOpen, isTrue);
       expect(s.chat.last.text, 'Tell me what you ate.');
       expect(s.loggingMeal, isTrue, reason: 'what is typed next is the meal, and spends no question');

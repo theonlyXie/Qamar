@@ -1,5 +1,5 @@
 // Beside Arabic-Indic digits a middle dot is a zero: "١٦ · وجبة" reads as
-// "١٦٠ وجبة", 160 meals, since ٠ is drawn as a dot (the liquid-glass skill,
+// "١٦٠ وجبة", 160 meals, since ٠ is drawn as a dot (the qamar-design skill,
 // references/arabic.md). Where English separates with " · ", Arabic copy
 // uses the Arabic comma. This holds every Arabic string in lib/ to it: no
 // "·" beside a number, written or computed.
@@ -91,7 +91,7 @@ void main() {
     s.go(AppScreen.today);
     s.orbTap();
     await check('the tree');
-    s.closeTree();
+    s.closeLog();
     s.quickLog(QuickLog.text);
     s.proposal = const MealAnalysis([
       ConfirmItemDef(ar: 'كشري', en: 'Koshary', portionAr: 'طبق وسط', portionEn: '1 medium bowl', conf: Confidence.high, kcal: 640, p: 19, c: 118, f: 11),

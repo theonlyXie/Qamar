@@ -1,22 +1,22 @@
 /// Shared layout constants that more than one screen has to agree on.
 abstract final class QLayout {
-  /// Height of the band at the bottom of the screen where the orb rests
-  /// (O1). Screens that show the orb pad their scroll views by this much, so
-  /// nothing the person needs ever sits under it.
-  ///
-  /// Seat 6 owns this value and builds the band itself (the stops, the snap
-  /// and the edge fade); it may retune it now that the orb's Su pill is only a
-  /// passing receipt.
-  static const double orbBand = 72;
+  /// The tab bar's pill (the kit's floating bar): its height, and the gap
+  /// under it to the bottom of the safe area.
+  static const double tabBar = 66;
+  static const double tabBarGap = 12;
 
-  /// Where an orb screen's list ends: the band, and a gap above it, so the
-  /// last thing on the page comes to rest above the orb (O1). Content that
-  /// is still scrolling passes under the band's soft fade.
-  static const double pageBottom = orbBand + 24;
+  /// Height of the band at the bottom of a tab page that the tab bar floats
+  /// in (O1): the bar and the gap under it. The tab pages pad their scroll
+  /// views by this much, so nothing the person needs ever sits under it.
+  static const double tabBand = tabBar + tabBarGap;
+
+  /// Where a tab page's list ends: the band, and a gap above it, so the last
+  /// thing on the page comes to rest above the bar. Content that is still
+  /// scrolling passes under the bar's soft fade.
+  static const double pageBottom = tabBand + 24;
 
   /// Where a page starts under the status bar: close, as a large title sits
-  /// under a phone's own bar. It was 56, which spent a band of empty sky
-  /// above every page and pushed Today's slot below the fold (O15).
+  /// under a phone's own bar (O15).
   static const double pageTop = 16;
 
   /// The smallest touch any control takes, each way (O11). 48 rather than

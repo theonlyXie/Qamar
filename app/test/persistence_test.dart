@@ -2827,7 +2827,7 @@ void main() {
     });
   });
 
-  group('the Log node’s other two branches', () {
+  group('the Log sheet’s repeat and movement', () {
     test('repeat offers the last week’s distinct meals, today’s first, and one tap logs one again', () async {
       final meals = FakeMealRepo()
         ..recent = [
@@ -2842,14 +2842,12 @@ void main() {
 
       expect(state.repeatChoices.map((m) => m.name), ['Koshary', 'Foul'], reason: 'the same dish twice is one choice');
 
-      state.expandTreeLog(0);
-      state.expandTreeSub(TreeSub.repeat);
-      expect(state.treeLogSub, TreeSub.repeat);
+      state.orbTap(); // the Log sheet, its Repeat chips on it
+      expect(state.logOpen, isTrue);
       state.repeatMeal(state.repeatChoices.first);
       await settle();
 
-      expect(state.treeOpen, isFalse);
-      expect(state.treeLogSub, isNull);
+      expect(state.logOpen, isFalse, reason: 'one tap logs it and the sheet goes');
       expect(state.meals.single.name, 'Koshary');
       expect(state.meals.single.kcal, 520);
       expect(meals.saved.single.name, 'Koshary');
@@ -2858,17 +2856,16 @@ void main() {
       expect(state.repeatChoices.first.name, 'Koshary', reason: 'today’s meal leads the list');
     });
 
-    test('activity: a kind on the ring, a duration on the sheet, an estimate on the card', () async {
+    test('activity: a kind on the Log sheet, a duration on its own sheet, an estimate on the card', () async {
       final wallet = FakeWalletRepo();
       final repo = FakeActivityRepo(wallet: wallet);
       final state = backed(activities: repo, wallet: wallet, clock: () => DateTime(2026, 9, 21, 18));
       await settle();
       final before = state.suAvailable;
 
-      state.expandTreeLog(0);
-      state.expandTreeSub(TreeSub.activity);
+      state.orbTap(); // the Log sheet
       state.chooseActivity(ActivityKind.football);
-      expect(state.treeOpen, isFalse, reason: 'the sheet takes over from the ring');
+      expect(state.logOpen, isFalse, reason: 'the duration sheet takes over from the Log sheet');
       expect(state.pendingActivity, ActivityKind.football);
 
       await state.logActivity(30);

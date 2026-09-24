@@ -1,10 +1,16 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
+import 'package:qamar/l10n/strings.dart';
+import 'package:qamar/main.dart';
 import 'package:qamar/models/nudge.dart';
 import 'package:qamar/models/ramadan.dart';
+import 'package:qamar/screens/you_screen.dart';
 import 'package:qamar/services/repositories.dart';
 import 'package:qamar/state/app_state.dart';
-import 'package:qamar/widgets/tree_overlay.dart';
+import 'package:qamar/theme/icons.dart';
+import 'package:qamar/widgets/common.dart';
 
 void main() {
   final season = Season.ramadan1448;
@@ -94,15 +100,46 @@ void main() {
     });
   });
 
-  group('the tree in season', () {
-    test('a sixth node, Ramadan, evenly spaced; five otherwise', () {
-      final six = treeNodesFor(ramadan: true);
-      expect(six.map((n) => n.labelEn).toList(), ['Log', 'Plan', 'Water', 'Progress', 'Me', 'Ramadan']);
-      for (var i = 0; i < six.length; i++) {
-        expect(six[i].angle, closeTo(i * 60, 0.01));
-      }
-      expect(six.last.screen, AppScreen.ramadan);
-      expect(treeNodesFor(ramadan: false), same(kTreeNodes));
+  group('one tap away in season', () {
+    Future<void> pumpApp(WidgetTester tester, AppState s) async {
+      await tester.binding.setSurfaceSize(const Size(390, 2400)); // tall: the rows, not the fold
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(ChangeNotifierProvider.value(value: s, child: const QamarApp()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    final moonButton = find.byWidgetPredicate((w) => w is QRoundIconButton && w.icon == QIcons.moon);
+
+    testWidgets('in season Today’s header has the moon, and Me a Ramadan row; each opens Ramadan', (tester) async {
+      final s = AppState(clock: () => DateTime(2027, 2, 3, 10))..setLang(AppLang.en);
+      s.go(AppScreen.today);
+      await pumpApp(tester, s);
+      expect(moonButton, findsOneWidget);
+      await tester.tap(moonButton);
+      await tester.pump();
+      expect(s.screen, AppScreen.ramadan);
+
+      s.go(AppScreen.you);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      final row = find.byKey(YouScreen.ramadanRowKey);
+      await tester.ensureVisible(row);
+      await tester.pump();
+      await tester.tap(row);
+      await tester.pump();
+      expect(s.screen, AppScreen.ramadan);
+    });
+
+    testWidgets('out of season neither is there', (tester) async {
+      final s = AppState(clock: () => DateTime(2026, 9, 21, 10))..setLang(AppLang.en);
+      s.go(AppScreen.today);
+      await pumpApp(tester, s);
+      expect(moonButton, findsNothing);
+      s.go(AppScreen.you);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byKey(YouScreen.ramadanRowKey), findsNothing);
     });
   });
 

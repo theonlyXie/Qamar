@@ -1,26 +1,29 @@
-// Liquid-glass render harness for Qamar: draws every screen, in English and
+// qamar-design render harness for Qamar: draws every screen, in English and
 // Arabic, at phone size, to PNG files you can look at.
 //
 // This is a temporary test file and is never committed. To use it:
 //
-//   cp .claude/skills/liquid-glass/scripts/render_screens_test.dart app/test/zz_render_tmp_test.dart
-//   cd app && flutter test --update-goldens test/zz_render_tmp_test.dart \
+//   cp .claude/skills/qamar-design/scripts/render_screens_test.dart app/test/zz_render_tmp_test.dart
+//   cd app && flutter test test/zz_render_tmp_test.dart \
 //       --dart-define=OUT=/abs/path/for/pngs --dart-define=SHOT=after [--dart-define=ONLY=today]
-//   rm -f test/zz_render_tmp_test.dart; rm -rf test/failures
+//   rm -f test/zz_render_tmp_test.dart
 //
-// OUT is where the PNGs go (default /tmp/liquid-glass-renders). SHOT names a
+// OUT is where the PNGs go (default /tmp/qamar-design-renders). SHOT names a
 // sub-folder, so you can compare `before` with `after`. ONLY keeps just the
 // scenes whose name contains that text.
 //
-// Fonts: the bundled Inter and Noto Sans Arabic (app/assets/fonts), plus the
-// Cupertino icon font from the pub cache. Glyphs render as boxes if that font
-// is missing, so check the path below if you see boxes.
+// Fonts: the suite's own loader (test/support/app_fonts.dart) — the bundled
+// Space Grotesk, Noto Sans Arabic and Inter, and the Iconsax glyphs from the
+// iconsax_plus package. Glyphs render as boxes if the package is missing
+// (run `flutter pub get`).
 //
 // Add a scene for any screen or sheet you change. The pattern is: build an
 // AppState, put it where the screen is, then call _shoot.
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -36,52 +39,26 @@ import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/explain.dart';
 
+import 'support/app_fonts.dart';
+
 const _tag = String.fromEnvironment('SHOT', defaultValue: 'after');
 const _only = String.fromEnvironment('ONLY', defaultValue: '');
-const _out = String.fromEnvironment('OUT', defaultValue: '/tmp/liquid-glass-renders');
+const _out = String.fromEnvironment('OUT', defaultValue: '/tmp/qamar-design-renders');
 
 class _Ai implements AiGateway {
   @override
   dynamic noSuchMethod(Invocation i) => throw UnimplementedError();
 }
 
-Future<void> _fonts() async {
-  final home = Platform.environment['PUB_CACHE'] ?? '${Platform.environment['HOME']}/.pub-cache';
-  final hosted = Directory('$home/hosted/pub.dev');
-  final cupertino = hosted.existsSync()
-      ? hosted.listSync().whereType<Directory>().where((d) => d.path.contains('cupertino_icons-')).map((d) => File('${d.path}/assets/CupertinoIcons.ttf')).where((f) => f.existsSync()).toList()
-      : <File>[];
-  if (cupertino.isNotEmpty) {
-    await (FontLoader('packages/cupertino_icons/CupertinoIcons')..addFont(Future.value(cupertino.last.readAsBytesSync().buffer.asByteData()))).load();
-  }
-  // Apple's and Facebook's sign-in marks come from the Material font (the
-  // one exception to the family), which the app bundles.
-  final flutterRoot = Platform.environment['FLUTTER_ROOT'];
-  final material = File('${flutterRoot ?? '/opt/flutter'}/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf');
-  if (material.existsSync()) {
-    await (FontLoader('MaterialIcons')..addFont(Future.value(material.readAsBytesSync().buffer.asByteData()))).load();
-  }
-  final loaders = <String, FontLoader>{};
-  for (final f in Directory('assets/fonts').listSync().whereType<File>()) {
-    final family = f.path.contains('Noto') ? 'Noto Sans Arabic' : 'Inter';
-    loaders.putIfAbsent(family, () => FontLoader(family)).addFont(Future.value(f.readAsBytesSync().buffer.asByteData()));
-  }
-  for (final l in loaders.values) {
-    await l.load();
-  }
-}
-
 /// Draws the app with [state] on a 390 × [height] phone (iPhone 14 insets),
 /// runs [after] once it has settled, and writes `<OUT>/<SHOT>/<name>.png`.
 Future<void> _shoot(WidgetTester t, AppState state, String name, {double height = 844, void Function(AppState s)? after, Duration settle = const Duration(milliseconds: 900)}) async {
-  t.view.physicalSize = Size(390 * 3, height * 3);
-  t.view.devicePixelRatio = 3.0;
-  t.view.padding = const FakeViewPadding(top: 47 * 3, bottom: 34 * 3);
+  t.view.physicalSize = Size(390 * 2, height * 2);
+  t.view.devicePixelRatio = 2.0;
+  t.view.padding = const FakeViewPadding(top: 47 * 2, bottom: 34 * 2);
   addTearDown(t.view.reset);
-  await t.runAsync(() async {
-    await t.pumpWidget(ChangeNotifierProvider.value(value: state, child: const QamarApp()));
-    await Future.delayed(const Duration(milliseconds: 900));
-  });
+  final key = GlobalKey();
+  await t.pumpWidget(RepaintBoundary(key: key, child: ChangeNotifierProvider.value(value: state, child: const QamarApp())));
   await t.pump();
   await t.pump(const Duration(milliseconds: 900));
   if (after != null) {
@@ -89,7 +66,16 @@ Future<void> _shoot(WidgetTester t, AppState state, String name, {double height 
     await t.pump();
     await t.pump(settle);
   }
-  await expectLater(find.byType(QamarApp), matchesGoldenFile(Uri.file('$_out/$_tag/$name.png')));
+  final problem = t.takeException();
+  if (problem != null) stderr.writeln('EXCEPTION in $name: $problem');
+  await t.runAsync(() async {
+    final boundary = key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+    final image = await boundary.toImage(pixelRatio: 2);
+    final png = await image.toByteData(format: ui.ImageByteFormat.png);
+    File('$_out/$_tag/$name.png')
+      ..parent.createSync(recursive: true)
+      ..writeAsBytesSync(png!.buffer.asUint8List());
+  });
 }
 
 void _scene(String name, Future<void> Function(WidgetTester t) body) {
@@ -116,7 +102,7 @@ AppState _today(AppLang lang, {bool logged = false, bool tutorial = false}) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
-    await _fonts();
+    await loadAppFonts();
     for (final name in const ['com.qamar.app/quick_events', 'com.qamar.app/quick_invoke']) {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(MethodChannel(name), (call) async => null);
     }
@@ -139,7 +125,7 @@ void main() {
     _scene('04_today_first_$l', (t) async => _shoot(t, _today(lang, tutorial: true), '04_today_first_$l'));
     _scene('05_today_logged_$l', (t) async => _shoot(t, _today(lang, logged: true), '05_today_logged_$l'));
     _scene('05b_today_tall_$l', (t) async => _shoot(t, _today(lang, logged: true), '05b_today_tall_$l', height: 1800));
-    _scene('06_tree_$l', (t) async => _shoot(t, _today(lang), '06_tree_$l', after: (s) => s.orbTap()));
+    _scene('06_log_$l', (t) async => _shoot(t, _today(lang, logged: true), '06_log_$l', after: (s) => s.orbTap()));
     _scene('07_why_$l', (t) async => _shoot(t, _today(lang, logged: true), '07_why_$l', after: (s) => s.openWhy()));
     _scene('08_explain_$l', (t) async => _shoot(t, _today(lang, logged: true), '08_explain_$l', after: (s) => s.openExplain(kExplanations['kcal_remaining']!)));
     _scene('09_activity_$l', (t) async => _shoot(t, _today(lang), '09_activity_$l', after: (s) => s.chooseActivity(ActivityKind.walk)));
@@ -183,7 +169,7 @@ void main() {
       await _shoot(t, s, '11c_chat_listening_$l');
     });
 
-    // The rest of the tree.
+    // The other tabs, and the pages under them.
     _scene('12_plan_$l', (t) async => _shoot(t, _today(lang)..go(AppScreen.plan), '12_plan_$l'));
     _scene('13_progress_$l', (t) async => _shoot(t, _today(lang, logged: true)..go(AppScreen.progress), '13_progress_$l'));
     _scene('14_you_$l', (t) async {

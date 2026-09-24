@@ -1,8 +1,8 @@
 // Entrances on springs, seat 6's part (the scorecard's "zero
-// SpringDescription"; the orb's own springs are orb_band_test's): the sheets
-// rise from below their own height and the tree's ring grows in, both on the
-// settle spring (damping 1.0), quick and without a bounce, where they used
-// to be simply there; with reduce-motion on, nothing moves, it fades.
+// SpringDescription"; the orb's own springs are tab_bar_test's): the sheets,
+// the Log sheet among them, rise from below their own height on the settle
+// spring (damping 1.0), quick and without a bounce, where they used to be
+// simply there; with reduce-motion on, nothing moves, it fades.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
@@ -15,7 +15,7 @@ import 'package:qamar/main.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/motion.dart';
 import 'package:qamar/widgets/common.dart';
-import 'package:qamar/widgets/tree_overlay.dart';
+import 'package:qamar/widgets/log_sheet.dart';
 import 'package:qamar/widgets/why_sheet.dart';
 
 import 'support/app_fonts.dart';
@@ -92,7 +92,7 @@ void main() {
     });
   }
 
-  testWidgets('the tree’s ring grows in, and is whole at rest', (tester) async {
+  testWidgets('the Log sheet rises the same way, from under the tab bar', (tester) async {
     final s = AppState()..setLang(AppLang.en);
     s.dismissOrbTutorial();
     s.go(AppScreen.today);
@@ -100,16 +100,17 @@ void main() {
     s.orbTap();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 16));
-    final ring = find.descendant(of: find.byType(TreeOverlay), matching: find.byWidgetPredicate((w) => w is QSpringIn && w.arrive == QArrive.grow));
-    expect(ring, findsOneWidget);
-    final label = find.byKey(TreeOverlay.centreLabelKey);
-    final early = tester.getRect(label);
+    final panel = find.descendant(of: find.byType(LogSheet), matching: find.byKey(QSheetScrim.panelKey));
+    final title = find.descendant(of: panel, matching: find.text('Log'));
+    final early = tester.getRect(title);
+    await tester.pump(const Duration(milliseconds: 30));
+    final soon = tester.getRect(title);
     await tester.pump(const Duration(milliseconds: 700));
-    final rest = tester.getRect(label);
-    expect(early.width, lessThan(rest.width), reason: 'smaller, on its way in');
-    expect(early.center.dx, moreOrLessEquals(rest.center.dx, epsilon: 0.5), reason: 'growing about the centre, not sliding');
-    final opacities = tester.widgetList<Opacity>(find.ancestor(of: label, matching: find.byType(Opacity)));
-    expect(opacities.where((o) => o.opacity < 1), isEmpty, reason: 'whole at rest');
+    final rest = tester.getRect(title);
+    expect(tester.getRect(panel).bottom, moreOrLessEquals(_phone.height, epsilon: 0.5), reason: 'at rest on the bottom edge, under the bar');
+    expect(early.top, greaterThan(rest.top + 40), reason: 'it came from below');
+    expect(soon.top, lessThan(early.top), reason: 'rising');
+    expect(soon.top, greaterThan(rest.top), reason: 'not yet there: it moves, it does not appear');
   });
 
   testWidgets('with reduce-motion on, the sheet is in place from the first frame and fades in', (tester) async {

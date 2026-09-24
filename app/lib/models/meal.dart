@@ -237,8 +237,8 @@ const List<SpendItemDef> kSpendCatalog = [
   SpendItemDef(
     id: 'cosmetic',
     price: SuEconomy.cosmetic,
-    nameAr: 'شكل جديد للقمر والشجرة',
-    nameEn: 'A new look for the moon and tree',
+    nameAr: 'شكل جديد للقمر',
+    nameEn: 'A new look for the moon',
     whatAr: 'بيفضل معاك على طول، وبتشوفه قبل ما تاخده. بيغيّر الشكل بس، مش النصايح.',
     whatEn: 'Yours for good, and you see it before you take it. It changes the look only, never the advice.',
     limitAr: 'سعر ثابت · مفيش صناديق عشوائية',

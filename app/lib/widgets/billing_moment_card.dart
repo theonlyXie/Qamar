@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../models/billing.dart';
 import '../state/app_state.dart';
-import '../theme/app_theme.dart';
 import '../theme/colors.dart';
 import '../theme/icons.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
+import 'kit.dart';
 
 /// The billing moment on Today: the free week or the paid month in its last
 /// 48 hours, carrying the same question its push asked.
@@ -48,29 +48,29 @@ class BillingMomentCard extends StatelessWidget {
         builder: (context, pressed) => qPressed(
           context,
           pressed: pressed,
-          child: Container(
-            padding: const EdgeInsetsDirectional.fromSTEB(16, 14, 12, 14),
-            // A strong edge: the one card whose moment runs out.
-            decoration: QDecor.card(color: pressed ? QColors.surfaceRaised : QColors.surface, border: QColors.hairlineStrong),
+          // The kit's coral: the one card whose moment runs out.
+          child: PastelCard(
+            color: QColors.coral,
+            padding: const EdgeInsetsDirectional.fromSTEB(14, 14, 12, 14),
             child: Row(
               children: [
-                const Icon(QIcons.limit, size: 20, color: QColors.ink),
+                const PastelGlyph(QIcons.limit, size: 36),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(line, maxLines: 2, overflow: TextOverflow.ellipsis, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.ink)),
+                      Text(line, maxLines: 2, overflow: TextOverflow.ellipsis, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.onPastel)),
                       const SizedBox(height: 2),
-                      Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 13, color: QColors.inkTertiary)),
+                      Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 13, color: QColors.onPastel)),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
                 // It opens Qamar+ in the app: the chevron points the way
                 // the line reads, and turns in Arabic.
-                const Icon(QIcons.forward, size: 16, color: QColors.inkTertiary),
+                const QIcon(QIcons.forward, size: 20, color: QColors.onPastel),
               ],
             ),
           ),

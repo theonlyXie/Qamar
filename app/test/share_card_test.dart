@@ -1,21 +1,17 @@
 // The share card's sign-off, seat 6's part (the scorecard's 08: "dr-qamar.com
 // is an orphaned low-contrast watermark"). The link stays, since the card is
 // shared as an image and this is where it came from, but as a sign-off:
-// under a hairline, led by a crescent, from the start edge, in a colour
-// that passes AA on the card; the run, when it is shown, takes the other
-// end. Both languages. And the crescent is lit on the side the seven day
-// moons are, the right in both languages, where the glyph was lit on the
-// left and read as their mirror (seat 3). The crescent is the app's one
-// icon family's moon (QIcons, Cupertino), so its font is loaded to see it.
+// under a hairline, led by the moon's mark, from the start edge, in a colour
+// that passes AA on the card's lavender; the run, when it is shown, takes
+// the other end. Both languages. And the mark — the mascot's face, the
+// brand's own signature — is lit on the side the seven day moons are, the
+// right in both languages, where a glyph was once lit on the left and read
+// as their mirror (seat 3).
 
-import 'dart:convert';
-import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qamar/models/review.dart';
@@ -36,29 +32,8 @@ WeekReview _review(Streak streak) {
   return WeekReview.build(week: week, lastWeek: const [], targetKcal: 2000, streak: streak, iso: (x) => x, hasTarget: true);
 }
 
-/// The Cupertino icon font the app's glyphs are drawn from, where the
-/// package config says the package in use is; null when it is not there.
-File? _iconFont() {
-  final config = File('.dart_tool/package_config.json').absolute;
-  if (!config.existsSync()) return null;
-  final packages = (jsonDecode(config.readAsStringSync()) as Map)['packages'] as List;
-  for (final p in packages.cast<Map>()) {
-    if (p['name'] != 'cupertino_icons') continue;
-    final root = config.uri.resolve('${p['rootUri']}/');
-    final font = File.fromUri(root.resolve('assets/CupertinoIcons.ttf'));
-    return font.existsSync() ? font : null;
-  }
-  return null;
-}
-
 void main() {
-  final iconFont = _iconFont();
-  setUpAll(() async {
-    await loadAppFonts();
-    if (iconFont != null) {
-      await (FontLoader('packages/${CupertinoIcons.iconFontPackage}/${CupertinoIcons.iconFont}')..addFont(Future.value(iconFont.readAsBytesSync().buffer.asByteData()))).load();
-    }
-  });
+  setUpAll(loadAppFonts);
 
   for (final ar in [false, true]) {
     for (final run in [0, 4]) {
@@ -83,7 +58,7 @@ void main() {
           expect(link.left - mark.right, lessThanOrEqualTo(12));
         }
         final style = tester.widget<Text>(find.byKey(ReviewCard.footerKey)).style!;
-        expect(contrastRatio(style.color!, QColors.surfaceRaised), greaterThanOrEqualTo(4.5), reason: 'readable, not a watermark');
+        expect(contrastRatio(style.color!, QColors.lavender), greaterThanOrEqualTo(4.5), reason: 'readable on the card’s lavender, not a watermark');
         final runText = find.textContaining(ar ? 'أيام ورا بعض' : 'days in a row');
         if (run >= 2) {
           final r = tester.getRect(runText);
@@ -96,10 +71,10 @@ void main() {
     }
   }
 
-  // The glyph is drawn from the icon font; without it there is nothing to
-  // measure.
+  // The moons and the mark are painted: what is lit can be measured in the
+  // pixels.
   for (final ar in [false, true]) {
-    testWidgets('the crescent is lit on the side the day moons are (${ar ? 'ar' : 'en'})', (tester) async {
+    testWidgets('the moon’s mark is lit on the side the day moons are (${ar ? 'ar' : 'en'})', (tester) async {
       final monday = DateTime(2026, 9, 21);
       // A week of part-filled days, so every moon shows a lit side.
       final week = [for (var i = 0; i < 7; i++) DayTotals(day: monday.add(Duration(days: i)), kcal: const [400, 900, 1300, 1900, 700, 2600, 1500][i], meals: 2)];
@@ -115,8 +90,10 @@ void main() {
         return (image.width, bytes!);
       }))!;
 
-      // Where the light is across [r]: the centre of what is lit, from the
-      // middle of the box, as a share of its width. Right is positive.
+      // Where the light is across [r]: the centre of what is lit — brighter
+      // than the card's lavender — from the middle of the box, as a share of
+      // its width. Right is positive.
+      const ground = 0.2126 * 0xDD + 0.7152 * 0xC0 + 0.0722 * 0xFF;
       double litSide(Rect r) {
         final box = r.shift(-origin);
         double sum = 0, weight = 0;
@@ -124,7 +101,7 @@ void main() {
           for (var x = (box.left * 3).floor(); x < (box.right * 3).ceil(); x++) {
             final i = (y * width + x) * 4;
             final luma = 0.2126 * pixels.getUint8(i) + 0.7152 * pixels.getUint8(i + 1) + 0.0722 * pixels.getUint8(i + 2);
-            final w = (luma - 60).clamp(0, 255).toDouble();
+            final w = (luma - ground - 12).clamp(0, 255).toDouble();
             sum += w * ((x + 0.5) / 3 - (box.center.dx));
             weight += w;
           }
@@ -135,7 +112,7 @@ void main() {
       final moons = [for (final e in find.byType(QamarMoon).evaluate()) litSide(tester.getRect(find.byWidget(e.widget)))];
       expect(moons, everyElement(greaterThan(0.03)), reason: 'the day moons are lit on the right: $moons');
       final mark = litSide(tester.getRect(find.byKey(ReviewCard.markKey)));
-      expect(mark, greaterThan(0.03), reason: 'the crescent is lit on the right too, not their mirror ($mark)');
-    }, skip: iconFont == null);
+      expect(mark, greaterThan(0.03), reason: 'the mascot is lit on the right too, its shadow on the left: not their mirror ($mark)');
+    });
   }
 }

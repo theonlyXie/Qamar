@@ -22,6 +22,7 @@ import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/colors.dart';
 import 'package:qamar/widgets/ask_qamar_overlay.dart';
 import 'package:qamar/widgets/common.dart';
+import 'package:qamar/widgets/kit.dart';
 
 import 'support/app_fonts.dart';
 
@@ -88,9 +89,9 @@ void main() {
         s.go(AppScreen.plan);
         await _pumpApp(tester, s);
         final card = tester.getRect(find.byType(QStateCard));
-        // The header is the title's row, the back button in it; the space
-        // ends at the "Day changed?" row under it.
-        final header = tester.getRect(find.ancestor(of: find.byType(QBackButton), matching: find.byType(Row)).first);
+        // The header is the page's title (a tab's page: no back control); the
+        // space ends at the "Day changed?" row under it.
+        final header = tester.getRect(find.byType(QPageTitle));
         final dayRow = tester.getRect(find.ancestor(of: find.text(s.t.dayChanged), matching: find.byType(Row)).first);
         final spaceTop = header.bottom;
         final spaceBottom = dayRow.top;

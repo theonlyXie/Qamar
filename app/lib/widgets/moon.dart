@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 
 /// The Qamar moon, drawn rather than photographed — in greys only (the
-/// liquid-glass skill): every shade below is achromatic.
+/// qamar-design skill): every shade below is achromatic.
 ///
 /// This replaces the flat `qamar_orb.png` that used to sit inside [LivingOrb].
 /// A picture of a moon always reads as a picture — it has fixed lighting, a
@@ -21,8 +21,8 @@ import '../theme/colors.dart';
 ///  * earthshine on the night side, so the whole sphere stays visible instead
 ///    of the moon looking bitten.
 ///
-/// Nothing here animates position or scale — [LivingOrb] owns the breathing,
-/// halo, wander and sparks. The only motion is a very slow phase drift, so the
+/// Nothing here animates position or scale — [LivingOrb] owns the breath and
+/// the halo. The only motion is a very slow phase drift, so the
 /// terminator creeps the way a real moon's does.
 class QamarMoon extends StatefulWidget {
   final double size;

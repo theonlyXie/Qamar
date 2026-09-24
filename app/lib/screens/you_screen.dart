@@ -18,15 +18,16 @@ import '../theme/text_styles.dart';
 import '../widgets/account_sheet.dart';
 import '../widgets/avoid_editor.dart';
 import '../widgets/common.dart';
-import '../widgets/moon.dart';
+import '../widgets/kit.dart';
 import '../widgets/orb_gesture_guide.dart';
 
-/// Me, laid out the way a phone's settings are: one card to a group, a row
-/// to a thing, its value at the end and a chevron where it goes somewhere,
-/// switches on their own rows. What people come here for is at the top —
-/// who they are, Qamar+, their food, their points — and the rare and the
-/// technical at the foot: the nutritionists' codes, privacy, the version.
-/// Anything with more to it than a row opens a sheet over the page.
+/// Me, the kit's Settings page: the profile card, then one card to a group,
+/// a row to a thing, its value at the end and a chevron where it goes
+/// somewhere, switches (burgundy when on) on their own rows. What people
+/// come here for is at the top — who they are, Qamar+, their food, their
+/// points — and the rare and the technical at the foot: the nutritionists'
+/// codes, privacy, the version. Anything with more to it than a row opens a
+/// sheet over the page.
 class YouScreen extends StatelessWidget {
   const YouScreen({super.key});
 
@@ -88,6 +89,7 @@ class YouScreen extends StatelessWidget {
   static const helpRowKey = ValueKey('you-help');
   static const proCodeRowKey = ValueKey('you-pro-code');
   static const programmeRowKey = ValueKey('you-programme');
+  static const ramadanRowKey = ValueKey('you-ramadan');
 
   @override
   Widget build(BuildContext context) {
@@ -102,12 +104,9 @@ class YouScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(QSpace.page, QLayout.pageTop, QSpace.page, QLayout.pageBottom),
       children: [
-        Row(children: [
-          QBackButton(onTap: state.back, isAr: isAr),
-          const SizedBox(width: QSpace.sm),
-          Expanded(child: Text(t.you, style: QText.display(size: 34, ar: QText.arabic(t.you)))),
-        ]),
-        const SizedBox(height: QSpace.xxl),
+        // A tab's page: its name, and no way back (the tab bar is the way).
+        QPageTitle(title: t.you, isAr: isAr),
+        const SizedBox(height: QSpace.lg),
 
         // Who this is: the one hero on Me, the moon beside the name. Saving
         // the account is offered only while it really is a guest one.
@@ -118,7 +117,7 @@ class YouScreen extends StatelessWidget {
           ],
           footer: state.hasAccount ? null : t.saveProgressSub,
         ),
-        const SizedBox(height: QSpace.xxl),
+        const SizedBox(height: QSpace.lg),
 
         // Qamar+, and what it brings with it. The day's allowance in full is
         // said here; the conversation's header says only "Last question
@@ -152,7 +151,7 @@ class YouScreen extends StatelessWidget {
           ],
           footer: state.quotaSummary.isEmpty ? null : state.quotaSummary,
         ),
-        const SizedBox(height: QSpace.xxl),
+        const SizedBox(height: QSpace.lg),
 
         // The food: what Qamar plans around. What to avoid changes here, with
         // the consultation's own question, so a new allergy reaches every
@@ -182,10 +181,13 @@ class YouScreen extends StatelessWidget {
               label: isAr ? 'قمر فاكر' : 'Qamar remembers',
               value: remembered == 0 ? (isAr ? 'لسه ولا حاجة' : 'Nothing yet') : YouScreen.itemsLine(remembered, isAr: isAr, iso: state.iso),
             ),
+            // In the season, Ramadan: fasting days, suhoor and iftar.
+            if (state.seasonVisible)
+              _Row(key: YouScreen.ramadanRowKey, icon: QIcons.moonFull, label: isAr ? 'رمضان' : 'Ramadan', onTap: () => state.go(AppScreen.ramadan)),
           ],
           footer: state.avoidNotice,
         ),
-        const SizedBox(height: QSpace.xxl),
+        const SizedBox(height: QSpace.lg),
 
         // Su Points: the one way to the wallet on Me, and under it, in the
         // same card, what "Points and streaks" hides (O4). Off hides
@@ -214,7 +216,7 @@ class YouScreen extends StatelessWidget {
               ? 'نقاط Su ومستواك والسلسلة ومهمة اليوم. لو قفلتها بتستخبى بس: النقاط بتتحسب زي ما هي، ورصيدك فاضل في المحفظة.'
               : 'Su, your level, the streak and the day’s quest. Off only hides them: you still earn, and your balance stays in the wallet.',
         ),
-        const SizedBox(height: QSpace.xxl),
+        const SizedBox(height: QSpace.lg),
 
         _Group(
           header: isAr ? 'التطبيق' : 'App',
@@ -264,7 +266,7 @@ class YouScreen extends StatelessWidget {
             _Row(key: YouScreen.helpRowKey, icon: QIcons.gesture, label: isAr ? 'الحركات والاختصارات' : 'Gestures and shortcuts', onTap: () => _HelpSheet.open(context)),
           ],
         ),
-        const SizedBox(height: QSpace.xxl),
+        const SizedBox(height: QSpace.lg),
 
         // The professional programme, both sides of it (O12): a client's
         // code, and a nutritionist's own.
@@ -286,7 +288,7 @@ class YouScreen extends StatelessWidget {
                   : '${state.proName}’s code is on your account. Your price is the same, and they get their share when you subscribe.')
               : (isAr ? 'لو أخصائي أو مدرّب بعتك، ضيف الكود بتاعه. السعر مش بيتغير.' : 'If a nutritionist or coach sent you, add their code. Your price does not change.'),
         ),
-        const SizedBox(height: QSpace.xxl),
+        const SizedBox(height: QSpace.lg),
 
         // The consents given in the consultation, changeable here, and the
         // pages the stores require. Off means off: the analytics SDK stops
@@ -316,7 +318,7 @@ class YouScreen extends StatelessWidget {
             _Row(icon: QIcons.share, label: isAr ? 'صدّر أو امسح بياناتي' : 'Export or delete my data', external: true, onTap: () => _openPage(QamarConfig.deleteDataUrl)),
           ],
         ),
-        const SizedBox(height: QSpace.xxl),
+        const SizedBox(height: QSpace.xl),
 
         // The version and the consents agreed to, in the language's digits.
         Column(children: [
@@ -336,8 +338,8 @@ Future<void> _openPage(String url) async {
   }
 }
 
-/// One group: an eyebrow over it when it needs a name, its rows on one card
-/// under hairlines inset to the words, and a line of small print under it.
+/// One group (the kit's): its name over it when it needs one, its rows on
+/// one card with no lines between them, and a line of small print under it.
 class _Group extends StatelessWidget {
   final String? header;
   final List<Widget> rows;
@@ -353,24 +355,20 @@ class _Group extends StatelessWidget {
       children: [
         if (header != null)
           Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(QSpace.lg, 0, QSpace.lg, QSpace.sm),
+            padding: const EdgeInsetsDirectional.fromSTEB(QSpace.xs, QSpace.sm, QSpace.lg, QSpace.sm),
             child: Semantics(header: true, child: Text(QText.eyebrowText(header!, ar: isAr), style: QText.eyebrow(ar: isAr))),
           ),
         Container(
           key: cardKey,
           clipBehavior: Clip.antiAlias,
+          padding: const EdgeInsets.symmetric(vertical: 4),
           decoration: QDecor.card(),
-          child: Column(children: [
-            for (final (i, row) in rows.indexed) ...[
-              if (i > 0) const Divider(height: 1, thickness: 1, indent: _Row.wordsInset, color: QColors.hairline),
-              row,
-            ],
-          ]),
+          child: Column(children: rows),
         ),
         if (footer != null)
           Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(QSpace.lg, QSpace.sm, QSpace.lg, 0),
-            child: Text(footer!, style: QText.body(size: 13, height: 18, color: QColors.inkTertiary)),
+            padding: const EdgeInsetsDirectional.fromSTEB(QSpace.xs, QSpace.sm, QSpace.lg, 0),
+            child: Text(footer!, style: QText.body(size: 13, height: 18, color: QColors.inkSecondary)),
           ),
       ],
     );
@@ -410,8 +408,8 @@ class _Row extends StatelessWidget {
     this.semanticsLabel,
   });
 
-  /// Where the words start, from the card's edge: the hairlines start there.
-  static const wordsInset = QSpace.lg + 20 + QSpace.md;
+  /// Where the words start, from the card's edge.
+  static const wordsInset = QSpace.xl + 22 + 14;
 
   @override
   Widget build(BuildContext context) {
@@ -425,14 +423,14 @@ class _Row extends StatelessWidget {
   }
 
   Widget _drawn(bool pressed) {
-    final lead = leading ?? (icon == null ? null : Icon(icon, size: 20, color: QColors.ink));
-    final name = Text(label, textDirection: labelDirection, style: QText.body(size: 17, color: QColors.ink));
+    final lead = leading ?? (icon == null ? null : QIcon(icon!, size: 22, color: QColors.ink));
+    final name = Text(label, textDirection: labelDirection, style: QText.body(size: 16, color: QColors.ink));
     final words = sub == null
         ? name
         : Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             name,
             const SizedBox(height: 2),
-            Text(sub!, style: QText.body(size: 13, height: 18, color: QColors.inkTertiary)),
+            Text(sub!, style: QText.body(size: 13, height: 18, color: QColors.inkSecondary)),
           ]);
     final shown = value == null
         ? null
@@ -442,14 +440,14 @@ class _Row extends StatelessWidget {
       color: pressed ? QColors.surfaceRaised : Colors.transparent,
       constraints: const BoxConstraints(minHeight: 56),
       alignment: AlignmentDirectional.centerStart,
-      padding: const EdgeInsetsDirectional.fromSTEB(QSpace.lg, QSpace.sm, QSpace.lg, QSpace.sm),
+      padding: const EdgeInsetsDirectional.fromSTEB(QSpace.xl, QSpace.sm, QSpace.lg, QSpace.sm),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(children: [
-            SizedBox(width: 20, child: lead == null ? null : Center(child: lead)),
-            const SizedBox(width: QSpace.md),
+            SizedBox(width: 22, child: lead == null ? null : Center(child: lead)),
+            const SizedBox(width: 14),
             if (shown != null && sub == null) ...[
               // The name whole, and the value in what it leaves; at a large
               // text size the name wraps before it can push the value off.
@@ -463,7 +461,7 @@ class _Row extends StatelessWidget {
             if (control != null) ...[const SizedBox(width: QSpace.md), control!],
             if (onTap != null) ...[
               const SizedBox(width: QSpace.sm),
-              Icon(external ? QIcons.external : QIcons.forward, size: 17, color: QColors.inkTertiary),
+              QIcon(external ? QIcons.external : QIcons.forward, size: 20, color: QColors.ink),
             ],
           ]),
           if (below != null)
@@ -502,7 +500,8 @@ class _SwitchRow extends StatelessWidget {
       );
 }
 
-/// The person: the moon beside their name, and where their progress is kept.
+/// The person (the kit's profile card): the first letter of their name on
+/// its lavender circle, the name, and where their progress is kept.
 class _ProfileRow extends StatelessWidget {
   final AppState state;
   const _ProfileRow({required this.state});
@@ -511,16 +510,28 @@ class _ProfileRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isAr = state.isAr;
     final name = state.profile.name.isNotEmpty ? state.profile.name : (isAr ? 'يا صاحبي' : 'friend');
+    final initial = state.profile.name.trim().isEmpty ? '' : state.profile.name.trim().characters.first.toUpperCase();
     return Padding(
-      padding: const EdgeInsets.all(QSpace.lg),
+      padding: const EdgeInsetsDirectional.fromSTEB(QSpace.xl, QSpace.md, QSpace.lg, QSpace.md),
       child: Row(children: [
-        const ExcludeSemantics(child: QamarMoon(size: 48)),
-        const SizedBox(width: QSpace.lg),
+        ExcludeSemantics(
+          child: Container(
+            width: 54,
+            height: 54,
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.lavender),
+            child: Center(
+              child: initial.isEmpty
+                  ? const QIcon(QIcons.me, size: 26, color: QColors.onPastel)
+                  : Text(initial, style: QText.display(size: 24, ar: QText.arabic(initial), color: QColors.onPastel)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.display(size: 20, weight: FontWeight.w600, ar: QText.arabic(name))),
+            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
             const SizedBox(height: 2),
-            Text(state.accountEmail ?? state.t.guestAccount, style: QText.body(size: 15, color: QColors.inkSecondary)),
+            Text(state.accountEmail ?? state.t.guestAccount, style: QText.body(size: 13, color: QColors.inkSecondary)),
           ]),
         ),
       ]),
@@ -571,10 +582,10 @@ class _HelpSheet extends StatelessWidget {
         const SizedBox(height: QSpace.xxl),
         _Eyebrow(isAr ? 'من غير ما تفتح التطبيق' : 'Without opening the app'),
         Container(
-          decoration: QDecor.card(color: QColors.surfaceRaised),
+          decoration: QDecor.card(color: QColors.surfaceRaised, border: QColors.surfaceRaised),
           child: Column(children: [
             for (final (i, (where, how)) in ways.indexed) ...[
-              if (i > 0) const Divider(height: 1, thickness: 1, indent: QSpace.lg, color: QColors.hairline),
+              if (i > 0) const Divider(height: 1, thickness: 1, indent: QSpace.lg, color: QColors.hairlineStrong),
               Padding(
                 padding: const EdgeInsets.all(QSpace.lg),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -593,7 +604,7 @@ class _HelpSheet extends StatelessWidget {
             isAr
                 ? 'تسجيل الوجبة من الاختصار ببلاش ومش بيتعد. سؤال قمر بيتعد من أسئلة اليوم.'
                 : 'Logging a meal from a shortcut is free and never counted. Asking Qamar counts toward the day’s questions.',
-            style: QText.body(size: 13, height: 18, color: QColors.inkTertiary),
+            style: QText.body(size: 13, height: 18, color: QColors.inkSecondary),
           ),
         ),
       ],
@@ -741,7 +752,7 @@ class _ProgrammeSheetState extends State<_ProgrammeSheet> {
         const SizedBox(height: QSpace.xl),
         Container(
           padding: const EdgeInsets.all(QSpace.lg),
-          decoration: QDecor.card(color: QColors.surfaceRaised),
+          decoration: QDecor.card(color: QColors.surfaceRaised, border: QColors.surfaceRaised),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             _Eyebrow(isAr ? 'الكود بتاعك' : 'Your code'),
             // The code is set as a code; with none yet, the way to one is an
@@ -754,7 +765,7 @@ class _ProgrammeSheetState extends State<_ProgrammeSheet> {
                   )
                 : Text(isAr ? 'اربط حسابك عشان يطلعلك كود.' : 'Link an account to get a code.', key: YouScreen.proCodeKey, style: QText.body(size: 15, color: QColors.inkTertiary)),
             const SizedBox(height: QSpace.lg),
-            const Divider(height: 1, thickness: 1, color: QColors.hairline),
+            const Divider(height: 1, thickness: 1, color: QColors.hairlineStrong),
             const SizedBox(height: QSpace.lg),
             _Eyebrow(isAr ? 'العمولة' : 'Your earnings'),
             Row(children: [
@@ -785,10 +796,10 @@ class _ProgrammeSheetState extends State<_ProgrammeSheet> {
           const SizedBox(height: QSpace.xxl),
           _Eyebrow(isAr ? 'عملاؤك، الأسبوع ده' : 'Your clients, this week'),
           Container(
-            decoration: QDecor.card(color: QColors.surfaceRaised),
+            decoration: QDecor.card(color: QColors.surfaceRaised, border: QColors.surfaceRaised),
             child: Column(children: [
               for (final (i, c) in clients.indexed) ...[
-                if (i > 0) const Divider(height: 1, thickness: 1, indent: QSpace.lg, color: QColors.hairline),
+                if (i > 0) const Divider(height: 1, thickness: 1, indent: QSpace.lg, color: QColors.hairlineStrong),
                 Padding(
                   padding: const EdgeInsets.all(QSpace.lg),
                   child: Row(children: [
@@ -906,10 +917,10 @@ class _InvitationsSheetState extends State<_InvitationsSheet> {
           if (book.invitations.isNotEmpty) ...[
             const SizedBox(height: QSpace.md),
             Container(
-              decoration: QDecor.card(color: QColors.surfaceRaised),
+              decoration: QDecor.card(color: QColors.surfaceRaised, border: QColors.surfaceRaised),
               child: Column(children: [
                 for (final (i, inv) in book.invitations.indexed) ...[
-                  if (i > 0) const Divider(height: 1, thickness: 1, indent: QSpace.lg, color: QColors.hairline),
+                  if (i > 0) const Divider(height: 1, thickness: 1, indent: QSpace.lg, color: QColors.hairlineStrong),
                   Padding(
                     padding: const EdgeInsetsDirectional.fromSTEB(QSpace.lg, QSpace.xs, QSpace.xs, QSpace.xs),
                     child: SizedBox(
@@ -920,7 +931,7 @@ class _InvitationsSheetState extends State<_InvitationsSheet> {
                         Expanded(child: Text(inv.name, overflow: TextOverflow.ellipsis, style: QText.body(size: 17, color: QColors.ink))),
                         Text(statusOf(inv), style: QText.body(size: 13, color: inv.status == InvitationStatus.sent ? QColors.inkTertiary : QColors.ink)),
                         if (inv.status == InvitationStatus.sent)
-                          QRoundIconButton(icon: QIcons.share, size: 32, label: isAr ? 'ابعتها تاني' : 'Share again', onTap: () => state.shareInvitation(inv))
+                          QRoundIconButton(icon: QIcons.share, size: 32, raised: true, label: isAr ? 'ابعتها تاني' : 'Share again', onTap: () => state.shareInvitation(inv))
                         else
                           const SizedBox(width: QSpace.md),
                       ]),
@@ -938,16 +949,10 @@ class _InvitationsSheetState extends State<_InvitationsSheet> {
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => _invite(state),
               style: QText.body(size: 17, color: QColors.ink),
+              // The kit's field (the theme's): the ground in a grey edge.
               decoration: InputDecoration(
                 hintText: isAr ? 'اسم صاحبك' : 'Your friend’s name',
                 hintStyle: QText.body(size: 17, color: QColors.inkTertiary),
-                filled: true,
-                fillColor: QColors.surfaceRaised,
-                contentPadding: const EdgeInsets.symmetric(horizontal: QSpace.lg, vertical: 15),
-                border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(QRadii.control)), borderSide: BorderSide.none),
-                enabledBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(QRadii.control)), borderSide: BorderSide.none),
-                disabledBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(QRadii.control)), borderSide: BorderSide.none),
-                focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(QRadii.control)), borderSide: BorderSide(color: QColors.hairlineStrong, width: 1.5)),
               ),
             ),
           ],

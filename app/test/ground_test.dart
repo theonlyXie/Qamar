@@ -93,22 +93,22 @@ void main() {
       expect(lifetime.bottom, moreOrLessEquals(available.bottom, epsilon: 0.5), reason: 'one line of labels, not a 35px stagger');
     });
 
-    testWidgets('Progress’s cards share one edge (${lang.name})', (tester) async {
+    testWidgets('Progress’s cards are the kit’s pastels: the colour to the edge, no line round it (${lang.name})', (tester) async {
       final s = AppState()..setLang(lang);
       s.meals.add(LoggedMeal(name: 'Koshary', sub: '', kcal: 640, p: 20, c: 100, f: 18, at: DateTime.now()));
       s.go(AppScreen.today);
       s.go(AppScreen.progress);
       await _pumpPhone(tester, s);
-      for (final eyebrow in [lang == AppLang.ar ? 'السلسلة' : 'Streak', s.t.thisWeek]) {
-        final edges = tester
-            .widgetList<Container>(find.ancestor(of: find.text(eyebrow).first, matching: find.byType(Container)))
+      for (final title in [lang == AppLang.ar ? 'السلسلة' : 'Streak', s.t.thisWeek]) {
+        final card = tester
+            .widgetList<Container>(find.ancestor(of: find.text(title).first, matching: find.byType(Container)))
             .map((c) => c.decoration)
             .whereType<BoxDecoration>()
-            .map((d) => d.border)
-            .whereType<QGlassRim>()
-            .toList();
-        expect(edges, isNotEmpty, reason: eyebrow);
-        expect(edges.first, QGlassRim.soft, reason: '$eyebrow’s card: the one edge, a pane\'s rim');
+            .firstWhere((d) => d.color != null);
+        expect([QColors.lavender, QColors.lime, QColors.mint, QColors.coral], contains(card.color), reason: '$title’s card is a pastel');
+        expect(card.border, isNull, reason: '$title’s card: a pastel has no edge');
+        expect(card.borderRadius, BorderRadius.circular(QRadii.card));
+        expect(card.boxShadow, isNull);
       }
     });
   }

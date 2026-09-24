@@ -16,9 +16,12 @@ import '../theme/motion.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/explain.dart';
+import '../widgets/kit.dart';
 
-/// The day's meals, generated for this person: each one plainly, what goes
-/// on the plate, one tap to swap it, and one tap to shop the lot.
+/// The day's meals, generated for this person (the kit's Diets page): the
+/// day's total on its lavender card, then each meal plainly on its own card
+/// under a pastel band naming the slot — what goes on the plate, one tap to
+/// swap it — and one tap to shop the lot.
 ///
 /// The plan is the one the assistant built from their own numbers; when
 /// there isn't one it says so and offers to build it, since an empty plan is
@@ -48,11 +51,8 @@ class _PlanScreenState extends State<PlanScreen> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final title = Row(children: [
-      QBackButton(onTap: state.back, isAr: state.isAr),
-      const SizedBox(width: 8),
-      Expanded(child: Text(state.t.plan, style: QText.display(size: 34, ar: state.isAr))),
-    ]);
+    // A tab's page: its name, and no way back (the tab bar is the way).
+    final title = QPageTitle(title: state.t.plan, isAr: state.isAr);
 
     // No plan yet, or one that could not be written: the state sits in the
     // middle of the free space under the title, not stuck to its top with
@@ -88,17 +88,27 @@ class _PlanScreenState extends State<PlanScreen> {
 
     final meals = state.planMeals();
     final why = state.plan?.rationale;
+    final isAr = state.isAr;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, QLayout.pageTop, 20, QLayout.pageBottom),
       children: [
         title,
-        const SizedBox(height: 8),
-        _DayTotal(state: state, kcal: meals.fold(0, (sum, m) => sum + mealKcal(m))),
-        if (why != null && why.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(why, style: QText.body(size: 15, color: QColors.inkTertiary)),
-        ],
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+        // The kit's lavender card over its list: the day, its total against
+        // the target, and why it is built the way it is.
+        PastelCard(
+          color: QColors.lavender,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(isAr ? 'خطة النهارده' : 'Today’s plan', style: QText.body(size: 18, weight: FontWeight.w600, color: QColors.onPastel)),
+            const SizedBox(height: 4),
+            _DayTotal(state: state, kcal: meals.fold(0, (sum, m) => sum + mealKcal(m))),
+            if (why != null && why.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(why, style: QText.body(size: 15, color: QColors.onPastelSecondary)),
+            ],
+          ]),
+        ),
+        const SizedBox(height: 16),
         // A rewrite that did not happen (the plan's cap, a failure, a
         // fasting switch it could not follow) is said above the plan it
         // left in place, never only where it was asked (O10).
@@ -110,6 +120,7 @@ class _PlanScreenState extends State<PlanScreen> {
           _NudgePrompt(state: state),
           const SizedBox(height: 14),
         ],
+        QSectionTitle(isAr ? 'الوجبات' : 'Meals', isAr: isAr),
         for (final m in meals) ...[
           _MealCard(state: state, meal: m),
           const SizedBox(height: 14),
@@ -129,7 +140,7 @@ class _PlanScreenState extends State<PlanScreen> {
 /// its hairline, drawn when the orb hovers.
 const _explainInset = 5.0;
 
-/// The day's total under the title, against the target.
+/// The day's total on the lavender card, against the target.
 class _DayTotal extends StatelessWidget {
   final AppState state;
   final int kcal;
@@ -154,10 +165,10 @@ class _DayTotal extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             ExplainMark(
-              child: Text(isAr ? '${state.iso('$kcal')} سعر' : '$kcal kcal', style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink, ar: isAr)),
+              child: Text(isAr ? '${state.iso('$kcal')} سعر' : '$kcal kcal', style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.onPastel, ar: isAr)),
             ),
             // Arabic takes its own comma: a "·" there reads as a zero.
-            Text(isAr ? '، $vsTarget' : ' · $vsTarget', style: QText.body(size: 15, color: QColors.inkSecondary)),
+            Text(isAr ? '، $vsTarget' : ' · $vsTarget', style: QText.body(size: 15, color: QColors.onPastelSecondary)),
           ],
         ),
       ),
@@ -165,11 +176,22 @@ class _DayTotal extends StatelessWidget {
   }
 }
 
-/// One meal: when, what, what goes on the plate, and the one tap to swap it.
+/// One meal (the kit's diet card): a pastel band with the slot, its glyph
+/// and its figure where the kit has its photo; under it what, what goes on
+/// the plate, and the one tap to swap it.
 class _MealCard extends StatelessWidget {
   final AppState state;
   final PlanMeal meal;
   const _MealCard({required this.state, required this.meal});
+
+  /// Each slot's pastel and glyph: the morning's lime and sunrise, midday's
+  /// mint and sun, the evening's lavender and moon; the rest coral.
+  static ({Color color, IconData icon}) lookOf(String id) => switch (id) {
+        'breakfast' || 'suhoor' => (color: QColors.lime, icon: QIcons.sunrise),
+        'lunch' => (color: QColors.mint, icon: QIcons.sunset),
+        'dinner' || 'iftar' => (color: QColors.lavender, icon: QIcons.moon),
+        _ => (color: QColors.coral, icon: QIcons.plan),
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -180,24 +202,18 @@ class _MealCard extends StatelessWidget {
     final swapped = state.isSlotSwapped(meal.id);
     final still = MediaQuery.disableAnimationsOf(context);
 
+    final look = lookOf(meal.id);
     final content = Column(
       key: ValueKey('${meal.id}:$name'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          Expanded(child: Text(QText.eyebrowText(isAr ? meal.slotAr : meal.slotEn, ar: isAr), style: QText.eyebrow(ar: isAr))),
-          ExplainMark(
-            child: Text(isAr ? '${state.iso('$kcal')} سعر' : '$kcal kcal', style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink, ar: isAr)),
-          ),
-        ]),
-        const SizedBox(height: 6),
         Text(name, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
         if (note.isNotEmpty) ...[
           const SizedBox(height: 2),
           Text(note, style: QText.body(size: 15, color: QColors.inkSecondary)),
         ],
         if (meal.portions.isNotEmpty) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           const Divider(color: QColors.hairline, height: 1, thickness: 1),
           const SizedBox(height: 6),
           // What goes on the plate, and how much: the portions a plan is
@@ -217,8 +233,7 @@ class _MealCard extends StatelessWidget {
     );
 
     return Container(
-      // With the explainable's own inset, the card's 20 and 16.
-      padding: const EdgeInsets.symmetric(horizontal: 20 - _explainInset, vertical: 13),
+      clipBehavior: Clip.antiAlias,
       decoration: QDecor.card(),
       // The whole meal is what the orb explains: dropped on it, the portions
       // and their calories.
@@ -226,8 +241,26 @@ class _MealCard extends StatelessWidget {
         id: 'plan_meal_${meal.id}',
         explanation: mealExplanation(meal, iso: state.iso, digits: state.digits),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Container(
+              color: look.color,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              // A pastel, so the dotted mark on the figure is black.
+              child: DefaultTextStyle.merge(style: const TextStyle(color: QColors.onPastel), child: Row(children: [
+                PastelGlyph(look.icon, size: 36),
+                const SizedBox(width: 10),
+                Expanded(child: Text(isAr ? meal.slotAr : meal.slotEn, style: QText.body(size: 18, weight: FontWeight.w600, color: QColors.onPastel))),
+                ExplainMark(
+                  child: Text(isAr ? '${state.iso('$kcal')} سعر' : '$kcal kcal', style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.onPastel, ar: isAr)),
+                ),
+              ])),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
             // A swap changes the meal in place: the new one fades in where the
             // old one was, and the card takes its size at once, so nothing
             // grows while the words change.
@@ -260,6 +293,9 @@ class _MealCard extends StatelessWidget {
                 },
               ),
             ],
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -301,7 +337,7 @@ class _PlanEmpty extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: QDecor.card(),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Padding(padding: EdgeInsets.only(top: 1), child: Icon(QIcons.safety, size: 20, color: QColors.ink)),
+          const Padding(padding: EdgeInsets.only(top: 1), child: QIcon(QIcons.safety, size: 20, color: QColors.ink)),
           const SizedBox(width: 12),
           Expanded(child: Text(state.generalGuidancePlanNote, style: QText.body(size: 17, color: QColors.ink))),
         ]),
@@ -393,35 +429,36 @@ class _NudgePrompt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAr = state.isAr;
-    return Container(
+    // The question on the kit's mint, its two answers black and quiet.
+    return PastelCard(
+      color: QColors.mint,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-      decoration: QDecor.card(border: QColors.hairlineStrong),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            const Icon(QIcons.bell, size: 20, color: QColors.ink),
-            const SizedBox(width: 8),
+            const PastelGlyph(QIcons.bell, size: 36),
+            const SizedBox(width: 10),
             Expanded(
-              child: Text(isAr ? 'أسألك في مواعيد أكلك؟' : 'Shall I ask at your meal times?', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
+              child: Text(isAr ? 'أسألك في مواعيد أكلك؟' : 'Shall I ask at your meal times?', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.onPastel)),
             ),
           ]),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             isAr
-                ? 'مرتين في اليوم، زي «الغدا إيه النهارده؟»، أول أسبوعين بس. تغيّرها من «أنا» في أي وقت.'
+                ? 'مرتين في اليوم، زي «الغدا إيه النهارده؟»، أول أسبوعين بس. تغيّرها من «حسابي» في أي وقت.'
                 : 'Twice a day, like “What’s for lunch today?”, for your first two weeks. Change it any time in Me.',
-            style: QText.body(size: 15, color: QColors.inkSecondary),
+            style: QText.body(size: 15, color: QColors.onPastelSecondary),
           ),
           const SizedBox(height: 8),
           Row(children: [
-            QOutlineButton(label: isAr ? 'اسمح' : 'Allow', height: 36, onTap: state.allowNudges),
+            QPastelButton(label: isAr ? 'اسمح' : 'Allow', height: 36, onTap: state.allowNudges),
             const SizedBox(width: 8),
             QTapArea(
               onTap: state.declineNudges,
               builder: (context, pressed) => Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(isAr ? 'لا، شكراً' : 'No, thanks', style: QText.body(size: 15, weight: FontWeight.w500, color: pressed ? QColors.ink : QColors.inkSecondary)),
+                child: Text(isAr ? 'لا، شكراً' : 'No, thanks', style: QText.body(size: 15, weight: FontWeight.w600, color: pressed ? QColors.onPastelSecondary : QColors.onPastel)),
               ),
             ),
           ]),
@@ -454,7 +491,7 @@ class _ShopCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(children: [
-            const Icon(QIcons.shop, size: 20, color: QColors.ink),
+            const QIcon(QIcons.shop, size: 22, color: QColors.ink),
             const SizedBox(width: 8),
             Expanded(child: Text(isAr ? 'اشتري خطة النهارده' : 'Shop this plan', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink))),
           ]),
@@ -477,13 +514,12 @@ class _ShopCard extends StatelessWidget {
             QPrimaryButton(
               key: PlanScreen.shopKey,
               label: isAr ? 'اطلب من $partner' : 'Shop at $partner',
-              height: 48,
               onTap: () => state.shopThisPlan(),
             ),
           if (state.shopNotice case final notice?) ...[
             const SizedBox(height: 10),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Padding(padding: EdgeInsets.only(top: 1), child: Icon(QIcons.error, size: 16, color: QColors.ink)),
+              const Padding(padding: EdgeInsets.only(top: 1), child: QIcon(QIcons.error, size: 16, color: QColors.ink)),
               const SizedBox(width: 8),
               Expanded(child: Text(notice, style: QText.body(size: 13, color: QColors.ink))),
             ]),

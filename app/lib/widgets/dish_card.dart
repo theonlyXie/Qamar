@@ -4,6 +4,7 @@ import '../models/dishes.dart';
 import '../models/nudge.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/icons.dart';
 import '../theme/text_styles.dart';
 
 /// One real Egyptian dish with its numbers (O5): named, portioned, costed.
@@ -13,7 +14,7 @@ import '../theme/text_styles.dart';
 /// and its numbers alone. Always said to be an estimate: the portions are
 /// household sizes.
 ///
-/// A card on the page (the liquid-glass skill): the flat surface, a hairline,
+/// A card on the page (the qamar-design skill): the flat surface, a hairline,
 /// the card corner; an eyebrow for the meal, the dish as the lead line, its
 /// numbers under it in two steps of ink.
 class DishCard extends StatelessWidget {
@@ -68,28 +69,53 @@ class DishCard extends StatelessWidget {
   /// What the numbers are: an estimate, at home-sized portions.
   static String estimateLine(bool isAr) => isAr ? 'تقدير، بحصص البيت.' : 'An estimate, for home-sized portions.';
 
+  /// The kit's diet card, as the plan draws a meal: the slot on a mint band
+  /// where the kit has its photo, the dish and its figures under it.
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(QSpace.xl),
+      clipBehavior: Clip.antiAlias,
       decoration: QDecor.card(),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (slot != null) ...[
-            Text(QText.eyebrowText(slotLine(slot!, isAr), ar: isAr), style: QText.eyebrow(ar: isAr)),
-            const SizedBox(height: QSpace.sm),
-          ],
-          Text(isAr ? dish.nameAr : dish.nameEn, style: QText.body(size: 17, weight: FontWeight.w600)),
-          const SizedBox(height: 2),
-          Text(dish.portions(isAr), style: QText.body(size: 13, color: QColors.inkTertiary)),
-          const SizedBox(height: QSpace.md),
-          Text(costLine(), style: QText.number(size: 15, weight: FontWeight.w600, ar: isAr)),
-          const SizedBox(height: 2),
-          Text(macroLine(), style: QText.body(size: 13, color: QColors.inkSecondary)),
-          const SizedBox(height: QSpace.md),
-          Text(estimateLine(isAr), style: QText.body(size: 12, color: QColors.inkTertiary)),
+          Container(
+            color: QColors.mint,
+            padding: const EdgeInsets.symmetric(horizontal: QSpace.lg, vertical: QSpace.md),
+            child: Row(children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.pastelTrack),
+                child: const Center(child: QIcon(QIcons.plan, size: 18, color: QColors.onPastel)),
+              ),
+              const SizedBox(width: QSpace.md),
+              Expanded(
+                child: Text(
+                  slot != null ? slotLine(slot!, isAr) : (isAr ? 'طبق من خطتك' : 'A dish from your plan'),
+                  style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.onPastel),
+                ),
+              ),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(QSpace.lg, QSpace.md, QSpace.lg, QSpace.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(isAr ? dish.nameAr : dish.nameEn, style: QText.body(size: 17, weight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(dish.portions(isAr), style: QText.body(size: 13, color: QColors.inkSecondary)),
+                const SizedBox(height: QSpace.md),
+                Text(costLine(), style: QText.number(size: 15, weight: FontWeight.w600, ar: isAr)),
+                const SizedBox(height: 2),
+                Text(macroLine(), style: QText.body(size: 13, color: QColors.inkSecondary)),
+                const SizedBox(height: QSpace.md),
+                Text(estimateLine(isAr), style: QText.body(size: 12, color: QColors.inkTertiary)),
+              ],
+            ),
+          ),
         ],
       ),
     );

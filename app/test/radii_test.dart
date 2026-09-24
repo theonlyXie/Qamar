@@ -1,9 +1,10 @@
-// Corners (the liquid-glass skill): four radii and the pill, each shape taking
-// the corner of what it is: an inset (12), a control or field (18), a card or
-// a message bubble (24), a sheet's top (32), and the pill for anything a
-// finger presses. No corner is written as a number outside the theme, and a
-// sweep of every screen, the tree and the conversation, in both languages,
-// finds no other corner drawn.
+// Corners (the qamar-design skill, the Nutri AI kit's): four radii and the
+// pill, each shape taking the corner of what it is: a control or field (12),
+// a tile inside a card (16), a card or a message bubble (24), a sheet's top
+// (32), and the pill for chips, the segmented control and the tab bar. No
+// corner is written as a number outside the theme, and a sweep of every
+// screen, the Log sheet and the conversation, in both languages, finds no
+// other corner drawn.
 
 import 'dart:io';
 
@@ -57,7 +58,7 @@ void main() {
   });
 
   test('four corners and the pill', () {
-    expect([QRadii.inset, QRadii.control, QRadii.card, QRadii.sheet, QRadii.pill], [12, 18, 24, 32, 999]);
+    expect([QRadii.control, QRadii.inset, QRadii.card, QRadii.sheet, QRadii.pill], [12, 16, 24, 32, 999]);
   });
 
   test('no corner is written as a number outside the theme', () {
@@ -74,7 +75,7 @@ void main() {
   });
 
   for (final lang in AppLang.values) {
-    testWidgets('every corner drawn is on the scale: every screen, the tree, the conversation, a sheet (${lang.name})', (tester) async {
+    testWidgets('every corner drawn is on the scale: every screen, the Log sheet, the conversation, a sheet (${lang.name})', (tester) async {
       tester.view.devicePixelRatio = 3;
       tester.view.physicalSize = const Size(390, 2400) * 3;
       addTearDown(tester.view.reset);
@@ -96,8 +97,8 @@ void main() {
       }
       s.go(AppScreen.today);
       s.orbTap();
-      await check('the tree');
-      s.closeTree();
+      await check('the Log sheet');
+      s.closeLog();
       s.openChat();
       await check('the conversation');
       s.closeChat();

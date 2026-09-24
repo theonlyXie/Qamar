@@ -75,10 +75,15 @@ void main() {
       expect(data.label, startsWith(s.t.walletTitle), reason: 'heard by the wallet’s name');
       expect(data.label, contains(lang == AppLang.ar ? 'متاح' : 'available'), reason: 'and its balance');
 
-      // The food: one card, three lines under hairlines.
+      // The food: one card, three rows, with no lines between them (the
+      // kit's settings list keeps its rows apart by their height alone).
       final readOut = find.byKey(YouScreen.readOutKey);
       expect(readOut, findsOneWidget);
-      expect(find.descendant(of: readOut, matching: find.byType(Divider)), findsNWidgets(2), reason: 'three lines of one card, under hairlines');
+      expect(find.descendant(of: readOut, matching: find.byType(Divider)), findsNothing, reason: 'no hairlines between the rows');
+      for (final label in [lang == AppLang.ar ? 'هدفك اليومي' : 'Daily target', lang == AppLang.ar ? 'قمر فاكر' : 'Qamar remembers']) {
+        expect(find.descendant(of: readOut, matching: find.text(label)), findsOneWidget, reason: 'three rows of one card');
+      }
+      expect(find.descendant(of: readOut, matching: find.byKey(YouScreen.avoidEntryKey)), findsOneWidget);
       // One of them changes something, and says so with the chevron; the
       // read-outs carry neither a chevron nor a touch.
       expect(find.descendant(of: readOut, matching: find.byIcon(QIcons.forward)), findsOneWidget);

@@ -1,125 +1,105 @@
 import 'package:flutter/material.dart';
 
-/// Qamar's palette: black, white, the greys between them, and one colour of
-/// ours, burgundy (the liquid-glass skill, .claude/skills/liquid-glass).
+/// Qamar's palette (the qamar-design skill, .claude/skills/qamar-design): the
+/// Nutri AI kit's flat near-black ground and its four pastels, with Qamar's
+/// burgundy where the kit has its orange.
 ///
-/// Black is the ground and white is the ink. Every grey is white laid over
-/// black at some strength, written here as the solid grey it makes so a
-/// contrast ratio can be checked exactly. Burgundy marks what a finger can do
-/// and what has been chosen: the primary button, the send button, a chosen
-/// answer, a switch that is on, a bar filling. It never says how something
-/// went: there are no success, warning or error colours, and state is said
-/// with a glyph, a word or a weight (colors_test.dart holds all of it).
+/// The ground is one grey, and everything that sits on it is a step lighter:
+/// a card, then a control, then a control's circle. Content that matters
+/// most sits on a pastel card in black ink: the day's calories on lavender,
+/// protein on mint, carbs on lime, fat on coral. Burgundy marks what a finger
+/// does and what has been chosen: the primary button, the chosen segment, a
+/// switch that is on, the tab the person is on. It never says how something
+/// went; the one other colour, [error], is a field's own complaint and
+/// nothing else (colors_test.dart holds all of it).
 ///
 /// No hex is written outside lib/theme (the moon's own greys in
 /// widgets/moon.dart aside), and no token is kept that nothing draws.
 class QColors {
   QColors._();
 
-  /// The two colours.
   static const black = Color(0xFF000000);
   static const white = Color(0xFFFFFFFF);
 
-  /// The page's ground: pure black, which an OLED screen draws as off.
-  static const canvas = black;
+  /// The page's ground: the kit's grey 600, a black that is not quite.
+  static const canvas = Color(0xFF121212);
 
-  /// Three surfaces, each a step lighter, for content that sits on the
-  /// canvas: a card or a grouped list; something raised on it (a field, the
-  /// person's own words in the conversation, a pressed row); and a control
-  /// on a card or a selected row. Content is never drawn on glass; these are
-  /// what content sits on.
-  static const surface = Color(0xFF121212);
-  static const surfaceRaised = Color(0xFF1E1E1E);
-  static const surfaceHigh = Color(0xFF2C2C2C);
+  /// What sits on the ground, a step lighter each: a card, a grouped list, a
+  /// row, a sheet, a dialog (grey 500); a control on the ground or on a card —
+  /// the tab bar, a back button, a sign-in button, a field's edge (grey 400);
+  /// a circle on a control, a track, a pressed control (grey 300). Flat: no
+  /// shadow and no glass.
+  static const surface = Color(0xFF232220);
+  static const surfaceRaised = Color(0xFF2F2F2F);
+  static const surfaceHigh = Color(0xFF474747);
 
-  /// Three steps of ink, each passing AA (4.5:1) on every surface above and
-  /// on the glass (colors_test.dart): the words, then what supports them, then
-  /// captions and hints. Hierarchy past the third step comes from size and
-  /// weight, never from fading further.
+  /// Three steps of ink on the dark, each passing AA (4.5:1) on the ground,
+  /// the card and the control (colors_test.dart): the words, then what
+  /// supports them (grey 200), then captions and hints. Past the third step
+  /// hierarchy comes from size and weight.
   static const ink = white;
-  static const inkSecondary = Color(0xFFC7C7C7);
-  static const inkTertiary = Color(0xFF999999);
+  static const inkSecondary = Color(0xFFC3C3C3);
+  static const inkTertiary = Color(0xFF9A9A9A);
 
-  /// The label of a control with nothing to do: the one place ink sits below
-  /// AA, on purpose, and still at least 3:1 so it is there to see.
-  static const inkDisabled = Color(0xFF666666);
+  /// The label of a control with nothing to do: below AA on purpose, and
+  /// still at least 3:1 on the card and the control so it is there to see.
+  static const inkDisabled = Color(0xFF7A7A7A);
 
-  /// Words and glyphs on a white fill (the camera's shutter): black.
-  static const onInk = black;
+  /// Words on white and on a pastel: the kit's black.
+  static const onInk = canvas;
 
-  /// Burgundy, the fill of what a finger does: the primary button, the send
-  /// button, a chosen chip, a switch that is on. White on it reads at 8.9:1.
-  /// One burgundy fill to a screen at most, so the one thing to do is the
-  /// warmest thing there.
+  /// The four pastels, the kit's accents. A pastel is a card's whole ground,
+  /// with [onPastel] words on it, never a line or a word on the dark.
+  static const lavender = Color(0xFFDDC0FF);
+  static const lime = Color(0xFFF5F378);
+  static const mint = Color(0xFF45C588);
+  static const coral = Color(0xFFFF6F43);
+
+  /// Ink on a pastel: black for the words, 80% black for what supports them
+  /// (4.5:1 or better on all four), and black at 12% for a bar's unlit track
+  /// and a glyph's circle.
+  static const onPastel = canvas;
+  static const onPastelSecondary = Color(0xCC121212);
+  static const pastelTrack = Color(0x1F121212);
+
+  /// Burgundy, Qamar's own: the fill of what a finger does. White on it
+  /// reads at 8.9:1. One burgundy action to a screen.
   static const accent = Color(0xFF8E1B34);
 
-  /// The fill while it is pressed: a step deeper, as a lit button gives.
+  /// The fill while it is pressed: a step deeper.
   static const accentPressed = Color(0xFF751529);
 
-  /// Burgundy as a line or a mark on the dark: a bar filling, the streak's
-  /// ring, a text action, a chosen radio. Lighter than the fill so it reads
-  /// against black and glass (at least 4.8:1 on every panel), and never the
-  /// colour of reading text.
+  /// Burgundy as a word or a line on the dark: a text action, a bar filling
+  /// on a dark card, a chosen radio's ring. Lighter than the fill so it
+  /// reads on the ground and the card.
   static const accentInk = Color(0xFFE8768D);
 
-  /// Burgundy washed into a surface: a chosen row, a tinted panel.
+  /// Burgundy washed into a surface: a chosen row.
   static const accentWash = Color(0x478E1B34);
 
   /// Words and glyphs on burgundy.
   static const onAccent = white;
 
-  /// A sheet's frosted ground: the surface at 78%, over the blurred page, so
-  /// its words never depend on what is behind it.
-  static const glassSheet = Color(0xC7121212);
+  /// Two edges: a field's and a divider's (grey 400), and a strong one for
+  /// a control that must read as a boundary on the card (grey 300). A focused
+  /// field takes the ink itself.
+  static const hairline = surfaceRaised;
+  static const hairlineStrong = surfaceHigh;
 
-  /// The page's light: a burgundy glow from above the top of the screen,
-  /// fading to black by about the middle (QDecor.ambient). The glass panels
-  /// scroll over it, so glass has something to show. Dim enough that the
-  /// third ink still passes AA on the brightest panel in it.
-  static const ambient = Color(0xFF2A0912);
+  /// A field that has something wrong with it: its edge, the kit's red. The
+  /// words under it stay in the full ink: this red passes 3:1 as a mark on
+  /// the ground and the card, not AA as text.
+  static const error = Color(0xFFC93838);
 
-  /// Two edges: the hairline every card, row and field draws, and a strong one
-  /// for what must read as a boundary (a selected control, a focused field).
-  static const hairline = Color(0x24FFFFFF);
-  static const hairlineStrong = Color(0x47FFFFFF);
+  /// A control over a photo or the camera (the scan screen's tiles, a close
+  /// button on a picture): the ground at half strength, so the picture still
+  /// shows round it, and a step stronger while pressed.
+  static const overPhoto = Color(0x80121212);
+  static const overPhotoPressed = Color(0xB3121212);
 
-  /// Liquid Glass, as panels (QDecor.card, sheets): a card, a grouped list,
-  /// a sheet. White over the page's light, brighter at the top as light
-  /// caught in a curved surface is, with a rim bright along the top that
-  /// fades to the hairline down the sides (QGlassRim). A shape inside a panel
-  /// takes the inset step over it.
-  static const glassPanel = Color(0x12FFFFFF);
-  static const glassPanelTop = Color(0x1AFFFFFF);
-  static const glassInset = Color(0x0DFFFFFF);
-  static const glassRim = Color(0x47FFFFFF);
-
-  /// A pane raised: pressed, or a pane standing inside another. Flat, a step
-  /// over the plain pane's top.
-  static const glassRaised = Color(0x24FFFFFF);
-
-  /// Liquid Glass, the floating control layer (QGlass): the orb, the tree's
-  /// buttons, the composer, a floating back button, a sheet's grabber bar.
-  /// A breath of white over whatever is behind it, blurred; a specular edge
-  /// that is bright at the top and fades down the sides; and, when the phone
-  /// asks for more contrast, a solid fallback.
-  static const glassFill = Color(0x1FFFFFFF);
-  static const glassFillPressed = Color(0x2EFFFFFF);
-  static const glassFillClear = Color(0x0FFFFFFF);
-  static const glassEdgeTop = Color(0x66FFFFFF);
-
-  /// The rim of burgundy glass, catching more of the light.
-  static const glassRimTinted = Color(0x8CFFFFFF);
-  static const glassEdgeBottom = Color(0x14FFFFFF);
-  static const glassSolid = surfaceRaised;
-
-  /// The glass's lens: the upper part of a piece of glass is this much
-  /// brighter, fading to nothing half way down, as light caught in a curved
-  /// surface is.
-  static const glassLens = Color(0x14FFFFFF);
-
-  /// What a sheet or an overlay dims the page with: black at 64%. One
-  /// strength for every modal, so opening one always reads the same.
-  static const scrim = Color(0xA3000000);
+  /// What a sheet or a dialog dims the page with: black at 50%, as the kit
+  /// takes #121212 to #090909 behind a dialog. One strength for every modal.
+  static const scrim = Color(0x80000000);
 }
 
 /// Other people's marks, drawn the way their owners require. Google's sign-in

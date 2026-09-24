@@ -14,6 +14,7 @@ import 'package:qamar/models/billing.dart';
 import 'package:qamar/screens/subscription_screen.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/common.dart';
+import 'package:qamar/widgets/kit.dart';
 
 /// A free-tier person whose earned-month status the server has answered:
 /// no paid membership yet, so the window opens on the first payment.
@@ -126,8 +127,9 @@ void main() {
     final text = await _paywall(tester, _lite(AppLang.en, earned: _stated()));
     expect(tester.widget<Text>(find.byKey(SubscriptionScreen.leadKey)).data,
         'Qamar+ tells you what to eat tomorrow: it writes the plan at night, in Egyptian dishes.');
-    // The table's name is an eyebrow: set in capitals in English.
-    final table = text.substring(text.indexOf('WHAT YOU GET'));
+    // The table's name is an eyebrow, in sentence case (the kit sets no
+    // label in capitals).
+    final table = text.substring(text.indexOf('What you get'));
     expect(table.indexOf('Tomorrow’s plan, written overnight'), lessThan(table.indexOf('Log meals by typing or speaking')),
         reason: 'tomorrow’s plan is the table’s first row');
   });
@@ -256,7 +258,7 @@ void main() {
   group('one thing to do', () {
     for (final lang in AppLang.values) {
       final ar = lang == AppLang.ar;
-      testWidgets('the free week, while it is on offer, with its rule under it; the month an outline (${lang.name})', (tester) async {
+      testWidgets('the free week, while it is on offer, with its rule under it; the month the black button on its card (${lang.name})', (tester) async {
         final s = _lite(lang, earned: _stated())..plusTrialEligible = true;
         await _paywall(tester, s);
         expect(find.byType(QPrimaryButton), findsOneWidget);
@@ -267,10 +269,10 @@ void main() {
               : 'No card, and nothing renews on its own: after 7 days you are simply back on the free Qamar.'),
           findsOneWidget,
         );
-        expect(tester.widget<QOutlineButton>(find.byKey(SubscriptionScreen.buyKey)).label, ar ? 'ادفع شهر بـ ٥٠٠ ج.م' : 'Pay EGP 500 for a month');
+        expect(tester.widget<QPastelButton>(find.byKey(SubscriptionScreen.buyKey)).label, ar ? 'ادفع شهر بـ ٥٠٠ ج.م' : 'Pay EGP 500 for a month');
       });
 
-      testWidgets('with the week used, the month is the one white button, at the quoted price (${lang.name})', (tester) async {
+      testWidgets('with the week used, the month is the one burgundy button, at the quoted price (${lang.name})', (tester) async {
         await _paywall(tester, _lite(lang, earned: _stated()));
         expect(find.byType(QPrimaryButton), findsOneWidget);
         expect(tester.widget<QPrimaryButton>(find.byKey(SubscriptionScreen.primaryKey)).label, ar ? 'ادفع شهر بـ ٥٠٠ ج.م' : 'Pay EGP 500 for a month');

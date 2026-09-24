@@ -54,18 +54,9 @@ enum BillingMoment { none, trialEnding, membershipEnding }
 /// How a meal gets logged straight from the orb, with no page in between.
 enum QuickLog { voice, text, photo, repeat, activity }
 
-/// The Log node's third level: the ring shows kinds of movement, or recent
-/// meals to repeat.
-enum TreeSub { activity, repeat }
-
-/// The orb's whole vocabulary. Tap opens the tree (or comes back to Today),
-/// hold talks to Qamar, dragging it onto a number explains that number.
+/// The orb's whole vocabulary. Tap opens the Log sheet, hold talks to Qamar,
+/// dragging it onto a number explains that number.
 enum OrbGesture { tap, hold, explain }
-
-/// The three places the orb can rest in its band at the bottom of the
-/// screen (O1), start-relative: the start is the left in English and the
-/// right in Arabic.
-enum OrbStop { start, centre, end }
 
 enum AppScreen { welcome, scan, onboard, today, plan, progress, you, wallet, subscription, ramadan }
 
@@ -181,7 +172,6 @@ class AppState extends ChangeNotifier {
   static const _kRamadanAsked = 'ramadan_asked';
   static const _kHoldCoachSeen = 'hold_coach_seen';
   static const _kWeekCardSeen = 'week_card_seen';
-  static const _kOrbStop = 'orb_stop';
 
   Future<void> _loadDevicePrefs() async {
     final p = _prefs;
@@ -204,7 +194,6 @@ class AppState extends ChangeNotifier {
       final proCode = await p.getString(_kPendingProCode);
       final proWho = await p.getString(_kProName);
       final lockDay = await p.getString(_kLockOfferDay);
-      final stop = await p.getString(_kOrbStop);
       final stale = await p.getString(_kPlanStaleDays);
       if (_disposed) return;
       if (stale != null && stale.trim().isNotEmpty) _planStaleDays.addAll(stale.split(',').where((d) => d.trim().isNotEmpty));
@@ -214,10 +203,6 @@ class AppState extends ChangeNotifier {
       if (proWho != null && proWho.trim().isNotEmpty) proName ??= proWho.trim();
       if (lockDay != null && lockDay.trim().isNotEmpty) _lockOfferDay = lockDay.trim();
       if (asked != null) ramadanAskedFor = asked;
-      // Where the person left the orb resting last time (O1).
-      for (final s in OrbStop.values) {
-        if (s.name == stop) orbStop = s;
-      }
       if (weekSeen != null) _weekCardSeenDay = weekSeen;
       if (reviewNumbers != null) reviewShowNumbers = reviewNumbers;
       if (consent != null) {
@@ -602,22 +587,32 @@ class AppState extends ChangeNotifier {
 
   // ---- the way back: one rule (seat 2) ---------------------------------------
   //
-  // Every screen but the two roots — the welcome screen and Today — has one
-  // back control, in the same place (the top start corner) with the same
-  // arrow, and it returns to the screen the person came from. The phone's own
-  // back does the same, after closing whatever sheet is open. The orb, where it
-  // shows, is the way home to Today.
+  // The four tabs — Today, Progress, Plan, Me — are peers, reached from the
+  // tab bar, and have no back control: the phone's back from any of them
+  // but Today goes to Today. Every other screen but the welcome screen has
+  // one back control, in the same place (the top start corner) with the same
+  // chevron, and it returns to the screen the person came from. The phone's
+  // own back does the same, after closing whatever sheet is open.
 
   /// The roots: nothing to go back to from here.
   static const rootScreens = {AppScreen.welcome, AppScreen.today};
 
+  /// The tab bar's pages, in its order either side of the orb: Today and
+  /// Progress, then Plan and Me.
+  static const tabScreens = [AppScreen.today, AppScreen.progress, AppScreen.plan, AppScreen.you];
+
+  /// Whether [screen] is one of the tab bar's pages, which draw no back
+  /// control of their own.
+  bool get onTab => tabScreens.contains(screen);
+
   /// The screens the person came through to reach this one, most recent last.
-  /// Reaching a root clears it; going back to a screen already on it cuts it
-  /// there, so it never loops.
+  /// Reaching a root or a tab clears it (a tab is reached from the bar, not
+  /// from where the person was); going back to a screen already on it cuts
+  /// it there, so it never loops.
   final List<AppScreen> _trail = [];
 
   void _recordTrail({required AppScreen to}) {
-    if (rootScreens.contains(to)) {
+    if (rootScreens.contains(to) || tabScreens.contains(to)) {
       _trail.clear();
       return;
     }
@@ -650,7 +645,7 @@ class AppState extends ChangeNotifier {
     // carries on where it was, so a slip of the thumb costs nothing.
     if (from == AppScreen.onboard && msgs.any((m) => m.kind == ObKind.u)) consultationPaused = true;
     _screenNow = to;
-    _collapseTree();
+    _collapseLog();
     _track('back', {'from': from.name, 'to': to.name});
     _notify();
     _screen(to);
@@ -664,7 +659,7 @@ class AppState extends ChangeNotifier {
   /// overlay to close, or a screen to go back from. At a root with nothing
   /// open it is the system's (leaving the app).
   bool get handlesSystemBack =>
-      explainOpen != null || whyOpen || authOpen || pendingActivity != null || chatOpen || treeOpen || canGoBack;
+      explainOpen != null || whyOpen || authOpen || pendingActivity != null || chatOpen || logOpen || canGoBack;
 
   /// The phone's back: the topmost sheet or overlay first, then [back].
   void systemBack() {
@@ -673,7 +668,7 @@ class AppState extends ChangeNotifier {
     if (authOpen) return closeAuth();
     if (whyOpen) return closeWhy();
     if (chatOpen) return closeChat();
-    if (treeOpen) return closeTree();
+    if (logOpen) return closeLog();
     back();
   }
   int step = 0;
@@ -719,15 +714,10 @@ class AppState extends ChangeNotifier {
   int turn = 0;
   bool chatOpen = false;
 
-  /// Where the orb rests (O1): one of three stops in the band at the bottom
-  /// of the screen — start, centre, end — chosen by where the person lets go
-  /// of it, and kept on the phone. Start-relative, so the layout mirrors in
-  /// Arabic. The end stop by default.
-  OrbStop orbStop = OrbStop.end;
-
-  /// True while the orb is off the band: held under a finger, or placed at
-  /// [orbStart]/[orbY] by [setOrbPosition]. Letting go ([settleOrb]) puts it
-  /// back at a stop. It never rests on the page's content.
+  /// True while the orb is out of the tab bar: held under a finger, or
+  /// placed at [orbStart]/[orbY] by [setOrbPosition], to be dropped on a
+  /// number. Letting go ([releaseOrb]) puts it back in the middle of the
+  /// bar. It never rests on the page's content.
   bool orbHeld = false;
 
   /// Where a held orb is, measured from the start edge of the screen — the
@@ -736,7 +726,8 @@ class AppState extends ChangeNotifier {
   double orbStart = 290;
   double orbY = 620;
 
-  bool treeOpen = false;
+  /// The Log sheet, the orb's tap: every way to log, one tap each.
+  bool logOpen = false;
   int suAvailable = 0;
   int suLifetime = 0;
 
@@ -889,7 +880,7 @@ class AppState extends ChangeNotifier {
 
   /// A push tapped in the last half hour wins; then a log that began from
   /// the orb's waiting question; then nothing. Whether a question was
-  /// waiting is recorded whatever the path — a log from the tree while the
+  /// waiting is recorded whatever the path — a log from the Log sheet while the
   /// orb pulses is the habit itself, and this is how that is told apart.
   ({String prompt, bool orbWaiting}) _logStartNow({bool fromWaitingQuestion = false}) => (
         prompt: _nudgedRecently
@@ -1149,7 +1140,7 @@ class AppState extends ChangeNotifier {
     final slot = MealSlot.values.asNameMap()[payload.substring(6)] ?? MealSlot.lunch;
     _nudgeTappedAt = _clock();
     _track('nudge_tapped', {'slot': slot.name});
-    _collapseTree();
+    _collapseLog();
     if (_logUnderWay) {
       // A log already under way is picked up where it was, with its start.
       openChat();
@@ -1215,12 +1206,12 @@ class AppState extends ChangeNotifier {
   // ---- the hold, named where it is done (O1) --------------------------------
   //
   // Hold is the one gesture people have to learn, and it is the logging path.
-  // The tutorial card on Today stays until the first hold; if the tree has
-  // been opened and closed twice with no hold, a one-time mark above the orb
-  // names it, in the card's words (HoldCopy).
+  // The tutorial card on Today stays until the first hold; if the Log sheet
+  // has been opened and closed twice with no hold, a one-time mark above the
+  // orb names it, in the card's words (HoldCopy).
 
-  /// Times an open tree closed while the hold was still unlearned.
-  int treeClosesWithoutHold = 0;
+  /// Times an open Log sheet closed while the hold was still unlearned.
+  int logClosesWithoutHold = 0;
 
   /// The mark has been dismissed, or made unnecessary by a hold. Remembered
   /// on the phone: it is one-time.
@@ -1232,9 +1223,9 @@ class AppState extends ChangeNotifier {
   bool get holdCoachDue =>
       !holdCoachSeen &&
       !gesturesLearned.contains(OrbGesture.hold) &&
-      treeClosesWithoutHold >= 2 &&
+      logClosesWithoutHold >= 2 &&
       screen == AppScreen.today &&
-      !treeOpen &&
+      !logOpen &&
       !chatOpen;
 
   void dismissHoldCoach() {
@@ -1251,7 +1242,7 @@ class AppState extends ChangeNotifier {
       _prefs?.setBool(_kHoldCoachSeen, true).catchError((_) {});
     }
     // Recorded whether or not the tutorial card is still showing, and kept
-    // across launches: Me's ticks and the tree's "tap the moon" line read it.
+    // across launches: Me's ticks read it.
     if (gesturesLearned.contains(g)) return;
     gesturesLearned.add(g);
     _prefs?.setString(_kOrbGestures, gesturesLearned.map((x) => x.name).join(',')).catchError((_) {});
@@ -1345,7 +1336,7 @@ class AppState extends ChangeNotifier {
 
   void go(AppScreen s) {
     screen = s;
-    _collapseTree();
+    _collapseLog();
     _notify();
     _screen(s);
   }
@@ -1465,15 +1456,15 @@ class AppState extends ChangeNotifier {
     );
   }
 
-  /// A problem in the tree, shown in place of the ring: Photo was chosen and
-  /// the camera would not open. Closing the tree clears it.
-  Problem? treeProblem;
+  /// A problem in the Log sheet, shown in place of its choices: Photo was
+  /// chosen and the camera would not open. Closing the sheet clears it.
+  Problem? logProblem;
 
-  /// Photo was chosen in the tree and the camera would not open: the tree
+  /// Photo was chosen in the Log sheet and the camera would not open: it
   /// says so, and "Type it instead" keeps the meal being logged.
-  void cameraFailedInTree(Object e) {
-    treeProblem = cameraProblem(e, instead: ProblemAction(isAr ? 'اكتبها بدل كده' : 'Type it instead', () => quickLog(QuickLog.text)));
-    _track('camera_failed', {'where': 'tree', 'refused': treeProblem!.kind == ProblemKind.permission});
+  void cameraFailedInLog(Object e) {
+    logProblem = cameraProblem(e, instead: ProblemAction(isAr ? 'اكتبها بدل كده' : 'Type it instead', () => quickLog(QuickLog.text)));
+    _track('camera_failed', {'where': 'log', 'refused': logProblem!.kind == ProblemKind.permission});
     _notify();
   }
 
@@ -2978,7 +2969,7 @@ class AppState extends ChangeNotifier {
 
   void openWallet() {
     screen = AppScreen.wallet;
-    _collapseTree();
+    _collapseLog();
     _notify();
     _screen(AppScreen.wallet);
   }
@@ -3057,7 +3048,7 @@ class AppState extends ChangeNotifier {
   // Blueprint: "Ramadan mode free for everyone → suhoor and iftar plans,
   // hydration windows → 30-day Ramadan log: 500 points → Eid report: what
   // changed in 30 days → keep the plan going? standard price." The mode
-  // shows itself a week before the first fast (a seventh node on the tree)
+  // shows itself a week before the first fast (a card on Today, a row on Me)
   // and stays a week after Eid for the report. The switch lives on the
   // profile so the server's night job writes a fasting day.
 
@@ -3554,7 +3545,7 @@ class AppState extends ChangeNotifier {
 
   void openSubscription() {
     screen = AppScreen.subscription;
-    _collapseTree();
+    _collapseLog();
     plusNotice = null;
     _notify();
     refreshPlusQuote();
@@ -5055,7 +5046,7 @@ class AppState extends ChangeNotifier {
   void openChat({bool greet = true}) {
     if (!chatOpen) composerFocusAtOpen = composerFocus;
     chatOpen = true;
-    _collapseTree();
+    _collapseLog();
     // Reopened while a meal is still being read: Qamar is still reading it.
     chatState = _mealReads > 0 ? ChatState.thinking : ChatState.idle;
     if (greet && chat.isEmpty) {
@@ -5386,21 +5377,13 @@ class AppState extends ChangeNotifier {
 
   List<String> chatSuggestions() => isAr ? kChatSuggestionsAr : kChatSuggestionsEn;
 
-  // ---- orb + tree -------------------------------------------------
+  // ---- the orb, in the middle of the tab bar ----------------------------
 
-  bool get orbVisible => const {
-        AppScreen.today,
-        AppScreen.plan,
-        AppScreen.progress,
-        AppScreen.you,
-        AppScreen.wallet,
-        // Not the paywall (O1): its back control at the top is the way home
-        // (way_back_test), and a decision is made there without the orb over
-        // the comparison table or its tree offering ways out mid-choice.
-        // Reached from the tree in season: without the orb, and with no back
-        // control, it was the one screen with no way out.
-        AppScreen.ramadan,
-      }.contains(screen);
+  /// The tab bar, and the orb in it, are on the four tab pages. The pages
+  /// reached from them (the wallet, Qamar+, Ramadan) have a back control
+  /// instead, as the kit's pages under a tab do; the paywall in particular
+  /// is decided without the orb offering ways out mid-choice.
+  bool get orbVisible => onTab;
 
   /// [start] is measured from the start edge (see [orbStart]); a drag in
   /// Arabic turns its physical movement into start-relative movement first.
@@ -5412,12 +5395,10 @@ class AppState extends ChangeNotifier {
     _notify();
   }
 
-  /// Lets go of the orb: it rests at [stop] in the band, and the phone keeps
-  /// that choice for the next launch.
-  void settleOrb(OrbStop stop) {
-    orbStop = stop;
+  /// Lets go of the orb: it goes back to the middle of the tab bar.
+  void releaseOrb() {
+    if (!orbHeld) return;
     orbHeld = false;
-    _prefs?.setString(_kOrbStop, stop.name).catchError((_) {});
     _notify();
   }
 
@@ -5451,22 +5432,16 @@ class AppState extends ChangeNotifier {
 
   // ---- the orb's gestures ---------------------------------------------
   //
-  // Blueprint contract. Tap: on Today the tree blooms; anywhere else it goes
-  // home to Today — the orb is the one fixed point, so "tap the orb" always
-  // gets home (a screen's back arrow, [back], goes where the person came from).
-  // Hold: the conversation opens and the moon is already listening. Drag:
-  // move the orb, and drop it on a value to have it explained (the explain
-  // section above).
+  // Blueprint contract. Tap: the Log sheet rises, on whichever tab (the tab
+  // bar itself is the way between pages). Hold: the conversation opens and
+  // the moon is already listening. Drag: the orb leaves the bar under the
+  // finger, and dropped on a value has it explained (the explain section
+  // above).
 
   void orbTap() {
     _learn(OrbGesture.tap);
     if (chatOpen) return;
-    if (screen != AppScreen.today) {
-      _collapseTree();
-      go(AppScreen.today);
-      return;
-    }
-    toggleTree();
+    toggleLog();
   }
 
   /// Hold to talk. Voice is the default input: the conversation opens and the
@@ -5474,7 +5449,7 @@ class AppState extends ChangeNotifier {
   Future<void> holdOrb() async {
     _learn(OrbGesture.hold);
     if (chatOpen) return;
-    _collapseTree();
+    _collapseLog();
     final n = waitingNudge;
     // The orb holds a meal question. Qamar asks it, as its newest line, the
     // first time the orb is held while it waits in this conversation, and
@@ -5496,44 +5471,14 @@ class AppState extends ChangeNotifier {
     await tapOrbListen();
   }
 
-  /// Index of the Log node while its input methods are fanned out.
-  int? treeLogIndex;
-  bool get treeLogExpanded => treeLogIndex != null;
-
-  /// Index of the Water node while its units are fanned out.
-  int? treeWaterIndex;
-  bool get treeWaterExpanded => treeWaterIndex != null;
-
-  /// Whether the ring currently shows a node's choices rather than the nodes.
-  bool get treeExpanded => treeLogExpanded || treeWaterExpanded;
-
-  void expandTreeLog(int index) {
-    treeWaterIndex = null;
-    treeLogIndex = index;
-    _notify();
-  }
-
-  void expandTreeWater(int index) {
-    treeLogIndex = null;
-    treeWaterIndex = index;
-    _notify();
-  }
-
-  /// The Log node's third level, while a branch of it is fanned out.
-  TreeSub? treeLogSub;
-
-  void expandTreeSub(TreeSub sub) {
-    treeLogSub = sub;
-    _notify();
-  }
-
   // ---- repeat a meal ---------------------------------------------------
 
   /// The last week's meals from the server, newest first; today's local
   /// meals come first in [repeatChoices] whatever the server has.
   final List<LoggedMeal> recentMeals = [];
 
-  /// Up to five distinct recent meals, newest first — the ring's choices.
+  /// Up to five distinct recent meals, newest first: the Log sheet's "Same
+  /// again".
   List<LoggedMeal> get repeatChoices {
     final seen = <String>{};
     final out = <LoggedMeal>[];
@@ -5549,11 +5494,11 @@ class AppState extends ChangeNotifier {
   /// Logs [source] again, now, with the same numbers. No model, no
   /// confirmation step: repeating is the two-tap path the blueprint asks for.
   void repeatMeal(LoggedMeal source) {
-    // One tap from the tree: the log starts and ends here, so its start is
+    // One tap from the Log sheet: the log starts and ends here, so its start is
     // now, never one left over from an earlier, abandoned log.
     _logStart = null;
     final start = _logStartNow();
-    _collapseTree();
+    _collapseLog();
     final first = meals.isEmpty;
     final meal = LoggedMeal(
       name: source.name,
@@ -5611,7 +5556,7 @@ class AppState extends ChangeNotifier {
 
   final List<ActivityLog> activitiesToday = [];
 
-  /// The kind chosen on the ring, while the duration is being asked.
+  /// The kind chosen in the Log sheet, while the duration is being asked.
   ActivityKind? pendingActivity;
 
   int get activityMinutesToday => activitiesToday.fold(0, (s, a) => s + a.minutes);
@@ -5619,7 +5564,7 @@ class AppState extends ChangeNotifier {
 
   void chooseActivity(ActivityKind kind) {
     pendingActivity = kind;
-    _collapseTree();
+    _collapseLog();
     _notify();
   }
 
@@ -5657,10 +5602,10 @@ class AppState extends ChangeNotifier {
     );
   }
 
-  /// One tap on a unit logs it and closes the tree. Nothing goes through the
-  /// assistant.
+  /// One tap on a unit logs it and closes the Log sheet. Nothing goes
+  /// through the assistant.
   void quickWater(WaterUnit unit) {
-    closeTree();
+    closeLog();
     logWater(unit);
   }
 
@@ -5674,7 +5619,7 @@ class AppState extends ChangeNotifier {
   ///    through [logPhotoTaken].
   void quickLog(QuickLog kind) {
     _logStart = _logStartNow();
-    _collapseTree();
+    _collapseLog();
     // Asked in words, the meal question is Qamar's first line; a photo is
     // on its way from the camera, and a cancelled camera leaves the greeting.
     openChat(greet: kind == QuickLog.photo);
@@ -5719,11 +5664,11 @@ class AppState extends ChangeNotifier {
     _analyseMeal(inputType: 'photo', imagePath: path);
   }
 
-  void toggleTree() {
-    if (treeOpen) {
-      _collapseTree();
+  void toggleLog() {
+    if (logOpen) {
+      _collapseLog();
     } else {
-      treeOpen = true;
+      logOpen = true;
     }
     _notify();
   }
@@ -5731,27 +5676,24 @@ class AppState extends ChangeNotifier {
   /// Today's "Log a meal" button: straight into the conversation, asking
   /// what was eaten, with the keyboard up. One tap to the question, where it
   /// used to open the moon's menu and ask again how; the composer has the
-  /// camera and the microphone beside the field, and the moon keeps the
-  /// other ways (repeat, activity).
+  /// camera and the microphone beside the field, and the moon's Log sheet
+  /// keeps the other ways (repeat, water, movement).
   void logFromToday() {
     _track('log_button_tapped', const {});
     quickLog(QuickLog.text);
   }
 
-  void closeTree() {
-    _collapseTree();
+  void closeLog() {
+    _collapseLog();
     _notify();
   }
 
-  /// Closes the ring and folds any fanned-out node back, without notifying —
-  /// every caller goes on to change something else and notifies once. Every
-  /// way the tree closes comes through here, so a close is counted once.
-  void _collapseTree() {
-    if (treeOpen && !gesturesLearned.contains(OrbGesture.hold)) treeClosesWithoutHold++;
-    treeLogIndex = null;
-    treeLogSub = null;
-    treeWaterIndex = null;
-    treeProblem = null;
-    treeOpen = false;
+  /// Closes the Log sheet, without notifying — every caller goes on to
+  /// change something else and notifies once. Every way the sheet closes
+  /// comes through here, so a close is counted once.
+  void _collapseLog() {
+    if (logOpen && !gesturesLearned.contains(OrbGesture.hold)) logClosesWithoutHold++;
+    logProblem = null;
+    logOpen = false;
   }
 }

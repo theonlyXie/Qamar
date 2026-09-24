@@ -3,7 +3,6 @@
 // card is put away they can still be looked up. The card is the same one
 // Today shows, with the same ticks.
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -18,7 +17,7 @@ import 'package:qamar/widgets/hold_coach_mark.dart';
 import 'package:qamar/theme/icons.dart';
 import 'package:qamar/widgets/common.dart';
 import 'package:qamar/widgets/orb_gesture_guide.dart';
-import 'package:qamar/widgets/tree_overlay.dart';
+import 'package:qamar/widgets/log_sheet.dart';
 
 import 'support/app_fonts.dart';
 import 'support/arabic_digits.dart';
@@ -107,20 +106,20 @@ void main() {
     await _pump(tester, s);
     final guide = find.byType(OrbGestureGuide);
     expect(find.descendant(of: guide, matching: find.byIcon(QIcons.done)), findsNothing);
-    s.orbTap(); // the tree opens: the tap is learned
-    s.closeTree();
+    s.orbTap(); // the Log sheet rises: the tap is learned
+    s.closeLog();
     await tester.pump();
     expect(find.descendant(of: guide, matching: find.byIcon(QIcons.done)), findsOneWidget);
     expect(find.descendant(of: guide, matching: find.byIcon(QIcons.mic)), findsOneWidget, reason: 'the hold, not yet');
-    expect(find.descendant(of: guide, matching: find.textContaining('Tap it\u00A0— opens the tree')), findsOneWidget);
+    expect(find.descendant(of: guide, matching: find.textContaining('Tap it\u00A0— opens Log')), findsOneWidget);
     expect(find.descendant(of: guide, matching: find.textContaining('Drag it onto a dotted number\u00A0— it explains itself')), findsOneWidget);
   });
 
   testWidgets('Me ticks the gestures already done', (tester) async {
     final s = AppState()..setLang(AppLang.en);
     s.go(AppScreen.today);
-    s.orbTap(); // the tree opens: the tap is learned
-    s.closeTree();
+    s.orbTap(); // the Log sheet rises: the tap is learned
+    s.closeLog();
     s.go(AppScreen.you);
     await _pump(tester, s);
     await _openHelp(tester);
@@ -158,7 +157,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 20));
     s.go(AppScreen.today);
     s.orbTap();
-    s.closeTree();
+    s.closeLog();
     await s.holdOrb();
 
     final again = AppState(prefs: prefs);
@@ -167,13 +166,17 @@ void main() {
     expect(again.gesturesLearned, isNot(contains(OrbGesture.explain)));
   });
 
-  test('the tap row names the tree’s own labels, and says what a tap does off Today', () {
+  test('the tap row names the Log sheet’s own words: its three ways to say a meal, water and movement', () {
     final (_, _, _, _, whatAr, whatEn) = OrbGestureGuide.rows().first;
-    for (final n in kTreeNodes) {
-      expect(whatAr, contains(n.labelAr), reason: 'the card and the ring use the same words');
-      expect(whatEn, contains(n.labelEn));
+    for (final m in kLogMethods) {
+      expect(whatAr, contains(m.labelAr), reason: 'the card and the sheet use the same words');
+      expect(whatEn.toLowerCase(), contains(m.labelEn.toLowerCase()));
     }
-    expect(whatAr, isNot(contains('مياه')));
-    expect(whatEn, contains('back to Today'), reason: 'in Me a tap goes home, not to the tree');
+    expect(whatAr, contains('الماء'));
+    expect(whatEn, contains('water'));
+    expect(whatAr, contains('حركة'));
+    expect(whatEn, contains('movement'));
+    expect(whatAr, isNot(contains('مياه')), reason: 'one word for water, the sheet’s');
+    expect(whatEn, isNot(contains('tree')), reason: 'the tap opens the Log sheet on every tab; there is no tree');
   });
 }

@@ -11,7 +11,13 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  # Not drawn by the app (its one family is Iconsax, below), but the
+  # framework's own Cupertino widgets name its font, so it stays bundled.
   cupertino_icons: ^1.0.8
+
+  # The Nutri AI kit's icon family, Iconsax (vuesax): linear for a glyph at
+  # rest, bold for the chosen one. MIT (iconsax_plus/LICENSE).
+  iconsax_plus: ^1.0.0
 
   # State management — one app-wide store mirrors the prototype's single
   # Component class; Provider keeps that mapping literal and avoids codegen.
@@ -64,6 +70,21 @@ flutter:
           weight: 600
         - asset: assets/fonts/NotoSansArabic-700.ttf
           weight: 700
+    # Latin: Space Grotesk (SIL OFL 1.1, assets/fonts/SpaceGrotesk-OFL.txt),
+    # the Nutri AI kit's face. Static instances of the variable font at the
+    # four weights the scale uses.
+    - family: Space Grotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-400.ttf
+          weight: 400
+        - asset: assets/fonts/SpaceGrotesk-500.ttf
+          weight: 500
+        - asset: assets/fonts/SpaceGrotesk-600.ttf
+          weight: 600
+        - asset: assets/fonts/SpaceGrotesk-700.ttf
+          weight: 700
+    # The last fallback: a mark Space Grotesk does not draw (✓) still finds a
+    # face instead of a box.
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter-400.ttf

@@ -1,57 +1,48 @@
-import 'dart:math' as math;
-import 'dart:ui' show FontFeature;
-
 import 'package:flutter/material.dart';
 import 'colors.dart';
 
-/// Type, the liquid-glass way (.claude/skills/liquid-glass): one grotesk, sized
-/// on Apple's text styles, with Arabic in its own face.
+/// Type, the Nutri AI kit's (the qamar-design skill): Space Grotesk for
+/// Latin, on the kit's own scale, with Arabic in its own face.
 ///
-/// Latin is set in Inter, the open face closest to Apple's San Francisco;
-/// Arabic, and the Arabic-Indic digits, in Noto Sans Arabic. Every style names
-/// Inter first and Noto Sans Arabic as its fallback, so a line in either
-/// language — or both, like a dish name in an English sentence — draws each
-/// script in its own face with nothing to decide at the call site. Both are
-/// bundled (pubspec.yaml): an Arabic-first app must not wait on a download to
-/// draw its words.
+/// Latin is set in Space Grotesk, the kit's grotesk; Arabic, and the
+/// Arabic-Indic digits, in Noto Sans Arabic; Inter is the last fallback, for
+/// the odd mark Space Grotesk does not draw (✓). Every style names all three,
+/// so a line in either language — or both, like a dish name in an English
+/// sentence — draws each script in its own face with nothing to decide at the
+/// call site. All are bundled (pubspec.yaml): an Arabic-first app must not
+/// wait on a download to draw its words.
 ///
 /// ## The scale
 ///
-/// Apple's Dynamic Type styles at the default size, and nowhere between (each
-/// builder asserts it, so a test that draws an off-scale size fails):
+/// The kit's type styles, and nowhere between (each builder asserts it, so a
+/// test that draws an off-scale size fails):
 ///
-///  * reading and controls, [textSizes]: 11 caption 2, 12 caption, 13
-///    footnote, 15 subheadline, 16 callout, 17 body and headline — the
-///    conversation, rows, buttons. Nothing under 11.
-///  * titles, [displaySizes], each with its line height: 20 title 3, 22 title
-///    2, 28 title 1, 34 large title (a page's name).
-///  * figures, [figureSizes]: 20, 28, 34, 48, and 56 for a screen's one hero
-///    figure (HeroNumber) — tabular, so a changing number does not shuffle
-///    its neighbours.
+///  * reading and controls, [textSizes], each with the kit's leading: 12 a
+///    badge's word, 13 footnote, 15 subheadline and body 2, 16 callout (a
+///    button's label), 17 body, 18 headline. Nothing under 12.
+///  * titles, [displaySizes]: 20 title 3 (a card's title), 24 title 2 (a
+///    page's or a sheet's name), 28 title 1, 34 large title. Bold.
+///  * figures, [figureSizes]: 20, 24, 28, 34, 48, and 56 for a screen's one
+///    hero figure (HeroNumber) — tabular, so a changing number does not
+///    shuffle its neighbours.
 ///
-/// ## Tracking
-///
-/// Set by size, never by the call site ([tracking]): none at reading sizes,
-/// tighter as type grows past 20, the way SF and Inter's own metrics run.
-/// Arabic is never tracked: space between joined letters breaks the word.
-/// Titles say whether they are Arabic ([display]'s `ar`); body text is never
-/// tracked (it carries both scripts); figures are digits, which do not join.
+/// Nothing is tracked: Space Grotesk is set as drawn, and Arabic must never
+/// be (space between joined letters breaks the word).
 class QText {
   QText._();
 
-  static const textSizes = <double>[11, 12, 13, 15, 16, 17];
+  static const textSizes = <double>[12, 13, 15, 16, 17, 18];
 
-  /// Apple's line height for each reading size, used when a call site does
+  /// The kit's line height for each reading size, used when a call site does
   /// not set its own.
-  static final _leading = <double, double>{11: 13, 12: 16, 13: 18, 15: 20, 16: 21, 17: 22};
+  static final _leading = <double, double>{12: 16, 13: 19, 15: 22, 16: 24, 17: 24, 18: 27};
 
-  static final displaySizes = <double, double>{20: 25, 22: 28, 28: 34, 34: 41};
-  static const figureSizes = <double>[20, 28, 34, 48, 56];
+  static final displaySizes = <double, double>{20: 30, 24: 36, 28: 42, 34: 51};
+  static const figureSizes = <double>[20, 24, 28, 34, 48, 56];
 
-  /// Tracking for Latin type at [size], in points: 0 under 20, then
-  /// size × (−0.0223 + 0.185·e^(−0.1745·size)), about −1.7% at 20 and
-  /// −2.2% at 34.
-  static double tracking(double size) => size < 20 ? 0 : size * (-0.0223 + 0.185 * math.exp(-0.1745 * size));
+  /// Tracking at [size]: none. Kept as the one place a size's tracking is
+  /// decided, so a future face can bring its own table.
+  static double tracking(double size) => 0;
 
   /// Whether [text] has an Arabic letter in it (Arabic-Indic digits do not
   /// count: they do not join), for [display]'s `ar` when the words are not
@@ -59,12 +50,13 @@ class QText {
   static bool arabic(String text) => _arabicLetter.hasMatch(text);
   static final _arabicLetter = RegExp('[ء-يٮ-ۓۺ-ۿݐ-ݿﭐ-﷿ﹰ-ﻼ]');
 
-  static const _family = 'Inter';
-  static const _fallback = ['Noto Sans Arabic'];
+  static const family = 'Space Grotesk';
+  static const fallback = ['Noto Sans Arabic', 'Inter'];
 
-  /// A title: a page's name (34), a sheet's (22), a card's lead figure line
-  /// (20), at one of [displaySizes] and its line height. Bold, as Apple's
-  /// large titles are. [ar]: the text is Arabic, so it is not tracked.
+  /// A title: a page's name (24), a card's (20), a hero line (28, 34), at one
+  /// of [displaySizes] and its line height. Bold, as the kit's titles are.
+  /// [ar]: the text is Arabic (kept for the call sites that say so; nothing
+  /// is tracked either way).
   static TextStyle display({
     required double size,
     required bool ar,
@@ -73,18 +65,17 @@ class QText {
   }) {
     assert(displaySizes.containsKey(size), 'display at $size is off the scale: ${displaySizes.keys}');
     return TextStyle(
-      fontFamily: _family,
-      fontFamilyFallback: _fallback,
+      fontFamily: family,
+      fontFamilyFallback: fallback,
       fontSize: size,
-      height: (displaySizes[size] ?? size * 1.2) / size,
+      height: (displaySizes[size] ?? size * 1.5) / size,
       fontWeight: weight,
       color: color,
-      letterSpacing: ar ? 0 : tracking(size),
+      letterSpacing: 0,
     );
   }
 
-  /// Reading and control text at one of [textSizes]. Never tracked: it
-  /// carries both scripts, and Arabic must not be.
+  /// Reading and control text at one of [textSizes].
   static TextStyle body({
     required double size,
     double? height,
@@ -93,10 +84,10 @@ class QText {
   }) {
     assert(textSizes.contains(size), 'body at $size is off the scale: $textSizes');
     return TextStyle(
-      fontFamily: _family,
-      fontFamilyFallback: _fallback,
+      fontFamily: family,
+      fontFamilyFallback: fallback,
       fontSize: size,
-      height: (height ?? _leading[size] ?? size * 1.3) / size,
+      height: (height ?? _leading[size] ?? size * 1.4) / size,
       fontWeight: weight,
       color: color,
       // Zero, not null: left null it inherits Material's bodyMedium +0.25,
@@ -107,7 +98,7 @@ class QText {
 
   /// A figure: a count, a price, a macro, at a reading size or one of
   /// [figureSizes], with tabular digits. [ar]: a figure that carries an
-  /// Arabic word ("٢ لتر"), so it is not tracked.
+  /// Arabic word ("٢ لتر").
   static TextStyle number({
     required double size,
     double? height,
@@ -117,32 +108,30 @@ class QText {
   }) {
     assert(textSizes.contains(size) || figureSizes.contains(size), 'number at $size is off the scale: $textSizes, $figureSizes');
     return TextStyle(
-      fontFamily: _family,
-      fontFamilyFallback: _fallback,
+      fontFamily: family,
+      fontFamilyFallback: fallback,
       fontSize: size,
-      height: (height ?? _leading[size] ?? size * 1.15) / size,
+      height: (height ?? _leading[size] ?? size * 1.2) / size,
       fontWeight: weight,
       color: color,
-      letterSpacing: ar ? 0 : tracking(size),
+      letterSpacing: 0,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
   }
 
-  /// A small label over a group or a figure, the eyebrow: 12, semibold, in
-  /// the third ink. Latin eyebrows are set in capitals with a little
-  /// tracking so short words read as a label; Arabic has no capitals and is
-  /// never tracked, so it is left as it is.
-  static TextStyle eyebrow({required bool ar, Color color = QColors.inkTertiary}) => TextStyle(
-        fontFamily: _family,
-        fontFamilyFallback: _fallback,
-        fontSize: 12,
-        height: 16 / 12,
+  /// A small label over a group or a card's figure: the kit's caption 2, 15
+  /// semibold, in sentence case (the kit sets no label in capitals), in the
+  /// second ink on the dark or [color] on a pastel.
+  static TextStyle eyebrow({required bool ar, Color color = QColors.inkSecondary}) => TextStyle(
+        fontFamily: family,
+        fontFamilyFallback: fallback,
+        fontSize: 15,
+        height: 22 / 15,
         fontWeight: FontWeight.w600,
         color: color,
-        letterSpacing: ar ? 0 : 0.6,
+        letterSpacing: 0,
       );
 
-  /// [text] as an eyebrow shows it: in capitals for Latin, as written for
-  /// Arabic.
-  static String eyebrowText(String text, {required bool ar}) => ar ? text : text.toUpperCase();
+  /// [text] as an eyebrow shows it: as written, in both languages.
+  static String eyebrowText(String text, {required bool ar}) => text;
 }

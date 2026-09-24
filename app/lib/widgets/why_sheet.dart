@@ -50,7 +50,7 @@ class WhySheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(t.whyTitle, style: QText.display(size: 22, ar: QText.arabic(t.whyTitle), color: QColors.ink)),
+              Text(t.whyTitle, style: QText.display(size: 24, ar: QText.arabic(t.whyTitle), color: QColors.ink)),
               const SizedBox(height: 8),
               for (final (i, r) in rows.indexed) ...[
                 if (i > 0) const Divider(color: QColors.hairline, height: 1),

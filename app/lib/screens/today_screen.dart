@@ -19,7 +19,9 @@ import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/hero_number.dart';
-import '../widgets/glass.dart';
+import '../widgets/kit.dart';
+import '../widgets/mascot.dart';
+import '../widgets/surface.dart';
 import '../widgets/explain.dart';
 import '../widgets/general_guidance_card.dart';
 import '../widgets/orb_gesture_guide.dart';
@@ -36,6 +38,9 @@ class TodayScreen extends StatefulWidget {
 
   /// The calorie card's one line saying these are estimates.
   static const estimateKey = ValueKey('today-estimate');
+
+  /// The gap between Today's zones.
+  static const gap = 12.0;
 
   @override
   State<TodayScreen> createState() => _TodayScreenState();
@@ -96,7 +101,7 @@ class _TodayScreenState extends State<TodayScreen> {
         for (final zone in TodayZone.values)
           if (zones[zone] case final w?) ...[
             KeyedSubtree(key: TodayScreen.zoneKey(zone), child: w),
-            const SizedBox(height: 14),
+            const SizedBox(height: TodayScreen.gap),
           ],
       ],
     );
@@ -119,17 +124,20 @@ class _TodayScreenState extends State<TodayScreen> {
 
 /// Today's zones, top to bottom: the layout contract (O15).
 ///
-/// Above the fold on a 390x844 phone: the header, Qamar's card with "Log a
-/// meal", the numbers, and the one contextual slot ([todayFocus]). Below:
+/// Above the fold on a 390x844 phone, over the tab bar: the header, Qamar's
+/// card with "Log a meal", the numbers, and the one contextual slot
+/// ([todayFocus]). Below:
 /// water, the cards that lost the slot (the quest among them), the next
 /// meal, movement and the meals logged today. Every seat builds inside this order; the
 /// contract test (test/today_layout_test.dart) holds it.
 enum TodayZone { header, qamar, numbers, slot, water, runnersUp, nextMeal, activity, meals }
 
-/// The greeting, the name, and the two game elements, each a named piece
-/// that can be removed: the streak line (seat 3, O4) and the one Su chip
-/// (O9). With "Points and streaks" off (showScore) both go and the header
-/// closes up.
+/// The kit's header: Qamar's face in its lavender circle saying good
+/// morning, the name under the greeting, and the game's two elements, each a
+/// named piece that can be removed: the streak line (seat 3, O4) and the one
+/// Su chip (O9). With "Points and streaks" off (showScore) both go and the
+/// header closes up. In the season, a moon button beside the chip opens
+/// Ramadan.
 class _Header extends StatelessWidget {
   final AppState state;
   const _Header({required this.state});
@@ -141,16 +149,30 @@ class _Header extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.lavender),
+          child: const Center(child: MoonMascot(size: 32, mood: MoonMood.joy)),
+        ),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(greetingFor(state.clockNow(), ar: state.isAr), style: QText.body(size: 15, color: QColors.inkTertiary)),
-              Text(nameOr, style: QText.display(size: 34, ar: QText.arabic(nameOr), color: QColors.ink), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(greetingFor(state.clockNow(), ar: state.isAr), style: QText.body(size: 13, color: QColors.inkSecondary)),
+              // The two lines as tall as a touch (48), so the header closes up
+              // under the name even beside the season's round button.
+              const SizedBox(height: 2),
+              Text(nameOr, style: QText.body(size: 18, height: 27, weight: FontWeight.w600, color: QColors.ink), maxLines: 1, overflow: TextOverflow.ellipsis),
               if (streak != null) TodayStreakLine(text: streak),
             ],
           ),
         ),
+        if (state.seasonVisible) ...[
+          QRoundIconButton(icon: QIcons.moon, onTap: () => state.go(AppScreen.ramadan), label: state.isAr ? 'رمضان' : 'Ramadan', size: 44),
+          if (state.showScore) const SizedBox(width: 4),
+        ],
         // One Su display on Today, and it opens the wallet (O9). Level
         // lives in the wallet only.
         if (state.showScore) SuChip(state: state),
@@ -181,7 +203,7 @@ class TodayStreakLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      Text(text, style: QText.body(size: 15, color: QColors.inkSecondary));
+      Text(text, style: QText.body(size: 13, color: QColors.accentInk));
 }
 
 /// The day's sentence in Qamar's card. What it says is seat 3's (O3, O15):
@@ -205,10 +227,10 @@ class TodayStreakLine extends StatelessWidget {
 
 /// Qamar's card (O15): the day's sentence, and under it "Log a meal".
 ///
-/// The button is Today's one primary action and it stays above the fold. It
-/// opens the tree already on Log rather than going round it, so using it
-/// shows where logging lives. The night note, which was a card of its own,
-/// is the sentence here in the morning, with its link to today's plan.
+/// The button is Today's one primary action and it stays above the fold: it
+/// goes straight to the meal question. The night note, which was a card of
+/// its own, is the sentence here in the morning, with its link to today's
+/// plan.
 class QamarCard extends StatelessWidget {
   final AppState state;
   const QamarCard({super.key, required this.state});
@@ -228,11 +250,12 @@ class QamarCard extends StatelessWidget {
     // counted once it has been drawn, not when it is merely possible.
     final offerWeek = locked && line.fromNight && state.lockCardTrialOffer;
     if (offerWeek) WidgetsBinding.instance.addPostFrameCallback((_) => state.recordLockCardOffer());
-    // Qamar's voice, plainly: the sentence across the card and the one white
-    // button under it. No second moon beside it — the orb below is the moon,
-    // always on screen — so the words get the whole width and fewer lines.
+    // Qamar's voice, plainly: the sentence across the card and the one
+    // burgundy button under it. No moon beside it — the header's face and
+    // the orb in the bar are the moon — so the words get the whole width and
+    // fewer lines.
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
       decoration: QDecor.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -253,7 +276,7 @@ class QamarCard extends StatelessWidget {
                   child: SizedBox(
                     height: QLayout.minTap,
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(offerWeek ? QIcons.gift : (locked ? QIcons.locked : QIcons.external), size: 16, color: locked ? QColors.ink : QColors.inkSecondary),
+                      QIcon(offerWeek ? QIcons.gift : (locked ? QIcons.locked : QIcons.external), size: 18, color: QColors.accentInk),
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
@@ -264,7 +287,7 @@ class QamarCard extends StatelessWidget {
                               : locked
                                   ? (isAr ? 'الخطة الكاملة في قمر+' : 'The full plan is Qamar+')
                                   : (isAr ? 'افتح خطة النهارده' : 'Open today’s plan'),
-                          style: QText.body(size: 15, weight: FontWeight.w500, color: locked ? QColors.ink : QColors.inkSecondary),
+                          style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.accentInk),
                         ),
                       ),
                     ]),
@@ -274,14 +297,17 @@ class QamarCard extends StatelessWidget {
             )
           else
             const SizedBox(height: 12),
-          QPrimaryButton(key: logKey, label: state.t.logMeal, onTap: state.logFromToday, height: 48),
+          QPrimaryButton(key: logKey, label: state.t.logMeal, icon: QIcons.add, onTap: state.logFromToday),
         ],
       ),
     );
   }
 }
 
-/// The day's numbers: calories left and the three macros.
+/// The day's numbers, the kit's calorie card: on lavender, the gauge with
+/// what is left in its middle, and the three macros under it as the kit's
+/// nested tiles — protein on mint, carbs on lime, fat on coral. "Why?"
+/// beside the card's name explains the figure.
 class _NumbersCard extends StatelessWidget {
   final AppState state;
   const _NumbersCard({required this.state});
@@ -289,48 +315,95 @@ class _NumbersCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = state.t;
+    final isAr = state.isAr;
     final tg = state.target();
     final con = state.consumed();
     final remaining = (tg.kcal - con.kcal).clamp(0, 1 << 30);
     double pct(int a, int b) => b == 0 ? 0 : (a / b).clamp(0, 1).toDouble();
-    // Within its budget above the fold (O15, <=290pt; about 250 here): the
-    // number with its unit under it and the question it raises beside it,
-    // the three macros in tight rows, and one line saying these are
+    // In Arabic the slash keeps its spaces: joined to Arabic-Indic digits it
+    // would make one number of the two, read target first
+    // (iso_direction_test.dart).
+    String grams(int a, int b) => isAr ? '${state.iso('$a / $b')} جم' : '$a/${b}g';
+    // Within its budget above the fold (O15): the card's name, the gauge,
+    // the three tiles, and under the card one line saying these are
     // estimates, in a colour that passes AA.
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
-      decoration: QDecor.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // The screen's one hero: the day's figure, large, in either digit
-          // set, and its words under it across the card. The explainable
-          // region is the figure and its words; its mark is on the words.
-          Explainable(
-            id: 'kcal_remaining',
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                HeroNumber(state.digits('$remaining'), semanticsLabel: '${state.digits('$remaining')} ${t.kcalRemaining}'),
-                const Spacer(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Its top is the "Why?" pill's touch band, which is air enough over
+        // the name; the same inset either side, in either language.
+        PastelCard(
+          color: QColors.lavender,
+          padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(children: [
+                Expanded(child: Text(isAr ? 'السعرات' : 'Calories', style: QText.body(size: 18, weight: FontWeight.w600, color: QColors.onPastel))),
                 // Beside the figure it explains: one short word, "Why?".
-                QOutlineButton(label: t.whyCta, onTap: state.openWhy, height: 32),
+                QPastelButton(label: t.whyCta, onTap: state.openWhy, height: 32),
               ]),
-              const SizedBox(height: 10),
-              ExplainMark(child: Text(t.kcalRemaining, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkSecondary))),
-            ]),
+              Center(
+                child: CalorieGauge(
+                  width: 150,
+                  eaten: pct(con.kcal, tg.kcal),
+                  end: state.digits('${tg.kcal}'),
+                  // The screen's one hero: what is left, in either digit set,
+                  // its words under it. The explainable region is the figure
+                  // and its words; its mark is on the words.
+                  centre: Explainable(
+                    id: 'kcal_remaining',
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      HeroNumber(state.digits('$remaining'), size: 34, color: QColors.onPastel, semanticsLabel: '${state.digits('$remaining')} ${t.kcalRemaining}'),
+                      ExplainMark(child: Text(isAr ? 'سعر فاضل' : 'kcal left', style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.onPastelSecondary))),
+                    ]),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(children: [
+                Expanded(child: Explainable(id: 'protein', child: _MacroTile(color: QColors.mint, label: t.protein, text: grams(con.p, tg.protein), pct: pct(con.p, tg.protein)))),
+                const SizedBox(width: 8),
+                Expanded(child: Explainable(id: 'carbs', child: _MacroTile(color: QColors.lime, label: t.carbs, text: grams(con.c, tg.carbs), pct: pct(con.c, tg.carbs)))),
+                const SizedBox(width: 8),
+                Expanded(child: Explainable(id: 'fat', child: _MacroTile(color: QColors.coral, label: t.fat, text: grams(con.f, tg.fat), pct: pct(con.f, tg.fat)))),
+              ]),
+            ],
           ),
-          const SizedBox(height: 16),
-          Explainable(id: 'protein', child: _MacroRow(label: t.protein, text: state.isAr ? '${state.iso('${con.p} / ${tg.protein}')} جم' : '${con.p} / ${tg.protein} g', pct: pct(con.p, tg.protein))),
-          const SizedBox(height: 10),
-          Explainable(id: 'carbs', child: _MacroRow(label: t.carbs, text: state.isAr ? '${state.iso('${con.c} / ${tg.carbs}')} جم' : '${con.c} / ${tg.carbs} g', pct: pct(con.c, tg.carbs))),
-          const SizedBox(height: 10),
-          Explainable(id: 'fat', child: _MacroRow(label: t.fat, text: state.isAr ? '${state.iso('${con.f} / ${tg.fat}')} جم' : '${con.f} / ${tg.fat} g', pct: pct(con.f, tg.fat))),
-          const SizedBox(height: 14),
-          Text(t.estimateNote, key: TodayScreen.estimateKey, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 12, color: QColors.inkTertiary)),
-        ],
-      ),
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 4),
+          child: Text(t.estimateNote, key: TodayScreen.estimateKey, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 12, color: QColors.inkTertiary)),
+        ),
+      ],
     );
   }
+}
+
+/// A macro in the calorie card: its pastel, its name, its figures and a bar,
+/// nested in the lavender as the kit nests its macro tiles.
+class _MacroTile extends StatelessWidget {
+  final Color color;
+  final String label;
+  final String text;
+  final double pct;
+  const _MacroTile({required this.color, required this.label, required this.text, required this.pct});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+        decoration: QDecor.pastel(color, radius: QRadii.inset),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onPastel)),
+            ExplainMark(child: Text(text, maxLines: 1, softWrap: false, overflow: TextOverflow.visible, style: QText.number(size: 13, color: QColors.onPastel))),
+            const SizedBox(height: 6),
+            QBar(value: pct, height: 4, onPastel: true),
+          ],
+        ),
+      );
 }
 
 /// The next planned meal, once a plan exists for this person.
@@ -342,41 +415,66 @@ class _NextMealCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = state.t;
+    final isAr = state.isAr;
     final nextMeal = meal;
-    // The card lines up with the others; what the orb explains is the meal
-    // and its figure inside it.
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: QDecor.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(QText.eyebrowText(t.nextMeal, ar: state.isAr), style: QText.eyebrow(ar: state.isAr)),
-          const SizedBox(height: 6),
-          Explainable(
-            id: 'next_meal',
-            explanation: mealExplanation(nextMeal, iso: state.iso, digits: state.digits),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(state.isAr ? nextMeal.nameAr : nextMeal.nameEn, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
-              ExplainMark(
-                child: Text(
-                  state.isAr ? 'حوالي ${state.iso('${mealKcal(nextMeal)}')} سعر' : 'About ${mealKcal(nextMeal)} kcal',
-                  style: QText.body(size: 15, color: QColors.inkSecondary),
+    // The kit's "Diet Plan": the group's title over the meal's card, the
+    // slot on a lime band at its top (the kit's photo, drawn as the plan's
+    // own colour), its name and its figure under it. What the orb explains
+    // is the meal and its figure.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        QSectionTitle(t.nextMeal, isAr: isAr),
+        Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: QDecor.card(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                color: QColors.lime,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(children: [
+                  const QIcon(QIcons.plan, size: 20, color: QColors.onPastel),
+                  const SizedBox(width: 8),
+                  Text(isAr ? nextMeal.slotAr : nextMeal.slotEn, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.onPastel)),
+                ]),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Explainable(
+                      id: 'next_meal',
+                      explanation: mealExplanation(nextMeal, iso: state.iso, digits: state.digits),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(isAr ? nextMeal.nameAr : nextMeal.nameEn, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
+                        const SizedBox(height: 2),
+                        ExplainMark(
+                          child: Text(
+                            isAr ? 'حوالي ${state.iso('${mealKcal(nextMeal)}')} سعر' : 'About ${mealKcal(nextMeal)} kcal',
+                            style: QText.body(size: 13, color: QColors.inkSecondary),
+                          ),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(children: [
+                      // Only offered when the slot really has somewhere else to go.
+                      if (state.slotHasAlternative(nextMeal.id)) ...[
+                        QOutlineButton(label: t.swap, onTap: () => state.toggleSlotSwap(nextMeal.id), height: 36, icon: QIcons.swap),
+                        const SizedBox(width: 8),
+                      ],
+                      QOutlineButton(label: t.openPlan, onTap: () => state.go(AppScreen.plan), height: 36),
+                    ]),
+                  ],
                 ),
               ),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          Row(children: [
-            // Only offered when the slot really has somewhere else to go.
-            if (state.slotHasAlternative(nextMeal.id)) ...[
-              QOutlineButton(label: t.swap, onTap: () => state.toggleSlotSwap(nextMeal.id), height: 36, icon: QIcons.swap),
-              const SizedBox(width: 8),
             ],
-            QOutlineButton(label: t.openPlan, onTap: () => state.go(AppScreen.plan), height: 36),
-          ]),
-        ],
-      ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -390,39 +488,38 @@ class _LoggedMeals extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = state.t;
     final isAr = state.isAr;
-    // One grouped list, the way a phone's settings are: rows on one surface,
-    // hairlines between them, never a card per meal.
+    // One grouped list, the kit's: rows on one card, never a card per
+    // meal, each meal's figure in the kit's meta row under its name.
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8, top: 4),
-          child: Text(QText.eyebrowText(t.loggedToday, ar: isAr), style: QText.eyebrow(ar: isAr)),
-        ),
-        Container(
-          decoration: QDecor.card(),
-          child: Column(
-            children: [
-              for (final (i, m) in state.meals.indexed) ...[
-                if (i > 0) const Divider(height: 1, thickness: 1, indent: 16, endIndent: 16, color: QColors.hairline),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(m.name, style: QText.body(size: 17, weight: FontWeight.w500, color: QColors.ink)),
-                          if (m.sub.isNotEmpty) Text(m.sub, style: QText.body(size: 13, color: QColors.inkTertiary)),
-                        ]),
+        QSectionTitle(t.loggedToday, isAr: isAr),
+        QListGroup(rows: [
+          for (final m in state.meals)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(m.name, style: QText.body(size: 16, weight: FontWeight.w500, color: QColors.ink)),
+                      Text(
+                        [
+                          if (m.sub.isNotEmpty) m.sub,
+                          isAr ? '${t.protein} ${state.iso('${m.p}')} جم' : '${t.protein} ${m.p}g',
+                          isAr ? '${t.carbs} ${state.iso('${m.c}')} جم' : '${t.carbs} ${m.c}g',
+                          isAr ? '${t.fat} ${state.iso('${m.f}')} جم' : '${t.fat} ${m.f}g',
+                        ].join(isAr ? '، ' : ' | '),
+                        style: QText.body(size: 13, color: QColors.inkSecondary),
                       ),
-                      Text(isAr ? '${state.iso('${m.kcal}')} سعر' : '${m.kcal} kcal', style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink, ar: isAr)),
-                    ],
+                    ]),
                   ),
-                ),
-              ],
-            ],
-          ),
-        ),
+                  const SizedBox(width: 12),
+                  Text(isAr ? '${state.iso('${m.kcal}')} سعر' : '${m.kcal} kcal', style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink, ar: isAr)),
+                ],
+              ),
+            ),
+        ]),
       ],
     );
   }
@@ -439,15 +536,20 @@ class _WaterCard extends StatelessWidget {
     final litres = WaterStatus.qty(w.litres);
     final left = WaterStatus.qty(w.litresLeft);
 
-    // The card lines up with the others; what the orb explains is the
-    // figure row inside it.
+    // The card lines up with the others: the kit's grey card, its name with
+    // its glyph, the figure, the bar; what the orb explains is the figure
+    // row inside it.
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       decoration: QDecor.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(QText.eyebrowText(isAr ? 'الماء' : 'Water', ar: isAr), style: QText.eyebrow(ar: isAr)),
+          Row(children: [
+            const QIcon(QIcons.water, size: 20, color: QColors.ink),
+            const SizedBox(width: 8),
+            Text(isAr ? 'الماء' : 'Water', style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.ink)),
+          ]),
           const SizedBox(height: 8),
           Explainable(
             id: 'water',
@@ -456,7 +558,7 @@ class _WaterCard extends StatelessWidget {
               textBaseline: TextBaseline.alphabetic,
               children: [
                 ExplainMark(
-                  child: Text(isAr ? '${state.iso(litres)} لتر' : '$litres L', style: QText.number(size: 28, weight: FontWeight.w600, color: QColors.ink, ar: isAr)),
+                  child: Text(isAr ? '${state.iso(litres)} لتر' : '$litres L', style: QText.number(size: 28, weight: FontWeight.w700, color: QColors.ink, ar: isAr)),
                 ),
                 const Spacer(),
                 Text(
@@ -499,7 +601,7 @@ class _WaterCard extends StatelessWidget {
                 style: TextButton.styleFrom(minimumSize: const Size(QLayout.minTap, QLayout.minTap)),
                 child: Text(
                   isAr ? 'تراجع' : 'Undo',
-                  style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkSecondary),
+                  style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.accentInk),
                 ),
               ),
             ),
@@ -527,28 +629,8 @@ class _WaterAdd extends StatelessWidget {
       );
 }
 
-class _MacroRow extends StatelessWidget {
-  final String label;
-  final String text;
-  final double pct;
-  const _MacroRow({required this.label, required this.text, required this.pct});
-  /// One line each: the name, its bar, and the figure at the end — where
-  /// the bar under the name spent a second line on every macro.
-  @override
-  Widget build(BuildContext context) {
-    return Row(children: [
-      SizedBox(width: 72, child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkSecondary))),
-      const SizedBox(width: 8),
-      Expanded(child: QBar(value: pct)),
-      const SizedBox(width: 12),
-      ExplainMark(child: Text(text, style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink))),
-    ]);
-  }
-}
-
-
-/// Today's movement, as logged from the ring: what, how long, and an estimate
-/// of what it cost. Shown beside the food, never subtracted from it.
+/// Today's movement, as logged from the Log sheet: what, how long, and an
+/// estimate of what it cost. Shown beside the food, never subtracted from it.
 class _ActivityCard extends StatelessWidget {
   final AppState state;
   const _ActivityCard({required this.state});
@@ -557,14 +639,14 @@ class _ActivityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isAr = state.isAr;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       decoration: QDecor.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
             Expanded(
-              child: Text(QText.eyebrowText(isAr ? 'حركة النهاردة' : 'Today’s movement', ar: isAr), style: QText.eyebrow(ar: isAr)),
+              child: Text(isAr ? 'حركة النهاردة' : 'Today’s movement', style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.ink)),
             ),
             Text(
               isAr
@@ -572,7 +654,7 @@ class _ActivityCard extends StatelessWidget {
                   // middle dot reads as a zero.
                   ? '${state.iso('${state.activityMinutesToday}')} د، حوالي ${state.iso('${state.activityKcalToday}')} سعرة'
                   : '${state.activityMinutesToday} min · ~${state.activityKcalToday} kcal',
-              style: QText.number(size: 12, weight: FontWeight.w600, color: QColors.ink),
+              style: QText.number(size: 13, weight: FontWeight.w600, color: QColors.ink),
             ),
           ]),
           const SizedBox(height: 8),
@@ -580,10 +662,10 @@ class _ActivityCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: Row(children: [
-                const Icon(QIcons.run, size: 17, color: QColors.ink),
+                const QIcon(QIcons.run, size: 18, color: QColors.ink),
                 const SizedBox(width: 8),
                 Expanded(child: Text(a.label(ar: isAr), style: QText.body(size: 15, color: QColors.ink))),
-                Text(isAr ? '${state.iso('${a.minutes}')} د' : '${a.minutes} min', style: QText.number(size: 12, color: QColors.inkTertiary)),
+                Text(isAr ? '${state.iso('${a.minutes}')} د' : '${a.minutes} min', style: QText.number(size: 13, color: QColors.inkSecondary)),
               ]),
             ),
           const SizedBox(height: 6),
@@ -599,7 +681,8 @@ class _ActivityCard extends StatelessWidget {
 
 /// The one question the season asks, once: fasting this year? Yes turns the
 /// plan into iftar and suhoor and the water card into windows; no leaves the
-/// day as it is. Either way the seventh node stays on the tree in season.
+/// day as it is. Either way Ramadan stays one tap away in season (the moon
+/// by the header, and Me).
 ///
 /// Answered, and the plan could not be rewritten for the answer (the plan's
 /// daily cap, no connection), the slot keeps one line saying so, with the
@@ -626,18 +709,20 @@ class _FastingPrompt extends StatelessWidget {
     // are drawn 34 tall in a 48-point touch (O11), so the 7 points of touch
     // under each outline are the card's bottom margin, and the 7 above it
     // the gap to the line over them: 8 visible points on every side.
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 1),
-      decoration: QDecor.card(border: QColors.hairlineStrong),
+    // The season's own pastel: lavender, with the moon; the answers are the
+    // kit's black buttons on it.
+    return PastelCard(
+      color: QColors.lavender,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 1),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            const Icon(QIcons.moon, size: 15, color: QColors.ink),
+            const QIcon(QIcons.moon, size: 18, color: QColors.onPastel),
             const SizedBox(width: 6),
             Expanded(
               child: Text('$lead ${isAr ? 'هتصوم؟' : 'Fasting?'}',
-                  style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink)),
+                  style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.onPastel)),
             ),
           ]),
           const SizedBox(height: 2),
@@ -647,12 +732,12 @@ class _FastingPrompt extends StatelessWidget {
             isAr
                 ? 'لو أيوة، الوجبات تبقى إفطار وسحور. ببلاش\u00A0للكل.'
                 : 'If yes, meals become iftar and suhoor. Free for\u00A0everyone.',
-            style: QText.body(size: 12, height: 18, color: QColors.inkTertiary),
+            style: QText.body(size: 12, height: 18, color: QColors.onPastelSecondary),
           ),
           Row(children: [
-            QOutlineButton(label: isAr ? 'أيوة، صايم' : 'Yes, fasting', height: 34, color: QColors.ink, onTap: () => state.setFasting(true)),
+            QPastelButton(label: isAr ? 'أيوة، صايم' : 'Yes, fasting', height: 34, onTap: () => state.setFasting(true)),
             const SizedBox(width: 10),
-            QOutlineButton(label: isAr ? 'لا' : 'No', height: 34, color: QColors.inkSecondary, onTap: () => state.setFasting(false)),
+            QPastelButton(label: isAr ? 'لا' : 'No', height: 34, onTap: () => state.setFasting(false)),
           ]),
         ],
       ),
@@ -689,9 +774,9 @@ class _HydrationLine extends StatelessWidget {
           : 'Between windows. Suhoor until ${SunTimes.clock(h.fajrMin)}.';
     }
     return Row(children: [
-      const Icon(QIcons.moon, size: 14, color: QColors.ink),
+      const QIcon(QIcons.moon, size: 16, color: QColors.ink),
       const SizedBox(width: 6),
-      Expanded(child: Text(text, style: QText.body(size: 12, height: 17, color: QColors.ink))),
+      Expanded(child: Text(text, style: QText.body(size: 13, color: QColors.ink))),
     ]);
   }
 }
@@ -730,25 +815,26 @@ class _EarnedMonthCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(QRadii.card),
         onTap: granted ? state.dismissEarnedMonthCard : null,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          decoration: QDecor.card(border: QColors.hairlineStrong),
+        // A gift, on the kit's lime.
+        child: PastelCard(
+          color: QColors.lime,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(children: [
-                const Icon(QIcons.gift, size: 15, color: QColors.ink),
+                const QIcon(QIcons.gift, size: 18, color: QColors.onPastel),
                 const SizedBox(width: 6),
-                Text(title, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.ink)),
+                Text(title, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.onPastel)),
               ]),
-              const SizedBox(height: 6),
-              Text(body, style: QText.body(size: 15, height: 21, color: QColors.ink)),
+              const SizedBox(height: 4),
+              Text(body, style: QText.body(size: 13, color: QColors.onPastel)),
               if (!granted) ...[
-                const SizedBox(height: 10),
-                QBar(value: pct),
+                const SizedBox(height: 8),
+                QBar(value: pct, onPastel: true),
               ],
-              const SizedBox(height: 6),
-              Text(note, style: QText.body(size: 12, height: 18, color: QColors.inkTertiary)),
+              const SizedBox(height: 4),
+              Text(note, style: QText.body(size: 12, color: QColors.onPastelSecondary)),
             ],
           ),
         ),
@@ -797,8 +883,10 @@ class SuChip extends StatelessWidget {
             constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             child: Center(
               widthFactor: 1,
-              child: QGlass(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              child: QSurface(
+                shape: QSurfaceShape.capsule,
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: Explainable(
                   id: 'su_points',
                   child: Row(mainAxisSize: MainAxisSize.min, children: [

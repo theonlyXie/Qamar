@@ -77,7 +77,7 @@ void main() {
       await look('the hold mark');
       s.orbTap();
       await look('the tree');
-      s.closeTree();
+      s.closeLog();
       s.openChat();
       await look('the conversation');
 

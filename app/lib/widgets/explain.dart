@@ -268,18 +268,19 @@ class _ExplainableState extends State<Explainable> {
 
     final hovered = context.select<AppState, bool>((s) => s.explainHoverId == widget.id);
 
-    // Under the orb it lifts: the raised surface behind it and the strong
-    // edge around it, no glow — a lighter fill is the lift on black. Both
-    // are painted just outside the value, not padded into it, so wrapping
-    // something to explain never moves or narrows it.
+    // Under the orb it lifts: a lighter fill behind it and a strong edge
+    // around it, no glow — on a pastel, black at a whisper and a black edge.
+    // Both are painted just outside the value, not padded into it, so
+    // wrapping something to explain never moves or narrows it.
+    final pastel = ExplainMark.onPastel(context);
     return TweenAnimationBuilder<double>(
       key: _key,
       tween: Tween(end: hovered ? 1 : 0),
       duration: const Duration(milliseconds: 160),
       child: widget.child,
       builder: (context, t, child) => CustomPaint(
-        painter: _HoverLift(t, fill: true),
-        foregroundPainter: _HoverLift(t, fill: false),
+        painter: _HoverLift(t, fill: true, pastel: pastel),
+        foregroundPainter: _HoverLift(t, fill: false, pastel: pastel),
         child: child,
       ),
     );
@@ -291,27 +292,28 @@ class _ExplainableState extends State<Explainable> {
 class _HoverLift extends CustomPainter {
   final double t;
   final bool fill;
-  const _HoverLift(this.t, {required this.fill});
+  final bool pastel;
+  const _HoverLift(this.t, {required this.fill, this.pastel = false});
 
   @override
   void paint(Canvas canvas, Size size) {
     if (t <= 0) return;
-    final r = RRect.fromRectAndRadius((Offset.zero & size).inflate(4).deflateRect(0, 2), const Radius.circular(QRadii.inset));
+    final r = RRect.fromRectAndRadius((Offset.zero & size).inflate(4).deflateRect(0, 2), const Radius.circular(QRadii.control));
     if (fill) {
-      canvas.drawRRect(r, Paint()..color = Color.lerp(Colors.transparent, QColors.surfaceHigh, t)!);
+      canvas.drawRRect(r, Paint()..color = Color.lerp(Colors.transparent, pastel ? QColors.pastelTrack : QColors.surfaceHigh, t)!);
     } else {
       canvas.drawRRect(
         r,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1
-          ..color = QColors.ink.withValues(alpha: t),
+          ..color = (pastel ? QColors.onPastel : QColors.ink).withValues(alpha: t),
       );
     }
   }
 
   @override
-  bool shouldRepaint(_HoverLift old) => old.t != t || old.fill != fill;
+  bool shouldRepaint(_HoverLift old) => old.t != t || old.fill != fill || old.pastel != pastel;
 }
 
 extension on Rect {
@@ -331,7 +333,13 @@ class ExplainMark extends StatelessWidget {
   final Widget child;
   const ExplainMark({super.key, required this.child});
 
+  /// The dots on the dark, and on a pastel card, where they are black.
   static final color = QColors.inkSecondary.withValues(alpha: 0.7);
+  static final pastelColor = QColors.onPastel.withValues(alpha: 0.6);
+
+  /// Whether [context] is on a pastel card: its words are drawn in the dark
+  /// ink there (PastelCard sets it).
+  static bool onPastel(BuildContext context) => (DefaultTextStyle.of(context).style.color ?? QColors.ink).computeLuminance() < 0.3;
 
   @override
   Widget build(BuildContext context) {
@@ -339,16 +347,17 @@ class ExplainMark extends StatelessWidget {
       context.findAncestorWidgetOfExactType<Explainable>() != null,
       'An ExplainMark says the orb explains this value: put it inside an Explainable.',
     );
-    return CustomPaint(foregroundPainter: const _DottedUnderline(), child: child);
+    return CustomPaint(foregroundPainter: _DottedUnderline(onPastel(context) ? pastelColor : color), child: child);
   }
 }
 
 class _DottedUnderline extends CustomPainter {
-  const _DottedUnderline();
+  final Color color;
+  const _DottedUnderline(this.color);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = ExplainMark.color;
+    final paint = Paint()..color = color;
     const r = 1.0, step = 4.0;
     final y = size.height - r;
     for (var x = r; x <= size.width - r; x += step) {
@@ -357,7 +366,7 @@ class _DottedUnderline extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _DottedUnderline oldDelegate) => false;
+  bool shouldRepaint(covariant _DottedUnderline oldDelegate) => oldDelegate.color != color;
 }
 
 /// The sheet the orb opens when it is dropped on a value.
@@ -390,20 +399,20 @@ class _ExplainSheetState extends State<ExplainSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(isAr ? ex.titleAr : ex.titleEn, style: QText.display(size: 22, ar: isAr, color: QColors.ink)),
+              Text(isAr ? ex.titleAr : ex.titleEn, style: QText.display(size: 24, ar: isAr, color: QColors.ink)),
               const SizedBox(height: 8),
               Text(isAr ? ex.bodyAr : ex.bodyEn, style: QText.body(size: 17, color: QColors.ink)),
               const SizedBox(height: 16),
-              // What to do with it: one line, set apart on the raised surface.
+              // What to do with it: one line, set apart on the kit's lime.
               Container(
                 padding: const EdgeInsets.all(14),
-                decoration: QDecor.card(color: QColors.surfaceRaised, radius: QRadii.control),
+                decoration: QDecor.pastel(QColors.lime, radius: QRadii.inset),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(QIcons.idea, size: 18, color: QColors.ink),
+                    const QIcon(QIcons.idea, size: 20, color: QColors.onPastel),
                     const SizedBox(width: 10),
-                    Expanded(child: Text(isAr ? ex.soWhatAr : ex.soWhatEn, style: QText.body(size: 15, color: QColors.inkSecondary))),
+                    Expanded(child: Text(isAr ? ex.soWhatAr : ex.soWhatEn, style: QText.body(size: 15, color: QColors.onPastel))),
                   ],
                 ),
               ),

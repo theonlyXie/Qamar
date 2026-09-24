@@ -15,15 +15,17 @@ import '../theme/icons.dart';
 import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
+import '../widgets/surface.dart';
 
-/// The InBody report, photographed: the other way into the consultation.
+/// The InBody report, photographed (the kit's AI Camera): the other way into
+/// the consultation.
 ///
-/// One job: take a photo of the report's first page. The shutter is the one
-/// white control; beside it, a photo already on the phone and typing the
-/// numbers instead, each named under its circle. The frame says where the
-/// page goes, and once the shot is taken it shows what Qamar is reading.
-/// When the camera will not open, the frame gives way to what happened and
-/// the way on, and the white is that card's.
+/// One job: take a photo of the report's first page. The kit's white shutter
+/// is the one thing to do; beside it, as the kit's grey tiles, a photo
+/// already on the phone and typing the numbers instead. The frame's white
+/// corners say where the page goes, and once the shot is taken it shows what
+/// Qamar is reading. When the camera will not open, the frame gives way to
+/// what happened and the way on.
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
 
@@ -103,19 +105,18 @@ class _ScanScreenState extends State<ScanScreen> {
                 if (problem == null)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _SideAction(
                         icon: QIcons.gallery,
                         label: isAr ? 'من الصور' : 'Photos',
                         onTap: idle ? () => _pick(ImageSource.gallery) : null,
                       ),
-                      const SizedBox(width: QSpace.xxxl),
+                      const SizedBox(width: QSpace.xl),
                       _Shutter(
                         label: isAr ? 'صوّر التقرير' : 'Photograph the report',
                         onTap: idle ? () => _pick(ImageSource.camera) : null,
                       ),
-                      const SizedBox(width: QSpace.xxxl),
+                      const SizedBox(width: QSpace.xl),
                       _SideAction(
                         icon: QIcons.keyboard,
                         label: isAr ? 'اكتبها' : 'Type it',
@@ -143,9 +144,9 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 }
 
-/// The way back, the screen's name, and the language. The name is centred
-/// on the screen while it fits between the two; at large text it gives way
-/// to them, never the other way round.
+/// The way back, the screen's name beside it (the kit's "AI Camera"), and
+/// the language at the end. At large text the name gives way to the two,
+/// never the other way round.
 class _Header extends StatelessWidget {
   final AppState state;
   const _Header({required this.state});
@@ -153,21 +154,22 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(QSpace.sm, 6, QSpace.sm, QSpace.md),
+      padding: const EdgeInsets.fromLTRB(QSpace.page, 6, QSpace.sm, QSpace.md),
       child: SizedBox(
-        height: math.max(QLayout.minTap, MediaQuery.textScalerOf(context).scale(22)),
-        child: NavigationToolbar(
-          middleSpacing: QSpace.sm,
-          leading: Center(widthFactor: 1, child: QBackButton(onTap: state.back, isAr: state.isAr)),
-          middle: Text(
-            state.t.scanTitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: QText.body(size: 17, weight: FontWeight.w600),
+        height: math.max(QLayout.minTap, MediaQuery.textScalerOf(context).scale(30)),
+        child: Row(children: [
+          QBackButton(onTap: state.back, isAr: state.isAr),
+          const SizedBox(width: QSpace.md),
+          Expanded(
+            child: Text(
+              state.t.scanTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: QText.display(size: 20, ar: state.isAr),
+            ),
           ),
-          trailing: Center(widthFactor: 1, child: QLangToggle(lang: state.lang, onChanged: state.setLang)),
-        ),
+          QLangToggle(lang: state.lang, onChanged: state.setLang),
+        ]),
       ),
     );
   }
@@ -206,7 +208,7 @@ class _Frame extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      busy ? const _BreathingDot() : const Icon(QIcons.camera, size: 28, color: QColors.inkSecondary),
+                      busy ? const _BreathingDot() : const QIcon(QIcons.scan, size: 32, color: QColors.inkSecondary),
                       const SizedBox(height: QSpace.md),
                       // Before the camera opens, what a photo gives.
                       Text(
@@ -257,11 +259,11 @@ class _Corners extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const arm = 28.0, r = QRadii.inset;
+    const arm = 40.0, r = QRadii.card;
     final paint = Paint()
       ..color = QColors.ink
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
+      ..strokeWidth = 3
       ..strokeCap = StrokeCap.round;
     var w = size.width, h = w / page;
     if (h > size.height) {
@@ -293,8 +295,9 @@ class _Corners extends CustomPainter {
   bool shouldRepaint(_Corners old) => false;
 }
 
-/// The one white control: the shutter. With nothing to do (the camera is
-/// opening, the shot is being read) it says so, grey, and takes no touch.
+/// The one white control, the kit's shutter: a white disc in a white ring.
+/// With nothing to do (the camera is opening, the shot is being read) it
+/// says so, grey, and takes no touch.
 class _Shutter extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
@@ -312,22 +315,24 @@ class _Shutter extends StatelessWidget {
         pressed: pressed,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          width: 72,
-          height: 72,
+          width: 76,
+          height: 76,
+          padding: const EdgeInsets.all(5),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: enabled ? QColors.ink : QDisabled.fill,
-            border: Border.all(color: enabled ? QColors.hairlineStrong : QDisabled.edge, width: 3),
+            border: Border.all(color: enabled ? QColors.ink : QDisabled.fill, width: 3),
           ),
-          child: Icon(QIcons.camera, size: 28, color: enabled ? QColors.onInk : QDisabled.label),
+          child: DecoratedBox(
+            decoration: BoxDecoration(shape: BoxShape.circle, color: enabled ? (pressed ? QColors.inkSecondary : QColors.ink) : QDisabled.fill),
+          ),
         ),
       ),
     );
   }
 }
 
-/// A way beside the shutter: a raised circle with its glyph, and its name
-/// under it, one touch for both.
+/// A way beside the shutter, the kit's grey tile: its glyph over its name,
+/// one touch for both.
 class _SideAction extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -337,29 +342,21 @@ class _SideAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
-    return Padding(
-      // Its circle's centre on the shutter's.
-      padding: const EdgeInsets.only(top: 10),
-      child: QTapArea(
-        onTap: onTap,
-        builder: (context, pressed) => qPressed(
-          context,
+    return QTapArea(
+      onTap: onTap,
+      builder: (context, pressed) => qPressed(
+        context,
+        pressed: pressed,
+        child: QSurface(
           pressed: pressed,
+          width: 92,
+          height: 64,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: pressed ? QColors.surfaceHigh : QColors.surfaceRaised,
-                  border: Border.all(color: enabled ? QColors.hairline : QDisabled.edge),
-                ),
-                child: Icon(icon, size: 22, color: enabled ? QColors.ink : QDisabled.label),
-              ),
-              const SizedBox(height: 6),
-              Text(label, style: QText.body(size: 12, weight: FontWeight.w500, color: enabled ? QColors.inkSecondary : QDisabled.label)),
+              QIcon(icon, size: 22, color: enabled ? QColors.ink : QDisabled.label),
+              const SizedBox(height: 4),
+              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 13, weight: FontWeight.w500, color: enabled ? QColors.ink : QDisabled.label)),
             ],
           ),
         ),

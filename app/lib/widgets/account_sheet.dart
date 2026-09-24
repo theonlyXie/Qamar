@@ -12,12 +12,13 @@ import '../theme/icons.dart';
 import '../theme/motion.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
+import 'surface.dart';
 
-/// A sheet's panel, drawn the one way every sheet from Me is (the liquid-glass
-/// sheet): the surface with 32-point top corners under a strong top edge, a
-/// grabber, the close on the leading side beside the title, what the sheet
-/// holds — scrolling when it is taller than the room — and at most one
-/// primary at its foot, with [footer] (a quiet action) under it.
+/// A sheet's panel, drawn the one way every sheet from Me is (the kit's
+/// sheet): the card grey with 32-point top corners, a grabber, the close on
+/// the leading side beside the title, what the sheet holds — scrolling when
+/// it is taller than the room — and at most one primary at its foot, with
+/// [footer] (a quiet action) under it.
 ///
 /// The account sheet is hosted by the shell; the sheets Me opens are pushed
 /// with [open], which puts them above everything, the orb included.
@@ -57,7 +58,7 @@ class SheetPanel extends StatelessWidget {
       type: MaterialType.transparency,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: math.max(0, mq.size.height - mq.padding.top - QSpace.xxl)),
-        child: QSheetGlass(
+        child: QSheetSurface(
           child: Padding(
             padding: EdgeInsets.fromLTRB(QSpace.page, QSpace.sm, QSpace.page, QSpace.lg + bottom),
             child: Column(
@@ -65,21 +66,17 @@ class SheetPanel extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // The grabber: where a finger takes the sheet down.
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 5,
-                    margin: const EdgeInsets.only(bottom: QSpace.md),
-                    decoration: const BoxDecoration(color: QColors.hairlineStrong, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill))),
-                  ),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: QSpace.md),
+                  child: Center(child: QSheetGrabber()),
                 ),
                 Row(children: [
-                  QRoundIconButton(key: closeKey, icon: QIcons.close, onTap: onClose, size: 34, label: isAr ? 'إغلاق' : 'Close'),
+                  QRoundIconButton(key: closeKey, icon: QIcons.close, onTap: onClose, size: 40, label: isAr ? 'إغلاق' : 'Close'),
                   const SizedBox(width: QSpace.sm),
                   Expanded(
                     child: Semantics(
                       header: true,
-                      child: Text(title, style: QText.display(size: 22, ar: QText.arabic(title))),
+                      child: Text(title, style: QText.display(size: 24, ar: QText.arabic(title))),
                     ),
                   ),
                 ]),
@@ -229,8 +226,8 @@ class ProviderRow extends StatelessWidget {
   /// colours, the one place colour is allowed; Apple's and Facebook's in ink.
   static Widget mark(OAuthChoice choice, {required bool enabled}) => switch (choice) {
         OAuthChoice.google => Opacity(opacity: enabled ? 1 : 0.4, child: const GoogleMark(size: 20)),
-        OAuthChoice.apple => Icon(QIcons.appleMark, size: 22, color: enabled ? QColors.ink : QDisabled.label),
-        OAuthChoice.facebook => Icon(QIcons.facebookMark, size: 22, color: enabled ? QColors.ink : QDisabled.label),
+        OAuthChoice.apple => QIcon(QIcons.appleMark, size: 22, color: enabled ? QColors.ink : QDisabled.label),
+        OAuthChoice.facebook => QIcon(QIcons.facebookMark, size: 22, color: enabled ? QColors.ink : QDisabled.label),
       };
 
   @override
@@ -340,8 +337,9 @@ class _GooglePainter extends CustomPainter {
   bool shouldRepaint(_GooglePainter oldDelegate) => false;
 }
 
-/// A provider as an outline capsule the width of the sheet: its mark, then
-/// "Continue with …". While its browser tab is open it breathes and says so.
+/// A provider as the kit's sign-in button, the width of the sheet: the
+/// control grey, its mark, then "Continue with …". While its browser tab is
+/// open it breathes and says so.
 class _ProviderButton extends StatelessWidget {
   final OAuthChoice choice;
   final String label;
@@ -367,14 +365,10 @@ class _ProviderButton extends StatelessWidget {
       builder: (context, pressed) => qPressed(
         context,
         pressed: pressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: 52,
+        child: QSurface(
+          pressed: pressed,
+          height: 50,
           padding: const EdgeInsets.symmetric(horizontal: QSpace.xl),
-          decoration: QDecor.capsule(
-            edge: lit ? QColors.hairlineStrong : QDisabled.edge,
-            fill: pressed ? QColors.surfaceRaised : Colors.transparent,
-          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -388,7 +382,7 @@ class _ProviderButton extends StatelessWidget {
                   busy ? busyLabel : label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: QText.body(size: 17, weight: FontWeight.w500, color: lit ? QColors.ink : QDisabled.label),
+                  style: QText.body(size: 15, weight: FontWeight.w500, color: lit ? QColors.ink : QDisabled.label),
                 ),
               ),
             ],
@@ -457,7 +451,7 @@ class _AccountSheetState extends State<AccountSheet> {
         primary: QPrimaryButton(label: state.isAr ? 'تمام' : 'Done', onTap: state.closeAuth),
         children: [
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Padding(padding: EdgeInsets.only(top: 1), child: Icon(QIcons.good, size: 20, color: QColors.ink)),
+            const Padding(padding: EdgeInsets.only(top: 1), child: QIcon(QIcons.good, size: 20, color: QColors.ink)),
             const SizedBox(width: QSpace.md),
             Expanded(child: Text(state.authDone!, style: QText.body(size: 17, color: QColors.ink))),
           ]),
@@ -503,18 +497,19 @@ class _AccountSheetState extends State<AccountSheet> {
         const ProviderRow(),
         const SizedBox(height: QSpace.xl),
         Row(children: [
-          const Expanded(child: Divider(color: QColors.hairline, height: 1)),
+          const Expanded(child: Divider(color: QColors.hairlineStrong, height: 1)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: QSpace.md),
-            child: Text(isAr ? 'أو بالإيميل' : 'or with email', style: QText.body(size: 13, color: QColors.inkTertiary)),
+            child: Text(isAr ? 'أو بالإيميل' : 'or with email', style: QText.body(size: 13, color: QColors.inkSecondary)),
           ),
-          const Expanded(child: Divider(color: QColors.hairline, height: 1)),
+          const Expanded(child: Divider(color: QColors.hairlineStrong, height: 1)),
         ]),
-        const SizedBox(height: QSpace.xl),
+        const SizedBox(height: QSpace.lg),
         SheetField(
           key: AccountSheet.emailKey,
           controller: _email,
-          hint: isAr ? 'الإيميل' : 'Email address',
+          label: isAr ? 'الإيميل' : 'Email',
+          hint: isAr ? 'اكتب الإيميل' : 'Enter your email',
           enabled: !sent && !busy,
           keyboardType: TextInputType.emailAddress,
           autofill: AutofillHints.email,
@@ -525,12 +520,13 @@ class _AccountSheetState extends State<AccountSheet> {
         ),
         if (sent) ...[
           const SizedBox(height: QSpace.md),
-          Text(isAr ? 'شوف الإيميل: هتلاقي فيه كود من ٦ أرقام.' : 'Check your inbox for a six-digit code.', style: QText.body(size: 13, color: QColors.inkTertiary)),
+          Text(isAr ? 'شوف الإيميل: هتلاقي فيه كود من ٦ أرقام.' : 'Check your inbox for a six-digit code.', style: QText.body(size: 13, color: QColors.inkSecondary)),
           const SizedBox(height: QSpace.sm),
           SheetField(
             key: AccountSheet.codeKey,
             controller: _code,
-            hint: isAr ? 'الكود' : 'Six-digit code',
+            label: isAr ? 'الكود' : 'Code',
+            hint: isAr ? 'الكود من ٦ أرقام' : 'Six-digit code',
             enabled: !busy,
             keyboardType: TextInputType.number,
             autofill: AutofillHints.oneTimeCode,
@@ -550,11 +546,13 @@ class _AccountSheetState extends State<AccountSheet> {
   }
 }
 
-/// A field on a sheet, the kit's way: the raised surface, the control
-/// corner, 52 tall, a placeholder in the third ink, and a strong edge while
-/// it has the focus. Always left to right: it holds an address or a code.
+/// A field on a sheet, the kit's way (the theme's field): its name over it
+/// when it has one, the ground inside a grey edge, the control corner, a
+/// placeholder in the third ink, and a white edge while it has the focus.
+/// Always left to right: it holds an address or a code.
 class SheetField extends StatelessWidget {
   final TextEditingController controller;
+  final String? label;
   final String hint;
   final bool enabled;
   final TextInputType keyboardType;
@@ -569,6 +567,7 @@ class SheetField extends StatelessWidget {
     super.key,
     required this.controller,
     required this.hint,
+    this.label,
     this.enabled = true,
     this.keyboardType = TextInputType.text,
     this.onChanged,
@@ -582,7 +581,16 @@ class SheetField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const shape = BorderRadius.all(Radius.circular(QRadii.control));
+    final field = _field();
+    if (label == null) return field;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+      Text(label!, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.ink)),
+      const SizedBox(height: QSpace.sm),
+      field,
+    ]);
+  }
+
+  Widget _field() {
     return TextField(
       controller: controller,
       enabled: enabled,
@@ -600,14 +608,12 @@ class SheetField extends StatelessWidget {
         hintText: hint,
         // A Latin placeholder ("QMR…") reads left to right in Arabic too.
         hintTextDirection: QText.arabic(hint) ? null : TextDirection.ltr,
-        hintStyle: QText.body(size: 17, color: QColors.inkTertiary),
-        filled: true,
-        fillColor: QColors.surfaceRaised,
-        contentPadding: const EdgeInsets.symmetric(horizontal: QSpace.lg, vertical: 15),
-        border: const OutlineInputBorder(borderRadius: shape, borderSide: BorderSide.none),
-        enabledBorder: const OutlineInputBorder(borderRadius: shape, borderSide: BorderSide.none),
-        disabledBorder: const OutlineInputBorder(borderRadius: shape, borderSide: BorderSide.none),
-        focusedBorder: const OutlineInputBorder(borderRadius: shape, borderSide: BorderSide(color: QColors.hairlineStrong, width: 1.5)),
+        hintStyle: QText.body(size: 15, color: QColors.inkTertiary),
+        // Waiting on a code, the address is set: the edge steps back.
+        disabledBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(QRadii.control)),
+          borderSide: BorderSide(color: QColors.hairline),
+        ),
       ),
     );
   }

@@ -151,7 +151,7 @@ void main() {
       state.go(AppScreen.today);
       state.orbTap();
       await check('the tree');
-      state.closeTree();
+      state.closeLog();
       state.openChat();
       await check('the conversation');
       state.closeChat();

@@ -12,9 +12,11 @@ import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/hero_number.dart';
 import '../widgets/explain.dart';
+import '../widgets/kit.dart';
 
-/// The Su Points wallet: the balance is the page's one hero, a large figure;
-/// under it the two tabs, Spend and History, and under them plain rows.
+/// The Su Points wallet: the balance is the page's one hero, a large figure
+/// on the kit's lime; under it the two tabs as the kit's segmented control,
+/// Spend and History, and under them plain rows.
 class WalletScreen extends StatelessWidget {
   const WalletScreen({super.key});
 
@@ -46,28 +48,21 @@ class WalletScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(QSpace.page, QLayout.pageTop, QSpace.page, QLayout.pageBottom),
       children: [
-        Row(children: [
-          QBackButton(onTap: state.back, isAr: isAr),
-          const SizedBox(width: QSpace.sm),
-          Expanded(
-            child: Text(t.walletTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.display(size: 34, ar: QText.arabic(t.walletTitle))),
-          ),
-        ]),
-        const SizedBox(height: QSpace.xxl),
+        QPageTitle(title: t.walletTitle, isAr: QText.arabic(t.walletTitle), back: state.back),
+        const SizedBox(height: QSpace.lg),
 
         // The hero: what there is to spend, large, with the coin as its
         // unit. Lifetime earned and Level keep score, so they go with "Points
         // and streaks" (O4); the balance stays, because spending needs it.
-        Container(
-          padding: const EdgeInsets.all(QSpace.xl),
-          decoration: QDecor.card(),
+        PastelCard(
+          color: QColors.lime,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // The two labels share a baseline; a long figure or a large
               // text size wraps the second rather than pushing it off the card.
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-                Text(QText.eyebrowText(t.suAvailable, ar: isAr), key: WalletScreen.availableLabelKey, style: QText.eyebrow(ar: isAr)),
+                Text(QText.eyebrowText(t.suAvailable, ar: isAr), key: WalletScreen.availableLabelKey, style: QText.eyebrow(ar: isAr, color: QColors.onPastel)),
                 if (state.showScore) ...[
                   const SizedBox(width: QSpace.md),
                   Flexible(
@@ -77,9 +72,9 @@ class WalletScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
                       children: [
-                        Flexible(child: Text(QText.eyebrowText(t.suLifetime, ar: isAr), key: WalletScreen.lifetimeLabelKey, textAlign: TextAlign.end, style: QText.eyebrow(ar: isAr))),
+                        Flexible(child: Text(QText.eyebrowText(t.suLifetime, ar: isAr), key: WalletScreen.lifetimeLabelKey, textAlign: TextAlign.end, style: QText.eyebrow(ar: isAr, color: QColors.onPastelSecondary))),
                         const SizedBox(width: QSpace.sm),
-                        Text(state.formatSu(state.suLifetime), style: QText.number(size: 13, weight: FontWeight.w600, color: QColors.inkSecondary)),
+                        Text(state.formatSu(state.suLifetime), style: QText.number(size: 13, weight: FontWeight.w600, color: QColors.onPastel)),
                       ],
                     ),
                   ),
@@ -87,29 +82,29 @@ class WalletScreen extends StatelessWidget {
               ]),
               const SizedBox(height: QSpace.lg),
               Row(children: [
-                const SuCoinIcon(size: 28),
+                const SuCoinIcon(size: 28, color: QColors.onPastel),
                 const SizedBox(width: QSpace.md),
                 Flexible(
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: AlignmentDirectional.centerStart,
-                    child: HeroNumber(balance, key: WalletScreen.balanceKey, semanticsLabel: '$balance ${t.suName}, ${t.suAvailable}'),
+                    child: HeroNumber(balance, key: WalletScreen.balanceKey, color: QColors.onPastel, semanticsLabel: '$balance ${t.suName}, ${t.suAvailable}'),
                   ),
                 ),
               ]),
               // Level lives here only (O9), and only while the score is shown
               // (O4): it buys nothing, and it is the leaderboard's number.
               if (state.showScore) ...[
-                const SizedBox(height: QSpace.xl),
-                QBar(key: WalletScreen.levelKey, value: state.levelPct() / 100),
+                const SizedBox(height: QSpace.lg),
+                QBar(key: WalletScreen.levelKey, value: state.levelPct() / 100, onPastel: true),
                 const SizedBox(height: QSpace.sm),
                 Row(children: [
                   Explainable(
                     id: 'level',
-                    child: ExplainMark(child: Text(isAr ? 'المستوى ${state.iso('${state.level()}')}' : 'Level ${state.level()}', style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.inkSecondary))),
+                    child: ExplainMark(child: Text(isAr ? 'المستوى ${state.iso('${state.level()}')}' : 'Level ${state.level()}', style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onPastel))),
                   ),
                   const SizedBox(width: QSpace.md),
-                  Expanded(child: Text(t.levelNote, textAlign: TextAlign.end, style: QText.body(size: 13, color: QColors.inkTertiary))),
+                  Expanded(child: Text(t.levelNote, textAlign: TextAlign.end, style: QText.body(size: 13, color: QColors.onPastelSecondary))),
                 ]),
               ],
             ],
@@ -137,17 +132,17 @@ class WalletScreen extends StatelessWidget {
         const SizedBox(height: QSpace.md),
         Padding(
           padding: const EdgeInsetsDirectional.symmetric(horizontal: QSpace.lg),
-          child: Text(t.walletTerms, key: WalletScreen.termsKey, style: QText.body(size: 13, height: 18, color: QColors.inkTertiary)),
+          child: Text(t.walletTerms, key: WalletScreen.termsKey, style: QText.body(size: 13, height: 18, color: QColors.inkSecondary)),
         ),
       ],
     );
   }
 }
 
-/// Two tabs as one segmented control: a capsule track, and under the chosen
-/// tab a white segment with black words, which slides to the other when it is
-/// chosen (a state change: 220 ms, ease-out; with reduce motion it simply
-/// moves). Each tab is a whole touch and says it is selected.
+/// Two tabs as the kit's segmented control: a white track, and under the
+/// chosen tab a burgundy segment with white words, which slides to the other
+/// when it is chosen (a state change: 220 ms, ease-out; with reduce motion it
+/// simply moves). Each tab is a whole touch and says it is selected.
 class _Tabs extends StatelessWidget {
   final List<(WalletTab, String)> tabs;
   final WalletTab chosen;
@@ -158,8 +153,8 @@ class _Tabs extends StatelessWidget {
   Widget build(BuildContext context) {
     final still = MediaQuery.disableAnimationsOf(context);
     final index = tabs.indexWhere((t) => t.$1 == chosen);
-    const track = 40.0;
-    const inset = 3.0;
+    const track = 44.0;
+    const inset = 4.0;
     // The track is drawn 40 tall in a band a whole touch tall (O11): each
     // tab takes the full 48, the capsule and its white segment sit inside.
     return SizedBox(
@@ -167,7 +162,7 @@ class _Tabs extends StatelessWidget {
       child: Stack(children: [
         Positioned.fill(
           child: Center(
-            child: Container(height: track, decoration: QDecor.capsule(edge: QColors.hairline, fill: QColors.glassPanel)),
+            child: Container(height: track, decoration: QDecor.segmentTrack),
           ),
         ),
         Positioned.fill(
@@ -206,7 +201,7 @@ class _Tabs extends StatelessWidget {
                     child: AnimatedDefaultTextStyle(
                       duration: still ? Duration.zero : const Duration(milliseconds: 220),
                       curve: Curves.easeOutCubic,
-                      style: QText.body(size: 15, weight: FontWeight.w600, color: tab == chosen || pressed ? QColors.ink : QColors.inkSecondary),
+                      style: QText.body(size: 15, weight: FontWeight.w500, color: tab == chosen ? QColors.onAccent : (pressed ? QColors.onPastelSecondary : QColors.onInk)),
                       child: Text(label),
                     ),
                   ),
@@ -253,23 +248,23 @@ class _SpendRow extends StatelessWidget {
     final after = state.suAvailable - item.price < 0 ? 0 : state.suAvailable - item.price;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(QSpace.lg, QSpace.lg, QSpace.lg, QSpace.md),
+      padding: const EdgeInsets.fromLTRB(QSpace.xl, QSpace.lg, QSpace.lg, QSpace.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-            Expanded(child: Text(isAr ? item.nameAr : item.nameEn, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink))),
+            Expanded(child: Text(isAr ? item.nameAr : item.nameEn, style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.ink))),
             const SizedBox(width: QSpace.md),
             Text(state.suAmount(item.price), style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink, ar: isAr)),
           ]),
           const SizedBox(height: QSpace.xs),
           Text(isAr ? item.whatAr : item.whatEn, style: QText.body(size: 15, color: QColors.inkSecondary)),
           const SizedBox(height: QSpace.xs),
-          Text(isAr ? item.limitAr : item.limitEn, style: QText.body(size: 13, height: 18, color: QColors.inkTertiary)),
+          Text(isAr ? item.limitAr : item.limitEn, style: QText.body(size: 13, height: 18, color: QColors.inkSecondary)),
           Row(children: [
             Expanded(
               child: afford
-                  ? Text('${state.t.balanceAfter} ${state.formatSu(after)}', style: QText.number(size: 13, color: QColors.inkTertiary, ar: isAr))
+                  ? Text('${state.t.balanceAfter} ${state.formatSu(after)}', style: QText.number(size: 13, color: QColors.inkSecondary, ar: isAr))
                   : const SizedBox.shrink(),
             ),
             QOutlineButton(
@@ -312,8 +307,8 @@ class _History extends StatelessWidget {
               child: Row(children: [
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(entry.label, style: QText.body(size: 17, color: QColors.ink)),
-                    Text(entry.when, style: QText.body(size: 13, height: 18, color: QColors.inkTertiary)),
+                    Text(entry.label, style: QText.body(size: 16, color: QColors.ink)),
+                    Text(entry.when, style: QText.body(size: 13, height: 18, color: QColors.inkSecondary)),
                   ]),
                 ),
                 const SizedBox(width: QSpace.md),

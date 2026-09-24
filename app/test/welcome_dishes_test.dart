@@ -1,4 +1,4 @@
-// The welcome's way in, made one tap (the liquid-glass skill: no step that is
+// The welcome's way in, made one tap (the qamar-design skill: no step that is
 // not a real decision). "Chat with Qamar" used to open a sheet of three
 // dishes and a second button before the first question (O5); it now goes
 // straight to the first question, and the first moment of value is the
@@ -104,11 +104,11 @@ void main() {
     }
 
     for (final lang in AppLang.values) {
-      testWidgets('"Chat with Qamar" is the one white button, and one tap puts the first question on screen (${lang.name})', (tester) async {
+      testWidgets('"Chat with Qamar" is the one round button, and one tap puts the first question on screen (${lang.name})', (tester) async {
         final s = await pump(tester, AppState()..setLang(lang));
-        final primaries = find.descendant(of: find.byType(WelcomeScreen), matching: find.byType(QPrimaryButton));
-        expect(primaries, findsOneWidget, reason: 'one thing to do');
-        expect(tester.widget<QPrimaryButton>(primaries).label, s.t.chatDirect);
+        expect(find.descendant(of: find.byKey(WelcomeScreen.chatPillKey), matching: find.text(s.t.chatDirect)), findsOneWidget);
+        expect(find.descendant(of: find.byType(WelcomeScreen), matching: find.byType(QPrimaryButton)), findsNothing,
+            reason: 'one thing to do: the round button in its bump; the report is the white capsule above it');
 
         await tester.tap(find.byKey(WelcomeScreen.chatPillKey));
         await tester.pump();
@@ -136,7 +136,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(s.screen, AppScreen.welcome);
       expect(s.consultationPaused, isTrue);
-      expect(find.widgetWithText(QPrimaryButton, s.t.next), findsOneWidget, reason: '"Continue", not a new start');
+      expect(find.descendant(of: find.byKey(WelcomeScreen.chatPillKey), matching: find.text(s.t.next)), findsOneWidget, reason: '"Continue", not a new start');
 
       await tester.tap(find.byKey(WelcomeScreen.chatPillKey));
       await tester.pump();

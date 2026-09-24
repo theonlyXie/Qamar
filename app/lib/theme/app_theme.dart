@@ -1,32 +1,35 @@
 import 'package:flutter/material.dart';
 import 'colors.dart';
+import 'text_styles.dart';
 
-/// The corners (the liquid-glass skill). Controls are round-ended; everything
-/// that holds content takes one of three corners, by what it is, and a shape
-/// inside another keeps the outer corner less the space between them, so the
-/// two stay concentric (radii_test.dart).
+/// The corners (the qamar-design skill), the Nutri AI kit's: four radii and
+/// the pill, each shape taking the corner of what it is, and a shape inside
+/// another keeping the outer corner less the space between them, so the two
+/// stay concentric (radii_test.dart).
 class QRadii {
   QRadii._();
 
-  /// Anything a finger presses: buttons, chips, the composer, toggles. Drawn
-  /// as a capsule (StadiumBorder) whatever its height.
+  /// A chip, a segmented control and its chosen segment, the tab bar, a bar
+  /// of progress: drawn as a capsule (StadiumBorder) whatever its height.
   static const pill = 999.0;
 
-  /// A small shape inside another: a thumbnail, a bar, a wash.
-  static const inset = 12.0;
+  /// Something a finger presses or types into, drawn as a rounded rectangle:
+  /// a button, a field, a notice, the selection band of a wheel.
+  static const control = 12.0;
 
-  /// A field, a notice, a bubble: something inside a card or on the page.
-  static const control = 18.0;
+  /// A shape inside a card: a tile inside a pastel card, a photo, a bubble in
+  /// the conversation, a group of rows.
+  static const inset = 16.0;
 
-  /// A card: anything that holds content on the canvas.
+  /// A card: a pastel card, a list, a photo card, a dialog.
   static const card = 24.0;
 
   /// The top corners of a sheet rising from the bottom.
   static const sheet = 32.0;
 
   /// The corner of a shape [inset] points inside one with corner [outer]:
-  /// concentric, never smaller than the inset corner.
-  static double inside(double outer, double inset) => (outer - inset).clamp(inset, outer).toDouble();
+  /// concentric, never smaller than the control corner.
+  static double inside(double outer, double inset) => (outer - inset).clamp(control, outer).toDouble();
 }
 
 /// The spacing steps, on a 4-point grid.
@@ -40,12 +43,16 @@ class QSpace {
   static const xxl = 24.0;
   static const xxxl = 32.0;
 
-  /// The page's side margin.
+  /// The page's side margin: the kit's 20.
   static const page = 20.0;
 }
 
 ThemeData buildQamarTheme() {
   final base = ThemeData.dark(useMaterial3: true);
+  OutlineInputBorder edge(Color c, [double w = 1]) => OutlineInputBorder(
+        borderRadius: const BorderRadius.all(Radius.circular(QRadii.control)),
+        borderSide: BorderSide(color: c, width: w),
+      );
   return base.copyWith(
     scaffoldBackgroundColor: QColors.canvas,
     canvasColor: QColors.canvas,
@@ -56,23 +63,41 @@ ThemeData buildQamarTheme() {
       onSecondary: QColors.onInk,
       surface: QColors.surface,
       onSurface: QColors.ink,
-      error: QColors.ink,
-      onError: QColors.onInk,
+      error: QColors.error,
+      onError: QColors.ink,
       outline: QColors.hairlineStrong,
     ),
     textTheme: base.textTheme.apply(
+      fontFamily: QText.family,
+      fontFamilyFallback: QText.fallback,
       bodyColor: QColors.ink,
       displayColor: QColors.ink,
     ),
-    // The switch, Apple's way: on is a burgundy track under a white thumb,
-    // off a raised grey track with a white one.
+    // The kit's field: the ground inside a grey edge, the edge white while it
+    // is being typed in and red when something is wrong with it.
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: QColors.canvas,
+      hintStyle: QText.body(size: 15, color: QColors.inkTertiary),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: edge(QColors.hairlineStrong),
+      enabledBorder: edge(QColors.hairlineStrong),
+      focusedBorder: edge(QColors.ink),
+      errorBorder: edge(QColors.error),
+      focusedErrorBorder: edge(QColors.error),
+      // The red is the edge's: the words under it are the full ink, which
+      // passes AA where the red would not.
+      errorStyle: QText.body(size: 13, color: QColors.ink),
+    ),
+    // The kit's switch: on is a burgundy track under a white thumb, off the
+    // raised grey with a white one.
     switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.disabled) ? QColors.inkDisabled : QColors.ink),
+      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.disabled) ? QColors.inkDisabled : QColors.white),
       trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? QColors.accent : QColors.surfaceHigh),
-      trackOutlineColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? Colors.transparent : QColors.hairlineStrong),
+      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
     ),
     textSelectionTheme: const TextSelectionThemeData(
-      cursorColor: QColors.accentInk,
+      cursorColor: QColors.ink,
       selectionColor: QColors.accentWash,
       selectionHandleColor: QColors.accentInk,
     ),
@@ -83,55 +108,34 @@ ThemeData buildQamarTheme() {
   );
 }
 
-/// Shared card and pill decorations so screens don't hand-roll BoxDecoration.
+/// Shared decorations, so screens don't hand-roll BoxDecoration.
 class QDecor {
   QDecor._();
 
-  /// A card is a pane of Liquid Glass (the liquid-glass skill): white over
-  /// the page's light, brighter at the top, with a rim that catches the
-  /// light along its top edge ([QGlassRim]). No blur: a card is content, it
-  /// scrolls, and blur there would cost frames; what shows through it is the
-  /// page's burgundy light, which is smooth anyway. No shadow: on black a
-  /// shadow has nothing to darken.
+  /// A card on the dark (the qamar-design skill): the kit's grey 500, flat,
+  /// with an edge a step lighter so it holds its shape on the ground. No
+  /// shadow and no glass.
   ///
-  /// [color] asks for a raised pane (surfaceRaised or surfaceHigh: pressed,
-  /// or a shape inside another), a step brighter; the surface, or nothing,
-  /// is the plain pane. [border] as hairlineStrong gives the stronger rim of
-  /// something that must read as a boundary.
+  /// [color] asks for a raised card (surfaceRaised: pressed, or a shape on a
+  /// card); [border] as hairlineStrong for one that must read as a boundary
+  /// (chosen), accent for the chosen one of several.
   static BoxDecoration card({
-    Color? color,
+    Color color = QColors.surface,
     Color border = QColors.hairline,
     double radius = QRadii.card,
   }) =>
       BoxDecoration(
-        color: _raised(color) ? QColors.glassRaised : null,
-        gradient: _raised(color) ? null : _pane,
-        border: border == QColors.hairlineStrong ? QGlassRim.strong : QGlassRim.soft,
+        color: color,
+        border: Border.all(color: border),
         borderRadius: BorderRadius.circular(radius),
       );
 
-  static bool _raised(Color? color) => color == QColors.surfaceRaised || color == QColors.surfaceHigh;
-
-  static const _pane = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [QColors.glassPanelTop, QColors.glassPanel],
-    stops: [0, 0.6],
-  );
-
-  /// The page's light, painted once behind every screen: a burgundy glow
-  /// from just above the top of the screen, gone to black by about the
-  /// middle. It stays where it is while the page scrolls, so the glass
-  /// panels move over it.
-  static const ambient = BoxDecoration(
-    color: QColors.canvas,
-    gradient: RadialGradient(
-      center: Alignment(0, -1.25),
-      radius: 1.35,
-      colors: [QColors.ambient, QColors.canvas],
-      stops: [0, 1],
-    ),
-  );
+  /// A pastel card (the kit's lavender, lime, mint, coral), with black words
+  /// on it: where the figures that matter most sit. No edge.
+  static BoxDecoration pastel(Color color, {double radius = QRadii.card}) => BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(radius),
+      );
 
   /// A capsule drawn by its edge: a tag, a quiet chip. [fill] shows while it
   /// is pressed or selected.
@@ -141,84 +145,30 @@ class QDecor {
         borderRadius: const BorderRadius.all(Radius.circular(QRadii.pill)),
       );
 
-  /// The chosen segment of a segmented control (the language toggle, the
-  /// wallet's tabs): a raised pane of neutral glass. A mode is not an action,
-  /// so it is not burgundy.
+  /// A segmented control's track: the kit's white capsule.
+  static const segmentTrack = BoxDecoration(
+    color: QColors.white,
+    borderRadius: BorderRadius.all(Radius.circular(QRadii.pill)),
+  );
+
+  /// The chosen segment: a burgundy capsule with white words on it, as the
+  /// kit fills its chosen segment with its own colour.
   ///
   /// Its edge is a plain Border, as [segmentRest]'s is, so the segment can
   /// animate between the two.
   static const segmentThumb = BoxDecoration(
-    color: QColors.glassFillPressed,
-    border: Border.fromBorderSide(BorderSide(color: QColors.hairlineStrong)),
+    color: QColors.accent,
+    border: Border.fromBorderSide(BorderSide(color: QColors.accent)),
     borderRadius: BorderRadius.all(Radius.circular(QRadii.pill)),
   );
 
-  /// A segment not chosen: nothing drawn, the same shape.
+  /// A segment not chosen: nothing drawn, the same shape; black words on the
+  /// white track.
   static const segmentRest = BoxDecoration(
     color: Colors.transparent,
     border: Border.fromBorderSide(BorderSide(color: Colors.transparent)),
     borderRadius: BorderRadius.all(Radius.circular(QRadii.pill)),
   );
-}
-
-/// The rim of a pane of glass: the edge bright where light meets the top of
-/// it, fading to the hairline by the middle and staying there down the sides
-/// and along the bottom. A [BoxBorder], so any BoxDecoration can wear it.
-///
-/// Its two instances are constants, so a decoration that animates from one
-/// to the same one is identical and nothing needs interpolating.
-class QGlassRim extends BoxBorder {
-  /// The colour along the top edge, and down the rest of it.
-  final Color light, edge;
-  const QGlassRim._({required this.light, required this.edge});
-
-  /// A card's rim.
-  static const soft = QGlassRim._(light: QColors.glassRim, edge: QColors.hairline);
-
-  /// The rim of something that must read as a boundary: a chosen or focused
-  /// pane, a sheet.
-  static const strong = QGlassRim._(light: QColors.glassEdgeTop, edge: QColors.hairlineStrong);
-
-  static const double _width = 1;
-
-  @override
-  BorderSide get top => BorderSide(color: light, width: _width);
-
-  @override
-  BorderSide get bottom => BorderSide(color: edge, width: _width);
-
-  @override
-  bool get isUniform => true;
-
-  @override
-  EdgeInsetsGeometry get dimensions => const EdgeInsets.all(_width);
-
-  @override
-  ShapeBorder scale(double t) => this;
-
-  @override
-  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection, BoxShape shape = BoxShape.rectangle, BorderRadius? borderRadius}) {
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = _width
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [light, edge, edge],
-        stops: const [0, 0.45, 1],
-      ).createShader(rect);
-    if (shape == BoxShape.circle) {
-      canvas.drawCircle(rect.center, rect.shortestSide / 2 - _width / 2, paint);
-      return;
-    }
-    canvas.drawRRect((borderRadius ?? BorderRadius.zero).toRRect(rect).deflate(_width / 2), paint);
-  }
-
-  @override
-  bool operator ==(Object other) => other is QGlassRim && other.light == light && other.edge == edge;
-
-  @override
-  int get hashCode => Object.hash(light, edge);
 }
 
 extension QTextStyleShortcuts on BuildContext {

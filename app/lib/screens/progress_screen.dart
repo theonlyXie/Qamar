@@ -19,14 +19,17 @@ import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/hero_number.dart';
 import '../widgets/explain.dart';
+import '../widgets/kit.dart';
 import '../widgets/review_card.dart';
 
-/// Progress: how the week is going, read at a glance, and the card to share.
+/// Progress (the kit's Analysis page): how the week is going, read at a
+/// glance, and the card to share.
 ///
-/// One figure, the days logged this week, large; the run, while the score
-/// is shown; the week's card (a moon a day, the sentence the person did not
-/// expect, the one change) with the one way to send it; and the weight's
-/// direction once there are two readings to draw it from.
+/// One figure, the days logged this week, large on the mint card; the run,
+/// on lime, while the score is shown; the week's card (a moon a day, the
+/// sentence the person did not expect, the one change) with the one way to
+/// send it; and the weight's direction once there are two readings to draw
+/// it from.
 ///
 /// Nothing here is illustrative. A week with nothing logged says so in
 /// words, not with a lonely zero; the moons of unlogged days rest; and no
@@ -51,12 +54,9 @@ class ProgressScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, QLayout.pageTop, 20, QLayout.pageBottom),
       children: [
-        Row(children: [
-          QBackButton(onTap: state.back, isAr: state.isAr),
-          const SizedBox(width: 8),
-          Expanded(child: Text(state.t.progress, style: QText.display(size: 34, ar: state.isAr))),
-        ]),
-        const SizedBox(height: 20),
+        // A tab's page: its name, and no way back (the tab bar is the way).
+        QPageTitle(title: state.t.progress, isAr: state.isAr),
+        const SizedBox(height: 16),
         _WeekFigure(state: state),
         const SizedBox(height: 14),
         // The streak keeps score, so it goes with "Points and streaks" (O4),
@@ -104,29 +104,34 @@ class _WeekFigure extends StatelessWidget {
     // "of 7 days": the noun agrees with the seven, so it reads right beside
     // any figure, one or six.
     final ofSeven = isAr ? 'من ${state.iso('7')} أيام متسجّلة' : 'of 7 days logged';
-    return Container(
+    // The kit's mint header card, the week's one figure on it.
+    return PastelCard(
       key: ProgressScreen.weekKey,
+      color: QColors.mint,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-      decoration: QDecor.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(state.t.thisWeek, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkSecondary)),
-          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: Text(state.t.thisWeek, style: QText.body(size: 18, weight: FontWeight.w600, color: QColors.onPastel))),
+            const PastelGlyph(QIcons.calendar, size: 36),
+          ]),
+          const SizedBox(height: 8),
           if (days == 0)
             Text(
               isAr ? 'لسه مفيش أكل متسجّل الأسبوع ده. أول وجبة تسجّلها هتبان هنا.' : 'Nothing logged this week yet. Your first meal shows up here.',
-              style: QText.body(size: 17, color: QColors.ink),
+              style: QText.body(size: 17, color: QColors.onPastel),
             )
           else ...[
             HeroNumber(
               state.digits('$days'),
+              color: QColors.onPastel,
               semanticsLabel: isAr ? '${state.iso('$days')} $ofSeven' : '$days $ofSeven',
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             // Arabic takes its own comma: beside Arabic-Indic digits a "·"
             // reads as a zero.
-            Text(isAr ? '$ofSeven، $meals' : '$ofSeven · $meals', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkSecondary)),
+            Text(isAr ? '$ofSeven، $meals' : '$ofSeven · $meals', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.onPastelSecondary)),
           ],
         ],
       ),
@@ -157,30 +162,31 @@ class _StreakCard extends StatelessWidget {
         : streak.atRisk
             ? days(streak.current)
             : (isAr ? '${days(streak.current)} ورا بعض' : '${days(streak.current)} in a row');
-    return Container(
-      // The value's explainable inset (Explainable's own) takes the last of
-      // the end padding, so the run ends where the card's content does.
-      padding: const EdgeInsetsDirectional.fromSTEB(20, 14, 15, 14),
-      decoration: QDecor.card(),
+    // On the kit's lime. The value's explainable inset (Explainable's own)
+    // takes the last of the end padding, so the run ends where the card's
+    // content does.
+    return PastelCard(
+      color: QColors.lime,
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 14, 15, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Icon(QIcons.flame, size: 20, color: streak.current > 0 ? QColors.ink : QColors.inkTertiary),
-            const SizedBox(width: 8),
-            Text(isAr ? 'السلسلة' : 'Streak', style: QText.body(size: 17, color: QColors.ink)),
+            const PastelGlyph(QIcons.flame, size: 36),
+            const SizedBox(width: 10),
+            Text(isAr ? 'السلسلة' : 'Streak', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.onPastel)),
             const Spacer(),
             // The run is what the orb explains: the dotted value.
             Explainable(
               id: 'streak',
-              child: ExplainMark(child: Text(value, style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink, ar: isAr))),
+              child: ExplainMark(child: Text(value, style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.onPastel, ar: isAr))),
             ),
           ]),
           if (note != null) ...[
             const SizedBox(height: 4),
             Padding(
-              padding: const EdgeInsetsDirectional.only(start: 28),
-              child: Text(note, style: QText.body(size: 13, color: QColors.inkTertiary)),
+              padding: const EdgeInsetsDirectional.only(start: 46),
+              child: Text(note, style: QText.body(size: 13, color: QColors.onPastelSecondary)),
             ),
           ],
         ],
@@ -205,8 +211,8 @@ class _WeightCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(QText.eyebrowText(state.t.weightTrend, ar: isAr), style: QText.eyebrow(ar: isAr)),
-          const SizedBox(height: 8),
+          Text(state.t.weightTrend, style: QText.body(size: 16, weight: FontWeight.w600, color: QColors.ink)),
+          const SizedBox(height: 6),
           Text(ProgressScreen.trendLine(isAr, readings, state.iso), style: QText.body(size: 17, color: QColors.ink)),
           const SizedBox(height: 16),
           ExcludeSemantics(
@@ -274,8 +280,9 @@ class _WeightTrendPainter extends CustomPainter {
     for (final r in readings) {
       canvas.drawCircle(at(r), 2.5, Paint()..color = QColors.inkSecondary);
     }
-    // The latest reading, where the line ends: the one lit dot.
-    canvas.drawCircle(at(readings.last), 5, Paint()..color = QColors.ink);
+    // The latest reading, where the line ends: the one lit dot, in the
+    // kit's lavender.
+    canvas.drawCircle(at(readings.last), 5, Paint()..color = QColors.lavender);
   }
 
   @override
@@ -384,7 +391,7 @@ class _SwitchRow extends StatelessWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                 Text(label, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.ink)),
-                if (note != null) Text(note!, style: QText.body(size: 13, color: QColors.inkTertiary)),
+                if (note != null) Text(note!, style: QText.body(size: 13, color: QColors.inkSecondary)),
               ]),
             ),
             const SizedBox(width: 12),

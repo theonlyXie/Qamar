@@ -1,135 +1,189 @@
-import 'package:flutter/cupertino.dart';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart' show Icons;
+import 'package:flutter/widgets.dart';
+import 'package:iconsax_plus/iconsax_plus.dart';
 
-/// Every glyph the app draws, by what it means (the liquid-glass skill: one
-/// icon family). All of them are Cupertino icons — the open drawing of Apple's
-/// SF Symbols that ships with Flutter — at one weight, so a page never mixes
-/// a filled Material glyph with an outlined one again. Filled forms are used
-/// only for a selected or "on" state, the way SF Symbols uses them.
+/// Every glyph the app draws, by what it means (the qamar-design skill: one
+/// icon family). All of them are Iconsax, the Nutri AI kit's family (vuesax):
+/// linear at rest, and bold only for a chosen or "on" state — the tab the
+/// person is on, a done mark — the way the kit fills its active tab.
 ///
-/// No `Icons.` (Material) glyph is drawn anywhere (icons_test.dart), and a
-/// screen names its glyph here rather than reaching into the family, so the
-/// family can be changed in one place.
+/// No `Icons.` (Material) or Cupertino glyph is drawn anywhere (icons_test.dart),
+/// and a screen names its glyph here rather than reaching into the family, so
+/// the family can be changed in one place.
 abstract final class QIcons {
-  static const _font = CupertinoIcons.iconFont;
-  static const _package = CupertinoIcons.iconFontPackage;
+  static const _linear = 'IconsaxPlusLinear';
+  static const _pkg = 'iconsax_plus';
 
-  // Navigation. Back and forward point the way the reading goes: they mirror
-  // in Arabic, where back points right.
-  static const back = IconData(0xf3cf, fontFamily: _font, fontPackage: _package, matchTextDirection: true);
-  static const forward = IconData(0xf3d1, fontFamily: _font, fontPackage: _package, matchTextDirection: true);
-  static const close = CupertinoIcons.xmark;
-  static const down = CupertinoIcons.chevron_down;
-  static const more = CupertinoIcons.ellipsis;
-  static const external = CupertinoIcons.arrow_up_right;
+  // Navigation. Back and forward point the way the reading goes, so they
+  // mirror in Arabic, where back points right (the family's arrow_left_1 and
+  // arrow_right_3, the chevrons, with matchTextDirection).
+  static const back = IconData(0xe930, fontFamily: _linear, fontPackage: _pkg, matchTextDirection: true);
+  static const forward = IconData(0xe936, fontFamily: _linear, fontPackage: _pkg, matchTextDirection: true);
+
+  /// Close: Iconsax draws no plain ×, so the mark is the family's "add"
+  /// turned an eighth of a turn, which [QIcon] does. It is its own constant
+  /// (the add glyph set to mirror, which a cross does not show), so it is
+  /// never taken for [add]; icons_test.dart holds that every close is drawn
+  /// through [QIcon].
+  static const close = IconData(0xe907, fontFamily: _linear, fontPackage: _pkg, matchTextDirection: true);
+  static const down = IconsaxPlusLinear.arrow_down;
+  static const up = IconsaxPlusLinear.arrow_up_1;
+  static const more = IconsaxPlusLinear.more;
+  static const external = IconsaxPlusLinear.export_3;
 
   // The conversation.
-  static const send = CupertinoIcons.arrow_up;
-  static const mic = CupertinoIcons.mic;
-  static const micOff = CupertinoIcons.mic_slash;
-  static const voice = CupertinoIcons.waveform;
-  static const stop = CupertinoIcons.stop_fill;
-  static const attach = CupertinoIcons.plus;
-  static const camera = CupertinoIcons.camera;
-  static const photo = CupertinoIcons.photo;
-  static const keyboard = CupertinoIcons.keyboard;
-  static const copy = CupertinoIcons.doc_on_doc;
+  static const send = IconsaxPlusLinear.arrow_up;
+  static const mic = IconsaxPlusLinear.microphone_2;
+  static const micOff = IconsaxPlusLinear.microphone_slash_1;
+  static const voice = IconsaxPlusLinear.voice_cricle;
+  static const stop = IconsaxPlusBold.stop;
+  static const attach = IconsaxPlusLinear.add;
+  static const camera = IconsaxPlusLinear.camera;
+  static const photo = IconsaxPlusLinear.gallery;
+  static const keyboard = IconsaxPlusLinear.keyboard;
+  static const copy = IconsaxPlusLinear.copy;
+  static const ask = IconsaxPlusLinear.magic_star;
 
   // Actions.
-  static const add = CupertinoIcons.plus;
-  static const remove = CupertinoIcons.minus;
-  static const check = CupertinoIcons.checkmark;
-  static const done = CupertinoIcons.checkmark_circle_fill;
-  static const edit = CupertinoIcons.pencil;
-  static const repeat = CupertinoIcons.arrow_counterclockwise;
-  static const share = CupertinoIcons.square_arrow_up;
-  static const swap = CupertinoIcons.arrow_2_circlepath;
-  static const scan = CupertinoIcons.viewfinder;
+  static const add = IconsaxPlusLinear.add;
+  static const remove = IconsaxPlusLinear.minus;
+  static const check = IconsaxPlusLinear.tick_circle;
+  static const done = IconsaxPlusBold.tick_circle;
+  static const edit = IconsaxPlusLinear.edit_2;
+  static const repeat = IconsaxPlusLinear.repeat;
+  static const share = IconsaxPlusLinear.export;
+  static const swap = IconsaxPlusLinear.refresh_2;
+  static const scan = IconsaxPlusLinear.scan;
 
-  // The tree and the day.
-  static const log = CupertinoIcons.square_pencil;
-  static const plan = CupertinoIcons.square_list;
-  static const water = CupertinoIcons.drop;
-  static const waterFull = CupertinoIcons.drop_fill;
-  static const review = CupertinoIcons.chart_bar;
-  static const me = CupertinoIcons.person;
-  static const moon = CupertinoIcons.moon;
-  static const moonFull = CupertinoIcons.moon_fill;
-  static const flame = CupertinoIcons.flame;
-  static const glass = CupertinoIcons.drop;
-  static const bottle = CupertinoIcons.drop_fill;
-  static const tea = CupertinoIcons.flame;
-  static const shop = CupertinoIcons.cart;
+  // The tabs and the day. A tab's glyph is linear at rest and bold when it
+  // is the page the person is on ([onFor]).
+  static const today = IconsaxPlusLinear.home;
+  static const log = IconsaxPlusLinear.note_2;
+  static const plan = IconsaxPlusLinear.reserve;
+  static const review = IconsaxPlusLinear.activity;
+  static const me = IconsaxPlusLinear.profile;
+  static const water = IconsaxPlusLinear.drop;
+  static const waterFull = IconsaxPlusBold.drop;
+  static const moon = IconsaxPlusLinear.moon;
+  static const moonFull = IconsaxPlusBold.moon;
+  static const flame = IconsaxPlusLinear.flash;
+  static const glass = IconsaxPlusLinear.drop;
+  static const bottle = IconsaxPlusLinear.milk;
+  static const tea = IconsaxPlusLinear.coffee;
+  static const shop = IconsaxPlusLinear.shopping_cart;
+
+  /// The macros, on their cards: carbs a sheaf of grain in the kit, drawn
+  /// here as the family's cake (bread and sweets); protein the egg-and-yolk
+  /// shape the kit uses, the family's "record"; fat a drop.
+  static const calories = IconsaxPlusLinear.flash;
+  static const protein = IconsaxPlusLinear.record_circle;
+  static const carbs = IconsaxPlusLinear.cake;
+  static const fat = IconsaxPlusLinear.drop;
 
   // Movement.
-  static const walk = CupertinoIcons.person;
-  static const run = CupertinoIcons.hare;
-  static const football = CupertinoIcons.sportscourt;
-  static const gym = CupertinoIcons.bolt;
-  static const other = CupertinoIcons.ellipsis_circle;
+  static const walk = IconsaxPlusLinear.routing;
+  static const run = IconsaxPlusLinear.flash;
+  static const football = IconsaxPlusLinear.cup;
+  static const gym = IconsaxPlusLinear.weight_1;
+  static const other = IconsaxPlusLinear.more_circle;
 
   // States: a glyph says what a colour used to.
-  static const info = CupertinoIcons.info_circle;
-  static const warning = CupertinoIcons.exclamationmark_circle;
-  static const error = CupertinoIcons.exclamationmark_triangle;
-  static const offline = CupertinoIcons.wifi_slash;
-  static const locked = CupertinoIcons.lock;
-  static const limit = CupertinoIcons.hourglass;
-  static const empty = CupertinoIcons.moon_stars;
-  static const good = CupertinoIcons.checkmark_circle;
-  static const gift = CupertinoIcons.gift;
-  static const plus = CupertinoIcons.sparkles;
-  static const safety = CupertinoIcons.heart;
-  static const time = CupertinoIcons.clock;
-  static const gesture = CupertinoIcons.hand_draw;
-  static const trend = CupertinoIcons.graph_square;
-  static const idea = CupertinoIcons.lightbulb;
-  static const shield = CupertinoIcons.shield;
-  static const star = CupertinoIcons.star;
-  static const thumbsUp = CupertinoIcons.hand_thumbsup;
-  static const thumbsDown = CupertinoIcons.hand_thumbsdown;
+  static const info = IconsaxPlusLinear.info_circle;
+  static const warning = IconsaxPlusLinear.warning_2;
+  static const error = IconsaxPlusLinear.danger;
+  static const offline = IconsaxPlusLinear.cloud_cross;
+  static const locked = IconsaxPlusLinear.lock;
+  static const limit = IconsaxPlusLinear.timer_1;
+  static const empty = IconsaxPlusLinear.moon;
+  static const good = IconsaxPlusLinear.tick_circle;
+  static const gift = IconsaxPlusLinear.gift;
+  static const plus = IconsaxPlusLinear.crown;
+  static const safety = IconsaxPlusLinear.heart;
+  static const time = IconsaxPlusLinear.clock;
+  static const gesture = IconsaxPlusLinear.finger_cricle;
+  static const trend = IconsaxPlusLinear.trend_up;
+  static const idea = IconsaxPlusLinear.lamp_on;
+  static const shield = IconsaxPlusLinear.shield_tick;
+  static const star = IconsaxPlusLinear.star;
+  static const thumbsUp = IconsaxPlusLinear.like_1;
+  static const thumbsDown = IconsaxPlusLinear.dislike;
 
   // Choosing: a round mark for one of several, the way a list picks one.
-  static const chosen = CupertinoIcons.largecircle_fill_circle;
-  static const unchosen = CupertinoIcons.circle;
+  static const chosen = IconsaxPlusBold.record_circle;
+  static const unchosen = IconsaxPlusLinear.record;
 
   // The orb's gestures, as the gestures guide names them.
-  static const tap = CupertinoIcons.hand_point_right;
-  static const move = CupertinoIcons.move;
+  static const tap = IconsaxPlusLinear.finger_cricle;
+  static const move = IconsaxPlusLinear.arrow_2;
 
   // Things and places.
-  static const calendar = CupertinoIcons.calendar;
-  static const basket = CupertinoIcons.bag;
-  static const gallery = CupertinoIcons.photo_on_rectangle;
-  static const settings = CupertinoIcons.gear;
-  static const bell = CupertinoIcons.bell;
-  static const bellOff = CupertinoIcons.bell_slash;
-  static const language = CupertinoIcons.globe;
-  static const trash = CupertinoIcons.trash;
-  static const friends = CupertinoIcons.person_2;
-  static const account = CupertinoIcons.person_crop_circle;
-  static const link = CupertinoIcons.link;
-  static const mail = CupertinoIcons.envelope;
-  static const document = CupertinoIcons.doc_text;
-  static const card = CupertinoIcons.creditcard;
-  static const code = CupertinoIcons.qrcode;
-  static const shown = CupertinoIcons.eye;
-  static const hidden = CupertinoIcons.eye_slash;
-  static const refresh = CupertinoIcons.arrow_clockwise;
-  static const sunrise = CupertinoIcons.sunrise;
-  static const sunset = CupertinoIcons.sunset;
-  static const search = CupertinoIcons.search;
-  static const up = CupertinoIcons.chevron_up;
-  static const unlocked = CupertinoIcons.lock_open;
+  static const calendar = IconsaxPlusLinear.calendar_1;
+  static const basket = IconsaxPlusLinear.bag_2;
+  static const gallery = IconsaxPlusLinear.gallery;
+  static const settings = IconsaxPlusLinear.setting_2;
+  static const bell = IconsaxPlusLinear.notification;
+  static const bellOff = IconsaxPlusLinear.notification_bing;
+  static const language = IconsaxPlusLinear.language_square;
+  static const trash = IconsaxPlusLinear.trash;
+  static const friends = IconsaxPlusLinear.profile_2user;
+  static const account = IconsaxPlusLinear.profile_circle;
+  static const link = IconsaxPlusLinear.link_2;
+  static const mail = IconsaxPlusLinear.sms;
+  static const document = IconsaxPlusLinear.document_text;
+  static const card = IconsaxPlusLinear.card;
+  static const code = IconsaxPlusLinear.scan_barcode;
+  static const shown = IconsaxPlusLinear.eye;
+  static const hidden = IconsaxPlusLinear.eye_slash;
+  static const refresh = IconsaxPlusLinear.refresh_2;
+  static const sunrise = IconsaxPlusLinear.sun_fog;
+  static const sunset = IconsaxPlusLinear.sun;
+  static const search = IconsaxPlusLinear.search_normal_1;
+  static const unlocked = IconsaxPlusLinear.unlock;
 
   /// Leaving (sign out): the arrow points out of the box the way the
   /// reading goes, so it mirrors in Arabic.
-  static const signOut = IconData(0xf90e, fontFamily: _font, fontPackage: _package, matchTextDirection: true);
+  static const signOut = IconData(0xeadf, fontFamily: _linear, fontPackage: _pkg, matchTextDirection: true);
+
+  /// The bold form of a tab's glyph, for the tab the person is on.
+  static IconData onFor(IconData g) => switch (g) {
+        IconsaxPlusLinear.home => IconsaxPlusBold.home,
+        IconsaxPlusLinear.reserve => IconsaxPlusBold.reserve,
+        IconsaxPlusLinear.activity => IconsaxPlusBold.activity,
+        IconsaxPlusLinear.profile => IconsaxPlusBold.profile,
+        IconsaxPlusLinear.moon => IconsaxPlusBold.moon,
+        _ => g,
+      };
 
   // Other people's marks, in their owners' own drawing and in one ink: the
-  // sign-in buttons' Apple and Facebook. Neither is in the Cupertino family,
-  // and neither is ours to redraw; like Google's G (QBrandMarks) they are the
-  // one exception to the family, and they are named here and nowhere else.
+  // sign-in buttons' Apple and Facebook. Neither is in Iconsax, and neither is
+  // ours to redraw; like Google's G (QBrandMarks) they are the one exception
+  // to the family, and they are named here and nowhere else.
   static const appleMark = Icons.apple;
   static const facebookMark = Icons.facebook;
+}
+
+/// An icon as the app draws it: the glyph, turned where the family draws the
+/// mark on its side ([QIcons.close]). Every control that takes a glyph draws
+/// it through here, so the close mark is never the add mark by mistake.
+class QIcon extends StatelessWidget {
+  final IconData icon;
+  final double size;
+  final Color? color;
+  final String? semanticLabel;
+  const QIcon(this.icon, {super.key, this.size = 24, this.color, this.semanticLabel});
+
+  @override
+  Widget build(BuildContext context) {
+    final glyph = Icon(icon, size: size, color: color, semanticLabel: semanticLabel);
+    if (icon != QIcons.close) return glyph;
+    // The add glyph's arms are two thirds of its box; turned, a fifth larger,
+    // so the cross spans what the family's other marks do.
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.rotationZ(math.pi / 4)..scaleByDouble(1.2, 1.2, 1, 1),
+      child: glyph,
+    );
+  }
 }

@@ -26,7 +26,7 @@ import 'package:qamar/widgets/common.dart';
 import 'package:qamar/screens/scan_screen.dart';
 import 'package:qamar/screens/today_screen.dart';
 import 'package:qamar/state/today_focus.dart';
-import 'package:qamar/widgets/tree_overlay.dart';
+import 'package:qamar/widgets/log_sheet.dart';
 
 import 'support/arabic_digits.dart';
 
@@ -245,9 +245,9 @@ void main() {
     test('refused, on Android: a permission, and "Type it instead" keeps the meal being logged', () {
       final s = AppState()..setLang(AppLang.en);
       s.go(AppScreen.today);
-      s.toggleTree();
-      s.cameraFailedInTree(refused);
-      final p = s.treeProblem!;
+      s.toggleLog();
+      s.cameraFailedInLog(refused);
+      final p = s.logProblem!;
       _plainProblem(p);
       expect(p.kind, ProblemKind.permission);
       expect(p.what, 'The camera is off for Qamar.');
@@ -258,7 +258,7 @@ void main() {
       p.action.onTap();
       expect(s.chatOpen, isTrue);
       expect(s.chat.last.text, 'Tell me what you ate.', reason: 'the conversation opens on the meal question, armed');
-      expect(s.treeOpen, isFalse);
+      expect(s.logOpen, isFalse);
     });
 
     test('refused, on an iPhone: "Open Settings" first, "Type it instead" beside it', () {
@@ -290,16 +290,16 @@ void main() {
     testWidgets('the tree shows it in place of the ring, and closing clears it', (tester) async {
       final s = AppState()..setLang(AppLang.en);
       s.go(AppScreen.today);
-      s.toggleTree();
-      s.cameraFailedInTree(refused);
+      s.toggleLog();
+      s.cameraFailedInLog(refused);
       await tester.pumpWidget(ChangeNotifierProvider.value(
         value: s,
-        child: const MaterialApp(home: Scaffold(body: Stack(children: [TreeOverlay()]))),
+        child: const MaterialApp(home: Scaffold(body: Stack(children: [LogSheet()]))),
       ));
       expect(find.byType(QStateCard), findsOneWidget);
       expect(find.text('The camera is off for Qamar.'), findsOneWidget);
-      s.closeTree();
-      expect(s.treeProblem, isNull);
+      s.closeLog();
+      expect(s.logProblem, isNull);
     });
 
     test('in the conversation: Qamar says so, with a photo from the phone as the way on', () {

@@ -12,13 +12,15 @@ import 'package:provider/provider.dart';
 
 import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
+import 'package:qamar/models/activity.dart';
 import 'package:qamar/screens/you_screen.dart';
 import 'package:qamar/state/app_state.dart';
+import 'package:qamar/theme/app_theme.dart';
 import 'package:qamar/theme/colors.dart';
 import 'package:qamar/theme/icons.dart';
 import 'package:qamar/theme/layout.dart';
 import 'package:qamar/widgets/common.dart';
-import 'package:qamar/widgets/glass.dart';
+import 'package:qamar/widgets/surface.dart';
 
 import 'support/app_fonts.dart';
 
@@ -26,23 +28,20 @@ Future<void> _pump(WidgetTester tester, Widget child) async {
   await tester.pumpWidget(MaterialApp(home: Scaffold(body: Center(child: child))));
 }
 
-/// The drawn box of a control: the decoration that carries its border.
-/// Where a control is drawn: its piece of glass, or the edged box of a
-/// control with nothing to do.
+/// Where a control is drawn: its surface (the control grey, or burgundy), or
+/// the edged box of a control drawn by its edge.
 Rect _drawn(WidgetTester tester, Finder control) {
   final boxes = find.descendant(
     of: control,
     matching: find.byWidgetPredicate((w) =>
-        w is DecoratedBox && (w.key == QGlass.fillKey || (w.decoration is BoxDecoration && (w.decoration as BoxDecoration).border != null))),
+        w is DecoratedBox && (w.key == QSurface.fillKey || (w.decoration is BoxDecoration && (w.decoration as BoxDecoration).border != null))),
   );
   return tester.getRect(boxes.first);
 }
 
-BoxDecoration _decoration(WidgetTester tester, Finder control) => tester
-    .widgetList<DecoratedBox>(find.descendant(of: control, matching: find.byType(DecoratedBox)))
-    .map((d) => d.decoration)
-    .whereType<BoxDecoration>()
-    .firstWhere((d) => d.border != null || d.gradient != null || d.color != null);
+/// A control's surface: the fill it is drawn with.
+ShapeDecoration _surface(WidgetTester tester, Finder control) =>
+    tester.widget<DecoratedBox>(find.descendant(of: control, matching: find.byKey(QSurface.fillKey)).first).decoration as ShapeDecoration;
 
 void main() {
   setUpAll(() async {
@@ -91,10 +90,13 @@ void main() {
     expect(find.bySemanticsLabel('More'), findsOneWidget);
   });
 
-  testWidgets('the language switch: each side is a whole touch, drawn inside a glass pill as tall as before', (tester) async {
+  testWidgets('the language switch: each side is a whole touch, drawn inside the kit’s white track as tall as before', (tester) async {
     for (final large in [false, true]) {
       await _pump(tester, QLangToggle(lang: AppLang.ar, onChanged: (_) {}, large: large));
-      final pill = tester.getRect(find.descendant(of: find.byType(QLangToggle), matching: find.byType(QGlass)).first);
+      final pill = tester.getRect(find.descendant(
+        of: find.byType(QLangToggle),
+        matching: find.byWidgetPredicate((w) => w is DecoratedBox && w.decoration == QDecor.segmentTrack),
+      ));
       expect(pill.height, large ? 34 : 28);
       for (final side in [find.bySemanticsLabel('العربية'), find.bySemanticsLabel('English')]) {
         final r = tester.getRect(side);
@@ -105,11 +107,11 @@ void main() {
   });
 
   group('a control with nothing to do says so', () {
-    testWidgets('an outline button: no touch, a faint edge, a muted label, not enabled', (tester) async {
+    testWidgets('a secondary button: no touch, the control grey, a muted label, not enabled', (tester) async {
       final handle = tester.ensureSemantics();
       await _pump(tester, const QOutlineButton(label: 'Redeem', onTap: null));
       final control = find.byType(QOutlineButton);
-      expect((_decoration(tester, control).border! as Border).top.color, QDisabled.edge);
+      expect(_surface(tester, control).color, QDisabled.fill);
       expect(tester.widget<Text>(find.text('Redeem')).style!.color, QDisabled.label);
       final data = tester.getSemantics(find.descendant(of: control, matching: find.byType(Semantics)).first).getSemanticsData();
       expect(data.flagsCollection.isEnabled, Tristate.isFalse, reason: 'a screen reader hears it as not enabled');
@@ -117,27 +119,28 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('the filled button: no gradient and no glow, a muted label', (tester) async {
+    testWidgets('the primary: not burgundy, no gradient and no glow, a muted label', (tester) async {
       await _pump(tester, const QPrimaryButton(label: 'One moment…', onTap: null));
-      final d = _decoration(tester, find.byType(QPrimaryButton));
+      final d = _surface(tester, find.byType(QPrimaryButton));
+      expect(d.color, QDisabled.fill, reason: 'nothing to act on, so no burgundy');
       expect(d.gradient, isNull);
-      expect(d.boxShadow, isNull);
+      expect(d.shadows, isNull);
       expect(tester.widget<Text>(find.text('One moment…')).style!.color, QDisabled.label);
       expect(QDisabled.label, QColors.inkDisabled);
     });
 
-    testWidgets('enabled, the same controls are glass and draw their own label', (tester) async {
+    testWidgets('enabled, the same controls draw their own surface and label', (tester) async {
       await _pump(tester, QOutlineButton(label: 'Redeem', onTap: () {}));
-      final glass = tester.widget<QGlass>(find.descendant(of: find.byType(QOutlineButton), matching: find.byType(QGlass)));
-      expect(glass.tint, isNull, reason: 'clear glass: a secondary action is not burgundy');
+      final surface = tester.widget<QSurface>(find.descendant(of: find.byType(QOutlineButton), matching: find.byType(QSurface)));
+      expect(surface.tint, isNull, reason: 'the control grey: a secondary action is not burgundy');
       expect(tester.widget<Text>(find.text('Redeem')).style!.color, isNot(QDisabled.label));
       await _pump(tester, QPrimaryButton(label: 'Log a meal', onTap: () {}));
-      expect(tester.widget<QGlass>(find.descendant(of: find.byType(QPrimaryButton), matching: find.byType(QGlass))).tint, QColors.accent, reason: 'the one thing to do is burgundy glass');
+      expect(tester.widget<QSurface>(find.descendant(of: find.byType(QPrimaryButton), matching: find.byType(QSurface))).tint, QColors.accent, reason: 'the one thing to do is burgundy');
       expect(tester.widget<Text>(find.text('Log a meal')).style!.color, QColors.onAccent);
     });
   });
 
-  testWidgets('in the tree a name is part of its circle: tapping "Plan" opens the plan', (tester) async {
+  testWidgets('on the Log sheet a name is part of its circle: tapping "Walk" chooses the walk', (tester) async {
     tester.view.devicePixelRatio = 3;
     tester.view.physicalSize = const Size(390, 844) * 3;
     addTearDown(tester.view.reset);
@@ -148,9 +151,9 @@ void main() {
     s.orbTap();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
-    await tester.tap(find.text('Plan'));
+    await tester.tap(find.text('Walk'));
     await tester.pump();
-    expect(s.screen, AppScreen.plan, reason: 'the word under the circle opens what the circle opens');
+    expect(s.pendingActivity, ActivityKind.walk, reason: 'the word under the circle does what the circle does');
   });
 
   for (final lang in AppLang.values) {

@@ -19,19 +19,21 @@ import '../theme/text_styles.dart';
 import '../widgets/common.dart';
 import '../widgets/dish_card.dart';
 import '../widgets/hero_number.dart';
-import '../widgets/glass.dart';
+import '../widgets/kit.dart';
+import '../widgets/mascot.dart';
+import '../widgets/surface.dart';
 
 /// The consultation (S06–S14), drawn the way a conversation with an
-/// assistant already looks on the phone: the liquid-glass chat pattern, as Ask
-/// Qamar draws it (widgets/ask_qamar_overlay.dart).
+/// assistant already looks on the phone: the qamar-design chat pattern, as
+/// Ask Qamar draws it (widgets/ask_qamar_overlay.dart).
 ///
-/// A black page. At the top, the way back (a glass circle), Qamar's name and
-/// one line saying where the consultation is. Qamar's words are plain text
-/// across the page; the person's answers sit in a grey bubble on their side.
-/// Each question's answers (chips, wheels, Continue) wait under it, and under
-/// them one glass field for typing an answer instead. The last question is
-/// the reveal: a dish, the day's target (the screen's one large figure),
-/// and "Let's start".
+/// The dark ground. At the top, the way back (the kit's grey circle), the
+/// moon's face and Qamar's name, and one line saying where the consultation
+/// is. Qamar's words are plain text across the page; the person's answers
+/// sit in a lavender bubble on their side. Each question's answers (chips,
+/// wheels, Continue) wait under it, and under them one grey field for typing
+/// an answer instead. The last question is the reveal: a dish, the day's
+/// target on the kit's lavender calorie card, and "Let's start".
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -288,7 +290,16 @@ class _Header extends StatelessWidget {
           middle: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(state.t.brand, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 17, weight: FontWeight.w600)),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.lavender),
+                  child: const Center(child: MoonMascot(size: 18, mood: MoonMood.joy)),
+                ),
+                const SizedBox(width: 8),
+                Flexible(child: Text(state.t.brand, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 17, weight: FontWeight.w600))),
+              ]),
               // The line keeps its height when it has nothing to say, so the
               // name never jumps.
               SizedBox(
@@ -304,7 +315,7 @@ class _Header extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
-                      style: QText.body(size: 12, height: 16, color: QColors.inkTertiary),
+                      style: QText.body(size: 12, height: 16, color: QColors.inkSecondary),
                     ),
                   ),
                 ),
@@ -367,8 +378,8 @@ class _Message extends StatelessWidget {
             child: Container(
               constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.8),
               padding: const EdgeInsets.symmetric(horizontal: QSpace.lg, vertical: 11),
-              decoration: BoxDecoration(color: QColors.surfaceHigh, borderRadius: BorderRadius.circular(QRadii.card)),
-              child: Text(msg.text(isAr), style: QText.body(size: 17, height: 24)),
+              decoration: BoxDecoration(color: QColors.lavender, borderRadius: BorderRadius.circular(QRadii.card)),
+              child: Text(msg.text(isAr), style: QText.body(size: 17, height: 24, color: QColors.onPastel)),
             ),
           ),
         );
@@ -434,7 +445,7 @@ class _TypingDotState extends State<_TypingDot> with SingleTickerProviderStateMi
                   scale: 0.72 + 0.28 * v,
                   child: Opacity(
                     opacity: 0.55 + 0.45 * v,
-                    child: const SizedBox(width: 14, height: 14, child: DecoratedBox(decoration: BoxDecoration(shape: BoxShape.circle, color: QColors.ink))),
+                    child: const SizedBox(width: 14, height: 14, child: DecoratedBox(decoration: BoxDecoration(shape: BoxShape.circle, color: QColors.lavender))),
                   ),
                 );
               },
@@ -581,7 +592,7 @@ class _AgeReadout extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (!adult) ...[
-          const Icon(QIcons.warning, size: 15, color: QColors.inkSecondary),
+          const QIcon(QIcons.warning, size: 16, color: QColors.inkSecondary),
           const SizedBox(width: 6),
         ],
         Flexible(
@@ -627,53 +638,61 @@ class _TargetCard extends StatelessWidget {
     final from = '${isAr ? 'من إجاباتك:' : 'From your answers:'} ${parts.join(isAr ? '، ' : '$nb· ')}';
     final kcal = state.digits('${tg.kcal}');
 
-    return Container(
-      padding: const EdgeInsets.all(QSpace.xl),
-      decoration: QDecor.card(),
+    // The kit's calorie card: the target on lavender, and the three macros
+    // nested under it on their own pastels, as Today draws the day.
+    return PastelCard(
+      color: QColors.lavender,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(QText.eyebrowText(t.dailyTarget, ar: isAr), style: QText.eyebrow(ar: isAr)),
-          const SizedBox(height: QSpace.md),
-          HeroNumber(kcal, semanticsLabel: '$kcal ${t.kcalDay}'),
-          const SizedBox(height: 10),
-          Text(t.kcalDay, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkSecondary)),
-          const SizedBox(height: QSpace.xl),
+          Text(t.dailyTarget, style: QText.body(size: 18, weight: FontWeight.w600, color: QColors.onPastel)),
+          const SizedBox(height: QSpace.sm),
+          HeroNumber(kcal, color: QColors.onPastel, semanticsLabel: '$kcal ${t.kcalDay}'),
+          const SizedBox(height: QSpace.sm),
+          Text(t.kcalDay, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.onPastelSecondary)),
+          const SizedBox(height: QSpace.lg),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Macro(label: t.protein, value: grams(tg.protein), ar: isAr),
-              _Macro(label: t.carbs, value: grams(tg.carbs), ar: isAr),
-              _Macro(label: t.fat, value: grams(tg.fat), ar: isAr),
+              _Macro(color: QColors.mint, label: t.protein, value: grams(tg.protein), ar: isAr),
+              const SizedBox(width: QSpace.sm),
+              _Macro(color: QColors.lime, label: t.carbs, value: grams(tg.carbs), ar: isAr),
+              const SizedBox(width: QSpace.sm),
+              _Macro(color: QColors.coral, label: t.fat, value: grams(tg.fat), ar: isAr),
             ],
           ),
           const SizedBox(height: QSpace.lg),
-          Text(from, style: QText.body(size: 13, color: QColors.inkTertiary)),
+          Text(from, style: QText.body(size: 13, color: QColors.onPastelSecondary)),
           const SizedBox(height: QSpace.xs),
-          Text(t.estimateNote, style: QText.body(size: 13, color: QColors.inkTertiary)),
+          Text(t.estimateNote, style: QText.body(size: 13, color: QColors.onPastelSecondary)),
         ],
       ),
     );
   }
 }
 
-/// A macro's name over its grams, one of three in a row: grouped by space,
-/// not boxed.
+/// A macro's name over its grams, one of three in a row, each on its own
+/// pastel nested in the lavender.
 class _Macro extends StatelessWidget {
+  final Color color;
   final String label;
   final String value;
   final bool ar;
-  const _Macro({required this.label, required this.value, required this.ar});
+  const _Macro({required this.color, required this.label, required this.value, required this.ar});
 
   @override
   Widget build(BuildContext context) => Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: QText.body(size: 13, color: QColors.inkTertiary)),
-            const SizedBox(height: 2),
-            Text(value, style: QText.number(size: 17, weight: FontWeight.w600, ar: ar)),
-          ],
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+          decoration: QDecor.pastel(color, radius: QRadii.inset),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onPastel)),
+              const SizedBox(height: 2),
+              Text(value, maxLines: 1, style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.onPastel, ar: ar)),
+            ],
+          ),
         ),
       );
 }
@@ -722,34 +741,35 @@ class _TrialOfferCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isAr = state.isAr;
     const days = AppState.trialOfferDays;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(QSpace.xl, QSpace.xl, QSpace.xl, QSpace.md),
-      decoration: QDecor.card(),
+    // A gift, on the kit's lime; its two answers the kit's black button and
+    // a quiet word.
+    return PastelCard(
+      color: QColors.lime,
+      padding: const EdgeInsets.fromLTRB(QSpace.xl, QSpace.lg, QSpace.xl, QSpace.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(padding: EdgeInsets.only(top: 1), child: Icon(QIcons.gift, size: 20, color: QColors.ink)),
-              const SizedBox(width: QSpace.sm),
+              const PastelGlyph(QIcons.gift, size: 36),
+              const SizedBox(width: QSpace.md),
               Expanded(
-                child: Text(TrialWords.offerTitle(days, ar: isAr, iso: state.iso), style: QText.body(size: 17, weight: FontWeight.w600)),
+                child: Text(TrialWords.offerTitle(days, ar: isAr, iso: state.iso), style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.onPastel)),
               ),
             ],
           ),
-          const SizedBox(height: QSpace.xs),
+          const SizedBox(height: QSpace.sm),
           Text(
             isAr ? 'من غير بطاقة، ومفيش حاجة بتتجدد لوحدها. خطة بكرة، وصور وأسئلة أكتر.' : 'No card, and nothing renews. Tomorrow’s plan, and more photos and questions.',
-            style: QText.body(size: 15, color: QColors.inkSecondary),
+            style: QText.body(size: 15, color: QColors.onPastelSecondary),
           ),
           const SizedBox(height: QSpace.md),
           Wrap(
             spacing: QSpace.xs,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              QOutlineButton(label: isAr ? 'ابدأ الأسبوع' : 'Start the week', onTap: state.acceptTrialOffer),
-              _TextAction(label: isAr ? 'مش دلوقتي' : 'Not now', onTap: state.declineTrialOffer),
+              QPastelButton(label: isAr ? 'ابدأ الأسبوع' : 'Start the week', height: 40, onTap: state.acceptTrialOffer),
+              _TextAction(label: isAr ? 'مش دلوقتي' : 'Not now', onTap: state.declineTrialOffer, onPastel: true),
             ],
           ),
         ],
@@ -758,11 +778,13 @@ class _TrialOfferCard extends StatelessWidget {
   }
 }
 
-/// A quiet action beside an outline: words in the second ink, a whole touch.
+/// A quiet action beside a button: words in the second ink, a whole touch;
+/// on a pastel, in black.
 class _TextAction extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
-  const _TextAction({required this.label, required this.onTap});
+  final bool onPastel;
+  const _TextAction({required this.label, required this.onTap, this.onPastel = false});
 
   @override
   Widget build(BuildContext context) => QTapArea(
@@ -772,15 +794,22 @@ class _TextAction extends StatelessWidget {
           pressed: pressed,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: QSpace.md),
-            child: Text(label, style: QText.body(size: 15, weight: FontWeight.w500, color: pressed ? QColors.ink : QColors.inkSecondary)),
+            child: Text(
+              label,
+              style: QText.body(
+                size: 15,
+                weight: onPastel ? FontWeight.w600 : FontWeight.w500,
+                color: onPastel ? (pressed ? QColors.onPastelSecondary : QColors.onPastel) : (pressed ? QColors.ink : QColors.inkSecondary),
+              ),
+            ),
           ),
         ),
       );
 }
 
-/// The composer, as the conversation's: one glass field, the words, and at
-/// its end one white circle that sends them. With nothing to send, or while
-/// Qamar is typing, the circle has nothing to do and says so.
+/// The composer, as the conversation's: one grey field, the words, and at
+/// its end one burgundy circle that sends them. With nothing to send, or
+/// while Qamar is typing, the circle has nothing to do and says so.
 class _Composer extends StatelessWidget {
   final AppState state;
   final TextEditingController ctrl;
@@ -790,10 +819,11 @@ class _Composer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return QGlass(
-      shape: QGlassShape.rounded,
-      radius: 26,
-      padding: const EdgeInsetsDirectional.only(start: 4, end: 4, top: 2, bottom: 2),
+    // One line is 48 tall, twice the corner: a capsule, as the kit's field
+    // is; more lines make it a rounded rectangle.
+    return QSurface(
+      radius: QRadii.card,
+      padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -806,14 +836,18 @@ class _Composer extends StatelessWidget {
               textInputAction: TextInputAction.send,
               onChanged: state.onDraftChanged,
               onSubmitted: (_) => state.sendDraft(),
-              cursorColor: QColors.accentInk,
               style: QText.body(size: 17, height: 22),
               decoration: InputDecoration(
                 hintText: placeholder,
                 hintStyle: QText.body(size: 17, height: 22, color: QColors.inkTertiary),
+                // The field is the composer's own: no fill or edge of the
+                // theme's around it.
+                filled: false,
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
                 isDense: true,
-                contentPadding: const EdgeInsetsDirectional.only(start: 14, end: 4, top: (QLayout.minTap - 22) / 2 + 0.5, bottom: (QLayout.minTap - 22) / 2 + 0.5),
+                contentPadding: const EdgeInsetsDirectional.only(start: 14, end: 4, top: (QLayout.minTap - 22) / 2, bottom: (QLayout.minTap - 22) / 2),
               ),
             ),
           ),
@@ -824,8 +858,7 @@ class _Composer extends StatelessWidget {
   }
 }
 
-/// The composer's one filled button: a circle of burgundy glass and a white
-/// arrow.
+/// The composer's one filled button: a burgundy circle and a white arrow.
 class _Send extends StatelessWidget {
   final VoidCallback? onTap;
   final String label;
@@ -846,21 +879,14 @@ class _Send extends StatelessWidget {
       builder: (context, pressed) => qPressed(
         context,
         pressed: pressed,
-        child: enabled
-            ? QGlass(
-                shape: QGlassShape.circle,
-                tint: QColors.accent,
-                pressed: pressed,
-                width: 36,
-                height: 36,
-                child: const Center(child: Icon(QIcons.send, size: 18, color: QColors.onAccent)),
-              )
-            : Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: QDisabled.fill),
-                child: const Icon(QIcons.send, size: 18, color: QDisabled.label),
-              ),
+        child: QSurface(
+          shape: QSurfaceShape.circle,
+          tint: enabled ? QColors.accent : QColors.surfaceHigh,
+          pressed: pressed,
+          width: 38,
+          height: 38,
+          child: Center(child: QIcon(QIcons.send, size: 20, color: enabled ? QColors.onAccent : QDisabled.label)),
+        ),
       ),
     );
   }

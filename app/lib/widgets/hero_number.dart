@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 
-/// The screen's one hero figure (the liquid-glass skill): a large numeral in
+/// The screen's one hero figure (the qamar-design skill): a large numeral in
 /// the interface's own face, bold, its digits tabular so a changing count
 /// holds its place. Arabic-Indic digits come from the face's Arabic
 /// fallback, so the figure reads the same in either language; its unit sits

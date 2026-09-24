@@ -11,6 +11,7 @@ import 'package:qamar/models/dishes.dart';
 import 'package:qamar/models/nudge.dart';
 import 'package:qamar/models/profile.dart';
 import 'package:qamar/theme/app_theme.dart';
+import 'package:qamar/theme/colors.dart';
 import 'package:qamar/theme/text_styles.dart';
 import 'package:qamar/widgets/dish_card.dart';
 
@@ -161,7 +162,7 @@ void main() {
       final d = _dish('chicken_salad_bread');
       await pump(tester, DishCard(dish: d, facts: d.facts(), targetKcal: 2180, slot: MealSlot.dinner, isAr: false, iso: (s) => s), ar: false);
       final text = allText(tester);
-      expect(text, contains('TONIGHT'), reason: 'the meal, as the card’s eyebrow');
+      expect(text, contains('Tonight'), reason: 'the meal, as the card’s eyebrow, in sentence case');
       expect(text, contains('Grilled chicken breast with baladi salad'));
       expect(text, contains('a chicken breast + a plate of baladi salad + half a baladi loaf'));
       expect(text, contains('About 419 kcal · 19% of your 2180'));
@@ -170,13 +171,14 @@ void main() {
       expect(text, isNot(contains('database')), reason: 'what the numbers are, not the machinery behind them');
     });
 
-    testWidgets('is a card on the page: a pane of glass, its rim and the card corner, no shadow', (tester) async {
+    testWidgets('is a card on the page: the card grey, its edge and the card corner, no shadow', (tester) async {
       final d = _dish('koshary');
       await pump(tester, DishCard(dish: d, facts: d.facts(), targetKcal: 2180, slot: MealSlot.lunch, isAr: false, iso: (s) => s), ar: false);
       final box = tester.widget<Container>(find.descendant(of: find.byType(DishCard), matching: find.byType(Container)).first);
       final decoration = box.decoration! as BoxDecoration;
       expect(decoration, QDecor.card(), reason: 'the one card the app draws');
-      expect(decoration.border, QGlassRim.soft);
+      expect(decoration.color, QColors.surface);
+      expect(decoration.border, Border.all(color: QColors.hairline));
       expect(decoration.borderRadius, BorderRadius.circular(QRadii.card));
       expect(decoration.boxShadow, isNull);
     });

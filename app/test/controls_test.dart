@@ -1,10 +1,11 @@
 // Controls that say what they will do, seat 6's part (the scorecard's 08,
 // 09, 11 and 12): switches drawn in the palette, not stock grey; a spend or
 // a payout the balance does not reach is off, not a live-looking button
-// that quietly does nothing; the wallet's chosen tab is inverted, a white
-// segment with black words, where it was gold washed to warm grey; a
-// placeholder for a code is an instruction, not a title; and the scan offers
-// typing once, not three times.
+// that quietly does nothing; the wallet's tabs are the kit's segmented
+// control, a white track with the chosen segment burgundy under white words,
+// where it was gold washed to warm grey; a placeholder for a code is an
+// instruction, not a title; and the scan offers typing once, not three
+// times.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -44,13 +45,14 @@ void main() {
     }
   });
 
-  test('switches are Apple\'s: on is a white thumb on a burgundy track, off a white thumb on raised grey', () {
+  test('switches are the kit\'s: on is a white thumb on a burgundy track, off a white thumb on the circle grey, no outline', () {
     final theme = buildQamarTheme().switchTheme;
-    expect(theme.thumbColor!.resolve({WidgetState.selected}), QColors.ink);
+    expect(theme.thumbColor!.resolve({WidgetState.selected}), QColors.white);
     expect(theme.trackColor!.resolve({WidgetState.selected}), QColors.accent);
-    expect(theme.thumbColor!.resolve({}), QColors.ink);
+    expect(theme.thumbColor!.resolve({}), QColors.white);
     expect(theme.trackColor!.resolve({}), QColors.surfaceHigh);
-    expect(theme.trackOutlineColor!.resolve({}), QColors.hairlineStrong);
+    expect(theme.trackOutlineColor!.resolve({}), Colors.transparent);
+    expect(theme.thumbColor!.resolve({WidgetState.disabled}), QColors.inkDisabled, reason: 'off-limits reads as such');
   });
 
   for (final lang in AppLang.values) {
@@ -93,23 +95,23 @@ void main() {
       expect(find.textContaining(s.t.balanceAfter), findsWidgets);
     });
 
-    testWidgets('the wallet’s chosen tab is a raised pane of neutral glass under white words, the other in the second ink (${lang.name})', (tester) async {
+    testWidgets('the wallet’s chosen tab is the burgundy segment under white words, the other black on the white track (${lang.name})', (tester) async {
       final s = AppState()..setLang(lang);
       s.go(AppScreen.today);
       s.go(AppScreen.wallet);
       await _pumpApp(tester, s);
       Color ink(String label) => tester.widget<RichText>(find.descendant(of: find.text(label), matching: find.byType(RichText))).text.style!.color!;
       final thumb = find.byKey(WalletScreen.thumbKey);
-      expect(tester.widget<DecoratedBox>(thumb).decoration, QDecor.segmentThumb, reason: 'a mode, not an action: neutral glass, not burgundy');
-      expect(ink(s.t.spendTab), QColors.ink, reason: 'with white words');
-      expect(ink(s.t.historyTab), QColors.inkSecondary);
+      expect(tester.widget<DecoratedBox>(thumb).decoration, QDecor.segmentThumb, reason: 'the kit fills its chosen segment with its own colour');
+      expect(ink(s.t.spendTab), QColors.onAccent, reason: 'with white words');
+      expect(ink(s.t.historyTab), QColors.onInk, reason: 'black on the white track');
       expect(tester.getRect(thumb).contains(tester.getCenter(find.text(s.t.spendTab))), isTrue, reason: 'under the chosen tab');
 
       s.showHistory();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(ink(s.t.historyTab), QColors.ink);
-      expect(ink(s.t.spendTab), QColors.inkSecondary);
+      expect(ink(s.t.historyTab), QColors.onAccent);
+      expect(ink(s.t.spendTab), QColors.onInk);
       expect(tester.getRect(thumb).contains(tester.getCenter(find.text(s.t.historyTab))), isTrue, reason: 'it moved to the other');
     });
 

@@ -1,10 +1,9 @@
 // The orb's receipt (O9), seat 6's part: where it sits and how it moves.
 // Seats 2 and 4 settled what it says (a coin and the signed amount, never a
 // balance, never a zero) and that nothing is drawn with "Points and streaks"
-// off; su_display_test.dart holds that. Here: it sits beside the orb, inside
-// the band, on the side facing the middle of the screen, at every stop in
-// both languages; it arrives with an ease-out and leaves with an ease-in, no
-// overshoot; it makes no haptic.
+// off; su_display_test.dart holds that. Here: it sits over the orb, just
+// above the tab bar's middle, in both languages; it arrives with an ease-out
+// and leaves with an ease-in, no overshoot; it makes no haptic.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,7 +14,7 @@ import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/models/activity.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/layout.dart';
-import 'package:qamar/widgets/orb_nav.dart';
+import 'package:qamar/widgets/tab_bar.dart';
 
 import 'support/app_fonts.dart';
 
@@ -31,7 +30,7 @@ Future<void> _pumpOrb(WidgetTester tester, AppState s) async {
         textDirection: context.watch<AppState>().isAr ? TextDirection.rtl : TextDirection.ltr,
         child: child!,
       ),
-      home: const Scaffold(body: Stack(children: [OrbNav()])),
+      home: const Scaffold(body: Stack(children: [QTabBar()])),
     ),
   ));
   await tester.pump();
@@ -46,32 +45,22 @@ void main() {
   setUpAll(loadAppFonts);
 
   for (final lang in AppLang.values) {
-    for (final stop in OrbStop.values) {
-      testWidgets('beside the orb at the ${stop.name} stop, in the band, facing the middle (${lang.name})', (tester) async {
-        final s = AppState()..setLang(lang);
-        s.go(AppScreen.today);
-        s.settleOrb(stop);
-        await _pumpOrb(tester, s);
-        await _earn(s);
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 400)); // arrived
-        final orb = tester.getRect(find.byKey(OrbNav.orbKey));
-        final receipt = tester.getRect(find.byType(SuReceiptChip));
+    testWidgets('over the orb, just above the bar’s middle, never on the moon (${lang.name})', (tester) async {
+      final s = AppState()..setLang(lang);
+      s.go(AppScreen.today);
+      await _pumpOrb(tester, s);
+      await _earn(s);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400)); // arrived
+      final orb = tester.getRect(find.byKey(QTabBar.orbKey));
+      final bar = tester.getRect(find.byKey(QTabBar.barKey));
+      final receipt = tester.getRect(find.byType(SuReceiptChip));
 
-        expect(receipt.top, greaterThanOrEqualTo(_area.height - QLayout.orbBand), reason: 'in the band, not over the page');
-        expect(receipt.center.dy, moreOrLessEquals(orb.center.dy, epsilon: 1), reason: 'on the moon’s level');
-        expect(receipt.overlaps(orb), isFalse, reason: 'beside the moon, not on it');
-        // The side facing the middle; at the centre stop, the end side.
-        final towardRight = stop == OrbStop.centre ? lang == AppLang.en : orb.center.dx < _area.width / 2;
-        if (towardRight) {
-          expect(receipt.left, greaterThanOrEqualTo(orb.right));
-        } else {
-          expect(receipt.right, lessThanOrEqualTo(orb.left));
-        }
-        expect(receipt.left, greaterThanOrEqualTo(0));
-        expect(receipt.right, lessThanOrEqualTo(_area.width));
-      });
-    }
+      expect(receipt.center.dx, moreOrLessEquals(orb.center.dx, epsilon: 0.5), reason: 'over the moon it came from');
+      expect(receipt.bottom, moreOrLessEquals(bar.top - 8, epsilon: 0.5), reason: 'just above the bar');
+      expect(receipt.overlaps(orb), isFalse, reason: 'never on the moon');
+      expect(receipt.top, greaterThanOrEqualTo(_area.height - QLayout.pageBottom - receipt.height), reason: 'at the page’s foot, where it fades under the bar');
+    });
   }
 
   test('it eases in and out, and never overshoots', () {

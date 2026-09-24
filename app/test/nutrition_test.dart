@@ -28,7 +28,8 @@ import 'package:qamar/state/chat_replies.dart';
 import 'package:qamar/widgets/explain.dart';
 import 'package:qamar/theme/colors.dart';
 import 'package:qamar/widgets/living_orb.dart';
-import 'package:qamar/widgets/tree_overlay.dart';
+import 'package:qamar/widgets/log_sheet.dart';
+import 'package:qamar/widgets/tab_bar.dart';
 
 /// Long enough for answerStep's 260ms hand-off plus a margin.
 Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 500));
@@ -629,21 +630,21 @@ void secondRound() {
     });
   });
 
-  group('orb radial menu', () {
-    test('tapping the orb on Today opens the tree, and again closes it', () {
+  group('the orb and the Log sheet', () {
+    test('tapping the orb on Today opens the Log sheet, and again closes it', () {
       final state = AppState()..go(AppScreen.today);
       state.orbTap();
-      expect(state.treeOpen, isTrue);
+      expect(state.logOpen, isTrue);
       state.orbTap();
-      expect(state.treeOpen, isFalse);
+      expect(state.logOpen, isFalse);
     });
 
-    test('tapping the orb anywhere else is Back to Today, not the menu', () {
-      for (final s in [AppScreen.plan, AppScreen.progress, AppScreen.you, AppScreen.wallet, AppScreen.subscription]) {
+    test('on every tab the tap is the Log sheet, over the page it is on: the tabs are the way between pages', () {
+      for (final s in AppState.tabScreens) {
         final state = AppState()..go(s);
         state.orbTap();
-        expect(state.screen, AppScreen.today, reason: 'from $s');
-        expect(state.treeOpen, isFalse, reason: 'from $s');
+        expect(state.screen, s, reason: 'from $s: no page changes');
+        expect(state.logOpen, isTrue, reason: 'from $s');
       }
     });
 
@@ -651,11 +652,11 @@ void secondRound() {
       // No Dictation injected — the device has no recogniser, as far as this
       // AppState is concerned.
       final state = AppState()..go(AppScreen.today);
-      state.toggleTree();
+      state.toggleLog();
       await state.holdOrb();
 
       expect(state.chatOpen, isTrue);
-      expect(state.treeOpen, isFalse, reason: 'the menu folds when the conversation opens');
+      expect(state.logOpen, isFalse, reason: 'the menu folds when the conversation opens');
       // It must NOT pretend to listen: it reports that dictation is unavailable
       // and leaves typing open, and nothing is said on the user's behalf.
       expect(state.chatState, ChatState.idle);
@@ -663,43 +664,37 @@ void secondRound() {
       expect(state.chat.any((c) => c.who == ChatWho.u), isFalse);
     });
 
-    test('Log fans out its methods, Water fans out its units, never both', () {
-      final state = AppState()..toggleTree();
-      final log = kTreeNodes.indexWhere((n) => n.action == TreeAction.log);
-      final water = kTreeNodes.indexWhere((n) => n.action == TreeAction.water);
-      state.expandTreeLog(log);
-      expect(state.treeLogExpanded, isTrue);
-      expect(state.treeWaterExpanded, isFalse);
-      state.expandTreeWater(water);
-      expect(state.treeWaterExpanded, isTrue);
-      expect(state.treeLogExpanded, isFalse);
-      state.closeTree();
-      expect(state.treeExpanded, isFalse);
-      expect(state.treeOpen, isFalse);
+    test('the Log sheet holds every way to log at once, nothing a level down', () {
+      expect(kLogMethods.map((m) => m.kind).toList(), [QuickLog.voice, QuickLog.text, QuickLog.photo]);
+      expect(kWaterChoices.map((c) => c.unit).toSet(), WaterUnit.values.toSet());
+      expect(kActivityChoices.map((a) => a.kind).toSet(), ActivityKind.values.toSet());
+      final state = AppState()..toggleLog();
+      state.closeLog();
+      expect(state.logOpen, isFalse);
     });
 
-    test('one tap on a water unit logs it and closes the tree', () {
-      final state = AppState()..toggleTree();
+    test('one tap on a water unit logs it and closes the sheet', () {
+      final state = AppState()..toggleLog();
       final before = state.screen;
       state.quickWater(WaterUnit.tea);
-      expect(state.treeOpen, isFalse);
+      expect(state.logOpen, isFalse);
       expect(state.water.ml, Water.teaMl);
       expect(state.screen, before, reason: 'water never pushes a page');
       expect(kWaterChoices.map((c) => c.unit).toSet(), WaterUnit.values.toSet());
     });
 
     test('quick logging opens the conversation and never changes screen', () {
-      final state = AppState()..toggleTree();
+      final state = AppState()..toggleLog();
       final before = state.screen;
       state.quickLog(QuickLog.text);
 
-      expect(state.treeOpen, isFalse);
+      expect(state.logOpen, isFalse);
       expect(state.chatOpen, isTrue);
       expect(state.screen, before, reason: 'logging must not push a page');
     });
 
     test('speaking opens the conversation and tries to listen for real', () async {
-      final state = AppState()..toggleTree();
+      final state = AppState()..toggleLog();
       state.quickLog(QuickLog.voice);
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
@@ -747,44 +742,18 @@ void secondRound() {
       expect(state.plusNotice, isNull);
     });
 
-    test('fanned-out choices sit on distinct ring positions, however many there are', () {
-      for (final count in [kLogMethods.length, kWaterChoices.length, kActivityChoices.length, 1, 5]) {
-        final seen = <Offset>{};
-        for (var i = 0; i < count; i++) {
-          final c = treeSubCenter(i, of: count);
-          for (final other in seen) {
-            // Overlapping circles were why only one of them could be tapped.
-            expect((c - other).distance, greaterThan(60), reason: 'choices overlap at $count');
-          }
-          seen.add(c);
-        }
-        expect(seen.length, count);
-      }
-    });
-
-    test('the Log node has the blueprint’s four branches plus typing, and Activity fans out the movements people name', () {
-      expect(kLogMethods.map((m) => m.labelEn).toList(), ['Speak', 'Type', 'Photo', 'Repeat', 'Activity']);
+    test('the three ways to say a meal are the blueprint’s speak, type and photo; the movements are the ones people name', () {
+      expect(kLogMethods.map((m) => m.labelEn).toList(), ['Speak', 'Type', 'Photo']);
       expect(kActivityChoices.map((a) => a.kind).toSet(), ActivityKind.values.toSet());
       expect(ActivityCatalog.kcalFor(ActivityKind.football, 30, 82), 287, reason: '7 MET × 82 kg × 0.5 h');
       expect(ActivityCatalog.kcalFor(ActivityKind.walk, 60, 70), 245);
     });
 
-    test('exactly one node logs and one waters, and neither opens a page', () {
-      final logs = kTreeNodes.where((n) => n.action == TreeAction.log).toList();
-      final waters = kTreeNodes.where((n) => n.action == TreeAction.water).toList();
-      expect(logs.length, 1);
-      expect(waters.length, 1);
-      expect(logs.single.screen, isNull, reason: 'logging must not open a page');
-      expect(waters.single.screen, isNull, reason: 'water must not open a page');
-    });
-
-    test('the five nodes are Log, Plan, Water, Progress and Me, evenly spaced; Today is the background', () {
-      expect(kTreeNodes.map((n) => n.labelEn).toList(), ['Log', 'Plan', 'Water', 'Progress', 'Me']);
-      expect(kTreeNodes.any((n) => n.screen == AppScreen.today), isFalse, reason: 'today is what the orb floats over');
-      expect(kTreeNodes.any((n) => n.screen == AppScreen.wallet), isFalse, reason: 'the wallet lives under Me');
-      for (var i = 0; i < kTreeNodes.length; i++) {
-        expect(kTreeNodes[i].angle, closeTo(i * 360 / kTreeNodes.length, 0.01));
-      }
+    test('the tabs are Today, Progress, Plan and Me, each named by its page; the wallet lives under Me', () {
+      final state = AppState()..setLang(AppLang.en);
+      expect(kTabs.map((t) => t.screen).toList(), [AppScreen.today, AppScreen.progress, AppScreen.plan, AppScreen.you]);
+      expect(kTabs.map((t) => t.label(state)).toList(), ['Today', 'Progress', 'Plan', 'Me']);
+      expect(kTabs.any((t) => t.screen == AppScreen.wallet), isFalse);
     });
   });
 
@@ -861,14 +830,22 @@ void languageTests() {
       }
     });
 
-    test('tree and log labels are translated', () {
-      for (final n in kTreeNodes) {
-        expect(n.label(true).trim(), isNotEmpty);
-        expect(n.label(false).trim(), isNotEmpty);
-        expect(n.label(true), isNot(n.label(false)));
+    test('the tabs and the Log sheet are translated', () {
+      final ar = AppState()..setLang(AppLang.ar);
+      final en = AppState()..setLang(AppLang.en);
+      for (final t in kTabs) {
+        expect(t.label(ar).trim(), isNotEmpty);
+        expect(t.label(en).trim(), isNotEmpty);
+        expect(t.label(ar), isNot(t.label(en)));
       }
       for (final m in kLogMethods) {
         expect(m.label(true), isNot(m.label(false)));
+      }
+      for (final w in kWaterChoices) {
+        expect(w.label(true), isNot(w.label(false)));
+      }
+      for (final a in kActivityChoices) {
+        expect(a.label(true), isNot(a.label(false)));
       }
     });
 

@@ -41,7 +41,7 @@ class _ActivitySheetState extends State<ActivitySheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(isAr ? '$name، قد إيه؟' : '$name, how long?', style: QText.display(size: 22, ar: isAr, color: QColors.ink)),
+              Text(isAr ? '$name، قد إيه؟' : '$name, how long?', style: QText.display(size: 24, ar: isAr, color: QColors.ink)),
               const SizedBox(height: 6),
               Text(
                 isAr ? 'تقدير على وزنك. بيتسجّل جنب الأكل.' : 'An estimate from your weight, logged beside the food.',

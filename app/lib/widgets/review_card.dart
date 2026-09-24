@@ -6,14 +6,15 @@ import '../models/review.dart';
 import '../models/streak.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
-import '../theme/icons.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
+import 'mascot.dart';
 import 'moon.dart';
 
 /// The one thing in the product designed to be shared, and it leaves the
-/// phone as a picture: so it is drawn in black and white only, on the solid
-/// card surface, with nothing that needs the app around it to be read.
+/// phone as a picture: so it is drawn whole on its own card, the kit's
+/// lavender with black words, with nothing that needs the app around it to
+/// be read, and signed with the moon's face.
 ///
 /// A moon for each day of the week, in greys, brightened from the resting
 /// crescent as far as that day's intake reached the target (a day with
@@ -63,13 +64,13 @@ class ReviewCard extends StatelessWidget {
       textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
       child: Container(
         width: width,
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-        decoration: QDecor.card(),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+        decoration: QDecor.pastel(QColors.lavender),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(QText.eyebrowText(isAr ? 'أسبوعي مع قمر' : 'My week with Qamar', ar: isAr), style: QText.eyebrow(ar: isAr)),
+            Text(isAr ? 'أسبوعي مع قمر' : 'My week with Qamar', style: QText.body(size: 18, weight: FontWeight.w600, color: QColors.onPastel)),
             const SizedBox(height: 16),
             // The week from its first day at the start edge, as it is read;
             // heard as one sentence rather than seven initials.
@@ -88,15 +89,15 @@ class ReviewCard extends StatelessWidget {
             const SizedBox(height: 20),
             // The picture's words wrap to even lines, so none ends on one
             // word alone, whatever the week says.
-            BalancedStartText(isAr ? review.insight.ar : review.insight.en, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
+            BalancedStartText(isAr ? review.insight.ar : review.insight.en, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.onPastel)),
             const SizedBox(height: 6),
-            BalancedStartText(isAr ? review.change.ar : review.change.en, style: QText.body(size: 15, color: QColors.inkSecondary)),
+            BalancedStartText(isAr ? review.change.ar : review.change.en, style: QText.body(size: 15, color: QColors.onPastelSecondary)),
             if (numbers.isNotEmpty) ...[
               const SizedBox(height: 12),
-              for (final line in numbers) BalancedStartText(line, style: QText.number(size: 13, color: QColors.inkTertiary, ar: isAr)),
+              for (final line in numbers) BalancedStartText(line, style: QText.number(size: 13, color: QColors.onPastelSecondary, ar: isAr)),
             ],
             const SizedBox(height: 16),
-            const Divider(color: QColors.hairline, height: 1, thickness: 1),
+            const Divider(color: QColors.pastelTrack, height: 1, thickness: 1),
             const SizedBox(height: 12),
             // The sign-off: where the card came from, led by the crescent
             // from the start edge; the run, when it is shown, at the other.
@@ -104,22 +105,17 @@ class ReviewCard extends StatelessWidget {
               key: ReviewCard.signOffKey,
               children: [
                 // The moon's mark, not an eighth day: the day moons are the
-                // only QamarMoons on the card. Filled, since it is a mark and
-                // not a control, and turned to be lit on the right, as the
-                // seven moons above it are in both languages; the glyph
-                // itself is lit on the left.
-                Transform.flip(
-                  flipX: true,
-                  child: const Icon(QIcons.moonFull, key: ReviewCard.markKey, size: 14, color: QColors.inkSecondary),
-                ),
+                // only QamarMoons on the card. The mascot's face, the brand's
+                // own signature.
+                const MoonMascot(key: ReviewCard.markKey, size: 20, mood: MoonMood.joy),
                 const SizedBox(width: 8),
-                Text(footer, key: ReviewCard.footerKey, textDirection: TextDirection.ltr, style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkTertiary)),
+                Text(footer, key: ReviewCard.footerKey, textDirection: TextDirection.ltr, style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onPastel)),
                 const Spacer(),
                 if (showStreak && review.streak.current >= 2)
                   Text(
                     // Counted as each language counts: يومين, not ٢ أيام.
                     '${Counted.day.of(review.streak.current, ar: isAr, iso: iso)} ${isAr ? 'ورا بعض' : 'in a row'}',
-                    style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.inkSecondary),
+                    style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.onPastelSecondary),
                   ),
               ],
             ),
@@ -161,7 +157,10 @@ class ReviewCard extends StatelessWidget {
 class BalancedStartText extends StatelessWidget {
   final String text;
   final TextStyle style;
-  const BalancedStartText(this.text, {super.key, required this.style});
+
+  /// The key of the [Text] drawn, for tests.
+  final Key? textKey;
+  const BalancedStartText(this.text, {super.key, required this.style, this.textKey});
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) {
@@ -172,7 +171,7 @@ class BalancedStartText extends StatelessWidget {
           Directionality.of(context),
           MediaQuery.textScalerOf(context),
         );
-        return SizedBox(width: width, child: Text(text, style: style));
+        return SizedBox(width: width, child: Text(text, key: textKey, style: style));
       });
 }
 
@@ -194,7 +193,7 @@ class _DayMoon extends StatelessWidget {
           child: QamarMoon(size: 32, staticPhase: known ? OrbState.phaseForFill(fill!) : OrbState.restPhase),
         ),
         const SizedBox(height: 8),
-        Text(letter, style: QText.body(size: 11, weight: FontWeight.w500, color: known ? QColors.inkSecondary : QColors.inkTertiary)),
+        Text(letter, style: QText.body(size: 12, weight: FontWeight.w600, color: known ? QColors.onPastel : QColors.onPastelSecondary)),
       ],
     );
   }

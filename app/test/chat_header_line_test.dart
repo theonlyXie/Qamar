@@ -53,7 +53,8 @@ void main() {
       final quiet = tester.getRect(name);
       final lineBox = tester.getRect(find.byKey(ChatHeader.lineKey));
       expect(lineBox.height, ChatHeader.lineHeight, reason: 'the empty line keeps its height');
-      expect(quiet.center.dx, moreOrLessEquals(195, epsilon: 0.5), reason: 'the name is centred on the screen');
+      final group = tester.getRect(find.ancestor(of: name, matching: find.byType(Row)).first);
+      expect(group.center.dx, moreOrLessEquals(195, epsilon: 0.5), reason: 'the moon’s face and the name, together, are centred on the screen');
 
       final states = <String, void Function()>{
         'the last question': () => s.aiQuota = _chat(1),

@@ -2,9 +2,9 @@
 // fonts do not draw (the Arabic greeting's 👋 rendered as a box at the start
 // of the first thing the app says); a trailing "..." is the ellipsis
 // character, one glyph with its own spacing, not three full stops; and every
-// character of copy is one a bundled face draws: every style names Inter
-// first and Noto Sans Arabic after it, so each script finds its face (You's
-// arrows once drew as boxes).
+// character of copy is one a bundled face draws: every style names Space
+// Grotesk first, then Noto Sans Arabic, then Inter, so each script — and the
+// odd mark — finds its face (You's arrows once drew as boxes).
 
 import 'dart:io';
 
@@ -43,11 +43,12 @@ void main() {
   });
 
   test('every character of copy is drawn by a bundled face, and body text falls back to the one that has it', () {
+    final grotesk = fontCharacters('assets/fonts/SpaceGrotesk-400.ttf');
     final noto = fontCharacters('assets/fonts/NotoSansArabic-400.ttf');
     final inter = fontCharacters('assets/fonts/Inter-400.ttf');
-    for (final style in [QText.body(size: 15), QText.number(size: 15), QText.display(size: 22, ar: true), QText.eyebrow(ar: true)]) {
-      expect(style.fontFamily, 'Inter', reason: 'Latin, and the arrows, in Inter');
-      expect(style.fontFamilyFallback, contains('Noto Sans Arabic'), reason: 'Arabic, and its digits, in Noto Sans Arabic');
+    for (final style in [QText.body(size: 15), QText.number(size: 15), QText.display(size: 24, ar: true), QText.eyebrow(ar: true)]) {
+      expect(style.fontFamily, 'Space Grotesk', reason: 'Latin, and the arrows, in the kit’s face');
+      expect(style.fontFamilyFallback, ['Noto Sans Arabic', 'Inter'], reason: 'Arabic and its digits in Noto Sans Arabic, then Inter for the odd mark');
     }
     final escape = RegExp(r'\\u\{([0-9A-Fa-f]+)\}|\\u([0-9A-Fa-f]{4})');
     final found = <String>[];
@@ -59,13 +60,14 @@ void main() {
       for (final c in text.runes) {
         // Controls and bidi isolates are not drawn.
         if (c < 0x20 || (c >= 0x200B && c <= 0x200F) || (c >= 0x2066 && c <= 0x2069) || c == 0xFFFC) continue;
-        if (!noto.contains(c) && !inter.contains(c)) found.add('$where: U+${c.toRadixString(16)} in $literal');
+        if (!grotesk.contains(c) && !noto.contains(c) && !inter.contains(c)) found.add('$where: U+${c.toRadixString(16)} in $literal');
       }
     }
     expect(found, isEmpty, reason: found.join('\n'));
-    // The arrows You uses are Inter's, not Noto's: the fallback is what
-    // draws them.
-    expect(noto.contains(0x2192), isFalse);
-    expect(inter.contains(0x2192), isTrue);
+    // The arrows You uses are Space Grotesk's own; the tick it lacks, and
+    // Noto lacks, is Inter's: the last fallback is what draws it.
+    expect(grotesk.contains(0x2192), isTrue);
+    expect(grotesk.contains(0x2713) || noto.contains(0x2713), isFalse);
+    expect(inter.contains(0x2713), isTrue);
   });
 }

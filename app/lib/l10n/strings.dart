@@ -80,8 +80,6 @@ class QStrings {
       guestAccount,
       saveProgress,
       saveProgressSub,
-      treeHint,
-      ask,
       sListening,
       sThinking,
       protein,
@@ -153,8 +151,6 @@ class QStrings {
     required this.guestAccount,
     required this.saveProgress,
     required this.saveProgressSub,
-    required this.treeHint,
-    required this.ask,
     required this.sListening,
     required this.sThinking,
     required this.protein,
@@ -202,7 +198,6 @@ class QStrings {
     weightTrend: 'اتجاه الوزن',
     guestAccount: 'ضيف · محفوظ على الموبايل ده بس',
     saveProgress: 'احفظ تقدمك', saveProgressSub: 'اربط حسابك عشان ترجّع بياناتك على أي موبايل.',
-    treeHint: 'دوس بره للخروج · استمر ضاغط على قمر عشان تتكلم معاه', ask: 'اسأل قمر',
     sListening: 'بسمعك…', sThinking: 'بفكر…',
     protein: 'بروتين', carbs: 'كارب', fat: 'دهون',
   );
@@ -247,7 +242,6 @@ class QStrings {
     weightTrend: 'Weight trend',
     guestAccount: 'Guest · saved on this phone only',
     saveProgress: 'Save your progress', saveProgressSub: 'Link an account to get your data back on any phone.',
-    treeHint: 'Tap outside to close · hold Qamar to talk', ask: 'Ask Qamar',
     sListening: 'Listening…', sThinking: 'Thinking…',
     protein: 'Protein', carbs: 'Carbs', fat: 'Fat',
   );

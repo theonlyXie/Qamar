@@ -18,24 +18,27 @@ import '../theme/motion.dart';
 import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import 'common.dart';
-import 'glass.dart';
+import 'kit.dart';
+import 'mascot.dart';
+import 'surface.dart';
 
 /// S18 — Ask Qamar, the way a conversation with an assistant already looks
-/// on the phone (the liquid-glass skill's chat pattern).
+/// on the phone (the qamar-design skill's chat pattern), in the kit's
+/// colours.
 ///
-/// A black page. The assistant's words are plain text across the page; the
-/// person's own sit in a grey bubble on their side. At the foot, one glass
-/// field: a "+" for a photo, the words, and one white button that is the
-/// microphone while the field is empty and the send arrow once there is
-/// something to send. Nothing else: no orb docked to the side, no beam, no
-/// colour.
+/// The dark ground. The assistant's words are plain text across the page;
+/// the person's own sit in a lavender bubble on their side, in black. At the
+/// foot, one grey field: a "+" for a photo, the words, and one round button
+/// that is the microphone while the field is empty and the burgundy send
+/// arrow once there is something to send. A meal read off what was said is
+/// offered as the kit's scan result: the four macro tiles and the items.
 ///
 /// Motion is short and critically damped (QSpring), and falls back to a plain
 /// cross-fade under the platform's reduce-motion setting.
 const _ground = QColors.canvas;
 
-/// The person's own words: the raised grey, a step above the page.
-const _userBubble = QColors.surfaceHigh;
+/// The person's own words: the kit's lavender, with black ink on it.
+const _userBubble = QColors.lavender;
 
 bool _stillness(BuildContext context) => MediaQuery.disableAnimationsOf(context);
 
@@ -143,11 +146,20 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                           key: AskQamarOverlay.emptyKey,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 32),
-                            child: Text(
-                              state.isAr ? 'أساعدك في إيه؟' : 'What can I help with?',
-                              textAlign: TextAlign.center,
-                              style: QText.display(size: 28, ar: state.isAr, weight: FontWeight.w600),
-                            ),
+                            child: Column(mainAxisSize: MainAxisSize.min, children: [
+                              Container(
+                                width: 96,
+                                height: 96,
+                                decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.lavender),
+                                child: const Center(child: MoonMascot(size: 70)),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                state.isAr ? 'أساعدك في إيه؟' : 'What can I help with?',
+                                textAlign: TextAlign.center,
+                                style: QText.display(size: 24, ar: state.isAr),
+                              ),
+                            ]),
                           ),
                         )
                       // Drawn from the bottom up (O10): a fresh conversation's
@@ -236,7 +248,7 @@ class _AskQamarOverlayState extends State<AskQamarOverlay> with SingleTickerProv
                           state.isAr ? 'قمر ممكن يغلط. أي حاجة طبية راجعها مع دكتور.' : 'Qamar can make mistakes. Check anything medical with a doctor.',
                           key: AskQamarOverlay.disclosureKey,
                           textAlign: TextAlign.center,
-                          style: QText.body(size: 11, color: QColors.inkTertiary),
+                          style: QText.body(size: 12, color: QColors.inkTertiary),
                         ),
                       ),
                     ],
@@ -289,12 +301,23 @@ class _Header extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
       child: Row(
         children: [
-          _GlassIcon(icon: QIcons.close, onTap: state.closeChat, label: state.isAr ? 'اقفل المحادثة' : 'Close the conversation'),
+          _RoundIcon(icon: QIcons.close, onTap: state.closeChat, label: state.isAr ? 'اقفل المحادثة' : 'Close the conversation'),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(t.brand, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
+                // The moon's face beside the name, as a conversation shows
+                // who is on the other end.
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(
+                    width: 26,
+                    height: 26,
+                    decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.lavender),
+                    child: const Center(child: MoonMascot(size: 19, mood: MoonMood.joy)),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(t.brand, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
+                ]),
                 // The line keeps its height when it has nothing to say, so
                 // the name never jumps as a status comes and goes (O8).
                 SizedBox(
@@ -376,7 +399,7 @@ class _ChatTurn extends StatelessWidget {
                     ClipRRect(borderRadius: BorderRadius.circular(QRadii.inset), child: _photoThumb(turn.photoPath!, 140)),
                     const SizedBox(height: 8),
                   ],
-                  Text(turn.text, style: QText.body(size: 17, height: 24, color: QColors.ink)),
+                  Text(turn.text, style: QText.body(size: 17, height: 24, color: QColors.onPastel)),
                 ],
               ),
             ),
@@ -456,7 +479,7 @@ class _CopyReplyState extends State<_CopyReply> {
           pressed: pressed,
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 150),
-            child: Icon(_copied ? QIcons.check : QIcons.copy, key: ValueKey(_copied), size: 18, color: QColors.inkTertiary),
+            child: QIcon(_copied ? QIcons.check : QIcons.copy, key: ValueKey(_copied), size: 20, color: QColors.inkTertiary),
           ),
         ),
       ),
@@ -501,7 +524,7 @@ class _ThinkingState extends State<_Thinking> with SingleTickerProviderStateMixi
               scale: 0.72 + 0.28 * v,
               child: Opacity(
                 opacity: 0.55 + 0.45 * v,
-                child: Container(width: 14, height: 14, decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.ink)),
+                child: Container(width: 14, height: 14, decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.lavender)),
               ),
             );
           },
@@ -579,10 +602,10 @@ class _EndFade extends StatelessWidget {
   }
 }
 
-/// The composer: one glass field, the way an assistant's is. A "+" for a
-/// photo at the start; the words; and at the end one white button that is
-/// the microphone while there is nothing to send and the send arrow once
-/// there is. While Qamar is listening the button is the stop square.
+/// The composer: one grey field, the way an assistant's is. A "+" for a
+/// photo at the start; the words; and at the end one round button that is
+/// the microphone while there is nothing to send and the burgundy send arrow
+/// once there is. While Qamar is listening the button is the stop square.
 class _Composer extends StatelessWidget {
   final AppState state;
   final TextEditingController ctrl;
@@ -595,10 +618,11 @@ class _Composer extends StatelessWidget {
     final ready = state.chatDraft.trim().isNotEmpty || state.chatPhotoPath != null;
     final listening = state.chatState == ChatState.listening;
     final isAr = state.isAr;
-    return QGlass(
-      shape: QGlassShape.rounded,
-      radius: 26,
-      padding: const EdgeInsetsDirectional.only(start: 4, end: 4, top: 2, bottom: 2),
+    // One line is 48 tall, twice the corner: a capsule, as the kit's field
+    // is; more lines make it a rounded rectangle.
+    return QSurface(
+      radius: QRadii.card,
+      padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -613,15 +637,19 @@ class _Composer extends StatelessWidget {
               textInputAction: TextInputAction.send,
               onChanged: state.onChatDraftChanged,
               onSubmitted: (_) => state.sendChat(),
-              cursorColor: QColors.accentInk,
               style: QText.body(size: 17, height: 22, color: QColors.ink),
               decoration: InputDecoration(
                 // Listening, the field says so where the words will appear.
                 hintText: listening ? state.t.sListening : placeholder,
                 hintStyle: QText.body(size: 17, height: 22, color: QColors.inkTertiary),
+                // The field is the composer's own: no fill or edge of the
+                // theme's around it.
+                filled: false,
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
                 isDense: true,
-                contentPadding: EdgeInsetsDirectional.only(start: kIsWeb ? 12 : 2, end: 4, top: (QLayout.minTap - 22) / 2 + 0.5, bottom: (QLayout.minTap - 22) / 2 + 0.5),
+                contentPadding: EdgeInsetsDirectional.only(start: kIsWeb ? 12 : 2, end: 4, top: (QLayout.minTap - 22) / 2, bottom: (QLayout.minTap - 22) / 2),
               ),
             ),
           ),
@@ -670,21 +698,22 @@ class _PlainIconState extends State<_PlainIcon> {
         child: SizedBox(
           width: QLayout.minTap,
           height: QLayout.minTap,
-          child: Center(child: qPressed(context, pressed: _down, child: Icon(widget.icon, size: widget.glyph, color: enabled ? QColors.ink : QDisabled.label))),
+          child: Center(child: qPressed(context, pressed: _down, child: QIcon(widget.icon, size: widget.glyph, color: enabled ? QColors.ink : QDisabled.label))),
         ),
       ),
     );
   }
 }
 
-/// The composer's one filled button: a white circle, a black glyph.
+/// The composer's one filled button: a circle, burgundy to send and the
+/// circle grey to speak.
 class _InkCircle extends StatefulWidget {
   final IconData icon;
   final VoidCallback? onTap;
   final String label;
 
   /// Burgundy: the composer's one action, sending what is written. The
-  /// microphone beside an empty field is clear glass, so the screen's one
+  /// microphone beside an empty field is the circle grey, so the screen's one
   /// burgundy thing stays the thing to do.
   final bool accent;
   const _InkCircle({required this.icon, required this.onTap, required this.label, this.accent = false});
@@ -724,25 +753,16 @@ class _InkCircleState extends State<_InkCircle> {
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 160),
                 transitionBuilder: (child, a) => ScaleTransition(scale: Tween(begin: 0.8, end: 1.0).animate(a), child: FadeTransition(opacity: a, child: child)),
-                // Burgundy glass to send; clear glass to speak.
-                child: enabled
-                    ? QGlass(
-                        key: ValueKey(widget.icon),
-                        shape: QGlassShape.circle,
-                        tint: widget.accent ? QColors.accent : null,
-                        pressed: _down,
-                        blur: 0,
-                        width: 36,
-                        height: 36,
-                        child: Center(child: Icon(widget.icon, size: 18, color: widget.accent ? QColors.onAccent : QColors.ink)),
-                      )
-                    : Container(
-                        key: ValueKey(widget.icon),
-                        width: 36,
-                        height: 36,
-                        decoration: const BoxDecoration(shape: BoxShape.circle, color: QDisabled.fill),
-                        child: Icon(widget.icon, size: 18, color: QDisabled.label),
-                      ),
+                // Burgundy to send; the circle grey to speak.
+                child: QSurface(
+                  key: ValueKey(widget.icon),
+                  shape: QSurfaceShape.circle,
+                  tint: widget.accent && enabled ? QColors.accent : (_down ? QColors.surface : QColors.surfaceHigh),
+                  pressed: _down,
+                  width: 38,
+                  height: 38,
+                  child: Center(child: QIcon(widget.icon, size: 20, color: enabled ? QColors.ink : QDisabled.label)),
+                ),
               ),
             ),
           ),
@@ -752,12 +772,12 @@ class _InkCircleState extends State<_InkCircle> {
   }
 }
 
-/// A floating glass circle with a glyph: the header's way out.
-class _GlassIcon extends StatelessWidget {
+/// The kit's grey circle with a glyph: the header's way out.
+class _RoundIcon extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final String label;
-  const _GlassIcon({required this.icon, required this.onTap, required this.label});
+  const _RoundIcon({required this.icon, required this.onTap, required this.label});
 
   @override
   Widget build(BuildContext context) => QTapArea(
@@ -766,20 +786,21 @@ class _GlassIcon extends StatelessWidget {
         builder: (context, pressed) => qPressed(
           context,
           pressed: pressed,
-          child: QGlass(
-            shape: QGlassShape.circle,
+          child: QSurface(
+            shape: QSurfaceShape.circle,
             pressed: pressed,
-            width: 40,
-            height: 40,
-            child: Center(child: Icon(icon, size: 18, color: QColors.ink)),
+            width: 44,
+            height: 44,
+            child: Center(child: QIcon(icon, size: 22, color: QColors.ink)),
           ),
         ),
       );
 }
 
 /// One chip for the conversation: the suggestions over the field, a turn's
-/// action, and a problem's ways on (O10). A capsule of clear glass drawn
-/// about 36 points tall that takes a whole touch ([QLayout.minTap]) (O11).
+/// action, and a problem's ways on (O10). A capsule of the control grey
+/// drawn about 38 points tall that takes a whole touch ([QLayout.minTap])
+/// (O11).
 /// The emphasised one, a turn's next step, says it in burgundy words: an
 /// action, but not the screen's one burgundy fill, which a conversation
 /// keeps for sending (and a reading's "Confirm and log").
@@ -801,9 +822,9 @@ class _Chip extends StatelessWidget {
         child: qPressed(
           context,
           pressed: pressed,
-          child: QGlass(
+          child: QSurface(
+            shape: QSurfaceShape.capsule,
             pressed: pressed,
-            blur: 0,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
             child: Text(label, style: QText.body(size: 15, weight: emphasis ? FontWeight.w600 : FontWeight.w500, color: emphasis ? QColors.accentInk : QColors.ink)),
           ),
@@ -832,7 +853,7 @@ class _Attachment extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ClipRRect(borderRadius: BorderRadius.circular(QRadii.inset), child: _photoThumb(path, 40)),
+            ClipRRect(borderRadius: BorderRadius.circular(QRadii.control), child: _photoThumb(path, 40)),
             const SizedBox(width: 10),
             Text(label, style: QText.body(size: 13, color: QColors.inkSecondary)),
             if (onRemove != null) _PlainIcon(icon: QIcons.close, onTap: onRemove!, glyph: 15, label: context.read<AppState>().isAr ? 'شيل الصورة' : 'Remove the photo'),
@@ -903,7 +924,7 @@ Widget _photoThumb(String path, double size) {
       height: size,
       child: const DecoratedBox(
         decoration: BoxDecoration(color: QColors.surfaceRaised),
-        child: Icon(QIcons.photo, size: 16, color: QColors.inkTertiary),
+        child: QIcon(QIcons.photo, size: 16, color: QColors.inkTertiary),
       ),
     ),
   );
@@ -932,23 +953,52 @@ class _ProposalCard extends StatelessWidget {
           Confidence.low => isAr ? 'اتأكد منها' : 'Check this',
         };
 
+    // The kit's scan result: what the meal comes to on the four tiles, each
+    // against the day's target, then the items, then the one burgundy
+    // action.
+    final tg = state.target();
+    double share(int a, int b) => b <= 0 ? 0 : (a / b).clamp(0.0, 1.0).toDouble();
+    String g(int n) => isAr ? '${state.iso('$n')} جم' : '${n}g';
     return _Appear(
       child: Container(
         margin: const EdgeInsets.only(bottom: 20),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-        decoration: QDecor.card(border: QColors.hairlineStrong),
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
+        decoration: QDecor.card(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(t.nothingWrites, style: QText.body(size: 13, color: QColors.inkTertiary)),
-            const SizedBox(height: 12),
-            for (var i = 0; i < items.length; i++) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(t.nothingWrites, style: QText.body(size: 13, color: QColors.inkSecondary)),
+            ),
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(
+                child: _Tile(
+                  color: QColors.lavender,
+                  label: isAr ? 'السعرات' : 'Calories',
+                  figure: isAr ? '${state.iso('${totals.kcal}')} سعر' : '${totals.kcal} kcal',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: _Tile(color: QColors.mint, label: t.protein, figure: g(totals.p), share: share(totals.p, tg.protein))),
+            ]),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: _Tile(color: QColors.lime, label: t.carbs, figure: g(totals.c), share: share(totals.c, tg.carbs))),
+              const SizedBox(width: 8),
+              Expanded(child: _Tile(color: QColors.coral, label: t.fat, figure: g(totals.f), share: share(totals.f, tg.fat))),
+            ]),
+            const SizedBox(height: 10),
+            for (var i = 0; i < items.length; i++)
               Opacity(
                 // A dropped item stays visible: the reading is still what the
                 // assistant saw, it just is not going in the log.
                 opacity: items[i].q == 0 ? 0.4 : 1,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsetsDirectional.fromSTEB(14, 10, 6, 8),
+                  decoration: QDecor.card(color: QColors.surfaceRaised, border: QColors.surfaceRaised, radius: QRadii.inset),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -959,45 +1009,34 @@ class _ProposalCard extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(isAr ? items[i].def.ar : items[i].def.en, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
-                                Text(isAr ? items[i].def.portionAr : items[i].def.portionEn, style: QText.body(size: 13, color: QColors.inkTertiary)),
+                                Text(isAr ? items[i].def.ar : items[i].def.en, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.ink)),
+                                // The kit's meta row: the portion, then its figure.
+                                Text(
+                                  '${isAr ? items[i].def.portionAr : items[i].def.portionEn}${isAr ? '، ' : ' | '}${isAr ? '${state.iso('${items[i].def.kcal * items[i].q}')} سعر' : '${items[i].def.kcal * items[i].q} kcal'}',
+                                  style: QText.body(size: 13, color: QColors.inkSecondary),
+                                ),
                               ],
                             ),
                           ),
-                          if (doubt(items[i].def.conf) case final d?) ConfidenceBadge(check: items[i].def.conf == Confidence.low, label: d),
+                          if (doubt(items[i].def.conf) case final d?) ...[
+                            const SizedBox(width: 6),
+                            ConfidenceBadge(check: items[i].def.conf == Confidence.low, label: d),
+                          ],
                         ],
                       ),
-                      const SizedBox(height: 6),
                       Row(
                         children: [
-                          QRoundIconButton(icon: QIcons.remove, onTap: () => state.decQty(i), size: 32, label: isAr ? 'أقل' : 'Fewer'),
-                          SizedBox(width: 40, child: Text(isAr ? state.iso('${items[i].q}×') : '${items[i].q}×', textAlign: TextAlign.center, style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink))),
-                          QRoundIconButton(icon: QIcons.add, onTap: () => state.incQty(i), size: 32, label: isAr ? 'أكتر' : 'More'),
-                          const Spacer(),
-                          Text(isAr ? '${state.iso('${items[i].def.kcal * items[i].q}')} سعر' : '${items[i].def.kcal * items[i].q} kcal',
-                              style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink)),
+                          QRoundIconButton(icon: QIcons.remove, onTap: () => state.decQty(i), size: 32, raised: true, label: isAr ? 'أقل' : 'Fewer'),
+                          SizedBox(width: 36, child: Text(isAr ? state.iso('${items[i].q}×') : '${items[i].q}×', textAlign: TextAlign.center, style: QText.number(size: 15, weight: FontWeight.w600, color: QColors.ink))),
+                          QRoundIconButton(icon: QIcons.add, onTap: () => state.incQty(i), size: 32, raised: true, label: isAr ? 'أكتر' : 'More'),
                         ],
                       ),
                     ],
                   ),
                 ),
               ),
-            ],
-            const Divider(height: 1, color: QColors.hairline),
-            const SizedBox(height: 12),
-            // The one number the meal comes to; the macros are Today's.
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(isAr ? 'الإجمالي' : 'Total', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.inkSecondary)),
-                Flexible(
-                  child: Text(isAr ? 'حوالي ${state.iso('${totals.kcal}')} سعر' : 'About ${totals.kcal} kcal',
-                      textAlign: TextAlign.end, style: QText.number(size: 17, weight: FontWeight.w600, color: QColors.ink, ar: isAr)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            QPrimaryButton(label: t.confirmAndLog, onTap: state.confirmProposal, height: 50),
+            const SizedBox(height: 4),
+            QPrimaryButton(label: t.confirmAndLog, onTap: state.confirmProposal),
             Center(
               child: TextButton(
                 onPressed: state.discardProposal,
@@ -1010,6 +1049,35 @@ class _ProposalCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// One of the scan result's four tiles: the macro's pastel, its name, its
+/// figure, and a bar of what the meal is of the day's target.
+class _Tile extends StatelessWidget {
+  final Color color;
+  final String label;
+  final String figure;
+  final double? share;
+  const _Tile({required this.color, required this.label, required this.figure, this.share});
+
+  @override
+  Widget build(BuildContext context) => PastelCard(
+        color: color,
+        radius: QRadii.inset,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        child: SizedBox(
+          height: 52,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.onPastel)),
+              Text(figure, maxLines: 1, style: QText.number(size: 15, weight: FontWeight.w500, color: QColors.onPastel)),
+              if (share != null) QBar(value: share!, height: 4, onPastel: true),
+            ],
+          ),
+        ),
+      );
 }
 
 /// 0 to 1, whatever the spring's last digits do.

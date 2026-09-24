@@ -23,21 +23,21 @@ abstract final class HoldCopy {
   static String line(bool isAr) => isAr ? '$doAr\u00A0— $whatAr' : '$doEn\u00A0— $whatEn';
 }
 
-/// A one-time hint by the orb (O1): after the tree has opened and closed
-/// twice with no hold, the one gesture people have to learn is named where
-/// it is done. It goes the moment they hold the moon or tap the hint, and it
-/// never comes back ([AppState.holdCoachDue]).
+/// A one-time hint over the orb (O1): after the Log sheet has opened and
+/// closed twice with no hold, the one gesture people have to learn is named
+/// where it is done. It goes the moment they hold the moon or tap the hint,
+/// and it never comes back ([AppState.holdCoachDue]).
 ///
-/// The orb's layout places it, from the orb's own rect: centred on the moon,
-/// kept inside the screen, with its [caret] on the moon's centre.
+/// The tab bar's layout places it over the middle of the bar, its [caret]
+/// on the orb: a white bubble with black words, the kit's white on the dark.
 class HoldCoachMark extends StatelessWidget {
   final AppState state;
 
   const HoldCoachMark({super.key, required this.state});
 
-  static const double width = 230;
-  static const _fill = QColors.surfaceRaised;
-  static const _edge = QColors.hairlineStrong;
+  static const double width = 240;
+  static const _fill = QColors.white;
+  static const _edge = QColors.white;
 
   /// The small point between the mark and the moon, its tip toward the moon:
   /// [up] when the mark sits below the orb.
@@ -63,20 +63,19 @@ class HoldCoachMark extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
               color: _fill,
-              border: Border.all(color: _edge),
-              // It floats by its lighter fill and edge; a black shadow has
+              // It floats by its white on the dark; a black shadow has
               // nothing to darken on this ground.
               borderRadius: BorderRadius.circular(QRadii.control),
             ),
             child: Row(
               children: [
-                const Icon(QIcons.mic, size: 18, color: QColors.ink),
+                const QIcon(QIcons.mic, size: 20, color: QColors.onInk),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(HoldCopy.line(isAr), style: QText.body(size: 15, color: QColors.ink)),
+                  child: Text(HoldCopy.line(isAr), style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.onInk)),
                 ),
                 const SizedBox(width: 6),
-                const Icon(QIcons.close, size: 16, color: QColors.inkTertiary),
+                const QIcon(QIcons.close, size: 18, color: QColors.onPastelSecondary),
               ],
             ),
           ),

@@ -1,9 +1,12 @@
-// The way back (seat 2): one rule, everywhere. Every screen but the two
-// roots — the welcome screen and Today — has one back control at the top
-// start corner, with the same arrow, and it returns to the screen the person
-// came from. The phone's back does the same, after closing whatever sheet is
-// open. The orb is the way home, and it shows on every in-app screen,
-// Ramadan included: that screen used to have neither.
+// The way back (seat 2), with the tab bar: one rule, everywhere. The four
+// tab pages — Today, Progress, Plan and Me — are reached from the bar and
+// draw no back control: the bar, with the orb in it, is the way between
+// them, and the phone's back from any of them goes to Today
+// (tab_bar_test.dart). Every other screen but the welcome has one back
+// control at the top start corner, with the same arrow, and it returns to
+// the screen the person came from; a page under a tab (the wallet, Qamar+,
+// Ramadan) shows no bar, so the one way out is never two. The phone's back
+// does the same, after closing whatever sheet is open.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,20 +20,17 @@ import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/icons.dart';
 import 'package:qamar/widgets/common.dart';
 import 'package:qamar/widgets/explain.dart';
-import 'package:qamar/widgets/orb_nav.dart';
+import 'package:qamar/widgets/tab_bar.dart';
 
 import 'support/app_fonts.dart';
 
 const _phone = Size(390, 844);
 
-/// How the person reaches each screen, and so where its back goes. The
-/// wallet and the paywall are reached from the place their old buttons did
-/// *not* go to (the wallet's went to Today, the paywall's to Me), so a
-/// button wired to a fixed place fails here.
+/// How the person reaches each screen that is not a tab, and so where its
+/// back goes. The wallet and the paywall are reached from the place their
+/// old buttons did *not* go to (the wallet's went to Today, the paywall's to
+/// Me), so a button wired to a fixed place fails here.
 final _reach = <AppScreen, (AppScreen from, void Function(AppState s) open)>{
-  AppScreen.plan: (AppScreen.today, (s) => s.go(AppScreen.plan)),
-  AppScreen.progress: (AppScreen.today, (s) => s.go(AppScreen.progress)),
-  AppScreen.you: (AppScreen.today, (s) => s.go(AppScreen.you)),
   AppScreen.wallet: (AppScreen.you, (s) => s.openWallet()),
   AppScreen.subscription: (AppScreen.today, (s) => s.openSubscription()),
   AppScreen.ramadan: (AppScreen.today, (s) => s.go(AppScreen.ramadan)),
@@ -54,13 +54,28 @@ void main() {
     }
   });
 
-  test('every screen is either a root or has a way back, and the list above covers them all', () {
+  test('every screen is a root, a tab, or has a way back, and the list above covers them all', () {
     for (final screen in AppScreen.values) {
-      final root = AppState.rootScreens.contains(screen);
-      expect(root || _reach.containsKey(screen), isTrue, reason: '$screen has no way back and is not a root');
+      final root = AppState.rootScreens.contains(screen) || AppState.tabScreens.contains(screen);
+      expect(root || _reach.containsKey(screen), isTrue, reason: '$screen has no way back and is not a root or a tab');
     }
     expect(AppState.rootScreens, {AppScreen.welcome, AppScreen.today});
+    expect(AppState.tabScreens, [AppScreen.today, AppScreen.progress, AppScreen.plan, AppScreen.you]);
   });
+
+  for (final lang in AppLang.values) {
+    for (final tab in AppState.tabScreens) {
+      testWidgets('$tab has the bar and no back control of its own (${lang.name})', (tester) async {
+        final s = AppState()..setLang(lang);
+        s.go(AppScreen.today);
+        s.go(tab);
+        await _pump(tester, s);
+        expect(tester.takeException(), isNull, reason: 'the page must fit on a phone');
+        expect(find.byType(QBackButton), findsNothing, reason: 'a tab is reached from the bar, and left by it');
+        expect(find.byType(QTabBar), findsOneWidget);
+      });
+    }
+  }
 
   for (final lang in AppLang.values) {
     for (final entry in _reach.entries) {
@@ -85,14 +100,9 @@ void main() {
         } else {
           expect(r.center.dx, lessThan(_phone.width / 3), reason: 'the start corner is the left in English');
         }
-        // In-app screens also show the orb, the way home, except the
-        // paywall: its back control above is the way home there, and the
-        // orb is hidden as agreed (O1).
-        if (screen == AppScreen.subscription) {
-          expect(find.byType(OrbNav), findsNothing, reason: 'the paywall has its own way back, and no orb');
-        } else if (from == AppScreen.today || from == AppScreen.you) {
-          expect(find.byType(OrbNav), findsOneWidget, reason: '$screen shows the orb');
-        }
+        // Off the tabs there is no bar: the back control above is the way
+        // out, and there is one (O1).
+        expect(find.byType(QTabBar), findsNothing, reason: '$screen has its own way back, and no bar');
 
         await tester.tap(back);
         await tester.pump();

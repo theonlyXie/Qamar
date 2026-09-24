@@ -1,19 +1,20 @@
 // The welcome and the paywall as compositions, seat 6's part (the scorecard's
 // 01 and 10): the welcome hangs from one centre line, its two ways back in
 // read alike as links, its fine print ends on no orphan word; on the paywall
-// the lockup is centred and balanced and the rest reads from the start, one
-// plan has no radio, and "included" is one mark in one colour in both
-// columns.
+// everything reads from the start, the lead balanced, one plan has no
+// radio, and "included" is one mark in one ink in both columns.
 //
-// The welcome in liquid-glass: the moon sitting on the name, the promise, then
-// the one white button ("Chat with Qamar") and the report as an outline under
-// it, the width of the page; no sign-up block (the three providers and
-// "Continue with email" are in the account sheet that "Sign in" opens,
-// Google's mark in colour), the guest line, the way back in and the
-// invitation side by side, and one order top to bottom. The buttons are
-// never scaled, the moon gives way first, and the invitation, its notice and
-// the fine print stay on screen, at 360x640, 375x667, 360x800 and 390x844,
-// in both languages and with each of the invitation's notices.
+// The welcome in the qamar-design skill (the Nutri AI kit's onboarding): the
+// lavender page, the moon mascot standing over the name, the promise, the
+// report as a white capsule, the guest line, the way back in and the
+// invitation side by side, the fine print, and at the foot the one thing to
+// do — the round black button ("Chat with Qamar") in its white bump. No
+// sign-up block (the three providers and "Continue with email" are in the
+// account sheet that "Sign in" opens, Google's mark in colour), and one order
+// top to bottom. The buttons are never scaled, the moon gives way first, and
+// the invitation, its notice and the fine print stay on screen, at 360x640,
+// 375x667, 360x800 and 390x844, in both languages and with each of the
+// invitation's notices.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -33,7 +34,8 @@ import 'package:qamar/theme/icons.dart';
 import 'package:qamar/theme/text_styles.dart';
 import 'package:qamar/widgets/account_sheet.dart';
 import 'package:qamar/widgets/common.dart';
-import 'package:qamar/widgets/moon.dart';
+import 'package:qamar/widgets/kit.dart';
+import 'package:qamar/widgets/mascot.dart';
 
 import 'persistence_test.dart' show FakeInvitationRepo;
 import 'support/app_fonts.dart';
@@ -139,9 +141,19 @@ void main() {
 
   testWidgets('balanced text keeps its lines and ends on no orphan', (tester) async {
     const sentence = 'AI-powered general wellness guidance. Not a medical service.';
-    final style = QText.body(size: 11, height: 17);
-    // At this width a plain Text leaves "service." alone on its line.
-    const width = 300.0;
+    final style = QText.body(size: 12, height: 16);
+    // A width at which a plain Text leaves its last word alone on a line.
+    double orphanWidth() {
+      for (var w = 180.0; w <= 420; w += 2) {
+        final p = TextPainter(text: TextSpan(text: sentence, style: style), textDirection: TextDirection.ltr)..layout(maxWidth: w);
+        final lines = p.computeLineMetrics();
+        p.dispose();
+        if (lines.length == 2 && lines.last.width < lines.first.width * 0.35) return w;
+      }
+      fail('no width leaves an orphan');
+    }
+
+    final width = orphanWidth();
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: Center(
@@ -164,7 +176,7 @@ void main() {
   });
 
   for (final lang in AppLang.values) {
-    testWidgets('the welcome hangs from one centre line: one white button, its links alike, its fine print whole (${lang.name})', (tester) async {
+    testWidgets('the welcome hangs from one centre line: one round button, its links alike, its fine print whole (${lang.name})', (tester) async {
       final s = AppState()..setLang(lang);
       await _pumpApp(tester, s);
       expect(find.byType(WelcomeScreen), findsOneWidget);
@@ -177,17 +189,20 @@ void main() {
       }
       _expectNoOrphan(tester.renderObject<RenderParagraph>(find.byKey(WelcomeScreen.boundaryKey)), 'the fine print');
 
-      // One thing to do, in white; the report is the second way in, drawn
-      // by its edge.
-      final primaries = find.descendant(of: find.byType(WelcomeScreen), matching: find.byType(QPrimaryButton));
-      expect(primaries, findsOneWidget, reason: 'one white button on the screen');
-      expect(tester.widget<QPrimaryButton>(primaries).label, s.t.chatDirect);
+      // One thing to do: the round black button at the foot; the report is
+      // the second way in, the white capsule. No burgundy button on the
+      // lavender.
+      expect(find.descendant(of: find.byKey(WelcomeScreen.chatPillKey), matching: find.text(s.t.chatDirect)), findsOneWidget);
+      expect(tester.getRect(find.byKey(WelcomeScreen.chatPillKey)).center.dx, moreOrLessEquals(mid, epsilon: 0.5));
+      expect(find.descendant(of: find.byType(WelcomeScreen), matching: find.byType(QPrimaryButton)), findsNothing);
       expect(find.descendant(of: find.byKey(WelcomeScreen.scanPillKey), matching: find.text(s.t.scanInbody)), findsOneWidget);
-      expect(tester.widget(find.byKey(WelcomeScreen.scanPillKey)), isA<QOutlineButton>());
+      expect(tester.widget(find.byKey(WelcomeScreen.scanPillKey)), isA<QPastelButton>());
+      expect(tester.widget<QPastelButton>(find.byKey(WelcomeScreen.scanPillKey)).light, isTrue, reason: 'the white capsule');
 
       final haveAccount = tester.widget<Text>(find.text(s.t.haveAccount));
       final invitation = tester.widget<Text>(find.text(WelcomeScreen.invitationLabel(lang == AppLang.ar)));
-      expect(haveAccount.style!.color, QColors.inkSecondary, reason: 'a quiet action: the second ink, never a hue');
+      expect(haveAccount.style!.color, QColors.onPastel, reason: 'a link on the lavender: black words, underlined, never a hue');
+      expect(haveAccount.style!.decoration, TextDecoration.underline);
       expect(invitation.style!.color, haveAccount.style!.color);
       expect(invitation.style!.fontSize, haveAccount.style!.fontSize);
 
@@ -217,7 +232,7 @@ void main() {
     });
 
     for (final phone in const [Size(390, 844), Size(360, 800), Size(375, 667), Size(360, 640)]) {
-      testWidgets('the moon sits on the name with air round it, and the ways in are under the promise, the width of the page (${lang.name}, ${phone.width.toInt()}x${phone.height.toInt()})', (tester) async {
+      testWidgets('the moon stands over the name with air round it, and the ways in are under the promise (${lang.name}, ${phone.width.toInt()}x${phone.height.toInt()})', (tester) async {
         tester.view.devicePixelRatio = 3;
         tester.view.physicalSize = phone * 3;
         addTearDown(tester.view.reset);
@@ -230,18 +245,19 @@ void main() {
         final scan = tester.getRect(find.byKey(WelcomeScreen.scanPillKey));
         final name = tester.getRect(find.text(s.t.brand));
         final promise = tester.getRect(find.text(s.t.promise));
-        final moon = find.descendant(of: find.byKey(WelcomeScreen.moonKey), matching: find.byType(QamarMoon));
+        final moon = find.byKey(WelcomeScreen.moonKey);
         if (phone.height >= 800) expect(moon, findsOneWidget, reason: 'a phone this tall has room for the moon');
         if (moon.evaluate().isNotEmpty) {
-          final disc = tester.getRect(moon.first);
-          expect(disc.height, greaterThanOrEqualTo(WelcomeScreen.moonMin - 4), reason: 'a moon worth the name');
-          expect(name.top - disc.bottom, greaterThanOrEqualTo(12), reason: 'the moon sits on the name, not on top of it');
+          expect(tester.widget(moon), isA<MoonMascot>());
+          final drawn = tester.getRect(moon);
+          expect(drawn.height, greaterThanOrEqualTo(WelcomeScreen.moonMin - 4), reason: 'a moon worth the name');
+          expect(name.top - drawn.bottom, greaterThanOrEqualTo(12), reason: 'the moon stands over the name, not on it');
+          expect(drawn.center.dx, moreOrLessEquals(phone.width / 2, epsilon: 1));
         }
-        expect(chat.top - promise.bottom, greaterThanOrEqualTo(24), reason: 'room between the promise and the ways in');
-        expect(scan.top, greaterThanOrEqualTo(chat.bottom), reason: 'the two ways in never overlap');
+        expect(scan.top - promise.bottom, greaterThanOrEqualTo(20), reason: 'room between the promise and the ways in');
+        expect(chat.top, greaterThanOrEqualTo(scan.bottom), reason: 'the two ways in never overlap');
         for (final r in [chat, scan]) {
-          expect(r.left, moreOrLessEquals(20, epsilon: 0.5), reason: 'the page’s margin, in either language');
-          expect(r.right, moreOrLessEquals(phone.width - 20, epsilon: 0.5));
+          expect(r.center.dx, moreOrLessEquals(phone.width / 2, epsilon: 0.5), reason: 'on the centre line, in either language');
         }
       });
     }
@@ -261,16 +277,17 @@ void main() {
           await tester.pump(const Duration(milliseconds: 400));
           expect(tester.takeException(), isNull, reason: 'nothing overflows at $at');
 
-          // Never scaled: the buttons are their own height at every size.
+          // Never scaled: the buttons are their own size at every size.
           final chat = tester.getRect(find.byKey(WelcomeScreen.chatPillKey));
           final scan = tester.getRect(find.byKey(WelcomeScreen.scanPillKey));
-          if (chat.height != 52 || scan.height != 48) failures.add('$at: buttons ${chat.height} and ${scan.height}');
+          if (chat.size != const Size.square(WelcomeScreen.startSize)) failures.add('$at: the round button is ${chat.size}');
+          if (scan.height != 48) failures.add('$at: the report’s touch is ${scan.height} tall');
 
-          final moon = find.descendant(of: find.byKey(WelcomeScreen.moonKey), matching: find.byType(QamarMoon));
-          final disc = moon.evaluate().isEmpty ? null : tester.getRect(moon.first);
+          final moon = find.byKey(WelcomeScreen.moonKey);
+          final drawn = moon.evaluate().isEmpty ? null : tester.getRect(moon);
           final wantsMoon = phone.height >= 800;
-          if (wantsMoon && disc == null) failures.add('$at: no moon');
-          if (disc != null && disc.height < WelcomeScreen.moonMin - 4) failures.add('$at: a moon of ${disc.height}');
+          if (wantsMoon && drawn == null) failures.add('$at: no moon');
+          if (drawn != null && drawn.height < WelcomeScreen.moonMin - 4) failures.add('$at: a moon of ${drawn.height}');
 
           // The way back in and the invitation share a line, side by side.
           final account = tester.getRect(find.text(s.t.haveAccount));
@@ -282,15 +299,15 @@ void main() {
           // Top to bottom, each clear of the next.
           final order = <(String, Rect)>[
             ('language', tester.getRect(find.byType(QLangToggle))),
-            if (disc != null) ('moon', disc),
+            if (drawn != null) ('moon', drawn),
             ('name', tester.getRect(find.text(s.t.brand))),
             ('promise', tester.getRect(find.text(s.t.promise))),
-            ('chat', chat),
             ('scan', scan),
             ('guest line', tester.getRect(find.byKey(WelcomeScreen.guestNoteKey))),
             ('links', links),
             if (notice != _Notice.none) ('notice', tester.getRect(find.byKey(WelcomeScreen.noticeKey))),
             ('fine print', tester.getRect(find.byKey(WelcomeScreen.boundaryKey))),
+            ('chat', chat),
           ];
           for (var i = 1; i < order.length; i++) {
             if (order[i].$2.top < order[i - 1].$2.bottom - 0.5) failures.add('$at: ${order[i].$1} over ${order[i - 1].$1}');
@@ -331,7 +348,8 @@ void main() {
         expect(text.data, contains(says[notice]!), reason: '${notice.name}: the notice the app says');
         if (notice == _Notice.refusedAfter) expect(s.invitedBy, 'Basel', reason: 'still invited by Basel, and the tone is not');
         if (notice == _Notice.unnamed) expect(s.invitedBy, isNull, reason: 'no name, and still good news');
-        expect(text.style!.color, notice.good ? QColors.ink : QColors.inkSecondary, reason: '${notice.name} ${notice.good ? 'is good news' : 'did not happen'}');
+        expect(text.style!.color, notice.good ? QColors.onPastel : QColors.onPastelSecondary,
+            reason: '${notice.name} ${notice.good ? 'is good news' : 'did not happen'}: the first or second ink on the lavender');
         await tester.pumpWidget(const SizedBox());
       }
     });
@@ -347,7 +365,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(tester.takeException(), isNull);
-      expect(tester.getRect(find.byKey(WelcomeScreen.chatPillKey)).height, 52);
+      expect(tester.getRect(find.byKey(WelcomeScreen.chatPillKey)).size, const Size.square(WelcomeScreen.startSize));
       expect(tester.getRect(find.byKey(WelcomeScreen.scanPillKey)).height, 48);
       expect(find.byType(FittedBox), findsNothing, reason: 'nothing on the welcome is drawn smaller than its size');
       final page = find.descendant(of: find.byType(WelcomeScreen), matching: find.byType(Scrollable)).first;
@@ -358,7 +376,7 @@ void main() {
       expect(tester.getRect(find.byKey(WelcomeScreen.noticeKey)).top, greaterThan(tester.getRect(find.text(s.t.haveAccount)).bottom));
     });
 
-    testWidgets('the paywall: a centred, balanced lockup; the rest from the start; one plan, no radio; one mark for included (${lang.name})', (tester) async {
+    testWidgets('the paywall reads from the start, its lead balanced; one plan, no radio; one mark for included (${lang.name})', (tester) async {
       final s = AppState()..setLang(lang);
       s.go(AppScreen.today);
       s.go(AppScreen.subscription);
@@ -366,19 +384,19 @@ void main() {
       expect(find.byType(SubscriptionScreen), findsOneWidget);
 
       final lead = tester.renderObject<RenderParagraph>(find.byKey(SubscriptionScreen.leadKey));
-      expect(lead.textAlign, TextAlign.center);
+      expect(lead.textAlign, TextAlign.start, reason: 'titles lead; only the welcome and an empty state are centred');
       _expectNoOrphan(lead, 'the lead');
-      expect(tester.getRect(find.byKey(SubscriptionScreen.leadKey)).center.dx, moreOrLessEquals(_phone.width / 2, epsilon: 1));
       final without = tester.widget<Text>(find.byKey(SubscriptionScreen.withoutKey));
       expect(without.textAlign ?? TextAlign.start, TextAlign.start, reason: 'three lines of reading are not centred');
 
       expect(find.byIcon(Icons.radio_button_checked), findsNothing, reason: 'one plan is not a choice');
       expect(find.byIcon(Icons.radio_button_unchecked), findsNothing);
 
-      // Included is a check and left out a dash, both in the ink, so the
-      // shape says which rather than a shade; one ink in both columns.
-      final checks = tester.widgetList<Icon>(find.byIcon(QIcons.check)).map((i) => i.color).toSet();
-      expect(checks, {QColors.ink}, reason: 'included is one ink in both columns');
+      // Included is a tick and left out a dash, the tick in the ink and the
+      // dash quieter, so the shape says which rather than a shade; one ink
+      // in both columns.
+      final ticks = tester.widgetList<Icon>(find.byIcon(QIcons.done)).map((i) => i.color).toSet();
+      expect(ticks, {QColors.ink}, reason: 'included is one ink in both columns');
       final dashes = tester.widgetList<Icon>(find.byIcon(QIcons.remove)).toList();
       expect(dashes, isNotEmpty, reason: 'what the free tier does not have is marked, not left blank');
       expect(dashes.map((i) => i.color).toSet(), {QColors.inkTertiary});

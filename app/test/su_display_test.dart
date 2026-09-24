@@ -17,7 +17,7 @@ import 'package:qamar/screens/wallet_screen.dart';
 import 'package:qamar/state/app_state.dart';
 import 'package:qamar/widgets/common.dart';
 import 'package:qamar/widgets/explain.dart';
-import 'package:qamar/widgets/orb_nav.dart';
+import 'package:qamar/widgets/tab_bar.dart';
 
 import 'support/app_fonts.dart';
 
@@ -33,7 +33,7 @@ Future<void> _pumpOrb(WidgetTester tester, AppState s) async {
         textDirection: context.watch<AppState>().isAr ? TextDirection.rtl : TextDirection.ltr,
         child: child!,
       ),
-      home: const Scaffold(body: Stack(children: [OrbNav()])),
+      home: const Scaffold(body: Stack(children: [QTabBar()])),
     ),
   ));
   await tester.pump();
@@ -66,7 +66,7 @@ void main() {
       s.go(AppScreen.today);
       await _pumpOrb(tester, s);
       expect(find.byType(SuReceiptChip), findsNothing);
-      for (final text in _texts(tester, find.byType(OrbNav))) {
+      for (final text in _texts(tester, find.byType(QTabBar))) {
         expect(text, isNot(matches(RegExp(r'[0-9٠-٩]|Su|نقط'))), reason: 'the orb drew "$text"');
       }
     });

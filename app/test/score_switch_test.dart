@@ -25,7 +25,7 @@ import 'package:qamar/state/app_state.dart';
 import 'package:qamar/theme/icons.dart';
 import 'package:qamar/widgets/hero_number.dart';
 import 'package:qamar/widgets/living_orb.dart';
-import 'package:qamar/widgets/orb_nav.dart';
+import 'package:qamar/widgets/tab_bar.dart';
 import 'package:qamar/widgets/quest_card.dart';
 import 'package:qamar/widgets/review_card.dart';
 

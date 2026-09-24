@@ -11,7 +11,10 @@ import 'package:qamar/l10n/strings.dart';
 import 'package:qamar/main.dart';
 import 'package:qamar/services/ai_gateway.dart';
 import 'package:qamar/state/app_state.dart';
+import 'package:qamar/theme/app_theme.dart';
+import 'package:qamar/theme/colors.dart';
 import 'package:qamar/widgets/explain.dart';
+import 'package:qamar/widgets/kit.dart';
 import 'package:qamar/widgets/orb_gesture_guide.dart';
 
 const _planJson = '''
@@ -81,14 +84,30 @@ void main() {
   testWidgets('the mark is a dotted line under the value, and leaves the value where it was', (tester) async {
     await tester.pumpWidget(ChangeNotifierProvider.value(
       value: AppState(),
-      child: const MaterialApp(
-        home: Scaffold(body: Center(child: Explainable(id: 'protein', child: ExplainMark(child: Text('34 / 148 g'))))),
+      child: MaterialApp(
+        theme: buildQamarTheme(),
+        home: const Scaffold(body: Center(child: Explainable(id: 'protein', child: ExplainMark(child: Text('34 / 148 g'))))),
       ),
     ));
     final mark = tester.getRect(find.byType(ExplainMark));
     final text = tester.getRect(find.text('34 / 148 g'));
     expect(mark, text, reason: 'it draws over the value’s own box, adding nothing to the layout');
-    expect(find.byType(ExplainMark), paints..circle(color: ExplainMark.color));
+    expect(find.byType(ExplainMark), paints..circle(color: ExplainMark.color), reason: 'on the dark, the second ink');
+  });
+
+  testWidgets('on a pastel the dots are black, as the words there are', (tester) async {
+    await tester.pumpWidget(ChangeNotifierProvider.value(
+      value: AppState(),
+      child: MaterialApp(
+        theme: buildQamarTheme(),
+        home: const Scaffold(
+          body: Center(
+            child: PastelCard(color: QColors.mint, child: Explainable(id: 'protein', child: ExplainMark(child: Text('34 / 148 g')))),
+          ),
+        ),
+      ),
+    ));
+    expect(find.byType(ExplainMark), paints..circle(color: ExplainMark.pastelColor));
   });
 
   test('the tutorial names the mark, in both languages', () {
