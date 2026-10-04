@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Universal links for invitations: https://dr-qamar.com/i/<code>.
+	     Attach this file in Xcode (Runner target → Signing & Capabilities →
+	     Associated Domains) and publish
+	     https://dr-qamar.com/.well-known/apple-app-site-association naming
+	     the team id and bundle id with path /i/*. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:dr-qamar.com</string>
+		<string>applinks:www.dr-qamar.com</string>
+	</array>
+</dict>
+</plist>

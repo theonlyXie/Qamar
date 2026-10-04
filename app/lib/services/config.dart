@@ -36,12 +36,36 @@ class QamarConfig {
   static const supportUrl = '$site/support';
   static const deleteDataUrl = '$site/delete-account';
 
+  /// Whether Qamar+ is being sold yet. Off until Paymob is live; turn it on
+  /// with --dart-define=BILLING_ENABLED=true.
+  ///
+  /// It gates taking money and nothing else (AppState.plusOnSale). While it
+  /// is off the paywall says paying is not open yet where the payment would
+  /// be, and no checkout is ever opened. The free week, an invitation's or a
+  /// nutritionist's fortnight, the day's limits and Su all work, because none
+  /// of them take money.
+  ///
+  /// This deliberately does not pretend everyone has a subscription. Nobody is
+  /// marked Active who has not started a trial; the distinction matters on the
+  /// day billing is switched on, because a build that had been claiming Plus
+  /// for everyone would suddenly take it away from them.
+  static const billingEnabled =
+      bool.fromEnvironment('BILLING_ENABLED', defaultValue: false);
+
   static bool get useSupabase => supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
   static bool get useAiGateway => aiGatewayUrl.isNotEmpty;
 
   /// Paymob billing Edge Function. Defaults to the same Supabase project as
   /// the rest of the backend so Egypt checkout needs no extra dart-define.
   static const billingUrlOverride = String.fromEnvironment('BILLING_URL');
+
+  /// Shop this plan. The signed grocery partner's deep-link template
+  /// (`{items}`, `{ref}`, `{lang}` are filled in), the name on the button and
+  /// Qamar's affiliate reference. With no template, nothing about shopping
+  /// appears in the app.
+  static const groceryPartnerUrl = String.fromEnvironment('GROCERY_PARTNER_URL');
+  static const groceryPartnerName = String.fromEnvironment('GROCERY_PARTNER_NAME', defaultValue: 'the partner');
+  static const groceryAffiliateId = String.fromEnvironment('GROCERY_AFFILIATE_ID');
   static String get billingUrl {
     if (billingUrlOverride.isNotEmpty) return billingUrlOverride;
     if (supabaseUrl.isEmpty) return '';
@@ -49,4 +73,17 @@ class QamarConfig {
   }
 
   static bool get useBilling => billingUrl.isNotEmpty;
+
+  /// PostHog. Empty means no analytics at all — the SDK is not initialised
+  /// and nothing is sent; there is no demo key. Even with a key, nothing is
+  /// sent before the person says yes to service improvement in the
+  /// consultation (see AppState.setImprove). EU ingestion by default: the
+  /// data stays under EU rules unless a build says otherwise.
+  static const posthogApiKey = String.fromEnvironment('POSTHOG_API_KEY');
+  static const posthogHost = String.fromEnvironment('POSTHOG_HOST', defaultValue: 'https://eu.i.posthog.com');
+  static bool get useAnalytics => posthogApiKey.isNotEmpty;
+
+  /// The version of the consent wording the person agrees to. Bump it when
+  /// the wording changes, and the consents table shows who agreed to what.
+  static const consentVersion = '1.1';
 }

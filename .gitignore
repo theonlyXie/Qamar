@@ -1,0 +1,2 @@
+# Worktrees the agents work in, beside the checkout.
+.claude/worktrees/

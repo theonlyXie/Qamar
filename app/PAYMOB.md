@@ -1,6 +1,6 @@
 # Turning on Paymob (no code)
 
-Qamar+ in Egypt is billed through **Paymob**, in **Egyptian pounds**. People can pay with a card (Visa, Mastercard, Meeza) or an Egyptian mobile wallet (Vodafone Cash, Orange Cash, and the others Paymob enables on your account). Su Points are still earned only — they are never sold.
+Qamar+ in Egypt is billed through **Paymob**, in **Egyptian pounds**. People can pay with a card (Visa, Mastercard, and Meeza where Paymob enables it) or an Egyptian mobile wallet (Vodafone Cash, Orange Cash, and the others Paymob enables on your account) — whichever integrations you configure and label (step 4); the paywall names only those. Su Points are still earned only — they are never sold.
 
 The app and the server are already wired for this. Your job is the business side: a Paymob merchant account, approval, and pasting four secrets into Supabase. Until those secrets exist, the paywall tells the truth and does not pretend a payment went through.
 
@@ -8,20 +8,23 @@ The app and the server are already wired for this. Your job is the business side
 
 | Plan | What they pay | What you keep in mind |
 |---|---|---|
-| Monthly list | **500** | The headline price |
-| First subscription | **350** | 30% off, once, on monthly |
-| Affiliate code | **299** | Buyer pays 299. The person who shared the code is owed **50 EGP cash** in their affiliate wallet. Your net is **249**. This is not Su Points. |
-| 3 months | **249** | Same cash as a year, shorter access — so the year is the obvious deal |
-| 1 year | **249** | 50% off the 500 list. This is the plan the paywall pushes |
+| Monthly | **500** | The only plan. No annual or family tier yet — those wait on month-2 retention. No discount marketing: a campaign code is the one thing that can lower the price, none is issued, and while one applies the paywall stops saying "same price for everyone". |
+| Professional's code | **500** | The client pays the same 500. The nutritionist or coach who gave the code is owed **100 EGP a month (20%) for 12 months** from the client's first payment, in their EGP wallet, and not after — re-typing the code at checkout does not restart the twelve months. One professional per client: another professional's code does not take the share over (switching is a support conversation). This is not Su Points. |
 
-The phone never decides the price. Checkout asks the server; the server stamps the amount Paymob collects. Later campaign codes (Ramadan, etc.) go in the `promo_codes` table as `kind = campaign` — you do not need another app release to add one.
+The phone never decides the price. Checkout asks the server; the server stamps the amount Paymob collects. A later campaign code (the earned-month promo, Ramadan) goes in the `promo_codes` table as `kind = campaign` — you do not need another app release to add one.
 
-Affiliate payouts: the marketer taps **Redeem EGP** once the wallet has at least 50 EGP. That opens a `requested` payout. You send the money from the company account (bank / wallet) and mark the row `sent`. Do not pay this out of Su Points.
+The professional's dashboard: `POST /billing/affiliate/clients` lists the clients who typed this professional's code **and said yes to sharing** (consent type `adherence_share`, migration 0053 — a switch under the code field and on Me, off until turned on, withdrawable), with the last seven days as numbers only: days logged, days within 10% of the target, the average, the target. Never meals, photos or weight. A client is listed only while their twelve months with the professional run.
+
+Professional payouts: the nutritionist taps **Redeem EGP** once the wallet has at least 50 EGP. That opens a `requested` payout. You send the money from the company account (bank / InstaPay) and mark the row `sent`. Do not pay this out of Su Points.
 
 ## What is already settled
 
+- **The earned month, once.** `POST /billing/earned` says where a member stands in the promo — 20 logged days in the first 30 days of paid membership at launch (migration 0058; both numbers are rows in `billing_config`, so they can be tuned without a release, and every sentence the app shows reads them from the status) — and `POST /billing/earned/claim` grants 30 more days of Qamar+ when they are reached (migration 0052, `earned_months`). The days are counted from `meal_logs` when asked, the window opens on the Cairo day of the first paid order, and the grant is appended to the running month the way a renewal is; a lapsed member gets a fresh 30 days with `provider = 'earned'`. The app claims it the moment it is due and shows the progress while it is being earned.
+- **A free week, once.** `POST /billing/trial/start` gives seven days of Qamar+ with no card. Its one reminder is scheduled on the phone the moment the trial starts, 48 hours before the week ends, and the Today card carries the same question inside those 48 hours. The database (`plus_trials`, migration 0043) allows one per account, never after a payment, and a later Paymob payment simply replaces the trial entitlement. Nothing renews on its own: when the week ends the person is back on Lite.
+- **The month's one reminder.** A paid month does not renew either, so 48 hours before a paid (or earned) month ends the phone asks, in Qamar's voice, whether to do another month, and says plainly that nothing renews on its own. `BillingMomentCard` (`lib/widgets/billing_moment_card.dart`) carries the same question inside those 48 hours, for Today's contextual slot. Like the free week's reminder it sits outside the fourteen-day window of meal questions, the person's zero-a-day does not silence it, and only the phone's notification permission does.
+
 - Talking to Qamar writes the meal plan.
-- Five shared AI uses per Cairo day; extras are bought with earned Su, not cash.
+- Lite is three meal photos and three questions a day. Extra photos are bought with earned Su, not cash; the fourth question is Qamar+.
 - Qamar+ checkout opens Paymob’s hosted page. The phone **never** marks someone as paid. Paymob tells our server; the server turns Qamar+ on.
 
 ## Steps for you
@@ -60,7 +63,7 @@ Open **Settings → API Keys** (wording may be “Developers”):
 | HMAC secret | `PAYMOB_HMAC_SECRET` |
 | Integration ID for **card** (and wallet if you want wallets) | `PAYMOB_INTEGRATION_IDS` |
 
-If you have more than one integration ID (card + wallet), write them in one line, separated by commas, no spaces: `123456,789012`.
+Write each integration ID with the rail it is, in one line, separated by commas: `card:123456,wallet:789012`. Add `meeza:<id>` (usually the card integration's own id, `meeza:123456`) once Paymob has enabled Meeza on the account. The label is how the paywall knows what to name: it lists only the rails you labelled, so it never promises Vodafone Cash or Meeza your account cannot take. Unlabelled IDs (`123456,789012`) still check out, but the paywall then names no rail at all.
 
 Test IDs only work with the test secret. Live IDs only work with the live secret. Mixing them is the usual reason checkout says the integration does not exist.
 
@@ -72,7 +75,14 @@ Still in the dashboard, enable at least:
 - Meeza if they offer it on your account
 - Mobile wallets (Vodafone Cash, Orange Cash, e& / We Pay) if you want those on day one
 
-Not every method is on by default. If a method is missing, write to Paymob support from the dashboard rather than changing the app.
+Not every method is on by default. If a method is missing, write to Paymob support from the dashboard rather than changing the app. When a method goes live, add its label to `PAYMOB_INTEGRATION_IDS`; when one is switched off, remove it, and the paywall stops naming it.
+
+**Not built yet, and what each needs from you** (the blueprint's v1 names Vodafone Cash, Fawry and Meeza):
+- **Vodafone Cash and the other wallets:** nothing new in code. Paymob's mobile-wallet integration, enabled on the account, and its id labelled `wallet:` above.
+- **Meeza:** nothing new in code. Paymob enabling Meeza on the card integration, then `meeza:<card id>`.
+- **Fawry (pay at a kiosk or in the Fawry app):** needs a merchant contract that does not exist yet. Either a FawryPay merchant account (its merchant code and security key, for a direct integration that has to be written), or Paymob's cash/kiosk integration if Paymob enables one on the account (its integration id; it is not labelled for the paywall until the paywall copy for paying in cash at a kiosk is written with it).
+- **InstaPay:** after v1, per the blueprint.
+- **iPhone:** an App Store build must sell digital subscriptions through Apple In-App Purchase (see below); Paymob stays for Android and the web.
 
 ### 6. Paste the secrets into Supabase
 
@@ -93,7 +103,7 @@ If the dashboard has a field for “notification URL” / “callback URL”, pa
 ### 7. Do one test payment
 
 1. Open Qamar while signed in (a guest must link an account first — we have to know who paid).
-2. You → Qamar+ → pick 1 year (EGP 249), 3 months (EGP 249), or monthly → **Start Qamar+**. A friend’s code on monthly is EGP 299.
+2. You → Qamar+ → **Start Qamar+** (EGP 500). With a professional's code the price is still 500; the code only attaches their share.
 3. Paymob’s page opens. Use Paymob’s **test card** from their documentation (not a real card).
 4. Finish. You come back to the app. Tap **Confirm subscription** if Qamar+ is not on yet — Paymob’s confirmation can land a few seconds later.
 
@@ -104,14 +114,14 @@ If it never turns on: the HMAC secret is usually wrong, or the webhook URL is no
 When test payments succeed and Paymob has approved the merchant file:
 
 1. Replace the four secrets with the **live** keys and live integration IDs.
-2. Make one real payment of 249 EGP (the 1-year plan) on a real card or wallet, then refund it from the Paymob dashboard if you do not want to keep it.
+2. Make one real payment of 500 EGP on a real card or wallet, then refund it from the Paymob dashboard if you do not want to keep it.
 3. Confirm the bank settlement account is the company account.
 
 ### 9. After that, leave it alone
 
 - Refunds and chargebacks are handled in the Paymob dashboard. The next time the app checks, Qamar+ follows what Paymob last confirmed.
-- Auto-renew (charge the card every month without asking) is a separate Paymob product called Subscriptions. This first version is **pay for a month, 3 months, or a year**. When you want auto-renew, turn Subscriptions on in the Paymob dashboard and tell us — the app does not invent a renewal it cannot collect.
-- Su Points stay earned. Never sell them through Paymob. Affiliate commission is a separate EGP wallet.
+- Auto-renew (charge the card every month without asking) is a separate Paymob product called Subscriptions. This first version is **pay for a month at a time**. When you want auto-renew, turn Subscriptions on in the Paymob dashboard and tell us — the app does not invent a renewal it cannot collect.
+- Su Points stay earned. Never sell them through Paymob. The professional's share is a separate EGP wallet.
 
 ## If you later put Qamar on the Apple App Store
 

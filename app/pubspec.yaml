@@ -11,7 +11,13 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  # Not drawn by the app (its one family is Iconsax, below), but the
+  # framework's own Cupertino widgets name its font, so it stays bundled.
   cupertino_icons: ^1.0.8
+
+  # The Nutri AI kit's icon family, Iconsax (vuesax): linear for a glyph at
+  # rest, bold for the chosen one. MIT (iconsax_plus/LICENSE).
+  iconsax_plus: ^1.0.0
 
   # State management — one app-wide store mirrors the prototype's single
   # Component class; Provider keeps that mapping literal and avoids codegen.
@@ -35,6 +41,14 @@ dependencies:
 
   intl: ^0.20.3
   http: ^1.2.2
+  shared_preferences: ^2.5.5
+  flutter_local_notifications: ^22.3.1
+  timezone: ^0.11.1
+  share_plus: ^13.3.0
+  posthog_flutter: ^5.44.2
+
+  # Reading the barcode on a packet with the camera (lib/screens/barcode_screen.dart).
+  mobile_scanner: ^7.4.0
 
 dev_dependencies:
   flutter_test:
@@ -43,20 +57,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/images/qamar_orb.png
-    - assets/images/qamar_orb_sm.png
-    - assets/images/su_coin.png
 
   # Bundled rather than fetched at runtime. google_fonts downloads on first
   # launch, so a phone with no connection — or one in Egypt on a bad line —
   # rendered the whole Arabic UI as tofu boxes until the download landed.
   # Only the weights the app actually asks for are shipped.
   fonts:
-    - family: Cormorant Garamond
-      fonts:
-        - asset: assets/fonts/CormorantGaramond-300.ttf
-          weight: 300
     - family: Noto Sans Arabic
       fonts:
         - asset: assets/fonts/NotoSansArabic-400.ttf
@@ -67,6 +73,21 @@ flutter:
           weight: 600
         - asset: assets/fonts/NotoSansArabic-700.ttf
           weight: 700
+    # Latin: Space Grotesk (SIL OFL 1.1, assets/fonts/SpaceGrotesk-OFL.txt),
+    # the Nutri AI kit's face. Static instances of the variable font at the
+    # four weights the scale uses.
+    - family: Space Grotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-400.ttf
+          weight: 400
+        - asset: assets/fonts/SpaceGrotesk-500.ttf
+          weight: 500
+        - asset: assets/fonts/SpaceGrotesk-600.ttf
+          weight: 600
+        - asset: assets/fonts/SpaceGrotesk-700.ttf
+          weight: 700
+    # The last fallback: a mark Space Grotesk does not draw (✓) still finds a
+    # face instead of a box.
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter-400.ttf

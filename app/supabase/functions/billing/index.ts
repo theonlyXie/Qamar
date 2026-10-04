@@ -6,24 +6,37 @@
 //   POST /billing/quote          { plan, promo_code? }                 JWT
 //   POST /billing/checkout       { plan, promo_code?, first_name? }    JWT
 //   POST /billing/entitlement    {}                                    JWT
+//   POST /billing/trial/start    {}                                    JWT
+//   POST /billing/earned         {}   where the earned month stands       JWT
+//   POST /billing/earned/claim   {}   grant it, once the threshold is met  JWT
 //   POST /billing/affiliate      {}                                    JWT
 //   POST /billing/affiliate/payout { amount_cents? }                   JWT
+//   POST /billing/affiliate/clients {}  the professional's consenting clients, this week   JWT
 //   POST /billing/webhook        Paymob transaction callback           HMAC
 //
 // Secrets:
 //   PAYMOB_SECRET_KEY
 //   PAYMOB_PUBLIC_KEY
 //   PAYMOB_HMAC_SECRET
-//   PAYMOB_INTEGRATION_IDS   comma-separated integration ids or names (card,wallet)
+//   PAYMOB_INTEGRATION_IDS   comma-separated integration ids or names, each
+//                            labelled with its rail so the paywall can name it:
+//                            card:123456,meeza:123456,wallet:789012
 //   PAYMOB_BASE_URL          optional, defaults to https://accept.paymob.com
 
+import { notYetEarnedMessage, type EarnedStatus } from "./earned.ts";
 import { verifyPaymobHmac } from "./hmac.ts";
+import { amountMatches, signedOrderId, txnObject, txnOutcome, type OrderRow } from "./webhook.ts";
 import {
   MIN_PAYOUT_CENTS,
   PLANS,
+  attachPromo,
   isPlanId,
   normalizePromoCode,
+  paymentConfig,
   quotePlus,
+  savedProfessional,
+  type PaymentKind,
+  type ReferralLookup,
   type PlanId,
   type Promo,
   type Quote,
@@ -50,8 +63,12 @@ function json(body: unknown, status = 200): Response {
 }
 
 function paymentMethods(): Array<number | string> {
-  const raw = (Deno.env.get("PAYMOB_INTEGRATION_IDS") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  return raw.map((s) => (/^\d+$/.test(s) ? Number(s) : s));
+  return paymentConfig(Deno.env.get("PAYMOB_INTEGRATION_IDS")).methods;
+}
+
+/** The rails the paywall may name: only labelled integrations (card:, meeza:, wallet:). */
+function paymentKinds(): PaymentKind[] {
+  return paymentConfig(Deno.env.get("PAYMOB_INTEGRATION_IDS")).kinds;
 }
 
 async function authenticate(req: Request): Promise<{ id: string; email?: string } | null> {
@@ -105,6 +122,10 @@ function quoteJson(q: Quote) {
     affiliate_commission_cents: q.affiliateCommissionCents,
     promo_note: q.promoNote,
     promo_error: q.promoError,
+    promo_notice: q.promoNotice,
+    // What checkout can take here, so the paywall names only that (card,
+    // meeza, wallet). Empty when the integrations are not labelled.
+    payment_methods: paymentKinds(),
   };
 }
 
@@ -141,15 +162,45 @@ async function loadPromo(code: string): Promise<Promo | null> {
   };
 }
 
+/**
+ * This client's referral row, whatever its ends_at: written by
+ * qamar_apply_paid_order on the first paid order that carried a professional,
+ * with twelve months from there (0039). attachPromo decides what it
+ * means: inside the twelve months it attaches that professional to a renewal
+ * without the client typing the code again; past them, nobody.
+ */
+async function loadReferral(userId: string): Promise<ReferralLookup> {
+  const res = await db(
+    `pro_referrals?user_id=eq.${userId}&select=promo_code_id,affiliate_user_id,ends_at,promo_codes(code,active)&limit=1`,
+  );
+  if (!res.ok) return { ok: false };
+  const rows = await res.json() as Array<Record<string, unknown>>;
+  return { ok: true, row: Array.isArray(rows) && rows[0] ? rows[0] : null };
+}
+
+/**
+ * The professional this person named before paying: a code redeemed in Me or
+ * through a /p/ link (qamar_redeem_pro_code, 0069). The first payment then
+ * carries their share, and pro_referrals starts its twelve months there.
+ */
+async function loadClaim(userId: string): Promise<Promo | null> {
+  const res = await db(
+    `pro_code_claims?user_id=eq.${userId}&select=promo_code_id,affiliate_user_id,promo_codes(code,active)&limit=1`,
+  );
+  if (!res.ok) return null;
+  const rows = await res.json() as Array<Record<string, unknown>>;
+  return savedProfessional(Array.isArray(rows) ? rows[0] : null);
+}
+
 async function buildQuote(userId: string, planRaw: unknown, codeRaw: unknown): Promise<Quote | Response> {
   if (typeof planRaw !== "string" || !isPlanId(planRaw)) {
-    return json({ error: "choose monthly, 3 months, or 1 year" }, 400);
+    return json({ error: "only the monthly plan exists" }, 400);
   }
   const code = normalizePromoCode(typeof codeRaw === "string" ? codeRaw : "");
-  let promo: Promo | null = null;
+  let typed: Promo | null = null;
   if (code) {
-    promo = await loadPromo(code);
-    if (!promo) {
+    typed = await loadPromo(code);
+    if (!typed) {
       const first = await firstPurchase(userId);
       const q = quotePlus({ plan: planRaw, firstPurchase: first, buyerUserId: userId, promo: null });
       q.promoError = "This code was not found";
@@ -157,8 +208,18 @@ async function buildQuote(userId: string, planRaw: unknown, codeRaw: unknown): P
       return q;
     }
   }
+  // One rule for a typed code and for none: the professional already on the
+  // account decides, for twelve months and not after (attachPromo).
+  const { promo, notice } = await attachPromo({
+    typed,
+    referral: () => loadReferral(userId),
+    now: new Date(),
+    claim: () => loadClaim(userId),
+  });
   const first = await firstPurchase(userId);
-  return quotePlus({ plan: planRaw, firstPurchase: first, buyerUserId: userId, promo });
+  const q = quotePlus({ plan: planRaw, firstPurchase: first, buyerUserId: userId, promo });
+  q.promoNotice = notice;
+  return q;
 }
 
 async function quoteRoute(userId: string, body: Record<string, unknown>): Promise<Response> {
@@ -293,10 +354,58 @@ async function entitlement(userId: string): Promise<Response> {
   return json(body);
 }
 
+/**
+ * Seven days of Qamar+, once, before any payment. The database decides
+ * eligibility (plus_trials, paid orders, current entitlement) — this only
+ * turns its refusals into 400s the app can show.
+ */
+async function startTrial(userId: string): Promise<Response> {
+  try {
+    const snap = await rpc("qamar_start_trial", { p_user_id: userId });
+    return json(snap);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "trial failed";
+    if (message.includes("already used")) return json({ error: "The free week has already been used on this account." }, 400);
+    if (message.includes("first-time")) return json({ error: "The free week is for first-time members." }, 400);
+    if (message.includes("already Qamar+")) return json({ error: "Qamar+ is already on." }, 400);
+    throw e;
+  }
+}
+
+// The earned month (0052, threshold since 0058): the logged days
+// billing_config asks for (20 at launch) in the first 30 of membership, and
+// the next 30 are on us. The status is a read; the claim re-checks under a
+// lock in the database and refuses with a reason the app can show, stating
+// the database's numbers rather than its own.
+async function earnedStatus(userId: string): Promise<Response> {
+  return json(await rpc("qamar_earned_month_status", { p_user_id: userId }));
+}
+
+async function earnedClaim(userId: string): Promise<Response> {
+  try {
+    return json(await rpc("qamar_claim_earned_month", { p_user_id: userId }));
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "claim failed";
+    if (message.includes("already granted")) return json({ error: "The earned month has already been granted on this account." }, 400);
+    if (message.includes("not yet earned")) {
+      const status = (await rpc("qamar_earned_month_status", { p_user_id: userId }).catch(() => null)) as EarnedStatus | null;
+      return json({ error: notYetEarnedMessage(status) }, 400);
+    }
+    throw e;
+  }
+}
+
 async function affiliate(userId: string): Promise<Response> {
   await rpc("qamar_ensure_affiliate_code", { p_user_id: userId });
   const snap = await rpc("qamar_affiliate_snapshot", { p_user_id: userId });
   return json(snap);
+}
+
+// The professional's dashboard (0053): each client who typed this person's
+// code and said yes to sharing, with the week's adherence. The consent gate
+// is in the database function; a client who withdraws disappears here.
+async function affiliateClients(userId: string): Promise<Response> {
+  return json(await rpc("qamar_pro_clients", { p_user_id: userId }));
 }
 
 async function affiliatePayout(userId: string, body: Record<string, unknown>): Promise<Response> {
@@ -320,24 +429,19 @@ async function affiliatePayout(userId: string, body: Record<string, unknown>): P
   }
 }
 
-function txnObject(body: unknown): Record<string, unknown> | null {
-  if (!body || typeof body !== "object") return null;
-  const o = body as Record<string, unknown>;
-  if (o.obj && typeof o.obj === "object") return o.obj as Record<string, unknown>;
-  if (typeof o.id !== "undefined" && typeof o.success !== "undefined") return o;
-  return null;
-}
-
-function orderIdFrom(obj: Record<string, unknown>): string | null {
-  const extras = obj.payment_key_claims;
-  if (extras && typeof extras === "object") {
-    const extraBag = (extras as { extra?: Record<string, unknown> }).extra;
-    const fromExtra = extraBag?.qamar_order_id;
-    if (typeof fromExtra === "string" && fromExtra) return fromExtra;
-  }
-  const merchant = obj.merchant_order_id ?? (obj.order as { merchant_order_id?: unknown } | undefined)?.merchant_order_id;
-  if (typeof merchant === "string" && merchant) return merchant;
-  return null;
+/**
+ * The billing_orders row for a Paymob order id, or null. Resolved by the
+ * signed `order.id` that checkout stored as paymob_order_id, so the webhook
+ * never acts on an order id the caller supplied.
+ */
+async function loadOrderByPaymobId(paymobOrderId: string): Promise<OrderRow | null> {
+  const res = await db(
+    `billing_orders?paymob_order_id=eq.${encodeURIComponent(paymobOrderId)}` +
+      `&select=id,user_id,plan,amount_cents,currency,status&limit=1`,
+  );
+  if (!res.ok) return null;
+  const rows = await res.json() as OrderRow[];
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
 }
 
 async function webhook(req: Request): Promise<Response> {
@@ -360,27 +464,42 @@ async function webhook(req: Request): Promise<Response> {
     return json({ error: "hmac mismatch" }, 401);
   }
 
-  const success = obj.success === true || obj.success === "true";
-  const pending = obj.pending === true || obj.pending === "pending";
-  const voided = obj.is_voided === true;
-  const refunded = obj.is_refunded === true;
+  // From here on, only signed fields decide anything: order.id, amount_cents,
+  // currency, success, pending, is_voided, is_refunded and the transaction id.
+  const outcome = txnOutcome(obj);
   const txnId = String(obj.id ?? "");
-  const orderId = orderIdFrom(obj);
+  const paymobOrderId = signedOrderId(obj);
+  if (!paymobOrderId || !txnId) return json({ error: "missing order or transaction id" }, 400);
 
-  if (!success || pending || voided || refunded) {
-    if (orderId) {
-      await db(`billing_orders?id=eq.${orderId}&status=eq.pending`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "failed", paymob_txn_id: txnId || null }),
-      });
-    }
+  const order = await loadOrderByPaymobId(paymobOrderId);
+  if (!order) {
+    // Not one of ours, or checkout never stored the intention's order id.
+    // Acknowledged so Paymob does not retry forever; logged so someone sees it.
+    console.error("billing webhook: no order for paymob order", paymobOrderId, "txn", txnId);
+    return json({ ok: true, applied: false, reason: "unknown order" });
+  }
+
+  if (!outcome.success || outcome.pending || outcome.voided || outcome.refunded) {
+    await db(`billing_orders?id=eq.${order.id}&status=eq.pending`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "failed", paymob_txn_id: txnId }),
+    });
     return json({ ok: true, applied: false });
   }
 
-  if (!orderId || !txnId) return json({ error: "missing order or transaction id" }, 400);
+  if (!amountMatches(obj, order)) {
+    // Signed amount disagrees with the order it is paying for. Nothing is
+    // applied and the order is left as it was; this is the row to read when
+    // someone asks why a payment "went through" and Plus did not turn on.
+    console.error(
+      "billing webhook: amount mismatch",
+      { order: order.id, expected: order.amount_cents, currency: order.currency, got: obj.amount_cents, txn: txnId },
+    );
+    return json({ error: "amount mismatch" }, 409);
+  }
 
   try {
-    const snap = await rpc("qamar_apply_paid_order", { p_order_id: orderId, p_txn_id: txnId });
+    const snap = await rpc("qamar_apply_paid_order", { p_order_id: order.id, p_txn_id: txnId });
     return json({ ok: true, applied: true, entitlement: snap });
   } catch (e) {
     console.error("billing apply", e);
@@ -421,10 +540,18 @@ Deno.serve(async (req) => {
         return await checkout(user, body);
       case "/entitlement":
         return await entitlement(user.id);
+      case "/trial/start":
+        return await startTrial(user.id);
+      case "/earned":
+        return await earnedStatus(user.id);
+      case "/earned/claim":
+        return await earnedClaim(user.id);
       case "/affiliate":
         return await affiliate(user.id);
       case "/affiliate/payout":
         return await affiliatePayout(user.id, body);
+      case "/affiliate/clients":
+        return await affiliateClients(user.id);
       default:
         return json({ error: `unknown route ${route}` }, 404);
     }

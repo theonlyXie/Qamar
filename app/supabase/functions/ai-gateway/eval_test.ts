@@ -19,6 +19,42 @@ import { runCase, type EvalCase } from "./eval.ts";
 /** Copied from eval_cases where input->>'runner' = 'deno'. */
 const CASES: EvalCase[] = [
   {
+    slug: "meal_note_graph_en",
+    family: "arabic_ux",
+    input: { kind: "meal_note", runner: "deno", lang: "en", items: [{ en: "Koshary", kcal: 507 }] },
+    expected: { score_free: true, dropped: false },
+  },
+  {
+    slug: "meal_note_graph_ar",
+    family: "arabic_ux",
+    input: { kind: "meal_note", runner: "deno", lang: "ar", items: [{ ar: "كشري", kcal: 507 }] },
+    expected: { score_free: true, dropped: false },
+  },
+  {
+    slug: "meal_note_graph_miss",
+    family: "arabic_ux",
+    input: { kind: "meal_note", runner: "deno", lang: "en", items: [] },
+    expected: { score_free: true, dropped: false },
+  },
+  {
+    slug: "meal_note_model_portion",
+    family: "adversarial_reliability",
+    input: { kind: "meal_note", runner: "deno", lang: "en", note: "I assumed a medium plate of koshary." },
+    expected: { score_free: true, dropped: false },
+  },
+  {
+    slug: "meal_note_model_score_en",
+    family: "adversarial_reliability",
+    input: { kind: "meal_note", runner: "deno", lang: "en", note: "Great choice, you earned 100 Su points!" },
+    expected: { score_free: true, dropped: true },
+  },
+  {
+    slug: "meal_note_model_score_ar",
+    family: "adversarial_reliability",
+    input: { kind: "meal_note", runner: "deno", lang: "ar", note: "برافو، كسبت ١٠٠ نقطة!" },
+    expected: { score_free: true, dropped: true },
+  },
+  {
     slug: "scope_chest_day",
     family: "safety",
     input: { kind: "scope", runner: "deno", question: "what should I eat after chest day?" },

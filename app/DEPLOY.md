@@ -22,19 +22,29 @@ scratch is the only fix.
 
 ## 1. Apply the migrations
 
-`0001`–`0029` are all live on `stqirjlqzchcoeegumoq` as of 2026-08-15. This
-section is kept for rebuilding the project from scratch, and for the next
-migration.
+Every file in `supabase/migrations/` up to `0077` is live on
+`stqirjlqzchcoeegumoq` as of 24 September 2026: `0057`–`0069` and `0077` were
+applied that day, the rest before. `0054`–`0056` are live too; their files
+arrive with PR #19. This section is kept for rebuilding the project from
+scratch, and for the next migration.
 
-The quickest path is the SQL editor in the dashboard: open each file, paste,
-run, in order. They are idempotent — `create table if not exists`, `create or
+**The live project refuses `supabase db push`.** Its migration history
+(`supabase_migrations.schema_migrations`) is stamped with the time each file
+ran rather than with these numbers, because the files were applied through the
+Supabase connector, so the CLI finds none of them in it. Apply a new migration
+with the connector's `apply_migration`, named `<number>_<name>`, or paste it
+into the SQL editor. `supabase/migrations/README.md` has the numbering rule and
+maps every live history name to its file.
+
+On a fresh project, the quickest path is the SQL editor in the dashboard: open
+each file, paste, run, in order. They are idempotent — `create table if not exists`, `create or
 replace function`, and every `create policy` is preceded by a `drop policy if
 exists` — so re-running one is harmless.
 
 Run them in order and do not skip `0006`: `0004` alone leaves a signup bonus
 that looks installed and never pays out. See the header of `0006` for why.
 
-With the CLI instead:
+With the CLI instead (a fresh project only, as above):
 
 ```sh
 supabase login                       # opens a browser
@@ -91,35 +101,45 @@ the user’s JWT itself.
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically —
 do not set them yourself.
 
-## 3. Deploy the function
+## 3. Deploy the functions
+
+The button: **Actions → Deploy Qamar → Run workflow**, choosing the branch to
+deploy from. It type-checks and tests both functions first and deploys nothing
+if either fails (`.github/workflows/deploy.yml`). It signs in to Supabase with
+the repository secret `SUPABASE_ACCESS_TOKEN`, a personal access token made at
+supabase.com under **Account → Access Tokens**. A run that stops at
+`unexpected list functions status 401: Unauthorized` means that token has
+expired or been revoked: make a new one, paste it into the secret (GitHub →
+the repository's **Settings → Secrets and variables → Actions**), and run the
+workflow again.
+
+From a checkout instead:
 
 ```sh
 supabase functions deploy ai-gateway
 supabase functions deploy billing --no-verify-jwt
 ```
 
-`ai-gateway` is already deployed and ACTIVE (`verify_jwt` on), and answers an
-unauthenticated call with 401. It has no secrets yet, so every route that
-reaches the model returns 500 until section 2 is done.
+**What is live**, as of 24 September 2026: `ai-gateway` version 13 (23
+August, from `52a80a7`) and `billing` version 1 (19 August), both deployed by
+the button from `claude/connector-status-check-xsmlnq`. PR #18's branch now contains all of that branch (merged at
+`897709c`), so deploying it keeps everything that is live and adds PR #18's
+routes. Deploy only from a branch that contains `897709c`, or packet scanning
+and the chat history come off the server. On 24 September the button's run
+from `897709c` stopped at the 401 above, so nothing changed.
 
-That first deploy went up through the Supabase MCP connector, which uploads
-file contents rather than a directory, so run the command above once from a
-checkout when convenient. It republishes straight from `supabase/functions/`
-and makes the deployed bundle provably identical to the repository.
+`ai-gateway` runs with `verify_jwt` on. Its secrets (section 2) must be set, or
+every route that reaches the model returns 500.
 
-**The running version is that first deploy, and it is now well behind the
-repository.** The food resolver, the safety recording, the self-harm and
-severe-symptom guards, the evidence packets and the verifier are all in
-`supabase/functions/` and none of them are live until the command above is run.
-The function is seven files bigger than the deployed one (`graph.ts`,
-`safety.ts`, `packet.ts`, `verify.ts` and their tests), which is the other
-reason to deploy from a checkout rather than file by file.
-
-Before deploying, from `supabase/functions/ai-gateway/`:
+The checks the button runs, to run first by hand:
 
 ```sh
-deno check index.ts     # types
-deno test               # scope, packet, verifier, eval dispatcher — 66 tests
+# in supabase/functions/ai-gateway/
+deno check index.ts
+deno test                 # 145 tests
+# in supabase/functions/billing/
+deno check index.ts hmac.ts pricing.ts webhook.ts
+deno test                 # 27 tests
 ```
 
 Verify it is up. A 401 is the correct answer to an unauthenticated call — it

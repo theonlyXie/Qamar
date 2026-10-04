@@ -32,6 +32,21 @@ abstract class Account {
   Future<void> startSignIn(String email);
   Future<void> confirmSignIn({required String email, required String token});
 
+  /// Signs in with a password, which sends no email at all.
+  ///
+  /// Every other route here depends on the project's SMTP server being able to
+  /// deliver a message. When it cannot — and right now it cannot, the server
+  /// answers `535 Invalid username` and Supabase returns a 500 — a code that
+  /// never arrives is the end of the road. This one does not ask anybody to
+  /// send anything, which is precisely why it exists.
+  Future<void> signInWithPassword({required String email, required String password});
+
+  /// Sets or replaces the password on the account already signed in.
+  ///
+  /// Does not send mail either: changing a password is not a change of
+  /// address, and Supabase only mails for the latter.
+  Future<void> setPassword(String password);
+
   /// Fires whenever the signed-in identity changes — including when the user
   /// returns from a provider's browser tab, which is the only way the app
   /// learns that an OAuth flow succeeded.
@@ -111,6 +126,16 @@ class AuthService implements Account {
   @override
   Future<void> confirmSignIn({required String email, required String token}) async {
     await _client.auth.verifyOTP(type: OtpType.email, email: email, token: token);
+  }
+
+  @override
+  Future<void> signInWithPassword({required String email, required String password}) async {
+    await _client.auth.signInWithPassword(email: email, password: password);
+  }
+
+  @override
+  Future<void> setPassword(String password) async {
+    await _client.auth.updateUser(UserAttributes(password: password));
   }
 
   /// Starts (or resumes) a session. Anonymous sign-in requires anonymous

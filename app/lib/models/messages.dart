@@ -1,4 +1,6 @@
-enum ObKind { q, u, target, save }
+import 'problem.dart';
+
+enum ObKind { q, u, target, save, dish, trialOffer }
 
 class ObMessage {
   final ObKind kind;
@@ -15,6 +17,19 @@ class ObMessage {
         ar = '',
         en = '';
 
+  /// The first moment of value: one real dish, costed against the new
+  /// target (AppState.revealDish).
+  const ObMessage.dish()
+      : kind = ObKind.dish,
+        ar = '',
+        en = '';
+
+  /// The free week, offered once after the plan reveal — never before it.
+  const ObMessage.trialOffer()
+      : kind = ObKind.trialOffer,
+        ar = '',
+        en = '';
+
   String text(bool isAr) => isAr ? ar : en;
 }
 
@@ -25,7 +40,23 @@ class ChatTurn {
   final String text;
   final String? sub;
   final String? action;
-  /// The action button opens the wallet (buy another Qamar use) instead of Plan.
+  /// The action button opens the wallet (buy another photo with Su) instead of Plan.
   final bool openWallet;
-  const ChatTurn({required this.who, required this.text, this.sub, this.action, this.openWallet = false});
+
+  /// The action button opens Qamar+ — the fourth question of the day.
+  final bool openPlus;
+
+  /// The photo the person sent with these words — a menu, a label, a plate.
+  /// Shown in their bubble; never kept anywhere but this device.
+  final String? photoPath;
+
+  /// Something that did not work, with its next step and, when there is
+  /// one, another way on (O10). The turn's [text] is the problem's "what";
+  /// its actions are drawn under it as buttons.
+  final Problem? problem;
+
+  /// The assistant's answer to something asked, as against Qamar's own
+  /// lines (a greeting, a question, a notice): only an answer can be copied.
+  final bool answer;
+  const ChatTurn({required this.who, required this.text, this.sub, this.action, this.openWallet = false, this.openPlus = false, this.photoPath, this.problem, this.answer = false});
 }

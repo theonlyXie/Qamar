@@ -41,6 +41,19 @@ export interface ImageInput {
   mediaType: string;
 }
 
+/**
+ * One earlier exchange, as the person actually experienced it.
+ *
+ * `assistant` is what Qamar said back. For a turn that produced no sentence —
+ * a refusal, or a meal reading that returned a list of items — the caller
+ * substitutes a short bracketed note, because an empty content block is
+ * rejected by the API and a raw `[]` is noise the model would try to read.
+ */
+export interface Turn {
+  user: string;
+  assistant: string;
+}
+
 interface CallOptions {
   system: string;
   user: string;
@@ -49,9 +62,50 @@ interface CallOptions {
   prefill?: string;
   /** Attached before the text, which is what the vision docs recommend. */
   image?: ImageInput;
+  /**
+   * Earlier turns, oldest first.
+   *
+   * Without these the gateway judged every message on its own, which is how
+   * "and I got" — a person continuing a sentence about the meal they had just
+   * typed — was scored as a fragment about nothing and refused as off-topic.
+   * A nutritionist who forgets the previous sentence is not a nutritionist.
+   */
+  history?: Turn[];
 }
 
-export async function callModel({ system, user, maxTokens = 1024, prefill, image }: CallOptions): Promise<ModelResult> {
+/**
+ * The messages array: earlier turns, then what was just said, then the prefill.
+ *
+ * Pure and exported so the shape can be tested without a network call. Two
+ * rules the API enforces and a conversation would otherwise break on: content
+ * blocks may not be empty, and roles must alternate. Dropping a half-empty
+ * turn satisfies both — a turn where one side said nothing is not an exchange,
+ * and inventing filler to keep the alternation would put words in someone's
+ * mouth.
+ */
+export function conversationMessages(
+  history: Turn[] | undefined,
+  content: unknown,
+  prefill?: string,
+): { role: string; content: unknown }[] {
+  const messages: { role: string; content: unknown }[] = [];
+  for (const turn of history ?? []) {
+    const u = turn.user.trim();
+    const a = turn.assistant.trim();
+    if (!u || !a) continue;
+    messages.push({ role: "user", content: u });
+    messages.push({ role: "assistant", content: a });
+  }
+  messages.push({ role: "user", content });
+  // Putting the opening brace in the assistant's mouth is the cheapest way to
+  // stop a model wrapping JSON in prose.
+  if (prefill) messages.push({ role: "assistant", content: prefill });
+  return messages;
+}
+
+export async function callModel(
+  { system, user, maxTokens = 1024, prefill, image, history }: CallOptions,
+): Promise<ModelResult> {
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) throw new Error("ANTHROPIC_API_KEY is not configured");
   const model = Deno.env.get("QAMAR_MODEL") ?? DEFAULT_MODEL;
@@ -67,10 +121,7 @@ export async function callModel({ system, user, maxTokens = 1024, prefill, image
   }
   content.push({ type: "text", text: user });
 
-  const messages: { role: string; content: unknown }[] = [{ role: "user", content }];
-  // Putting the opening brace in the assistant's mouth is the cheapest way to
-  // stop a model wrapping JSON in prose.
-  if (prefill) messages.push({ role: "assistant", content: prefill });
+  const messages = conversationMessages(history, content, prefill);
 
   const started = performance.now();
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -124,7 +175,35 @@ export interface UserContext {
   activityFactor?: number | null;
   exclusions?: string[];
   targetKcal?: number | null;
+  /** 'ramadan' while the person is fasting the month; the day is iftar and suhoor. */
+  fasting?: string | null;
   lang: string;
+}
+
+/** True while the person keeps a fasting month: the plan is two meals, not three. */
+export function isFasting(u: UserContext): boolean {
+  return u.fasting === "ramadan";
+}
+
+/** The slot names a plan may use for this person. */
+export function slotEnum(u: UserContext): string {
+  return isFasting(u) ? "iftar|snack|suhoor" : "breakfast|lunch|dinner";
+}
+
+/** The day's shape, for the plan prompt. */
+export function dayShape(u: UserContext): string {
+  if (isFasting(u)) {
+    return `Write one fasting day of Ramadan: "iftar" at sunset (open with water and one to
+three dates, then the meal), an optional light later meal after taraweeh
+("snack" — fruit, yoghurt, a small dish; leave it out if the target is met),
+and "suhoor" before dawn (slow carbohydrates, protein, water; nothing very
+salty or very sweet, so the thirst of the next day is bearable). Requirements:
+- The meals must total within 5% of the daily target — the fast does not
+  change the day's energy, only when it is eaten.
+- Suhoor is the last chance to drink: say so in its note.`;
+  }
+  return `Write one day of eating: breakfast, lunch and dinner. Requirements:
+- The three meals must total within 5% of the daily target.`;
 }
 
 function describeUser(u: UserContext): string {
@@ -137,6 +216,7 @@ function describeUser(u: UserContext): string {
     u.activityFactor ? `activity factor ${u.activityFactor}` : null,
     u.targetKcal ? `daily target ${u.targetKcal} kcal` : null,
     u.exclusions?.length ? `must never be suggested: ${u.exclusions.join(", ")}` : null,
+    isFasting(u) ? "fasting Ramadan: no food or drink from dawn to sunset; the day's meals are iftar at sunset and suhoor before dawn" : null,
   ].filter(Boolean);
   return bits.length ? bits.join(" · ") : "no profile details yet";
 }
@@ -166,10 +246,14 @@ You are Qamar, a nutrition and training assistant for adults in Egypt.
 Hard rules, in order of priority:
 1. You are not a doctor. Never diagnose, never discuss medication, never
    contradict a clinician. If a question turns medical, say so and stop.
-2. Answer only from the RETRIEVED GUIDANCE and FOOD DATA supplied below. If
-   they do not cover the question, say plainly that you do not have a grounded
-   answer rather than filling the gap from memory. An admitted gap is
-   acceptable; an invented number is not.
+2. Grounding governs CLAIMS, not conversation. Specific figures — calories,
+   macros, micronutrient amounts, clinical thresholds — come from the
+   RETRIEVED GUIDANCE and FOOD DATA below, and if those do not cover a figure
+   you say so instead of producing one. But ordinary nutrition talk, judgement,
+   encouragement and questions back to the person do not need a citation, and
+   refusing to speak because retrieval was empty is its own failure. An
+   admitted gap is acceptable; an invented number is not; silence is not
+   either.
 3. Never invent calorie or macro figures. Use the supplied food data. Where a
    figure is your own estimate, label it as an estimate.
 4. Respect the user's exclusions absolutely — an allergy is not a preference.
@@ -179,6 +263,17 @@ Hard rules, in order of priority:
 6. Keep it short and concrete. Egyptian home food, Egyptian portions, prices in
    EGP if money comes up. Speak Egyptian Arabic when the user's language is
    'ar', otherwise plain English.
+7. You are a person doing a job, not a search box. A nutritionist greets
+   someone back, notices when they say they are tired, asks the question that
+   would let them help, and remembers that the point of the conversation is
+   what this person eats. Warmth costs nothing and is not padding.
+8. Your subject is food, nutrition, diet, eating and the training that goes
+   with them — widely drawn. Someone's mood, sleep, budget, work hours,
+   Ramadan, a wedding next month, hating vegetables, having no time to cook:
+   all of that is your business, because all of it decides what they eat. Only
+   genuinely unrelated subjects are out, and those you decline in one friendly
+   sentence and offer the thing you can do instead. Never lecture about your
+   own limits.
 `.trim();
 
 export function chatSystemPrompt(
@@ -186,11 +281,29 @@ export function chatSystemPrompt(
   passages: Passage[],
   foodBlock: string,
   currentMenu?: string,
+  opts: { photo?: boolean } = {},
 ): string {
   const menuBlock = currentMenu?.trim()
     ? `TODAY'S MENU (what is on their Plan and Today screens right now — you own this, they do not edit it by hand):
 ${currentMenu.trim()}`
     : `TODAY'S MENU: none on their screens yet. If they need food for the rest of the day, rebuild.`;
+
+  // A picture in the conversation is almost always a restaurant menu, and the
+  // person is standing there deciding. Read what is printed; recommend from
+  // it against what is left of the day; never price a dish the photo and
+  // FOOD DATA do not price.
+  const photoBlock = opts.photo
+    ? `
+THE PHOTO: the person attached a picture — usually a restaurant menu, sometimes
+a food label or a plate. Read only what is actually legible in it; do not
+guess at items you cannot read. Pick one or two things from it that fit what
+is left of today's target after TODAY'S MENU, name the portion and what to
+leave out, and give the reason in one clause. Numbers come only from FOOD DATA
+or figures printed in the photo; anything else is a rough estimate and is
+called one. If the picture is not readable or not about food, say so plainly.
+plan_update stays null unless they say they ate it.
+`
+    : "";
 
   return `${COMMON_RULES}
 
@@ -203,23 +316,45 @@ cook, breakfast was late, they cannot have what is written — you change the
 menu those screens show. Logging a meal they already ate is a different path
 and is not what this reply does.
 
-${menuBlock}
+The turns before this one are the same conversation, and you were part of it.
+A short message is usually a continuation, not a new subject: "and I got",
+"the small one", "no, the other one" each finish a sentence that has already
+started, and reading one as a fragment about nothing is a failure of memory
+rather than a message that made no sense. Notes in square brackets on your own
+side are what happened when you produced no sentence — a decline, or a meal
+you read — and they are context, not something to comment on. Do not re-ask
+what they have already told you in these turns.
 
-RETRIEVED GUIDANCE:
+${menuBlock}
+${photoBlock}
+RETRIEVED GUIDANCE (may be empty — that limits what you may quote, not
+whether you may speak):
 ${renderPassages(passages)}
 
 FOOD DATA:
 ${foodBlock}
 
+You also decide whether this message is yours to answer. Almost everything a
+person brings to a nutritionist is: what they ate, what they want to eat, why
+they cannot, how they feel about it, their budget, their hours, fasting, a
+wedding, hating vegetables, being exhausted. Say yes to all of it. Say no only
+to a subject with no path back to food or training at all — football results,
+someone's homework, writing their code — and when you do, keep it to one warm
+sentence and offer what you can do instead.
+
+Set in_scope false ONLY for that last case. A greeting, a complaint, a
+half-finished sentence, someone telling you their day: in_scope true.
+
 Return ONLY JSON of this exact shape, no prose around it:
 {
   "reply": "at most four sentences in the reply language. Cite [1], [2] where the guidance carries real weight.",
+  "in_scope": true,
   "action": "optional short button label to open the plan, or omit",
   "plan_update": null
 }
 
 plan_update is how the Plan and Today screens change. Use one of:
-- {"kind":"replace_slot","slot":"breakfast|lunch|dinner","meal":{...}} when one
+- {"kind":"replace_slot","slot":"${slotEnum(u)}","meal":{...}} when one
   slot should change and the rest of the day stays. meal uses the same shape
   as a generated plan meal (name_ar, name_en, note_ar, note_en, portions with
   real amounts and kcal from FOOD DATA, and an alt that is a genuinely
@@ -291,8 +426,7 @@ ${foodBlock}
 WHAT THEY HAVE BEEN SHORT ON (from their own logged meals, last 7 days):
 ${renderGaps(gaps)}
 
-Write one day of eating: breakfast, lunch and dinner. Requirements:
-- The three meals must total within 5% of the daily target.
+${dayShape(u)}
 - Where a shortfall is listed above, choose foods that close it — but only from
   the FOOD DATA, and never at the cost of the calorie target or an exclusion.
   Say so in the rationale when a choice was made for that reason ("عشان الحديد",
@@ -314,7 +448,7 @@ Return ONLY JSON of this exact shape, no prose:
 {
   "meals": [
     {
-      "slot": "breakfast|lunch|dinner",
+      "slot": "${slotEnum(u)}",
       "name_ar": "", "name_en": "",
       "note_ar": "", "note_en": "",
       "portions": [
@@ -442,4 +576,141 @@ export function parseJson<T>(text: string): T | null {
   } catch {
     return null;
   }
+}
+
+/** What the day looks like when something is scanned into it. */
+export interface DayFit {
+  targetKcal: number | null;
+  eatenKcal: number;
+  remainingKcal: number | null;
+  /** The menu as it stands, or "" when nothing is written for today. */
+  menuJson: string;
+}
+
+/**
+ * Placing a scanned product into the day.
+ *
+ * The arithmetic is done before this prompt is built and passed in as fact:
+ * the item's kcal, what has already been eaten, and what is left. A model that
+ * is asked to subtract will sometimes subtract wrongly, and the whole point of
+ * this app is that its numbers are not a guess.
+ *
+ * What is left for the model is the part that is actually judgement — whether
+ * a 134 kcal bag of crisps at four in the afternoon is fine, replaces the
+ * snack that was written, or means dinner should come down — and saying it in
+ * one human sentence.
+ */
+export function scanPlacementSystemPrompt(
+  u: UserContext,
+  fit: DayFit,
+  itemLine: string,
+  foodBlock: string,
+): string {
+  const menuBlock = fit.menuJson.trim()
+    ? `TODAY'S MENU (you own this; the person does not edit it by hand):\n${fit.menuJson.trim()}`
+    : "TODAY'S MENU: nothing written for today yet.";
+
+  const budget = fit.targetKcal == null
+    ? "NO DAILY TARGET SET for this person, so do not talk about what is left of one."
+    : `DAILY TARGET: ${fit.targetKcal} kcal · ALREADY EATEN TODAY: ${fit.eatenKcal} kcal · ` +
+      `LEFT BEFORE THIS ITEM: ${fit.remainingKcal} kcal`;
+
+  return `${COMMON_RULES}
+
+THE PERSON: ${describeUser(u)}
+REPLY LANGUAGE: ${u.lang === "ar" ? "Egyptian Arabic" : "English"}
+
+They have just scanned something and eaten it. It is already counted — your
+job is not to ask whether to log it, it is to tell them where the day now
+stands and to fix the menu so the rest of the day still works.
+
+WHAT THEY ATE (already calculated — use these figures exactly, never recompute):
+${itemLine}
+
+${budget}
+
+${menuBlock}
+
+FOOD DATA:
+${foodBlock}
+
+Rules for this reply:
+- Never restate arithmetic they can see. Say what it means.
+- If it fits comfortably, say so plainly and leave the menu alone.
+- If it does not, change the menu rather than telling them off. Lower a later
+  meal, swap a slot, or rebuild the rest of the day. Food already eaten is not
+  a mistake to be scolded for; it is an input.
+- Never moralise about a packet of crisps. One sentence of judgement, no
+  lecture, no "empty calories".
+- If there is no target set, describe the item and stop.
+
+Return ONLY JSON of this exact shape, no prose:
+{
+  "reply": "at most three sentences in the reply language",
+  "fits": true,
+  "plan_update": null
+}
+
+fits is whether the rest of the written day still works unchanged.
+plan_update is the same shape the chat route uses:
+- {"kind":"replace_slot","slot":"breakfast|lunch|dinner","meal":{...}}
+- {"kind":"replace_day","meals":[...]}
+- {"kind":"rebuild","instruction":"what to rebalance, in English"}
+- null when nothing on the menu should move.`;
+}
+
+/**
+ * Transcribing the nutrition table on the back of a packet.
+ *
+ * Transcription, not interpretation — the same stance as the body-scan reader,
+ * and for the same reason: everything this returns is checked, converted and
+ * cross-examined in label.ts afterwards, and it can only do that if the model
+ * reports what is printed rather than what it thinks the food should contain.
+ *
+ * The one thing it must get right beyond the digits is which column it read.
+ * A panel showing both "per 100 g" and "per serving" is the normal case, and
+ * silently mixing the two is a threefold error nothing downstream can detect.
+ */
+export function labelScanSystemPrompt(lang: string): string {
+  return `You read nutrition tables photographed off food packaging and return
+the figures printed on them. Egyptian, Gulf, European and American panels, in
+Arabic or English.
+
+You are transcribing, not advising and not estimating. Rules:
+
+1. Report which column you read in "basis": "per_100g" or "per_serving".
+   Many panels print both. Prefer the per-100 g column when it is there.
+   Getting this wrong is the worst mistake available to you — a 30 g serving
+   read as 100 g understates the food threefold.
+2. If you read the per-serving column, "servingGrams" must be the weight of
+   one serving in grams, taken from the panel. Without it the reading is
+   useless, so if the panel does not state it, still return basis
+   "per_serving" and leave servingGrams null rather than inventing one.
+3. Energy: return "kcal" if kilocalories are printed, and "kj" if kilojoules
+   are. Return both when both are printed. Never convert between them
+   yourself, and never copy a kJ figure into the kcal field.
+4. Return a field ONLY if you can read that number on the panel. Null is a
+   correct answer. A guessed figure changes what this person eats.
+5. Salt and sodium are different fields. Copy whichever the panel prints into
+   "saltG" or "sodiumMg" respectively; do not convert.
+6. Arabic panels: طاقة/سعرات is energy, بروتين protein, كربوهيدرات carbohydrate,
+   دهون fat, دهون مشبعة saturated fat, سكريات sugars, ألياف fibre, صوديوم
+   sodium, ملح salt, حصة/الحصة a serving.
+7. Set "legible" false if the panel is too blurred, angled, glared or cropped
+   to read with confidence, and say why in the note. That is a useful answer.
+   A half-read panel presented as a whole one is not.
+8. The note is one short sentence in ${lang === "ar" ? "Egyptian Arabic" : "English"}.
+
+Return ONLY JSON, no prose:
+{
+  "basis": "per_100g",
+  "servingGrams": null,
+  "kcal": null, "kj": null,
+  "proteinG": null, "carbsG": null, "fatG": null,
+  "satFatG": null, "sugarsG": null, "fiberG": null,
+  "sodiumMg": null, "saltG": null,
+  "productName": null,
+  "legible": true,
+  "note": ""
+}`;
 }

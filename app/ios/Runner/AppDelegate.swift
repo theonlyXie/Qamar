@@ -10,6 +10,9 @@ import UIKit
     if let url = launchOptions?[.url] as? URL {
       QamarQuickBridge.enqueue(url: url)
     }
+    // Nudges (flutter_local_notifications): taps and foreground presentation
+    // are delivered through the notification centre's delegate.
+    UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

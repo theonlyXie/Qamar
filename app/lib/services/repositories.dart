@@ -1,5 +1,12 @@
+import '../models/activity.dart';
+import '../models/dishes.dart';
+import '../models/invitation.dart';
 import '../models/meal.dart';
+import '../models/nudge.dart';
+import '../models/quest.dart';
 import '../models/profile.dart';
+import '../models/ramadan.dart';
+import '../models/streak.dart';
 import '../models/water.dart';
 
 /// Repository interfaces mirroring the Supabase schema in
@@ -10,6 +17,44 @@ abstract class ProfileRepository {
   Future<Profile?> loadProfile(String userId);
   Future<void> saveProfile(String userId, Profile profile);
   Future<Target> saveTarget(String userId, Target target, {required Profile inputs});
+
+  /// The consent log is append-only: one row per change, the latest row is
+  /// the answer. [type] is one of [ConsentType].
+  Future<void> saveConsent(String userId, String type, {required bool granted, required String version});
+
+  /// The latest answer on record for [type]; null when never asked.
+  Future<bool?> loadConsent(String userId, String type);
+
+  /// The season in view (a week before Ramadan to a week after Eid), with the
+  /// dates the operator confirmed after the sighting; null when none.
+  Future<Season?> currentSeason();
+
+  /// The fasting switch, on the profile so the night job writes the right
+  /// kind of day.
+  Future<void> saveFastingMode(String userId, FastingMode mode);
+
+  /// Start was pressed — [via] is 'chat' or 'scan'. The denominator of
+  /// intake completion; the first one on the account is the one kept.
+  Future<void> recordIntakeStart(String userId, {required String via});
+
+  /// When this account began (auth.users.created_at, through
+  /// qamar_account_day0): day 0 for the kill metrics and for the phone's
+  /// fourteen-day push window alike. Null when the server cannot say.
+  Future<DateTime?> accountDay0(String userId);
+}
+
+/// The two consents the schema knows (consents.type).
+abstract final class ConsentType {
+  /// Processing the person's answers at all — required to use the app.
+  static const processing = 'processing_required';
+
+  /// Using anonymised usage to improve the service — optional, and the gate
+  /// on analytics.
+  static const improve = 'improve_optional';
+
+  /// Share weekly adherence with the nutritionist whose code is on the
+  /// subscription. Optional, off until said yes to, withdrawable.
+  static const adherence = 'adherence_share';
 }
 
 abstract class MealRepository {
@@ -34,6 +79,59 @@ abstract class MealRepository {
   Future<List<WeightReading>> weightHistory(String userId, {int days = 60});
 
   Future<void> recordWeight(String userId, {required double kg, DateTime? at});
+
+  /// The server's streak: computed from meal_logs, with freezes applied.
+  /// Null when the backend has no answer (older schema, offline).
+  Future<Streak?> streak(String userId);
+
+  /// When this person eats, learned from their logs (qamar_meal_time_profile).
+  /// Null when the backend has no answer.
+  Future<MealTimes?> mealTimes(String userId);
+
+  /// Last night's sentence about [day], written by the gateway's night job;
+  /// null when none was written (a new account, an empty day, no job yet).
+  Future<NightNote?> nightNote(String userId, DateTime day);
+
+  /// The last [days] days of meals, newest first — what "repeat a meal"
+  /// offers. Duplicates by name are the caller's to fold.
+  Future<List<LoggedMeal>> recentMeals(String userId, {int days = 7});
+
+  /// The food graph's per-100 g numbers for [slugs] (qamar_nutrients_per_100g:
+  /// USDA values for a food, derived from the ingredients for a dish). A slug
+  /// the graph has no complete numbers for is left out — a miss, never a
+  /// zero — and the caller falls back on what ships with the app.
+  Future<Map<String, Per100>> graphPer100(Iterable<String> slugs);
+}
+
+/// Movement logged by hand (activity_logs, migration 0051).
+abstract class ActivityRepository {
+  /// Writes the row and returns its id.
+  Future<String> add(String userId, ActivityLog entry);
+  Future<List<ActivityLog>> forDay(String userId, DateTime day);
+}
+
+/// The referral loop's server side (migration 0049). Every call is the
+/// signed-in person's own: their book, an invitation they issue, a code they
+/// redeem. Refusals arrive as [InvitationException] with the server's reason.
+abstract class InvitationRepository {
+  Future<InvitationBook> mine(String userId);
+  Future<Invitation> issue(String userId, {required String name});
+  Future<InvitationRedemption> redeem(String userId, {required String code});
+
+  /// A nutritionist's or coach's code (0069): puts the professional on the
+  /// account and, while its one trial is unused, starts the fortnight.
+  Future<ProCodeRedemption> redeemPro(String userId, {required String code});
+}
+
+class InvitationException implements Exception {
+  final String message;
+
+  /// The server looked at the code and said no: not there, already used, or
+  /// the person's own. The same code can never succeed.
+  final bool refused;
+  const InvitationException(this.message, {this.refused = false});
+  @override
+  String toString() => message;
 }
 
 abstract class WaterRepository {
@@ -42,11 +140,43 @@ abstract class WaterRepository {
   Future<List<WaterSip>> sipsForDay(String userId, DateTime day);
 }
 
+/// A redemption the server itself refused: the redeem function raised
+/// (qamar_wallet_redeem — not enough Su, the day's allowance used, no wall
+/// met today), so its transaction rolled back and nothing was spent. Any
+/// other failure of [WalletRepository.redeem] — no connection, a timeout, a
+/// 5xx — may have come after the purchase committed, and is not this.
+class RedeemRefused implements Exception {
+  final String message;
+  const RedeemRefused(this.message);
+
+  @override
+  String toString() => 'RedeemRefused: $message';
+}
+
 abstract class WalletRepository {
   Future<({int available, int lifetime})> balance(String userId);
   Future<void> credit(String userId, {required int amount, required String reason, required String idempotencyKey});
+
+  /// Today's quest, chosen by the server from what the day lacks, or null
+  /// (qamar_today_quest, 0061). The server pays it from the meal or glass
+  /// that satisfies it; nothing the phone sends pays it.
+  Future<DayQuest?> todayQuest(String userId);
+
+  /// "Not today": the quest is put away until tomorrow (qamar_skip_quest).
+  Future<void> skipQuest(String userId);
+
+  /// The onboarding bonus, once per account (qamar_grant_onboarding).
+  Future<void> grantOnboarding(String userId);
+  /// Spends Su on [item]. Throws [RedeemRefused] only when the server
+  /// refused it (nothing spent); anything else it throws leaves the purchase
+  /// unknown, and a retry with the same [idempotencyKey] is the purchase that
+  /// already happened, if it did (0067).
   Future<void> redeem(String userId, {required SpendItemDef item, required String idempotencyKey});
   Future<List<LedgerEntry>> ledger(String userId);
+
+  /// What one more question costs today, as the server charges it
+  /// (su_economy_config 'question_extra', 0066), or null if it has no row.
+  Future<int?> questionPrice();
 }
 
 /// A day's logged intake, as recorded — never estimated or back-filled.
@@ -61,6 +191,18 @@ class WeightReading {
   final DateTime at;
   final double kg;
   const WeightReading({required this.at, required this.kg});
+}
+
+/// The one sentence written at night about the coming day: tomorrow against
+/// today, no dish named. On Qamar+ the plan is behind it; on the free tier it
+/// is what stands in for the plan, with the plan locked.
+class NightNote {
+  final DateTime day;
+  final String ar;
+  final String en;
+  final int planKcal;
+  final int todayKcal;
+  const NightNote({required this.day, required this.ar, required this.en, required this.planKcal, required this.todayKcal});
 }
 
 /// Payload shape for [MealRepository.saveDraft] — matches meal_drafts.

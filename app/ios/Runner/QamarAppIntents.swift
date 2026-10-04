@@ -48,21 +48,23 @@ struct LogMealQamarIntent: AppIntent {
 @available(iOS 16.0, *)
 struct QamarShortcuts: AppShortcutsProvider {
   static var appShortcuts: [AppShortcut] {
-    [
-      AppShortcut(
-        intent: AskQamarIntent(),
-        phrases: [
-          "Ask \(.applicationName)",
-          "Talk to \(.applicationName)",
-        ]
-      ),
-      AppShortcut(
-        intent: LogMealQamarIntent(),
-        phrases: [
-          "Log a meal with \(.applicationName)",
-          "Tell \(.applicationName) what I ate",
-        ]
-      ),
-    ]
+    AppShortcut(
+      intent: AskQamarIntent(),
+      phrases: [
+        "Ask \(.applicationName)",
+        "Talk to \(.applicationName)",
+      ],
+      shortTitle: "Ask Qamar",
+      systemImageName: "moon.stars"
+    )
+    AppShortcut(
+      intent: LogMealQamarIntent(),
+      phrases: [
+        "Log a meal with \(.applicationName)",
+        "Tell \(.applicationName) what I ate",
+      ],
+      shortTitle: "Log a meal",
+      systemImageName: "fork.knife"
+    )
   }
 }
