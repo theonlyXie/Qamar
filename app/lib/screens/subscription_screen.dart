@@ -1,177 +1,468 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/trial_words.dart';
+import '../l10n/words.dart';
 import '../models/billing.dart';
 import '../services/config.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/icons.dart';
+import '../theme/layout.dart';
 import '../theme/text_styles.dart';
 import '../widgets/common.dart';
-import '../widgets/moon.dart';
+import '../widgets/review_card.dart';
+import '../widgets/kit.dart';
+import '../widgets/mascot.dart';
 
-/// Qamar+ paywall.
+/// Qamar+ and its paywall (the kit's Premium page): what it is for on the
+/// lavender card, the one plan and its price on the lime card, the one thing
+/// to do, then what is in each tier, and the fine print. Calm and short, and
+/// every clause true for the person reading it.
 ///
 /// Prices here match the Paymob catalog (EGP). The charge itself is stamped
 /// server-side; this screen only names the plan and, optionally, a promo code.
 class SubscriptionScreen extends StatelessWidget {
   const SubscriptionScreen({super.key});
 
+  static const leadKey = ValueKey('paywall-lead');
+  static const withoutKey = ValueKey('paywall-without');
+  static const bannerKey = ValueKey('paywall-banner');
+  static const paymentKey = ValueKey('paywall-payment');
+  static const codeLineKey = ValueKey('paywall-code-line');
+
+  /// The screen's one primary, and the way to a code.
+  static const primaryKey = ValueKey('paywall-primary');
+  static const buyKey = ValueKey('paywall-buy');
+
+  /// Said where the payment would be while Qamar+ is not on sale yet.
+  static const soonKey = ValueKey('paywall-soon');
+  static const codeToggleKey = ValueKey('paywall-code-toggle');
+
+  /// The billing function's reason a typed professional's code is not the
+  /// one paid, in the person's language; null when there is none.
+  static String? promoNoticeLine(bool isAr, String? notice) => switch (notice) {
+        'referral_ended' => isAr
+            ? 'السنة بتاعة أخصائيك على اشتراكك خلصت، فمفيش نصيب بيتدفع له دلوقتي. السعر زي ما هو.'
+            : 'Your nutritionist’s twelve months on your subscription have ended, so no share is paid to them now. Your price is the same.',
+        'other_professional' => isAr
+            // "Account", not "subscription": before a first payment the other
+            // professional is a claim on the account (0069), and there is no
+            // subscription yet. The same word as Me's refusal.
+            ? 'فيه أخصائي تاني على حسابك، وهو اللي بياخد النصيب لحد ما سنته تخلص. لو عايز تغيّر، كلّم الدعم. السعر زي ما هو.'
+            : 'Another nutritionist is already on your account, and their share stays with them for their twelve months. To change, write to support. Your price is the same.',
+        'unchecked' => isAr
+            ? 'مقدرتش أتأكد من كود الأخصائي دلوقتي، فمفيش نصيب على الدفعة دي. السعر زي ما هو.'
+            : 'I could not check the nutritionist’s code just now, so no share is attached to this payment. Your price is the same.',
+        _ => null,
+      };
+
+  /// How to pay, naming only the rails the billing function says checkout
+  /// can take (its labelled Paymob integrations). With none stated it names
+  /// none, rather than promise Vodafone Cash or Meeza an account cannot take.
+  static String paymentLine(bool isAr, List<String> methods) {
+    final names = [
+      if (methods.contains('card')) isAr ? 'فيزا أو ماستركارد' : 'Visa or Mastercard',
+      if (methods.contains('meeza')) isAr ? 'كارت ميزة' : 'a Meeza card',
+      if (methods.contains('wallet')) isAr ? 'فودافون كاش أو أي محفظة موبايل' : 'Vodafone Cash or another mobile wallet',
+    ];
+    final join = names.length < 2
+        ? names.join()
+        : '${names.sublist(0, names.length - 1).join(isAr ? '، ' : ', ')}${isAr ? '، أو ' : ', or '}${names.last}';
+    final how = names.isEmpty
+        ? (isAr ? 'الدفع بالجنيه عن طريق Paymob.' : 'You pay in EGP through Paymob.')
+        : (isAr ? 'الدفع بالجنيه عن طريق Paymob: $join.' : 'You pay in EGP through Paymob: $join.');
+    return '$how ${isAr ? 'قمر+ بيتفعل أول ما Paymob يأكد الدفع.' : 'Qamar+ turns on once Paymob confirms the payment.'}';
+  }
+
+  /// The price, as O14 agreed it: priced against a nutritionist, not against
+  /// apps, and every clause true for the person reading it.
+  /// - "About one visit": a visit costs EGP 350–800, a video consultation
+  ///   starts at 300; 500 is in that range, not below it.
+  /// - "Same price for everyone" goes whenever a campaign code has lowered
+  ///   this quote.
+  /// - The earned month is stated in the server's numbers, and only once the
+  ///   server has stated them and the month can still be earned.
+  /// - "Nothing renews on its own": a payment only extends the month
+  ///   (qamar_apply_paid_order), and there is nothing to cancel.
+  static String priceBanner(AppState state, PlusQuote quote) {
+    final isAr = state.isAr;
+    final price = formatEgp(quote.listPounds, ar: isAr, eastern: state.easternDigits);
+    final earned = state.earnedMonth;
+    return [
+      isAr
+          ? '$price في الشهر — في حدود تمن كشف واحد عند أخصائي تغذية، وقمر معاك في كل وجبة.'
+          : '$price a month — about one nutritionist visit, with Qamar at every meal.',
+      if (!quote.discounted) isAr ? 'نفس السعر للكل.' : 'Same price for everyone.',
+      if (earned.onOffer)
+        isAr
+            ? 'سجّل ${Counted.day.of(earned.needed, ar: true, iso: state.iso)} من أول ${Counted.day.of(earned.windowDays, ar: true, iso: state.iso)} بعد ما تشترك، والشهر اللي بعده علينا.'
+            : 'Log ${earned.needed} of your first ${Counted.day.of(earned.windowDays, ar: false, iso: state.iso)} after you subscribe and the next month is on us.',
+      isAr ? 'ومفيش حاجة بتتجدد لوحدها.' : 'Nothing renews on its own.',
+    ].join(' ');
+  }
+
+  /// The button that pays for a month, at the quoted amount.
+  static String buyLabel(AppState state, PlusQuote quote) {
+    final isAr = state.isAr;
+    final price = formatEgp(quote.amountPounds, ar: isAr, eastern: state.easternDigits);
+    return isAr ? 'ادفع شهر بـ $price' : 'Pay $price for a month';
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final isAr = state.isAr;
     final quote = state.displayPlusQuote;
+    // The one primary: the free week while it is on offer, otherwise a
+    // month, and nothing while a paid month is running (there is nothing to
+    // renew and nothing to cancel).
+    final trialOffer = !state.plusActive && state.plusTrialEligible;
+    // Paying waits for Paymob (AppState.plusOnSale); the free week does not.
+    final canBuy = state.plusOnSale && (!state.plusActive || state.plusIsTrial);
+    // Where a payment would have been offered, it says it is coming instead.
+    final soon = !state.plusOnSale && !trialOffer && (!state.plusActive || state.plusIsTrial);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 160),
+      padding: const EdgeInsets.fromLTRB(QSpace.page, QLayout.pageTop, QSpace.page, QSpace.xxxl),
       children: [
-        Row(
-          children: [
-            QRoundIconButton(icon: Icons.close, onTap: () => state.go(AppScreen.you)),
-            const Spacer(),
-            if (state.plusActive)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: QColors.green.withValues(alpha: 0.14),
-                  border: Border.all(color: QColors.green.withValues(alpha: 0.5)),
-                  borderRadius: BorderRadius.circular(999),
+        // The kit's Premium header: the way back and the name beside it.
+        QPageTitle(
+          title: 'Qamar+',
+          isAr: false,
+          back: state.back,
+          trailing: [if (state.plusActive) const _ActiveChip()],
+        ),
+        const SizedBox(height: QSpace.lg),
+
+        // What Qamar+ is for, first, on the lavender card, the moon beside
+        // it: the answer to "what do I eat?" The night job writes tomorrow's
+        // plan for every member at 22:00 Cairo.
+        PastelCard(
+          color: QColors.lavender,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                // From the start, and never ending on a word alone.
+                BalancedStartText(
+                  isAr ? 'قمر+ بيقولك تاكل إيه بكرة: بيكتبلك الخطة بالليل، بأكل مصري.' : 'Qamar+ tells you what to eat tomorrow: it writes the plan at night, in Egyptian dishes.',
+                  textKey: SubscriptionScreen.leadKey,
+                  style: QText.body(size: 18, height: 27, weight: FontWeight.w600, color: QColors.onPastel),
                 ),
-                child: Text(isAr ? 'مفعّل' : 'Active',
-                    style: QText.body(size: 11, weight: FontWeight.w600, color: QColors.green)),
-              ),
-          ],
+                const SizedBox(height: QSpace.sm),
+                Text(
+                  isAr
+                      ? 'ومن غيره قمر شغال برضه: خطة النهارده، تلات صور وتلات أسئلة كل يوم، والكتابة والصوت بلا حد.'
+                      : 'Without it Qamar still works: today’s plan, three photos and three questions a day, and unlimited typing and speaking.',
+                  key: SubscriptionScreen.withoutKey,
+                  style: QText.body(size: 15, color: QColors.onPastelSecondary),
+                ),
+              ]),
+            ),
+            const SizedBox(width: QSpace.md),
+            const MoonMascot(size: 56, mood: MoonMood.joy),
+          ]),
         ),
-        const SizedBox(height: 10),
-        Center(child: const QamarMoon(size: 84)),
-        const SizedBox(height: 14),
-        Center(
-          child: ShaderMask(
-            shaderCallback: (r) => QColors.brandGradient.createShader(r),
-            child: Text('Qamar+', style: QText.display(size: 34, height: 42, color: Colors.white)),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          isAr
-              ? 'قمر بيشتغل معاك من غير اشتراك. الكتابة والصوت مجاناً ومش بيخصموا استخدامات. Qamar+ بيفتح تحليل الوجبة بالصورة والخطة الكاملة.'
-              : 'Qamar works without a subscription. Typing and speaking a meal are free and do not spend Qamar uses. Qamar+ unlocks photo analysis and the full plan.',
-          textAlign: TextAlign.center,
-          style: QText.body(size: 14, height: 22, color: QColors.textMuted),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: QColors.violet.withValues(alpha: 0.10),
-            border: Border.all(color: QColors.violet.withValues(alpha: 0.35)),
-            borderRadius: BorderRadius.circular(QRadii.xl),
-          ),
-          child: Text(
-            isAr
-                ? 'السعر ٥٠٠ ج.م في الشهر. أول اشتراك خصم ٣٠٪ (٣٥٠ ج.م). السنة بـ ٢٤٩ ج.م — نفس سعر باقة ٣ شهور، ودي العرض اللي بنشجّع عليه.'
-                : 'List is EGP 500 a month. Your first subscription is 30% off (EGP 350). One year is EGP 249 — the same cash as the 3-month pack, and the plan we push.',
-            style: QText.body(size: 13, height: 20, color: QColors.textHigh),
-          ),
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(height: QSpace.md),
 
-        for (final plan in const [PlusPlan.annual, PlusPlan.quarterly, PlusPlan.monthly]) ...[
-          _TierCard(state: state, plan: plan),
-          const SizedBox(height: 10),
-        ],
-
-        const SizedBox(height: 4),
-        Text(
-          isAr ? 'كود عرض أو صديق' : 'A friend’s code or a promo',
-          style: QText.body(size: 12, weight: FontWeight.w600, color: QColors.textMuted),
-        ),
-        const SizedBox(height: 6),
-        const _PromoField(),
-        const SizedBox(height: 6),
-        Text(
-          quote.pricingReason == 'affiliate'
-              ? (isAr
-                  ? 'بالكود ده الشهر بـ ٢٩٩ ج.م. صاحبك ياخد ٥٠ ج.م كاش في محفظة العمولة (مش نقاط Su)، وصافي قمر ٢٤٩ ج.م.'
-                  : 'With this code the month is EGP 299. Your friend earns EGP 50 cash in their affiliate wallet (not Su Points). Qamar’s net is EGP 249.')
-              : (isAr
-                  ? 'لو حد بعتلك كود، اكتبه هنا: الشهر يبقى ٢٩٩ ج.م، وهو ياخد ٥٠ ج.م كاش نبعتهاله من طرفنا.'
-                  : 'If someone sent you a code, enter it here: monthly Plus is EGP 299, and they earn EGP 50 cash we send from our end.'),
-          style: QText.body(size: 12, height: 18, color: QColors.textFaint),
-        ),
-        if (quote.promoError != null) ...[
-          const SizedBox(height: 8),
-          Text(quote.promoError!, style: QText.body(size: 12, color: QColors.amber)),
-        ],
-        if (quote.promoNote != null) ...[
-          const SizedBox(height: 8),
-          Text(quote.promoNote!, style: QText.body(size: 12, height: 18, color: QColors.textMuted)),
-        ],
-
-        const SizedBox(height: 16),
-        _FeatureTable(state: state),
-        const SizedBox(height: 18),
+        _PlanCard(state: state, quote: quote, buyHere: trialOffer && state.plusOnSale),
+        const SizedBox(height: QSpace.lg),
 
         if (state.plusNotice != null) ...[
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: QColors.amber.withValues(alpha: 0.10),
-              border: Border.all(color: QColors.amber.withValues(alpha: 0.4)),
-              borderRadius: BorderRadius.circular(QRadii.lg),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.info_outline, size: 16, color: QColors.amber),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(state.plusNotice!,
-                      style: QText.body(size: 12, height: 19, color: QColors.amberSoft)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
+          QStateLine(line: state.plusNotice!, icon: QIcons.info),
+          const SizedBox(height: QSpace.lg),
         ],
 
-        QPrimaryButton(
-          label: state.plusActive
-              ? (isAr ? 'إدارة الاشتراك' : 'Manage subscription')
-              : (isAr
-                  ? 'ابدأ ${formatEgp(quote.amountPounds, ar: true)}'
-                  : 'Start Qamar+ — ${formatEgp(quote.amountPounds, ar: false)}'),
-          onTap: () { state.startPlusPurchase(); },
-        ),
-        const SizedBox(height: 8),
+        if (trialOffer) ...[
+          QPrimaryButton(
+            key: SubscriptionScreen.primaryKey,
+            label: TrialWords.paywallButton(ar: isAr),
+            onTap: () => state.startPlusTrial(placement: 'paywall'),
+          ),
+          const SizedBox(height: QSpace.sm),
+          Text(
+            TrialWords.paywallRule(AppState.trialOfferDays, ar: isAr, iso: state.iso),
+            textAlign: TextAlign.center,
+            style: QText.body(size: 13, height: 18, color: QColors.inkTertiary),
+          ),
+        ] else if (canBuy)
+          QPrimaryButton(key: SubscriptionScreen.primaryKey, label: SubscriptionScreen.buyLabel(state, quote), onTap: state.startPlusPurchase)
+        else if (soon)
+          QStateLine(
+            key: SubscriptionScreen.soonKey,
+            line: isAr ? 'الدفع لسه مش متاح. قريب.' : 'Paying for Qamar+ isn’t open yet. Soon.',
+          ),
+
+        const SizedBox(height: QSpace.xxl),
+        _FeatureTable(state: state),
+        // A code rides on a payment: while a paid month runs there is none.
+        if (canBuy) ...[
+          const SizedBox(height: QSpace.lg),
+          _CodeSection(state: state, quote: quote),
+        ],
+
+        const SizedBox(height: QSpace.lg),
         Center(
-          child: TextButton(
-            onPressed: () { state.restorePlusPurchases(); },
-            child: Text(isAr ? 'تأكيد الاشتراك' : 'Confirm subscription',
-                style: QText.body(size: 13, weight: FontWeight.w500, color: QColors.textMuted)),
+          child: QTapArea(
+            onTap: state.restorePlusPurchases,
+            builder: (context, pressed) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: QSpace.md),
+              child: Text(isAr ? 'استرجع الاشتراك' : 'Restore purchase',
+                  style: QText.body(size: 15, weight: FontWeight.w600, color: pressed ? QColors.ink : QColors.accentInk)),
+            ),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: QSpace.sm),
         Text(
-          isAr
-              ? 'الدفع في مصر عن طريق Paymob بالجنيه: فيزا، ماستركارد، Meeza، أو محفظة فودافون/أورانج. قمر+ بيتفعل بعد ما Paymob يأكد التحويل. نقاط Su مش بتتباع ومش بتتشحن بفلوس — بتتكسب بس. عمولة الأفلييت كاش بالجنيه، مش نقاط.'
-              : 'Egypt billing is Paymob, in EGP: Visa, Mastercard, Meeza, or Vodafone/Orange Cash. Qamar+ turns on after Paymob confirms the transfer. Su Points are never sold or topped up with money — they are only earned. Affiliate commission is EGP cash, not Su.',
+          '${paymentLine(isAr, quote.paymentMethods)} ${isAr ? 'نقاط Su مش بتتباع ومش بتتشحن بفلوس — بتتكسب بس. نصيب الأخصائي بيتدفع كاش بالجنيه، مش نقاط.' : 'Su Points are never sold or topped up with money — they are only earned. A nutritionist’s share is paid in EGP cash, not Su.'}',
+          key: SubscriptionScreen.paymentKey,
           textAlign: TextAlign.center,
-          style: QText.body(size: 11, height: 17, color: QColors.textFaint),
+          style: QText.body(size: 12, height: 17, color: QColors.inkTertiary),
         ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        const SizedBox(height: QSpace.sm),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            QLegalLink(label: isAr ? 'الشروط' : 'Terms', url: QamarConfig.termsUrl),
-            Text('  ·  ', style: QText.body(size: 11, color: QColors.textFaint)),
-            QLegalLink(label: isAr ? 'الخصوصية' : 'Privacy', url: QamarConfig.privacyUrl),
-            Text('  ·  ', style: QText.body(size: 11, color: QColors.textFaint)),
-            QLegalLink(label: isAr ? 'الدعم' : 'Support', url: QamarConfig.supportUrl),
+            QLegalLink(label: isAr ? 'الشروط' : 'Terms', url: QamarConfig.termsUrl, size: 13),
+            const _Dot(),
+            QLegalLink(label: isAr ? 'الخصوصية' : 'Privacy', url: QamarConfig.privacyUrl, size: 13),
+            const _Dot(),
+            QLegalLink(label: isAr ? 'الدعم' : 'Support', url: QamarConfig.supportUrl, size: 13),
           ],
         ),
       ],
+    );
+  }
+}
+
+/// The mark between two links, with room either side of it.
+class _Dot extends StatelessWidget {
+  const _Dot();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: QSpace.xs),
+        child: Text('·', style: QText.body(size: 13, color: QColors.inkSecondary)),
+      );
+}
+
+/// "Active", at the end of the header while Qamar+ is on: a check and the
+/// word, on the kit's mint.
+class _ActiveChip extends StatelessWidget {
+  const _ActiveChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = Directionality.of(context) == TextDirection.rtl;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: QSpace.md, vertical: 6),
+      decoration: QDecor.capsule(edge: QColors.mint, fill: QColors.mint),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        const QIcon(QIcons.done, size: 16, color: QColors.onPastel),
+        const SizedBox(width: 6),
+        Text(isAr ? 'مفعّل' : 'Active', style: QText.body(size: 13, weight: FontWeight.w600, color: QColors.onPastel)),
+      ]),
+    );
+  }
+}
+
+/// The one plan, on the kit's lime plan card: its name and price, the line
+/// under them, the agreed banner, and — while the free week is the primary —
+/// the way to pay for a month. One plan, so no radio: a single option is not
+/// a choice.
+class _PlanCard extends StatelessWidget {
+  final AppState state;
+  final PlusQuote quote;
+  final bool buyHere;
+  const _PlanCard({required this.state, required this.quote, required this.buyHere});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    final until = state.plusUntil?.toLocal();
+    final earned = state.earnedMonth;
+    final day = until == null ? '' : '${until.day}/${until.month}';
+    final sub = state.plusIsTrial && until != null
+        ? (isAr ? 'الأسبوع المجاني شغال · لحد ${state.iso(day)}' : 'Free week on · until $day')
+        : state.plusIsEarned && until != null
+            ? (isAr ? 'شهر علينا · لحد ${state.iso(day)}' : 'A month on us · until $day')
+            : state.plusActive && earned.inProgress
+                ? (isAr
+                    ? 'شهر علينا: ${state.iso('${earned.loggedDays}')} من ${Counted.day.of(earned.needed, ar: true, iso: state.iso)} مسجّلين'
+                    : 'A month on us: ${earned.loggedDays} of ${Counted.day.of(earned.needed, ar: false, iso: state.iso)} logged')
+                : state.plusActive && until != null
+                    ? (isAr ? 'شهرك شغال · لحد ${state.iso(day)}' : 'Your month · until $day')
+                    : quote.pricingReason == 'affiliate'
+                        ? (isAr ? '٣٠ يوم · بكود أخصائيك' : '30 days · with your nutritionist’s code')
+                        : (isAr ? '٣٠ يوم · مفيش حاجة بتتجدد لوحدها' : '30 days · nothing renews on its own');
+
+    return PastelCard(
+      color: QColors.lime,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(isAr ? 'شهري' : 'Monthly Plan', style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.onPastel)),
+          const SizedBox(height: QSpace.xs),
+          Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+            Text(formatEgp(quote.amountPounds, ar: isAr, eastern: state.easternDigits), style: QText.number(size: 28, weight: FontWeight.w700, color: QColors.onPastel, ar: isAr)),
+            const SizedBox(width: QSpace.xs),
+            Text(isAr ? '/ شهر' : '/month', style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.onPastelSecondary)),
+            // A campaign code is the one thing that can lower the price; when
+            // it has, show what it came down from.
+            if (quote.discounted) ...[
+              const SizedBox(width: QSpace.sm),
+              Text(
+                formatEgp(quote.listPounds, ar: isAr, eastern: state.easternDigits),
+                style: QText.number(size: 15, color: QColors.onPastelSecondary, ar: isAr).copyWith(decoration: TextDecoration.lineThrough, decorationColor: QColors.onPastelSecondary),
+              ),
+            ],
+          ]),
+          const SizedBox(height: 2),
+          Text(sub, style: QText.body(size: 13, height: 18, color: QColors.onPastelSecondary)),
+          const SizedBox(height: QSpace.md),
+          const Divider(height: 1, thickness: 1, color: QColors.pastelTrack),
+          const SizedBox(height: QSpace.md),
+          Text(SubscriptionScreen.priceBanner(state, quote), key: SubscriptionScreen.bannerKey, style: QText.body(size: 15, color: QColors.onPastel)),
+          if (buyHere) ...[
+            const SizedBox(height: QSpace.lg),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: QPastelButton(key: SubscriptionScreen.buyKey, label: SubscriptionScreen.buyLabel(state, quote), height: 44, onTap: state.startPlusPurchase),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A professional's code, which most people do not have: behind one quiet
+/// line until it is wanted, and open whenever there is something in it. A
+/// typed code that is not the one paid says why, before anything that would
+/// say it is (the billing function's rule: twelve months, one professional
+/// per client); its second half is the client's yes to the professional
+/// seeing the week as numbers, off until turned on, and also on Me.
+class _CodeSection extends StatefulWidget {
+  final AppState state;
+  final PlusQuote quote;
+  const _CodeSection({required this.state, required this.quote});
+
+  @override
+  State<_CodeSection> createState() => _CodeSectionState();
+}
+
+class _CodeSectionState extends State<_CodeSection> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final quote = widget.quote;
+    final isAr = state.isAr;
+    final typed = state.plusPromoCode.trim().isNotEmpty;
+    final open = _open || typed || quote.pricingReason == 'affiliate' || quote.promoNotice != null || quote.promoError != null;
+    final still = MediaQuery.disableAnimationsOf(context);
+
+    return AnimatedSize(
+      duration: still ? Duration.zero : const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+      alignment: AlignmentDirectional.topStart,
+      child: !open
+          ? Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: QTapArea(
+                key: SubscriptionScreen.codeToggleKey,
+                onTap: () => setState(() => _open = true),
+                builder: (context, pressed) => Row(mainAxisSize: MainAxisSize.min, children: [
+                  QIcon(QIcons.add, size: 18, color: pressed ? QColors.ink : QColors.accentInk),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(isAr ? 'معاك كود أخصائي أو مدرّب؟' : 'Have a nutritionist’s or coach’s code?',
+                        style: QText.body(size: 15, weight: FontWeight.w600, color: pressed ? QColors.ink : QColors.accentInk)),
+                  ),
+                ]),
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(start: QSpace.lg, bottom: QSpace.sm),
+                  child: Text(QText.eyebrowText(isAr ? 'كود الأخصائي أو المدرّب' : 'Your nutritionist’s or coach’s code', ar: isAr), style: QText.eyebrow(ar: isAr)),
+                ),
+                const _PromoField(),
+                const SizedBox(height: QSpace.sm),
+                Padding(
+                  padding: const EdgeInsetsDirectional.symmetric(horizontal: QSpace.lg),
+                  child: Text(
+                    key: SubscriptionScreen.codeLineKey,
+                    SubscriptionScreen.promoNoticeLine(isAr, quote.promoNotice) ??
+                        (quote.pricingReason == 'affiliate'
+                            ? (isAr
+                                ? 'الكود شغال. السعر زي ما هو، وأخصائيك بيتابع خطتك وبياخد نصيب من الاشتراك لمدة سنة.'
+                                : 'Code applied. Your price is unchanged; your nutritionist follows your plan and earns a share of this subscription for a year.')
+                            : (isAr
+                                ? 'لو أخصائي أو مدرّب بعتك، اكتب الكود هنا. السعر مش بيتغير — الكود بيربط خطتك بيه وبيديه نصيب من الاشتراك.'
+                                : 'If a nutritionist or coach sent you, enter their code. The price does not change — the code links your plan to them and pays them a share.')),
+                    style: QText.body(size: 13, height: 18, color: QColors.inkSecondary),
+                  ),
+                ),
+                if (quote.promoError != null) ...[
+                  const SizedBox(height: QSpace.sm),
+                  QStateLine(line: quote.promoError!, icon: QIcons.warning),
+                ],
+                if (quote.pricingReason == 'affiliate' || typed) ...[
+                  const SizedBox(height: QSpace.md),
+                  _ShareSwitch(state: state),
+                ],
+                if (quote.promoNote != null) ...[
+                  const SizedBox(height: QSpace.sm),
+                  Padding(
+                    padding: const EdgeInsetsDirectional.symmetric(horizontal: QSpace.lg),
+                    child: Text(quote.promoNote!, style: QText.body(size: 13, height: 18, color: QColors.inkTertiary)),
+                  ),
+                ],
+              ],
+            ),
+    );
+  }
+}
+
+/// The client's yes to the professional seeing the week as numbers: a row
+/// with its switch, the whole row the control, in Me's own words.
+class _ShareSwitch extends StatelessWidget {
+  final AppState state;
+  const _ShareSwitch({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = state.isAr;
+    return MergeSemantics(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onTap: () => state.setAdherenceShare(!state.adherenceShare),
+        child: Container(
+          padding: const EdgeInsetsDirectional.fromSTEB(QSpace.lg, QSpace.md, QSpace.md, QSpace.md),
+          decoration: QDecor.card(),
+          child: Row(children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(isAr ? 'شارك أسبوعي معاه' : 'Share my week with them', style: QText.body(size: 17, color: QColors.ink)),
+                const SizedBox(height: 2),
+                Text(
+                  isAr ? 'أيام التسجيل والمتوسط مقابل الهدف، ومفيش حاجة غيرهم.' : 'Days logged and the average against your target, nothing else.',
+                  style: QText.body(size: 13, height: 18, color: QColors.inkSecondary),
+                ),
+              ]),
+            ),
+            const SizedBox(width: QSpace.md),
+            Switch.adaptive(value: state.adherenceShare, onChanged: (v) => state.setAdherenceShare(v)),
+          ]),
+        ),
+      ),
     );
   }
 }
@@ -200,139 +491,20 @@ class _PromoFieldState extends State<_PromoField> {
 
   @override
   Widget build(BuildContext context) {
-    final isAr = context.watch<AppState>().isAr;
     return TextField(
       controller: _controller,
       textCapitalization: TextCapitalization.characters,
       autocorrect: false,
+      // A code is Latin: left to right in both languages ("QMR…", not "…QMR").
+      textDirection: TextDirection.ltr,
+      textInputAction: TextInputAction.done,
       onChanged: (v) => context.read<AppState>().setPlusPromoCode(v),
-      style: QText.number(size: 15, color: QColors.textPrimary),
+      style: QText.number(size: 17, color: QColors.ink),
       decoration: InputDecoration(
-        hintText: isAr ? 'QMR…' : 'QMR…',
-        hintStyle: QText.body(size: 14, color: QColors.textFaint),
-        filled: true,
-        fillColor: QColors.cardNavy,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: QColors.borderSoft)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: QColors.borderSoft)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: QColors.violet)),
-      ),
-    );
-  }
-}
-
-class _TierCard extends StatelessWidget {
-  final AppState state;
-  final PlusPlan plan;
-  const _TierCard({required this.state, required this.plan});
-
-  PlusQuote _quote() {
-    if (state.plusPlan == plan) return state.displayPlusQuote;
-    return PlusPricing.quote(plan: plan.name, firstPurchase: state.plusFirstPurchase);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isAr = state.isAr;
-    final selected = state.plusPlan == plan;
-    final quote = _quote();
-    final title = switch (plan) {
-      PlusPlan.annual => (isAr ? 'سنة' : '1 year'),
-      PlusPlan.quarterly => (isAr ? '٣ شهور' : '3 months'),
-      PlusPlan.monthly => (isAr ? 'شهري' : 'Monthly'),
-    };
-    final sub = switch (plan) {
-      PlusPlan.annual => isAr
-          ? 'خصم ٥٠٪ · نفس سعر ٣ شهور، و١٢ شهر'
-          : '50% off · same cash as 3 months, for 12',
-      PlusPlan.quarterly => isAr ? '٩٠ يوم · نفس سعر السنة نقداً' : '90 days · same cash price as a year',
-      PlusPlan.monthly => quote.pricingReason == 'affiliate'
-          ? (isAr ? 'بكود الصديق · ٣٠ يوم' : 'with a friend’s code · 30 days')
-          : quote.pricingReason == 'first_user'
-              ? (isAr ? 'أول اشتراك · خصم ٣٠٪' : 'first subscription · 30% off')
-              : (isAr ? '٣٠ يوم' : '30 days'),
-    };
-    final badge = switch (plan) {
-      PlusPlan.annual => isAr ? 'الأفضل' : 'Best value',
-      PlusPlan.quarterly => null,
-      PlusPlan.monthly => quote.discounted ? (isAr ? 'عرض' : 'Offer') : null,
-    };
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(QRadii.xl),
-        onTap: () => state.selectPlusPlan(plan),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: selected
-                ? const LinearGradient(colors: [QColors.cardMid, QColors.cardDeep])
-                : null,
-            color: selected ? null : QColors.cardNavy,
-            border: Border.all(
-              color: selected ? QColors.violet : QColors.borderSoft,
-              width: selected ? 1.6 : 1,
-            ),
-            borderRadius: BorderRadius.circular(QRadii.xl),
-            boxShadow: selected
-                ? [BoxShadow(color: QColors.violet.withValues(alpha: 0.22), blurRadius: 26)]
-                : null,
-          ),
-          child: Row(
-            children: [
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                size: 20,
-                color: selected ? QColors.violet : QColors.textFaint,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(title,
-                            style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.textPrimary)),
-                        if (badge != null) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: QColors.green.withValues(alpha: 0.16),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(badge,
-                                style: QText.body(size: 10, weight: FontWeight.w600, color: QColors.green)),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(sub, style: QText.body(size: 12, color: QColors.textMuted)),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (quote.discounted)
-                    Text(
-                      formatEgp(quote.listPounds, ar: isAr),
-                      style: QText.number(size: 11, color: QColors.textFaint).copyWith(
-                        decoration: TextDecoration.lineThrough,
-                      ),
-                    ),
-                  Text(
-                    formatEgp(quote.amountPounds, ar: isAr),
-                    style: QText.number(size: 16, weight: FontWeight.w600, color: QColors.textPrimary),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+        hintText: 'QMR…',
+        hintTextDirection: TextDirection.ltr,
+        // The kit's field (the theme's): the ground in a grey edge.
+        hintStyle: QText.body(size: 17, color: QColors.inkTertiary),
       ),
     );
   }
@@ -341,74 +513,70 @@ class _TierCard extends StatelessWidget {
 typedef PlusFeature = ({String ar, String en, bool inFree});
 
 const _features = <PlusFeature>[
-  (ar: 'تسجيل الوجبات بالكتابة أو الصوت', en: 'Log meals by typing or speaking', inFree: true),
-  (ar: 'هدف يومي وخطة أساسية', en: 'Daily target and a basic plan', inFree: true),
-  (ar: '٥ استخدامات لقمر في اليوم — سؤال أو خطة', en: '5 Qamar uses a day — chat or the plan', inFree: true),
+  // First, what Qamar+ is for: the answer to "what do I eat tomorrow?"
+  (ar: 'خطة بكرة، مكتوبة بالليل', en: 'Tomorrow’s plan, written overnight', inFree: false),
+  (ar: 'تسجيل الوجبات بالكتابة أو الصوت، بلا حد', en: 'Log meals by typing or speaking, unlimited', inFree: true),
+  (ar: 'خطة اليوم بأطباق حقيقية', en: 'Today’s plan in real dishes', inFree: true),
+  (ar: 'صور الوجبات — ٣ في اليوم (٣٠ مع قمر+)', en: 'Meal photos — 3 a day (30 with Qamar+)', inFree: true),
+  (ar: 'أسئلة لقمر — ٣ في اليوم (٥٠ مع قمر+)', en: 'Questions — 3 a day (50 with Qamar+)', inFree: true),
+  (ar: 'صور زيادة بنقاط Su', en: 'Extra photos with Su Points', inFree: true),
   (ar: 'نقاط Su والمهام اليومية', en: 'Su Points and daily quests', inFree: true),
-  (ar: 'استخدام زيادة من المحفظة بنقاط Su', en: 'Buy extra uses from the wallet with Su Points', inFree: true),
-  (ar: 'تحليل الوجبة بالصورة', en: 'Photograph a meal and have Qamar read it', inFree: false),
-  (ar: 'خطة أسبوعية كاملة بالمقادير', en: 'Full weekly plan with portions', inFree: false),
-  (ar: 'تقارير تقدم أعمق', en: 'Deeper progress reports', inFree: false),
+  (ar: 'المراجعة الأسبوعية الكاملة والمشاركة', en: 'The full weekly review, shareable', inFree: false),
   (ar: 'أولوية في المزايا الجديدة', en: 'Early access to new features', inFree: false),
 ];
 
+/// What each tier has, row by row: a check where it is included and a dash
+/// where it is not, in the ink (the shape says which, not a shade), and a
+/// screen reader told the same in words.
 class _FeatureTable extends StatelessWidget {
   final AppState state;
   const _FeatureTable({required this.state});
 
+  static const _column = 60.0;
+
   @override
   Widget build(BuildContext context) {
     final isAr = state.isAr;
+    final free = isAr ? 'مجاني' : 'Free';
+    String says(bool on) => on ? (isAr ? 'موجود' : 'included') : (isAr ? 'مش موجود' : 'not included');
+
+    Widget mark(bool on) => SizedBox(
+          width: _column,
+          child: Center(child: QIcon(on ? QIcons.done : QIcons.remove, size: 20, color: on ? QColors.ink : QColors.inkTertiary)),
+        );
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: QDecor.card(color: QColors.cardNavy, border: QColors.borderFaint, radius: QRadii.xl),
+      decoration: QDecor.card(),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(isAr ? 'اللي بتاخده' : 'What you get',
-                    style: QText.body(size: 10, weight: FontWeight.w500, color: QColors.textFaint, letterSpacing: 0.5)),
-              ),
-              SizedBox(
-                width: 52,
-                child: Text(isAr ? 'مجاني' : 'Free',
-                    textAlign: TextAlign.center,
-                    style: QText.body(size: 10, weight: FontWeight.w500, color: QColors.textFaint)),
-              ),
-              SizedBox(
-                width: 52,
-                child: Text('Qamar+',
-                    textAlign: TextAlign.center,
-                    style: QText.body(size: 10, weight: FontWeight.w600, color: QColors.violetSoft)),
-              ),
-            ],
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(QSpace.lg, QSpace.md, QSpace.sm, QSpace.md),
+            child: ExcludeSemantics(
+              child: Row(children: [
+                Expanded(child: Text(QText.eyebrowText(isAr ? 'اللي بتاخده' : 'What you get', ar: isAr), style: QText.eyebrow(ar: isAr))),
+                SizedBox(width: _column, child: Text(QText.eyebrowText(free, ar: isAr), textAlign: TextAlign.center, style: QText.eyebrow(ar: isAr))),
+                SizedBox(
+                  width: _column,
+                  child: Text('Qamar+', textDirection: TextDirection.ltr, textAlign: TextAlign.center, style: QText.eyebrow(ar: true, color: QColors.inkSecondary)),
+                ),
+              ]),
+            ),
           ),
-          const SizedBox(height: 6),
           for (final f in _features) ...[
-            const Divider(color: QColors.borderFaint, height: 1),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 9),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(isAr ? f.ar : f.en,
-                        style: QText.body(size: 13, height: 18, color: QColors.textHigh)),
+            const Divider(height: 1, thickness: 1, indent: QSpace.lg, color: QColors.hairline),
+            MergeSemantics(
+              child: Semantics(
+                label: '${isAr ? f.ar : f.en}. $free: ${says(f.inFree)}. Qamar+: ${says(true)}.',
+                child: ExcludeSemantics(
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.fromSTEB(QSpace.lg, QSpace.md, QSpace.sm, QSpace.md),
+                    child: Row(children: [
+                      Expanded(child: Text(isAr ? f.ar : f.en, style: QText.body(size: 15, color: QColors.ink))),
+                      mark(f.inFree),
+                      mark(true),
+                    ]),
                   ),
-                  SizedBox(
-                    width: 52,
-                    child: Icon(
-                      f.inFree ? Icons.check : Icons.remove,
-                      size: 16,
-                      color: f.inFree ? QColors.green : QColors.textFaint,
-                    ),
-                  ),
-                  const SizedBox(
-                    width: 52,
-                    child: Icon(Icons.check, size: 16, color: QColors.violetSoft),
-                  ),
-                ],
+                ),
               ),
             ),
           ],

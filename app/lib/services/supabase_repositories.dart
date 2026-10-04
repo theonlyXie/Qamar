@@ -1,7 +1,15 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/activity.dart';
+import '../models/days.dart';
+import '../models/dishes.dart';
+import '../models/invitation.dart';
 import '../models/meal.dart';
+import '../models/quest.dart';
+import '../models/nudge.dart';
 import '../models/profile.dart';
+import '../models/ramadan.dart';
+import '../models/streak.dart';
 import '../models/water.dart';
 import 'repositories.dart';
 
@@ -11,6 +19,96 @@ import 'repositories.dart';
 /// supabase_flutter's query builder API has shifted across major versions —
 /// re-check each call against the version actually pinned in pubspec.yaml
 /// before flipping QamarConfig.useSupabase on.
+class SupabaseInvitationRepository implements InvitationRepository {
+  final SupabaseClient _client;
+  const SupabaseInvitationRepository(this._client);
+
+  @override
+  Future<InvitationBook> mine(String userId) async {
+    final raw = await _client.rpc('qamar_my_invitations');
+    if (raw is! Map) return InvitationBook.empty;
+    return InvitationBook.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  @override
+  Future<Invitation> issue(String userId, {required String name}) async {
+    try {
+      final raw = await _client.rpc('qamar_issue_invitation', params: {'p_name': name});
+      return Invitation.fromJson(Map<String, dynamic>.from(raw as Map));
+    } on PostgrestException catch (e) {
+      throw InvitationException(e.message);
+    }
+  }
+
+  @override
+  Future<InvitationRedemption> redeem(String userId, {required String code}) async {
+    try {
+      final raw = await _client.rpc('qamar_redeem_invitation', params: {'p_code': code});
+      return InvitationRedemption.fromJson(Map<String, dynamic>.from(raw as Map));
+    } on PostgrestException catch (e) {
+      // The function's own refusals (raise exception, P0001) are answers about
+      // the code. "not signed in" is about the session, and may pass.
+      throw InvitationException(e.message, refused: e.code == 'P0001' && e.message != 'not signed in');
+    }
+  }
+
+  @override
+  Future<ProCodeRedemption> redeemPro(String userId, {required String code}) async {
+    try {
+      final raw = await _client.rpc('qamar_redeem_pro_code', params: {'p_code': code});
+      return ProCodeRedemption.fromJson(Map<String, dynamic>.from(raw as Map));
+    } on PostgrestException catch (e) {
+      // The same rule as an invitation: the function's own refusals (P0001)
+      // are final answers about the code; "not signed in" is about the session.
+      throw InvitationException(e.message, refused: e.code == 'P0001' && e.message != 'not signed in');
+    }
+  }
+}
+
+class SupabaseActivityRepository implements ActivityRepository {
+  final SupabaseClient _client;
+  const SupabaseActivityRepository(this._client);
+
+  @override
+  Future<String> add(String userId, ActivityLog entry) async {
+    final row = await _client
+        .from('activity_logs')
+        .insert({
+          'user_id': userId,
+          'kind': entry.kind.name,
+          'minutes': entry.minutes,
+          'kcal_est': entry.kcal,
+          'logged_at': entry.at.toUtc().toIso8601String(),
+        })
+        .select('id')
+        .single();
+    return row['id'] as String;
+  }
+
+  @override
+  Future<List<ActivityLog>> forDay(String userId, DateTime day) async {
+    final start = DateTime(day.year, day.month, day.day).toIso8601String();
+    final end = DateTime(day.year, day.month, day.day + 1).toIso8601String();
+    final rows = await _client
+        .from('activity_logs')
+        .select()
+        .eq('user_id', userId)
+        .gte('logged_at', start)
+        .lt('logged_at', end)
+        .order('logged_at');
+    return (rows as List).map((r) {
+      final kind = ActivityKind.values.asNameMap()[r['kind'] as String? ?? ''] ?? ActivityKind.other;
+      return ActivityLog(
+        id: r['id'] as String?,
+        kind: kind,
+        minutes: (r['minutes'] as num).toInt(),
+        kcal: (r['kcal_est'] as num).toInt(),
+        at: DateTime.tryParse(r['logged_at'] as String? ?? '')?.toLocal() ?? DateTime.now(),
+      );
+    }).toList();
+  }
+}
+
 class SupabaseProfileRepository implements ProfileRepository {
   final SupabaseClient _client;
   const SupabaseProfileRepository(this._client);
@@ -37,7 +135,34 @@ class SupabaseProfileRepository implements ProfileRepository {
       goal: _goalFromDb(row['goal'] as String?),
       activity: (row['activity_factor'] as num?)?.toDouble() ?? 1.5,
       prefs: (row['food_exclusions'] as List?)?.cast<String>() ?? const [],
+      fasting: (row['fasting_mode'] as String?) == 'ramadan' ? FastingMode.ramadan : FastingMode.none,
+      safety: SafetyAnswer.fromLifeStage(row['life_stage']),
     );
+  }
+
+  @override
+  Future<Season?> currentSeason() async {
+    final raw = await _client.rpc('qamar_current_season');
+    if (raw is! Map) return null;
+    return Season.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  @override
+  Future<void> saveFastingMode(String userId, FastingMode mode) async {
+    await _client.from('profiles').upsert({'user_id': userId, 'fasting_mode': mode.name});
+  }
+
+  /// One row per account (0057): a second Start is ignored rather than
+  /// moving the first, so the metric counts the day someone began.
+  @override
+  Future<void> recordIntakeStart(String userId, {required String via}) async {
+    await _client.from('intake_starts').upsert({'user_id': userId, 'via': via}, onConflict: 'user_id', ignoreDuplicates: true);
+  }
+
+  @override
+  Future<DateTime?> accountDay0(String userId) async {
+    final raw = await _client.rpc('qamar_account_day0');
+    return raw is String ? DateTime.tryParse(raw)?.toLocal() : null;
   }
 
   @override
@@ -55,7 +180,37 @@ class SupabaseProfileRepository implements ProfileRepository {
       'goal': profile.goal.name,
       'activity_factor': profile.activity,
       'food_exclusions': profile.prefs,
+      'fasting_mode': profile.fasting.name,
+      // Where the gateway reads pregnancy and breastfeeding (0007): it then
+      // refuses plans and answers in the condition-aware scope.
+      'life_stage': profile.safety.lifeStage,
     });
+  }
+
+  @override
+  Future<void> saveConsent(String userId, String type, {required bool granted, required String version}) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _client.from('consents').insert({
+      'user_id': userId,
+      'type': type,
+      'version': version,
+      'granted_at': granted ? now : null,
+      'withdrawn_at': granted ? null : now,
+    });
+  }
+
+  @override
+  Future<bool?> loadConsent(String userId, String type) async {
+    final row = await _client
+        .from('consents')
+        .select('granted_at, withdrawn_at')
+        .eq('user_id', userId)
+        .eq('type', type)
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    if (row == null) return null;
+    return row['granted_at'] != null && row['withdrawn_at'] == null;
   }
 
   @override
@@ -93,6 +248,32 @@ class SupabaseMealRepository implements MealRepository {
   const SupabaseMealRepository(this._client);
 
   @override
+  Future<Map<String, Per100>> graphPer100(Iterable<String> slugs) async {
+    final rows = await _client.from('foods').select('qamar_food_id, slug').inFilter('slug', slugs.toList());
+    final out = <String, Per100>{};
+    for (final r in rows as List) {
+      final id = r['qamar_food_id'] as String?;
+      final slug = r['slug'] as String?;
+      if (id == null || slug == null) continue;
+      final raw = await _client.rpc('qamar_nutrients_per_100g', params: {'p_food_id': id});
+      if (raw is! List) continue;
+      double? amount(String code) {
+        for (final n in raw) {
+          if (n is Map && n['nutrient_code'] == code) {
+            final a = n['amount'];
+            return a is num ? a.toDouble() : double.tryParse('$a');
+          }
+        }
+        return null;
+      }
+      final kcal = amount('energy_kcal'), protein = amount('protein_g'), carbs = amount('carbs_g'), fat = amount('fat_g');
+      if (kcal == null || protein == null || carbs == null || fat == null) continue;
+      out[slug] = (kcal: kcal, protein: protein, carbs: carbs, fat: fat);
+    }
+    return out;
+  }
+
+  @override
   Future<String> saveDraft(String userId, MealAnalysisDraft draft) async {
     final row = await _client
         .from('meal_drafts')
@@ -128,7 +309,7 @@ class SupabaseMealRepository implements MealRepository {
     required LoggedMeal meal,
     List<({ConfirmItemDef def, int qty})> items = const [],
   }) async {
-    await _client.from('meal_logs').insert({
+    final row = <String, dynamic>{
       'user_id': userId,
       'draft_id': draftId,
       'name': meal.name,
@@ -163,7 +344,23 @@ class SupabaseMealRepository implements MealRepository {
       'protein_g': meal.p,
       'carbs_g': meal.c,
       'fat_g': meal.f,
-    });
+      // What started the log (0059): the day-30 habit metric reads it.
+      if (meal.prompt != null) 'prompt': meal.prompt,
+      if (meal.orbWaiting != null) 'orb_waiting': meal.orbWaiting,
+    };
+    try {
+      await _client.from('meal_logs').insert(row);
+    } on PostgrestException catch (e) {
+      // A database that has not had 0059 yet does not know those two
+      // columns. The meal matters more than how it started: write it
+      // without them rather than refusing it.
+      final sentPrompt = row.containsKey('prompt') || row.containsKey('orb_waiting');
+      if (e.code != 'PGRST204' || !sentPrompt) rethrow;
+      row
+        ..remove('prompt')
+        ..remove('orb_waiting');
+      await _client.from('meal_logs').insert(row);
+    }
   }
 
   @override
@@ -172,14 +369,14 @@ class SupabaseMealRepository implements MealRepository {
     final end = DateTime(day.year, day.month, day.day + 1).toIso8601String();
     final rows = await _client.from('meal_logs').select().eq('user_id', userId).gte('logged_at', start).lt('logged_at', end).order('logged_at');
     return (rows as List)
-        .map((r) => LoggedMeal(name: r['name'] as String, sub: r['source'] as String, kcal: r['kcal'] as int, p: r['protein_g'] as int, c: r['carbs_g'] as int, f: r['fat_g'] as int))
+        .map((r) => LoggedMeal(name: r['name'] as String, sub: r['source'] as String, kcal: r['kcal'] as int, p: r['protein_g'] as int, c: r['carbs_g'] as int, f: r['fat_g'] as int, at: DateTime.tryParse(r['logged_at'] as String? ?? '')?.toLocal()))
         .toList();
   }
 
   @override
   Future<List<DayTotals>> dailyTotals(String userId, {int days = 7}) async {
     final now = DateTime.now();
-    final from = DateTime(now.year, now.month, now.day).subtract(Duration(days: days - 1));
+    final from = Days.add(now, -(days - 1));
     final rows = await _client
         .from('meal_logs')
         .select('kcal, logged_at')
@@ -207,8 +404,64 @@ class SupabaseMealRepository implements MealRepository {
   }
 
   @override
+  Future<MealTimes?> mealTimes(String userId) async {
+    final raw = await _client.rpc('qamar_meal_time_profile', params: {'p_user_id': userId});
+    if (raw is! Map) return null;
+    return MealTimes.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  @override
+  Future<Streak?> streak(String userId) async {
+    final raw = await _client.rpc('qamar_streak_snapshot', params: {'p_user_id': userId});
+    if (raw is! Map) return null;
+    return Streak.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  @override
+  Future<List<LoggedMeal>> recentMeals(String userId, {int days = 7}) async {
+    final from = Days.ago(DateTime.now(), days).toIso8601String();
+    final rows = await _client
+        .from('meal_logs')
+        .select()
+        .eq('user_id', userId)
+        .gte('logged_at', from)
+        .order('logged_at', ascending: false)
+        .limit(40);
+    return (rows as List)
+        .map((r) => LoggedMeal(
+              name: r['name'] as String,
+              sub: r['source'] as String,
+              kcal: r['kcal'] as int,
+              p: r['protein_g'] as int,
+              c: r['carbs_g'] as int,
+              f: r['fat_g'] as int,
+              at: DateTime.tryParse(r['logged_at'] as String? ?? '')?.toLocal(),
+            ))
+        .toList();
+  }
+
+  @override
+  Future<NightNote?> nightNote(String userId, DateTime day) async {
+    final d = day.toIso8601String().substring(0, 10);
+    final row = await _client
+        .from('night_notes')
+        .select('day, sentence_ar, sentence_en, plan_kcal, today_kcal')
+        .eq('user_id', userId)
+        .eq('day', d)
+        .maybeSingle();
+    if (row == null) return null;
+    return NightNote(
+      day: DateTime.parse(row['day'] as String),
+      ar: row['sentence_ar'] as String? ?? '',
+      en: row['sentence_en'] as String? ?? '',
+      planKcal: (row['plan_kcal'] as num?)?.toInt() ?? 0,
+      todayKcal: (row['today_kcal'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  @override
   Future<List<WeightReading>> weightHistory(String userId, {int days = 60}) async {
-    final from = DateTime.now().subtract(Duration(days: days));
+    final from = Days.ago(DateTime.now(), days);
     final rows = await _client
         .from('weight_entries')
         .select('value_kg, measured_at')
@@ -269,7 +522,11 @@ class SupabaseWaterRepository implements WaterRepository {
         .lt('logged_at', end)
         .order('logged_at');
     return (rows as List).map((r) {
-      final unit = (r['unit'] as String?) == 'bottle' ? WaterUnit.bottle : WaterUnit.glass;
+      final unit = switch (r['unit'] as String?) {
+        'bottle' => WaterUnit.bottle,
+        'tea' => WaterUnit.tea,
+        _ => WaterUnit.glass,
+      };
       return WaterSip(
         id: r['id'] as String?,
         unit: unit,
@@ -295,10 +552,12 @@ class SupabaseWalletRepository implements WalletRepository {
   ///
   /// `qamar_wallet_credit` is EXECUTE-revoked from anon and authenticated
   /// (migration 0003): if the app could call it, any user could award
-  /// themselves an unlimited balance. Points must be credited by the server
-  /// after it has verified the action that earned them. Calling this from the
-  /// client would fail with a permission error at the database, so it fails
-  /// here instead, where the reason is legible.
+  /// themselves an unlimited balance. Points are credited by the server from
+  /// the rows the person writes — a meal, a glass of water, and the day's
+  /// quest they satisfy (triggers in 0046 and 0061) — and by the onboarding
+  /// RPC. Calling this from the client would
+  /// fail with a permission error at the database, so it fails here instead,
+  /// where the reason is legible.
   @override
   Future<void> credit(String userId, {required int amount, required String reason, required String idempotencyKey}) {
     throw UnsupportedError(
@@ -308,19 +567,61 @@ class SupabaseWalletRepository implements WalletRepository {
   }
 
   @override
+  Future<DayQuest?> todayQuest(String userId) async => DayQuest.fromJson(await _client.rpc('qamar_today_quest'));
+
+  @override
+  Future<void> skipQuest(String userId) async {
+    await _client.rpc('qamar_skip_quest');
+  }
+
+  @override
+  Future<void> grantOnboarding(String userId) async {
+    await _client.rpc('qamar_grant_onboarding', params: {'p_user_id': userId});
+  }
+
+  @override
   Future<void> redeem(String userId, {required SpendItemDef item, required String idempotencyKey}) async {
-    await _client.rpc('qamar_wallet_redeem', params: {
-      'p_user_id': userId,
-      'p_catalog_item_id': item.id,
-      'p_idempotency_key': idempotencyKey,
-    });
+    try {
+      await _client.rpc('qamar_wallet_redeem', params: {
+        'p_user_id': userId,
+        'p_catalog_item_id': item.id,
+        'p_idempotency_key': idempotencyKey,
+      });
+    } catch (e) {
+      throw redeemFailure(e);
+    }
+  }
+
+  /// What a failed redemption means. Only the redeem function's own RAISE
+  /// (SQLSTATE P0001, which PostgREST sends as the error's code) is a refusal
+  /// whose transaction rolled back. A 5xx arrives as a PostgrestException too,
+  /// but its code is the status ("502", "504") and the purchase may have
+  /// committed before it, so it stays what it was: unknown.
+  static Object redeemFailure(Object e) =>
+      e is PostgrestException && e.code == 'P0001' ? RedeemRefused(e.message) : e;
+
+  @override
+  Future<int?> questionPrice() async {
+    final row = await _client.from('su_economy_config').select('value').eq('key', 'question_extra').maybeSingle();
+    final v = row?['value'];
+    return v is num ? v.round() : null;
   }
 
   @override
   Future<List<LedgerEntry>> ledger(String userId) async {
     final rows = await _client.from('su_point_ledger').select().eq('user_id', userId).order('created_at', ascending: false).limit(50);
-    return (rows as List)
-        .map((r) => LedgerEntry(label: r['reason'] as String, amount: r['delta'] as int, when: (r['created_at'] as String)))
-        .toList();
+    return (rows as List).map((r) {
+      final reason = r['reason'] as String;
+      final at = DateTime.tryParse(r['created_at'] as String);
+      // `label` stays the raw reason as a last resort; the wallet screen calls
+      // displayLabel(), which translates it.
+      return LedgerEntry(
+        label: reason,
+        amount: r['delta'] as int,
+        when: r['created_at'] as String,
+        reason: reason,
+        at: at,
+      );
+    }).toList();
   }
 }

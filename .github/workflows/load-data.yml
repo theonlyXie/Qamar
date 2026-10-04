@@ -24,6 +24,7 @@ on:
           - both
           - knowledge base only
           - nutrient values only
+          - world food catalogue (USDA bulk)
 
 env:
   SUPABASE_URL: https://stqirjlqzchcoeegumoq.supabase.co
@@ -97,10 +98,47 @@ jobs:
           USDA_API_KEY: ${{ secrets.USDA_API_KEY }}
         run: deno run --allow-net --allow-env supabase/functions/ai-gateway/ingest_usda.ts
 
-      - name: Fail if either load failed
-        if: ${{ steps.kb.outcome == 'failure' || steps.usda.outcome == 'failure' }}
+      # The whole generic food world: ~15,000 foods with full nutrient
+      # profiles. Three exports, 11 MB in total.
+      #
+      # Survey/FNDDS is the one that matters most for this app. It is the
+      # prepared-dish table — cheeseburgers, pizza, fried chicken — and it is
+      # exactly what the resolver had nothing for. SR Legacy covers raw and
+      # basic cooked ingredients; Foundation is the deepest nutrient detail.
+      #
+      # Branded (422 MB, ~2 million supermarket products) is deliberately not
+      # here. See the note at the top of ingest_fdc_bulk.ts.
+      - name: Load the world food catalogue
+        id: world
+        if: ${{ inputs.what == 'world food catalogue (USDA bulk)' }}
+        continue-on-error: true
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          echo "::error::knowledge base: ${{ steps.kb.outcome }}, nutrients: ${{ steps.usda.outcome }}"
+          set -euo pipefail
+          base=https://fdc.nal.usda.gov/fdc-datasets
+          work=$(mktemp -d)
+          load() {
+            name=$1; label=$2
+            echo "::group::$label"
+            curl -fsSL --retry 3 --retry-delay 5 -o "$work/$name.zip" "$base/$name.zip"
+            unzip -q -o "$work/$name.zip" -d "$work/$label"
+            # The exports nest their CSVs one directory down, and the name of
+            # that directory changes with every release.
+            dir=$(dirname "$(find "$work/$label" -name food.csv | head -1)")
+            deno run --allow-read --allow-net --allow-env \
+              supabase/functions/ai-gateway/ingest_fdc_bulk.ts "$dir" "$label"
+            rm -rf "$work/$label" "$work/$name.zip"
+            echo "::endgroup::"
+          }
+          load FoodData_Central_foundation_food_csv_2025-04-24 foundation
+          load FoodData_Central_sr_legacy_food_csv_2018-04     sr_legacy
+          load FoodData_Central_survey_food_csv_2024-10-31     survey_fndds
+
+      - name: Fail if either load failed
+        if: ${{ steps.kb.outcome == 'failure' || steps.usda.outcome == 'failure' || steps.world.outcome == 'failure' }}
+        run: |
+          echo "::error::knowledge base: ${{ steps.kb.outcome }}, nutrients: ${{ steps.usda.outcome }}, world: ${{ steps.world.outcome }}"
           echo "Re-running this workflow resumes rather than duplicating."
           exit 1
 

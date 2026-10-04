@@ -1,0 +1,41 @@
+{
+  // Run and Debug (F5): choose one at the top of the panel. All three run the
+  // Flutter app in app/ on the device picked in the status bar.
+  //
+  // demo: needs nothing. Every screen works, but there is no account, it
+  //   starts from the welcome each run, and meals can't be read (the chat
+  //   says it isn't connected).
+  // live server: the Supabase project. Reads app/live.json; copy
+  //   app/live.example.json to it and paste the project's key.
+  // full speed: the live server as a release build. No hot reload and no
+  //   debugger, but the motion runs as it will in the store build; a debug
+  //   run can stutter. Chrome, a phone or an Android emulator, not the iOS
+  //   Simulator.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Qamar · demo (no server)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/app",
+      "program": "${workspaceFolder}/app/lib/main.dart"
+    },
+    {
+      "name": "Qamar · live server",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/app",
+      "program": "${workspaceFolder}/app/lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=${workspaceFolder}/app/live.json"]
+    },
+    {
+      "name": "Qamar · live server, full speed",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/app",
+      "program": "${workspaceFolder}/app/lib/main.dart",
+      "flutterMode": "release",
+      "toolArgs": ["--dart-define-from-file=${workspaceFolder}/app/live.json"]
+    }
+  ]
+}

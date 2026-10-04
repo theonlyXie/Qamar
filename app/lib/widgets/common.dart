@@ -1,65 +1,864 @@
-import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../l10n/strings.dart';
+import '../models/problem.dart';
 import '../theme/app_theme.dart';
 import '../theme/colors.dart';
+import '../theme/icons.dart';
+import '../theme/layout.dart';
+import '../theme/motion.dart';
 import '../theme/text_styles.dart';
+import 'surface.dart';
 
+/// The touch rule every control here keeps (O11).
+///
+///  * At least [QLayout.minTap] points each way take the touch, whatever size
+///    is drawn: [builder] draws the control, centred in that area. A compact
+///    row keeps its look and the finger still gets a whole target.
+///  * The drawing answers on the press, not the release ([builder] is told
+///    when the finger is down).
+///  * A control with nothing to do ([onTap] null) says so: it takes no touch,
+///    and a screen reader hears it as not enabled. The drawing shows it too,
+///    with [QDisabled]'s faint edge and muted label.
+class QTapArea extends StatefulWidget {
+  final VoidCallback? onTap;
+  final Widget Function(BuildContext context, bool pressed) builder;
+
+  /// What a screen reader says, when the drawing has no words of its own (an
+  /// icon). Drawn words are read as they are.
+  final String? label;
+  final String? hint;
+  final bool link;
+  final double minWidth;
+  final double minHeight;
+
+  const QTapArea({
+    super.key,
+    required this.onTap,
+    required this.builder,
+    this.label,
+    this.hint,
+    this.link = false,
+    this.minWidth = QLayout.minTap,
+    this.minHeight = QLayout.minTap,
+  });
+
+  @override
+  State<QTapArea> createState() => _QTapAreaState();
+}
+
+class _QTapAreaState extends State<QTapArea> {
+  bool _down = false;
+
+  void _press(bool down) {
+    if (_down != down && mounted) setState(() => _down = down);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onTap != null;
+    return Semantics(
+      container: true,
+      button: !widget.link,
+      link: widget.link,
+      enabled: enabled,
+      label: widget.label,
+      hint: widget.hint,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: enabled ? (_) => _press(true) : null,
+        onTapUp: enabled ? (_) => _press(false) : null,
+        onTapCancel: enabled ? () => _press(false) : null,
+        onTap: widget.onTap,
+        child: _MinTap(minWidth: widget.minWidth, minHeight: widget.minHeight, child: widget.builder(context, enabled && _down)),
+      ),
+    );
+  }
+}
+
+/// Lays its child out exactly as its parent asks — so a button asked to fill
+/// a row still fills it — and is itself at least [minWidth] × [minHeight],
+/// with the child centred in the extra. The extra is part of the control:
+/// the GestureDetector around it takes touches across all of it.
+class _MinTap extends SingleChildRenderObjectWidget {
+  final double minWidth;
+  final double minHeight;
+  const _MinTap({required this.minWidth, required this.minHeight, required Widget super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderMinTap(minWidth, minHeight);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderMinTap renderObject) {
+    renderObject
+      ..minWidth = minWidth
+      ..minHeight = minHeight;
+  }
+}
+
+class _RenderMinTap extends RenderShiftedBox {
+  _RenderMinTap(this._minWidth, this._minHeight) : super(null);
+
+  double _minWidth;
+  set minWidth(double v) {
+    if (v == _minWidth) return;
+    _minWidth = v;
+    markNeedsLayout();
+  }
+
+  double _minHeight;
+  set minHeight(double v) {
+    if (v == _minHeight) return;
+    _minHeight = v;
+    markNeedsLayout();
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) => math.max(_minWidth, child?.getMinIntrinsicWidth(height) ?? 0);
+  @override
+  double computeMaxIntrinsicWidth(double height) => math.max(_minWidth, child?.getMaxIntrinsicWidth(height) ?? 0);
+  @override
+  double computeMinIntrinsicHeight(double width) => math.max(_minHeight, child?.getMinIntrinsicHeight(width) ?? 0);
+  @override
+  double computeMaxIntrinsicHeight(double width) => math.max(_minHeight, child?.getMaxIntrinsicHeight(width) ?? 0);
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    final c = child?.getDryLayout(constraints) ?? Size.zero;
+    return constraints.constrain(Size(math.max(c.width, _minWidth), math.max(c.height, _minHeight)));
+  }
+
+  @override
+  void performLayout() {
+    final c = child!;
+    c.layout(constraints, parentUsesSize: true);
+    size = constraints.constrain(Size(math.max(c.size.width, _minWidth), math.max(c.size.height, _minHeight)));
+    (c.parentData! as BoxParentData).offset = Offset((size.width - c.size.width) / 2, (size.height - c.size.height) / 2);
+  }
+}
+
+/// How a control with nothing to do is drawn, everywhere (O11): no press,
+/// the disabled ink on the control grey, where a fill would be.
+abstract final class QDisabled {
+  static const edge = QColors.hairline;
+  static const label = QColors.inkDisabled;
+  static const fill = QColors.surfaceRaised;
+}
+
+/// How a pressed control answers, on the press: a little smaller, the way a
+/// real button gives under a finger. With reduce-motion on it dims instead.
+Widget qPressed(BuildContext context, {required bool pressed, required Widget child}) {
+  if (MediaQuery.disableAnimationsOf(context)) {
+    return AnimatedOpacity(opacity: pressed ? 0.7 : 1, duration: const Duration(milliseconds: 90), child: child);
+  }
+  return AnimatedScale(scale: pressed ? 0.97 : 1, duration: const Duration(milliseconds: 120), curve: Curves.easeOut, child: child);
+}
+
+/// The one thing to do on a screen: the kit's large button, a burgundy
+/// rounded rectangle with white words (the qamar-design skill). One per
+/// screen; everything else is secondary, and nothing else on the screen is
+/// filled burgundy.
 class QPrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
   final double height;
-  final Gradient gradient;
-  const QPrimaryButton({super.key, required this.label, required this.onTap, this.height = 52, this.gradient = QColors.brandGradient});
+  final IconData? icon;
+  const QPrimaryButton({super.key, required this.label, required this.onTap, this.height = 50, this.icon});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(QRadii.lg),
-          onTap: onTap == null
-              ? null
-              : () {
-                  HapticFeedback.lightImpact();
-                  onTap!();
-                },
-          child: Ink(
-            decoration: QDecor.gradientButton(gradient: gradient),
-            child: Center(
-              child: Text(label, style: QText.body(size: 16, weight: FontWeight.w600, color: Colors.white)),
-            ),
+    final enabled = onTap != null;
+    final ink = enabled ? QColors.onAccent : QDisabled.label;
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          QIcon(icon!, size: 20, color: ink),
+          const SizedBox(width: 8),
+        ],
+        Flexible(
+          child: Text(label, textAlign: TextAlign.center, style: QText.body(size: 16, weight: FontWeight.w600, color: ink)),
+        ),
+      ],
+    );
+    return QTapArea(
+      onTap: enabled
+          ? () {
+              HapticFeedback.lightImpact();
+              onTap!();
+            }
+          : null,
+      builder: (context, pressed) => qPressed(
+        context,
+        pressed: pressed,
+        child: enabled
+            ? QSurface(
+                tint: QColors.accent,
+                pressed: pressed,
+                height: height,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Center(child: content),
+              )
+            : QSurface(
+                height: height,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Center(child: content),
+              ),
+      ),
+    );
+  }
+}
+
+/// A compact call to action inside a card: the kit's small button, burgundy,
+/// drawn 40 points tall and touched across 48 (O11). Where [QPrimaryButton]
+/// would be too much, and a text link too little.
+class QPillButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const QPillButton({super.key, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => QTapArea(
+        onTap: onTap,
+        builder: (context, pressed) => qPressed(
+          context,
+          pressed: pressed,
+          // As wide as its label: a Center with no width factor would fill
+          // the row.
+          child: QSurface(
+            tint: QColors.accent,
+            pressed: pressed,
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Center(widthFactor: 1, child: Text(label, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.onAccent))),
           ),
+        ),
+      );
+}
+
+/// How a [QSpringIn] arrives.
+enum QArrive { fade, rise, grow }
+
+/// An entrance on a spring rather than a curve over a set time: the settle
+/// spring (damping 1.0, response 0.35s; QSpring), so it arrives quickly and
+/// comes to rest without a bounce. [QArrive.rise] comes up from below its
+/// own height (a sheet), [QArrive.grow] from a little smaller and clear (the
+/// tree's ring), [QArrive.fade] only fades. With the platform's reduce-motion
+/// on, every one of them is a plain 150ms cross-fade: nothing moves.
+class QSpringIn extends StatefulWidget {
+  final Widget child;
+  final QArrive arrive;
+  const QSpringIn({super.key, required this.arrive, required this.child});
+
+  /// Where the entrance is at [v] (0 → 1): the offset as a fraction of the
+  /// child's height, the scale, the opacity. Clamped: a critically damped
+  /// spring does not pass 1, and nothing may.
+  static ({double dy, double scale, double opacity}) at(QArrive arrive, double v, {required bool still}) {
+    final t = v.clamp(0.0, 1.0);
+    if (still) return (dy: 0, scale: 1, opacity: t);
+    return switch (arrive) {
+      QArrive.rise => (dy: 1 - t, scale: 1, opacity: 1),
+      QArrive.grow => (dy: 0, scale: 0.94 + 0.06 * t, opacity: math.min(1, t * 1.6)),
+      QArrive.fade => (dy: 0, scale: 1, opacity: t),
+    };
+  }
+
+  @override
+  State<QSpringIn> createState() => _QSpringInState();
+}
+
+class _QSpringInState extends State<QSpringIn> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController.unbounded(vsync: this);
+  bool _started = false, _still = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    _still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    QSpring.drive(_c, 1, still: _still);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        child: widget.child,
+        builder: (context, child) {
+          final m = QSpringIn.at(widget.arrive, _c.value, still: _still);
+          Widget out = child!;
+          if (m.dy != 0) out = FractionalTranslation(translation: Offset(0, m.dy), child: out);
+          if (m.scale != 1) out = Transform.scale(scale: m.scale, child: out);
+          if (m.opacity < 1) out = Opacity(opacity: m.opacity, child: out);
+          return out;
+        },
+      );
+}
+
+/// Holds a sheet on screen while it leaves, so it can go the way it came
+/// (down, on the settle spring) instead of vanishing on the frame its state
+/// closed. [open] is the sheet's state; [child] stays built until its
+/// [QSheetScrim] has finished leaving, whatever closed it: the scrim, a
+/// drag, its own button or the phone's back. Opened again while leaving, it
+/// turns round from where it is.
+class QSheetSlot extends StatefulWidget {
+  final bool open;
+  final Widget child;
+  const QSheetSlot({super.key, required this.open, required this.child});
+
+  @override
+  State<QSheetSlot> createState() => _QSheetSlotState();
+}
+
+class _QSheetSlotState extends State<QSheetSlot> {
+  late bool _shown = widget.open;
+
+  @override
+  void didUpdateWidget(QSheetSlot old) {
+    super.didUpdateWidget(old);
+    if (widget.open) _shown = true;
+  }
+
+  void _gone() {
+    if (mounted && !widget.open && _shown) setState(() => _shown = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Positioned, like the sheets it holds: a bare box in the shell's Stack
+    // would give the Stack a size of its own, and shrink it to nothing.
+    if (!_shown) return const Positioned(left: 0, top: 0, child: SizedBox.shrink());
+    return _SheetExit(closing: !widget.open, onGone: _gone, child: widget.child);
+  }
+}
+
+class _SheetExit extends InheritedWidget {
+  final bool closing;
+  final VoidCallback onGone;
+  const _SheetExit({required this.closing, required this.onGone, required super.child});
+
+  static _SheetExit? maybeOf(BuildContext context) => context.dependOnInheritedWidgetOfExactType<_SheetExit>();
+
+  @override
+  bool updateShouldNotify(_SheetExit old) => old.closing != closing;
+}
+
+/// A sheet's panel (the qamar-design skill): [QSheetSurface] with its
+/// padding and the grabber that says it can be pulled down. Every sheet is
+/// one of these inside a [QSheetScrim], so they all arrive, look and leave
+/// the same way.
+class QSheetPanel extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  /// Whether [child] scrolls when the sheet would be taller than the screen
+  /// (a small phone, large text): the sheet then stops [QSpace.xxl] under
+  /// the top, and its grabber still takes it down.
+  final bool scrolls;
+  const QSheetPanel({super.key, required this.child, this.padding = const EdgeInsets.fromLTRB(20, 10, 20, 28), this.scrolls = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final panel = QSheetSurface(
+      padding: padding,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Center(child: QSheetGrabber()),
+          const SizedBox(height: 14),
+          if (scrolls) Flexible(child: SingleChildScrollView(child: child)) else child,
+        ],
+      ),
+    );
+    if (!scrolls) return panel;
+    return LayoutBuilder(
+      builder: (context, box) => ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: math.max(0, box.maxHeight - QSpace.xxl)),
+        child: panel,
+      ),
+    );
+  }
+}
+
+/// What every sheet is made of: the kit's card grey rising from the bottom,
+/// flat and solid, its top corners the sheet's 32 (the page behind is dimmed
+/// and blurred by the [QSheetScrim]).
+class QSheetSurface extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  const QSheetSurface({super.key, required this.child, this.padding = EdgeInsets.zero});
+
+  static const corners = BorderRadius.vertical(top: Radius.circular(QRadii.sheet));
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: padding,
+        decoration: const BoxDecoration(color: QColors.surface, borderRadius: corners),
+        child: child,
+      );
+}
+
+/// The small bar at the top of a sheet: 36 by 5, the control's circle grey.
+class QSheetGrabber extends StatelessWidget {
+  const QSheetGrabber({super.key});
+
+  @override
+  Widget build(BuildContext context) => const ExcludeSemantics(
+        child: SizedBox(
+          width: 36,
+          height: 5,
+          child: DecoratedBox(decoration: BoxDecoration(color: QColors.hairlineStrong, borderRadius: BorderRadius.all(Radius.circular(QRadii.pill)))),
+        ),
+      );
+}
+
+/// A sheet's ground, and the sheet on it. The scrim fades in on the settle
+/// spring while the sheet ([child]) rises from below its own height on it;
+/// it leaves the same way, down and out. It can be dragged: it follows the
+/// finger down, and on release goes where the release was heading — Apple's
+/// projection of the velocity, as the orb's snap uses — either away or back
+/// up, carrying the finger's speed into the spring. With reduce-motion on,
+/// arriving and leaving are a plain fade; a drag still moves it, since the
+/// finger is moving it.
+///
+/// A tap on the scrim, anywhere outside the sheet, is [onDismiss]; a screen
+/// reader hears that layer as a button named "Close" (إغلاق), where it used
+/// to be an unnamed button the size of the screen. The sheet takes its own
+/// touches: it sits above the scrim, so nothing inside it needs to swallow
+/// taps. [blur] blurs the page behind, in step with the scrim.
+class QSheetScrim extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onDismiss;
+  final double blur;
+  const QSheetScrim({super.key, required this.onDismiss, this.blur = 0, required this.child});
+
+  /// The dismiss layer and the sheet itself, for tests.
+  static const dismissKey = ValueKey('sheet-dismiss');
+  static const panelKey = ValueKey('sheet-panel');
+
+  static String closeLabel(BuildContext context) => Directionality.of(context) == TextDirection.rtl ? 'إغلاق' : 'Close';
+
+  /// Whether a release at [value] (1 at rest, 0 gone), moving at
+  /// [velocity] points a second (down positive) on a sheet [height] tall,
+  /// sends the sheet away: its projected rest is past half-way down, or it
+  /// was thrown down faster than a flick.
+  static bool releaseDismisses(double value, double velocity, double height) =>
+      velocity > QSpring.flickSpeed || value - QSpring.project(velocity) / height < 0.5;
+
+  @override
+  State<QSheetScrim> createState() => _QSheetScrimState();
+}
+
+class _QSheetScrimState extends State<QSheetScrim> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController.unbounded(vsync: this);
+  final _panel = GlobalKey();
+  bool _started = false, _still = false, _leaving = false, _dragged = false;
+
+  double get _height => (_panel.currentContext?.findRenderObject() as RenderBox?)?.size.height ?? 400;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (!_started) {
+      _started = true;
+      QSpring.drive(_c, 1, still: _still);
+    }
+    final exit = _SheetExit.maybeOf(context);
+    if (exit == null) return;
+    if (exit.closing && !_leaving) {
+      _leave(0);
+    } else if (!exit.closing && _leaving) {
+      // Opened again on its way out: it turns round from where it is.
+      _leaving = false;
+      QSpring.drive(_c, 1, still: _still);
+    }
+  }
+
+  void _leave(double velocity) {
+    _leaving = true;
+    QSpring.drive(_c, 0, still: _still && !_dragged, velocity: velocity).whenCompleteOrCancel(() {
+      if (mounted && _leaving && _c.value <= 0.001) _SheetExit.maybeOf(context)?.onGone();
+    });
+  }
+
+  void _dismiss([double velocity = 0]) {
+    if (_leaving) return;
+    _leave(velocity);
+    widget.onDismiss();
+  }
+
+  void _dragStart(DragStartDetails _) {
+    if (_leaving) return;
+    _c.stop();
+    _dragged = true;
+  }
+
+  void _dragUpdate(DragUpdateDetails d) {
+    if (_leaving) return;
+    _c.value = (_c.value - d.delta.dy / _height).clamp(0.0, 1.0);
+  }
+
+  void _dragEnd(DragEndDetails d) {
+    if (_leaving) return;
+    final h = _height;
+    final down = d.velocity.pixelsPerSecond.dy;
+    // The spring runs in sheet heights: the finger's speed, handed over.
+    final v = -down / h;
+    if (QSheetScrim.releaseDismisses(_c.value, down, h)) {
+      _dismiss(v);
+    } else {
+      QSpring.drive(_c, 1, still: false, velocity: v);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      excluding: _leaving,
+      child: IgnorePointer(
+        ignoring: _leaving,
+        child: AnimatedBuilder(
+          animation: _c,
+          child: GestureDetector(
+            excludeFromSemantics: true,
+            onVerticalDragStart: _dragStart,
+            onVerticalDragUpdate: _dragUpdate,
+            onVerticalDragEnd: _dragEnd,
+            child: SizedBox(key: QSheetScrim.panelKey, child: KeyedSubtree(key: _panel, child: widget.child)),
+          ),
+          builder: (context, panel) {
+            final v = _c.value.clamp(0.0, 1.0);
+            // Under reduce-motion, what the finger did not move only fades.
+            final fadeOnly = _still && !_dragged;
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                if (widget.blur > 0)
+                  ClipRect(child: BackdropFilter(filter: ImageFilter.blur(sigmaX: widget.blur * v, sigmaY: widget.blur * v), child: const SizedBox.expand())),
+                Semantics(
+                  key: QSheetScrim.dismissKey,
+                  container: true,
+                  button: true,
+                  label: QSheetScrim.closeLabel(context),
+                  onTap: _dismiss,
+                  child: GestureDetector(
+                    onTap: _dismiss,
+                    excludeFromSemantics: true,
+                    child: ColoredBox(color: QColors.scrim.withValues(alpha: QColors.scrim.a * v)),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: fadeOnly
+                      ? Opacity(opacity: v, child: panel)
+                      : FractionalTranslation(translation: Offset(0, 1 - v), child: panel),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-class QOutlineButton extends StatelessWidget {
-  final String label;
-  final VoidCallback? onTap;
-  final double height;
-  final Color color;
-  const QOutlineButton({super.key, required this.label, required this.onTap, this.height = 44, this.color = QColors.textMuted});
+/// Centred text wrapped to even lines, the way CSS's `text-wrap: balance`
+/// does: at the narrowest width that keeps the same number of lines, so a
+/// centred sentence never ends on one orphaned word ("…Not a medical" /
+/// "service."). One line stays one line.
+class QBalancedText extends StatelessWidget {
+  final String text;
+  final TextStyle style;
+
+  /// On the [Text] itself, for a finder that reads it.
+  final Key? textKey;
+
+  /// The widest its lines may run however wide the room is, a measure.
+  /// Held here rather than by a box around it, so that measuring the text
+  /// measures it at that width: a max-width box asks its child's height at
+  /// the full width, and a page that sizes itself from that came up a line
+  /// short.
+  final double maxWidth;
+  const QBalancedText(this.text, {super.key, this.textKey, required this.style, this.maxWidth = double.infinity});
+
+  /// The width [text] balances to inside [maxWidth].
+  static double balancedWidth(String text, TextStyle style, double maxWidth, TextDirection direction, TextScaler scaler) {
+    int lines(double w) => (TextPainter(text: TextSpan(text: text, style: style), textDirection: direction, textScaler: scaler)..layout(maxWidth: w)).computeLineMetrics().length;
+    final n = lines(maxWidth);
+    if (n < 2) return maxWidth;
+    var lo = maxWidth / (n + 1), hi = maxWidth;
+    for (var i = 0; i < 14; i++) {
+      final mid = (lo + hi) / 2;
+      if (lines(mid) > n) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+    return math.min(maxWidth, hi.ceilToDouble() + 1);
+  }
+
+  @override
+  Widget build(BuildContext context) => _Balance(
+        text: text,
+        style: DefaultTextStyle.of(context).style.merge(style),
+        direction: Directionality.of(context),
+        scaler: MediaQuery.textScalerOf(context),
+        measure: maxWidth,
+        child: Text(text, key: textKey, textAlign: TextAlign.center, style: style),
+      );
+}
+
+/// Lays its text out at the balanced width, centred in the width it is
+/// given. A render object rather than a LayoutBuilder so a parent that asks
+/// for intrinsic sizes (a sliver filling the remaining space) can: the lines
+/// are the same in number at either width, so the height is the text's.
+class _Balance extends SingleChildRenderObjectWidget {
+  final String text;
+  final TextStyle style;
+  final TextDirection direction;
+  final TextScaler scaler;
+  final double measure;
+  const _Balance({required this.text, required this.style, required this.direction, required this.scaler, required this.measure, required super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderBalance(text, style, direction, scaler, measure);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderBalance r) {
+    r
+      ..text = text
+      ..style = style
+      ..direction = direction
+      ..scaler = scaler
+      ..measure = measure
+      ..markNeedsLayout();
+  }
+}
+
+class _RenderBalance extends RenderShiftedBox {
+  String text;
+  TextStyle style;
+  TextDirection direction;
+  TextScaler scaler;
+  double measure;
+  _RenderBalance(this.text, this.style, this.direction, this.scaler, this.measure) : super(null);
+
+  // Measured at the width it will be laid out in: the room, or the measure
+  // where that is narrower.
+  @override
+  double computeMinIntrinsicHeight(double width) => child?.getMinIntrinsicHeight(math.min(width, measure)) ?? 0;
+  @override
+  double computeMaxIntrinsicHeight(double width) => child?.getMaxIntrinsicHeight(math.min(width, measure)) ?? 0;
+  @override
+  double computeMinIntrinsicWidth(double height) => math.min(child?.getMinIntrinsicWidth(height) ?? 0, measure);
+  @override
+  double computeMaxIntrinsicWidth(double height) => math.min(child?.getMaxIntrinsicWidth(height) ?? 0, measure);
+
+  @override
+  void performLayout() {
+    final c = child!;
+    final room = constraints.maxWidth;
+    final max = math.min(room, measure);
+    final w = max.isFinite ? QBalancedText.balancedWidth(text, style, max, direction, scaler) : max;
+    c.layout(constraints.copyWith(minWidth: 0, maxWidth: w), parentUsesSize: true);
+    size = constraints.constrain(Size(room.isFinite ? room : c.size.width, c.size.height));
+    (c.parentData! as BoxParentData).offset = Offset((size.width - c.size.width) / 2, (size.height - c.size.height) / 2);
+  }
+}
+
+/// A [Problem] on a screen (O10): what happened, why when it is known, and
+/// the next step as a real button, with another way on under it when there
+/// is one. The "what" line is always shown whole.
+///
+/// Its kind has a glyph, so the same words read as what they are at a
+/// glance: nothing here yet, something failed on our side, no connection,
+/// the phone has not allowed something, or a daily allowance used up (which
+/// is not a failure, and is not drawn as one). Centred, like every empty or
+/// error state, and meant to sit in the middle of the free space
+/// ([QStateArea]), not stuck to the top of it.
+class QStateCard extends StatelessWidget {
+  final Problem problem;
+  const QStateCard({super.key, required this.problem});
+
+  /// Each kind's glyph. The glyph, not a colour, says what kind of thing
+  /// happened: every kind is drawn in the same white ink.
+  static ({IconData icon, Color tint}) look(ProblemKind kind) => switch (kind) {
+        ProblemKind.empty => (icon: QIcons.empty, tint: QColors.ink),
+        ProblemKind.error => (icon: QIcons.error, tint: QColors.ink),
+        ProblemKind.offline => (icon: QIcons.offline, tint: QColors.ink),
+        ProblemKind.permission => (icon: QIcons.locked, tint: QColors.ink),
+        ProblemKind.limit => (icon: QIcons.limit, tint: QColors.ink),
+      };
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      child: OutlinedButton(
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: QColors.borderSoft),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(QRadii.md)),
-          backgroundColor: Colors.transparent,
+    final p = problem;
+    final l = look(p.kind);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+      decoration: QDecor.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Container(
+              key: ValueKey('state-glyph-${p.kind.name}'),
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(shape: BoxShape.circle, color: QColors.surfaceRaised),
+              child: QIcon(l.icon, size: 22, color: l.tint),
+            ),
+          ),
+          const SizedBox(height: 14),
+          QBalancedText(p.what, style: QText.body(size: 17, weight: FontWeight.w600, color: QColors.ink)),
+          if (p.why != null && p.why!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            QBalancedText(p.why!, style: QText.body(size: 15, color: QColors.inkSecondary)),
+          ],
+          const SizedBox(height: 18),
+          QPrimaryButton(label: p.action.label, onTap: p.action.onTap),
+          if (p.secondary != null) ...[
+            const SizedBox(height: 8),
+            QOutlineButton(label: p.secondary!.label, onTap: p.secondary!.onTap, height: 50, color: QColors.ink),
+          ],
+          if (p.also != null) ...[
+            const SizedBox(height: 8),
+            QOutlineButton(label: p.also!.label, onTap: p.also!.onTap, height: 50, color: QColors.ink),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The free space a state card sits in (O10): it takes the height it is
+/// given and puts the card at its optical centre — a little above the middle,
+/// where the eye expects the middle to be.
+class QStateArea extends StatelessWidget {
+  final Widget child;
+  const QStateArea({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) => Align(alignment: const Alignment(0, -0.18), child: child);
+}
+
+/// A [Problem]'s compact form, for where something was asked that another
+/// screen shows in full (O10): one line, and its way on as a text button
+/// with a 48pt target. Never a second card: it sits in the place of the
+/// thing that asked.
+class QStateLine extends StatelessWidget {
+  final String line;
+  final ProblemAction? action;
+  final Color accent;
+  final IconData icon;
+  const QStateLine({super.key, required this.line, this.action, this.accent = QColors.ink, this.icon = QIcons.info});
+
+  @override
+  Widget build(BuildContext context) {
+    final a = action;
+    return Container(
+      padding: EdgeInsetsDirectional.fromSTEB(14, 12, 14, a == null ? 12 : 2),
+      decoration: QDecor.card(color: QColors.surface, border: QColors.hairline, radius: QRadii.control),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(padding: const EdgeInsets.only(top: 2), child: QIcon(icon, size: 18, color: accent)),
+            const SizedBox(width: 8),
+            Expanded(child: Text(line, style: QText.body(size: 15, weight: FontWeight.w500, color: QColors.ink))),
+          ]),
+          if (a != null)
+            Padding(
+              // The button's own inset lines its words up under the line's.
+              padding: const EdgeInsetsDirectional.only(start: 10),
+              child: TextButton(
+                onPressed: a.onTap,
+                // The way on is something to do: burgundy, as every action is.
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  foregroundColor: QColors.accentInk,
+                ),
+                child: Text(a.label, style: QText.body(size: 15, weight: FontWeight.w600, color: QColors.accentInk)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The secondary action: the kit's grey button (its sign-in buttons), a
+/// rounded rectangle of the control grey with white words; a step lighter
+/// while pressed.
+class QOutlineButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onTap;
+
+  /// The outline's drawn height. The touch takes at least [QLayout.minTap]
+  /// whatever this is (O11).
+  final double height;
+  final Color color;
+  final IconData? icon;
+  const QOutlineButton({super.key, required this.label, required this.onTap, this.height = 44, this.color = QColors.ink, this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    final ink = enabled ? color : QDisabled.label;
+    return QTapArea(
+      onTap: onTap,
+      minWidth: 64,
+      builder: (context, pressed) => qPressed(
+        context,
+        pressed: pressed,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 64),
+          child: _SurfaceOrQuiet(
+            enabled: enabled,
+            pressed: pressed,
+            height: height,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              widthFactor: 1,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[
+                    QIcon(icon!, size: 18, color: ink),
+                    const SizedBox(width: 8),
+                  ],
+                  Flexible(
+                    child: Text(label, textAlign: TextAlign.center, style: QText.body(size: 15, weight: FontWeight.w500, color: ink)),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
-        child: Text(label, style: QText.body(size: 14, weight: FontWeight.w500, color: color)),
       ),
     );
   }
@@ -73,71 +872,156 @@ class QPillChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(QRadii.pill),
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        child: Container(
+    return QTapArea(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      // Chosen is a burgundy capsule with white words; the rest the control
+      // grey.
+      builder: (context, pressed) => qPressed(
+        context,
+        pressed: pressed,
+        child: QSurface(
+          shape: QSurfaceShape.capsule,
+          tint: selected ? QColors.accent : null,
+          pressed: pressed,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-          decoration: BoxDecoration(
-            color: selected ? QColors.violet.withOpacity(0.18) : QColors.cardDeep,
-            border: Border.all(color: selected ? QColors.violet : QColors.borderSoft),
-            borderRadius: BorderRadius.circular(QRadii.pill),
-          ),
-          child: Text(label, style: QText.body(size: 14, weight: FontWeight.w500, color: selected ? const Color(0xFFE9ECFF) : QColors.textMid)),
+          child: Text(label, style: QText.body(size: 15, weight: FontWeight.w500, color: selected ? QColors.onAccent : QColors.ink)),
         ),
       ),
     );
   }
 }
 
+/// A secondary control's body: the control grey, whether or not it can be
+/// used (its label says which).
+class _SurfaceOrQuiet extends StatelessWidget {
+  final bool enabled;
+  final bool pressed;
+  final double height;
+  final EdgeInsetsGeometry padding;
+  final Widget child;
+  const _SurfaceOrQuiet({required this.enabled, required this.pressed, required this.height, required this.padding, required this.child});
+
+  @override
+  Widget build(BuildContext context) => QSurface(pressed: enabled && pressed, height: height, padding: padding, child: child);
+}
+
+/// Su Points' coin, drawn in the palette: a white ring with a crescent in
+/// it — the moon's mark, as the coin of Qamar's own currency.
 class SuCoinIcon extends StatelessWidget {
   final double size;
-  const SuCoinIcon({super.key, this.size = 16});
+  final Color color;
+  const SuCoinIcon({super.key, this.size = 16, this.color = QColors.ink});
   @override
-  Widget build(BuildContext context) {
-    return ClipOval(
-      child: Image.asset('assets/images/su_coin.png', width: size, height: size, fit: BoxFit.cover),
-    );
-  }
+  Widget build(BuildContext context) => CustomPaint(size: Size.square(size), painter: _CoinPainter(color));
 }
 
+class _CoinPainter extends CustomPainter {
+  final Color color;
+  const _CoinPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = size.width / 2;
+    final c = Offset(r, r);
+    final stroke = math.max(1.0, size.width * 0.09);
+    canvas.drawCircle(c, r - stroke / 2, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..color = color);
+    // A crescent: a disc, less a disc a little to its upper right.
+    final moon = Path()..addOval(Rect.fromCircle(center: c, radius: r * 0.5));
+    final bite = Path()..addOval(Rect.fromCircle(center: c + Offset(r * 0.26, -r * 0.18), radius: r * 0.44));
+    canvas.drawPath(Path.combine(PathOperation.difference, moon, bite), Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_CoinPainter old) => old.color != color;
+}
+
+/// A reading that is less than sure, said in words: a quiet outline for a
+/// best guess, the strong one — in white — for something to check. A sure
+/// reading carries no badge at all.
 class ConfidenceBadge extends StatelessWidget {
-  final bool high;
+  /// Something to look at, not just a guess.
+  final bool check;
   final String label;
-  const ConfidenceBadge({super.key, required this.high, required this.label});
+  const ConfidenceBadge({super.key, required this.check, required this.label});
   @override
   Widget build(BuildContext context) {
-    final color = high ? QColors.green : QColors.amber;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(border: Border.all(color: color.withOpacity(0.4)), borderRadius: BorderRadius.circular(QRadii.pill)),
-      child: Text(label, style: QText.body(size: 11, weight: FontWeight.w500, color: color)),
+      decoration: QDecor.capsule(edge: check ? QColors.hairlineStrong : QColors.hairline),
+      child: Text(label, style: QText.body(size: 12, weight: FontWeight.w600, color: check ? QColors.ink : QColors.inkSecondary)),
     );
   }
 }
 
-class QRoundIconButton extends StatelessWidget {
-  final IconData icon;
+/// The one back control (the exit rule): every screen but the welcome
+/// screen and Today has it, in the same place — the top start corner — with
+/// the same chevron, which mirrors in Arabic, in the kit's grey circle. It
+/// returns to the screen the person came from. Drawn at 44 points, it takes
+/// touches across the full 48.
+class QBackButton extends StatelessWidget {
   final VoidCallback onTap;
-  final double size;
-  const QRoundIconButton({super.key, required this.icon, required this.onTap, this.size = 34});
+  final bool isAr;
+  const QBackButton({super.key, required this.onTap, required this.isAr});
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(side: BorderSide(color: QColors.borderSoft)),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: Icon(icon, size: size * 0.5, color: QColors.textMid),
+    return QTapArea(
+      onTap: onTap,
+      label: isAr ? 'رجوع' : 'Back',
+      builder: (context, pressed) => qPressed(
+        context,
+        pressed: pressed,
+        child: QSurface(
+          shape: QSurfaceShape.circle,
+          pressed: pressed,
+          width: 44,
+          height: 44,
+          // The chevron follows the text direction: it points right in Arabic.
+          child: const Center(child: QIcon(QIcons.back, size: 22, color: QColors.ink)),
+        ),
+      ),
+    );
+  }
+}
+
+/// A round icon control: the kit's grey circle (its bell and crown), a white
+/// glyph.
+class QRoundIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  /// The circle's drawn size; the touch takes at least [QLayout.minTap].
+  final double size;
+
+  /// What it does, for a screen reader: the icon has no words.
+  final String label;
+
+  /// On a control-grey surface, the circle a step lighter (the circle grey)
+  /// so it still shows.
+  final bool raised;
+  const QRoundIconButton({super.key, required this.icon, required this.onTap, required this.label, this.size = 34, this.raised = false});
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return QTapArea(
+      onTap: onTap,
+      label: label,
+      builder: (context, pressed) => qPressed(
+        context,
+        pressed: pressed,
+        child: QSurface(
+          shape: QSurfaceShape.circle,
+          pressed: pressed,
+          tint: raised ? (pressed ? QColors.surface : QColors.surfaceHigh) : null,
+          width: size,
+          height: size,
+          child: Center(child: QIcon(icon, size: (size * 0.5).roundToDouble(), color: enabled ? QColors.ink : QDisabled.label)),
         ),
       ),
     );
@@ -232,7 +1116,7 @@ class _QWheelFieldState extends State<QWheelField> {
           child: Text(
             widget.format?.call(v) ?? '$v',
             maxLines: 1,
-            style: QText.number(size: 19, weight: FontWeight.w600),
+            style: QText.number(size: 20, weight: FontWeight.w600),
           ),
         ),
     ];
@@ -240,10 +1124,11 @@ class _QWheelFieldState extends State<QWheelField> {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: QDecor.card(color: QColors.cardDeep, radius: QRadii.md),
+        // One radius across the answer stack: the wheels and Continue (O7).
+        decoration: QDecor.card(radius: QRadii.control),
         child: Column(
           children: [
-            Text(widget.unit, style: QText.body(size: 10, color: QColors.textMuted)),
+            Text(widget.unit, style: QText.body(size: 12, weight: FontWeight.w500, color: QColors.inkSecondary)),
             const SizedBox(height: 2),
             SizedBox(
               height: 88,
@@ -254,11 +1139,9 @@ class _QWheelFieldState extends State<QWheelField> {
                   IgnorePointer(
                     child: Container(
                       height: 32,
-                      decoration: BoxDecoration(
-                        color: QColors.violet.withValues(alpha: 0.12),
-                        border: Border.symmetric(
-                          horizontal: BorderSide(color: QColors.violet.withValues(alpha: 0.45)),
-                        ),
+                      decoration: const BoxDecoration(
+                        color: QColors.surfaceRaised,
+                        borderRadius: BorderRadius.all(Radius.circular(QRadii.control)),
                       ),
                     ),
                   ),
@@ -308,25 +1191,34 @@ class QLangToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final h = large ? 34.0 : 28.0;
-    return Container(
-      height: h,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: QColors.cardDeep.withValues(alpha: 0.9),
-        border: Border.all(color: QColors.borderSoft),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      // Fixed left-to-right so the two options never swap places when the
-      // direction flips — a control that moves as you use it is disorienting.
-      child: Directionality(
-        textDirection: TextDirection.ltr,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _Segment(label: 'ع', selected: lang == AppLang.ar, large: large, onTap: () => onChanged(AppLang.ar)),
-            _Segment(label: 'EN', selected: lang == AppLang.en, large: large, onTap: () => onChanged(AppLang.en)),
-          ],
-        ),
+    // Drawn [h] tall; each side takes a whole touch (O11), so the switch
+    // sits in a band [QLayout.minTap] tall and the pill is drawn behind.
+    return SizedBox(
+      height: QLayout.minTap,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(
+            child: Center(
+              child: SizedBox(height: h, child: const DecoratedBox(decoration: QDecor.segmentTrack, child: SizedBox.expand())),
+            ),
+          ),
+          // Fixed left-to-right so the two options never swap places when the
+          // direction flips — a control that moves as you use it is disorienting.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _Segment(label: 'ع', spoken: 'العربية', selected: lang == AppLang.ar, height: h - 6, large: large, onTap: () => onChanged(AppLang.ar)),
+                  _Segment(label: 'EN', spoken: 'English', selected: lang == AppLang.en, height: h - 6, large: large, onTap: () => onChanged(AppLang.en)),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -334,35 +1226,37 @@ class QLangToggle extends StatelessWidget {
 
 class _Segment extends StatelessWidget {
   final String label;
+  final String spoken;
   final bool selected;
   final bool large;
+  final double height;
   final VoidCallback onTap;
-  const _Segment({required this.label, required this.selected, required this.large, required this.onTap});
+  const _Segment({required this.label, required this.spoken, required this.selected, required this.large, required this.height, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: EdgeInsets.symmetric(horizontal: large ? 14 : 11),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            gradient: selected ? QColors.brandGradient : null,
-            borderRadius: BorderRadius.circular(999),
-          ),
+    return QTapArea(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      label: spoken,
+      builder: (context, pressed) => AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: height,
+        constraints: const BoxConstraints(minWidth: QLayout.minTap),
+        padding: EdgeInsets.symmetric(horizontal: large ? 14 : 11),
+        alignment: Alignment.center,
+        // The kit's segmented control: the chosen segment burgundy on the
+        // white track, with white words; the other black.
+        decoration: selected ? QDecor.segmentThumb : QDecor.segmentRest,
+        child: ExcludeSemantics(
           child: Text(
             label,
             style: QText.body(
               size: large ? 13 : 12,
               weight: FontWeight.w600,
-              color: selected ? Colors.white : QColors.textMuted,
+              color: selected ? QColors.onAccent : QColors.onInk,
             ),
           ),
         ),
@@ -373,54 +1267,90 @@ class _Segment extends StatelessWidget {
 
 /// Keeps a message list pinned to the newest message.
 ///
-/// A single post-frame `animateTo(maxScrollExtent)` is not enough: the extent
-/// is measured before tall content (the target card, a meal breakdown) has
-/// finished laying out, so the list stops short and the newest message stays
-/// off screen until the user scrolls by hand. This re-settles a moment later,
-/// and gets out of the way if the user has deliberately scrolled up to read
-/// back through the conversation.
+/// Both of the app's conversations are drawn from the bottom up
+/// (`ListView(reverse: true)`, newest first: O7, O10), so the newest message
+/// is always at offset 0, however tall the content above it grows. Pinning
+/// is one step: back to 0 when something new arrives, unless the person has
+/// scrolled up to read back. The top-down list needed a second pass for
+/// content that finished laying out late; this one does not.
 class ChatScroller {
   final ScrollController controller = ScrollController();
-  Timer? _settle;
   int _signature = -1;
 
-  /// Distance from the bottom within which we still consider the user "at the
-  /// bottom" and safe to auto-scroll.
+  /// Distance from the newest message within which we still consider the
+  /// user "at the bottom" and safe to auto-scroll.
   static const _stickyWindow = 160.0;
 
   /// Call from build with a value that changes whenever the content does.
   void sync(int signature) {
     if (signature == _signature) return;
     _signature = signature;
-    _schedule();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _go());
   }
 
-  void _schedule() {
-    WidgetsBinding.instance.addPostFrameCallback((_) => _go(animate: true));
-    _settle?.cancel();
-    // Second pass once late-laid-out content has grown the extent.
-    _settle = Timer(const Duration(milliseconds: 240), () => _go(animate: false));
-  }
-
-  void _go({required bool animate}) {
+  void _go() {
     if (!controller.hasClients) return;
     final pos = controller.position;
     // Never yank the view away from someone reading earlier messages.
-    if (pos.pixels < pos.maxScrollExtent - _stickyWindow && !animate) return;
-    if (animate) {
-      controller.animateTo(pos.maxScrollExtent,
-          duration: const Duration(milliseconds: 240), curve: Curves.easeOut);
-    } else {
-      controller.jumpTo(pos.maxScrollExtent);
-    }
+    if (pos.pixels > _stickyWindow || pos.pixels == 0) return;
+    controller.animateTo(0, duration: const Duration(milliseconds: 240), curve: Curves.easeOutCubic);
   }
 
-  void dispose() {
-    _settle?.cancel();
-    controller.dispose();
+  void dispose() => controller.dispose();
+}
+
+/// Holds the height its child last had while the child is empty (O7): a
+/// dock whose inputs go away between one question and the next keeps its
+/// place, so the conversation above it does not drop and come back. When the
+/// next inputs arrive it grows or shrinks to them once, smoothly.
+class QKeepHeight extends StatefulWidget {
+  /// Null while there is nothing to show; the last height is held.
+  final Widget? child;
+  const QKeepHeight({super.key, required this.child});
+
+  @override
+  State<QKeepHeight> createState() => _QKeepHeightState();
+}
+
+class _QKeepHeightState extends State<QKeepHeight> {
+  double _held = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = widget.child;
+    final still = MediaQuery.disableAnimationsOf(context);
+    return AnimatedSize(
+      duration: still ? Duration.zero : const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.bottomCenter,
+      child: child == null
+          ? SizedBox(height: _held)
+          : _ReportHeight(onHeight: (h) => _held = h, child: child),
+    );
   }
 }
 
+class _ReportHeight extends SingleChildRenderObjectWidget {
+  final ValueChanged<double> onHeight;
+  const _ReportHeight({required this.onHeight, required Widget super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderReportHeight(onHeight);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderReportHeight renderObject) => renderObject.onHeight = onHeight;
+}
+
+class _RenderReportHeight extends RenderProxyBox {
+  _RenderReportHeight(this.onHeight);
+  ValueChanged<double> onHeight;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    onHeight(size.height);
+  }
+}
 
 /// A text link to one of the public pages on dr-qamar.com.
 ///
@@ -431,11 +1361,14 @@ class QLegalLink extends StatelessWidget {
   final String label;
   final String url;
   final double size;
-  const QLegalLink({super.key, required this.label, required this.url, this.size = 11});
+  const QLegalLink({super.key, required this.label, required this.url, this.size = 12});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    // Small words, a whole touch (O11): the link takes [QLayout.minTap] each
+    // way however short its label.
+    return QTapArea(
+      link: true,
       onTap: () async {
         final uri = Uri.parse(url);
         // externalApplication: legal pages belong in the browser, where the
@@ -444,13 +1377,49 @@ class QLegalLink extends StatelessWidget {
           await launchUrl(uri);
         }
       },
-      child: Text(
+      builder: (context, pressed) => Text(
         label,
         style: QText.body(
           size: size,
           weight: FontWeight.w500,
-          color: QColors.textMuted,
-        ).copyWith(decoration: TextDecoration.underline, decorationColor: QColors.textFaint),
+          color: pressed ? QColors.inkSecondary : QColors.inkTertiary,
+        ).copyWith(decoration: TextDecoration.underline, decorationColor: QColors.inkTertiary),
+      ),
+    );
+  }
+}
+
+/// A bar of progress, the kit's: round-ended, 6 points tall. On the dark,
+/// burgundy along the control grey; on a pastel card ([onPastel]), black
+/// along black at 12%. How far along something is, said by length, never a
+/// verdict.
+class QBar extends StatelessWidget {
+  final double value;
+  final double height;
+  final bool onPastel;
+  const QBar({super.key, required this.value, this.height = 6, this.onPastel = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final v = value.clamp(0.0, 1.0);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(QRadii.pill),
+      child: SizedBox(
+        height: height,
+        child: Stack(
+          children: [
+            Positioned.fill(child: ColoredBox(color: onPastel ? QColors.pastelTrack : QColors.hairline)),
+            FractionallySizedBox(
+              alignment: AlignmentDirectional.centerStart,
+              widthFactor: v,
+              heightFactor: 1,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(QRadii.pill),
+                child: ColoredBox(color: onPastel ? QColors.onPastel : QColors.accentInk),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

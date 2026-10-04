@@ -17,6 +17,7 @@
 // there is no Anthropic key and no cost: the point of these families is that
 // they are deterministic.
 
+import { graphMealNote, mentionsScore, modelMealNote } from "./notes.ts";
 import { classify } from "./scope.ts";
 import { blocks, verifyMeal, verifyPlan, type Meal, type MealItem } from "./verify.ts";
 import type { Restriction } from "./safety.ts";
@@ -51,6 +52,8 @@ export function runCase(c: EvalCase): CaseOutcome {
         return verifyMealCase(c);
       case "verify_plan":
         return verifyPlanCase(c);
+      case "meal_note":
+        return mealNoteCase(c);
       default:
         return { passed: false, actual: {}, detail: `no Deno runner for kind ${kind}` };
     }
@@ -63,9 +66,14 @@ export function runCase(c: EvalCase): CaseOutcome {
 
 function scopeCase(c: EvalCase): CaseOutcome {
   const verdict = classify(c.input.question as string);
-  const actual: Record<string, unknown> = verdict.allowed
-    ? { refused: false, domain: verdict.domain }
-    : { refused: true, reason: verdict.reason };
+  const actual: Record<string, unknown> = !verdict.allowed
+    ? { refused: true, reason: verdict.reason }
+    // A greeting is allowed and has no domain. Reported as its own thing
+    // rather than folded into nutrition, so an eval case can tell the
+    // difference between "answered as a food question" and "said hello back".
+    : "greeting" in verdict
+    ? { refused: false, domain: "greeting" }
+    : { refused: false, domain: verdict.domain };
 
   if (actual.refused !== c.expected.refused) {
     return {
@@ -88,6 +96,31 @@ function scopeCase(c: EvalCase): CaseOutcome {
       passed: false,
       actual,
       detail: `answered in the wrong domain: expected ${c.expected.domain}, got ${actual.domain}`,
+    };
+  }
+  return { passed: true, actual, detail: null };
+}
+
+/**
+ * A meal reading's note is never about the score (O3). With `note`, the case
+ * is the model's note on a plate: one that talks points must be dropped. With
+ * `items`, it is the food graph's own note on a typed or spoken meal, which
+ * must read without any word about Su, points or earning.
+ */
+function mealNoteCase(c: EvalCase): CaseOutcome {
+  const lang = (c.input.lang as "ar" | "en") ?? "en";
+  const shown = "note" in c.input
+    ? modelMealNote(c.input.note as string | null)
+    : graphMealNote(lang, (c.input.items as MealItem[]) ?? [], c.input.photos_left === true);
+  const actual: Record<string, unknown> = { shown, dropped: shown === null, score_free: !mentionsScore(shown ?? "") };
+  if (actual.score_free !== true) {
+    return { passed: false, actual, detail: `the note speaks of the score: "${shown}"` };
+  }
+  if (c.expected.dropped !== undefined && actual.dropped !== c.expected.dropped) {
+    return {
+      passed: false,
+      actual,
+      detail: c.expected.dropped ? `expected the note to be dropped, it was shown: "${shown}"` : "expected a note, it was dropped",
     };
   }
   return { passed: true, actual, detail: null };

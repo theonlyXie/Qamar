@@ -35,7 +35,11 @@ class _QuickInvokeBinderState extends State<QuickInvokeBinder> with WidgetsBindi
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _drain();
+    if (state == AppLifecycleState.resumed) {
+      _drain();
+      // Anything logged while the signal was gone goes up now.
+      context.read<AppState>().drainPending();
+    }
   }
 
   Future<void> _drain() async {

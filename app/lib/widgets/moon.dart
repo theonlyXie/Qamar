@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../theme/colors.dart';
 
-/// The Qamar moon, drawn rather than photographed.
+/// The Qamar moon, drawn rather than photographed — in greys only (the
+/// qamar-design skill): every shade below is achromatic.
 ///
 /// This replaces the flat `qamar_orb.png` that used to sit inside [LivingOrb].
 /// A picture of a moon always reads as a picture — it has fixed lighting, a
@@ -19,8 +21,8 @@ import 'package:flutter/material.dart';
 ///  * earthshine on the night side, so the whole sphere stays visible instead
 ///    of the moon looking bitten.
 ///
-/// Nothing here animates position or scale — [LivingOrb] owns the breathing,
-/// halo, wander and sparks. The only motion is a very slow phase drift, so the
+/// Nothing here animates position or scale — [LivingOrb] owns the breath and
+/// the halo. The only motion is a very slow phase drift, so the
 /// terminator creeps the way a real moon's does.
 class QamarMoon extends StatefulWidget {
   final double size;
@@ -32,11 +34,17 @@ class QamarMoon extends StatefulWidget {
   /// Fixes the phase instead of drifting it. Useful for tests and goldens.
   final double? staticPhase;
 
+  /// Pins the phase to the day's state (see OrbState.moonPhase) while keeping
+  /// the slow drift, narrowed to a whisper either side. Null keeps the
+  /// decorative waxing band.
+  final double? phase;
+
   const QamarMoon({
     super.key,
     required this.size,
     this.phaseDuration = const Duration(seconds: 90),
     this.staticPhase,
+    this.phase,
   });
 
   @override
@@ -50,7 +58,20 @@ class _QamarMoonState extends State<QamarMoon> with SingleTickerProviderStateMix
   void initState() {
     super.initState();
     if (widget.staticPhase == null) {
-      _phase = AnimationController(vsync: this, duration: widget.phaseDuration)..repeat(reverse: true);
+      _phase = AnimationController(vsync: this, duration: widget.phaseDuration, value: 0.5);
+    }
+  }
+
+  /// Under reduce motion the drift stops, mid-band: the moon is still.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final phase = _phase;
+    if (phase == null) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      phase.stop();
+    } else if (!phase.isAnimating) {
+      phase.repeat(reverse: true);
     }
   }
 
@@ -76,7 +97,11 @@ class _QamarMoonState extends State<QamarMoon> with SingleTickerProviderStateMix
         // Drift across a narrow band: always waxing, never full, so the
         // crescent stays Qamar's mark — but wide enough that the cratered
         // surface is the thing you actually look at.
-        painter: _MoonPainter(phase: 0.28 + 0.16 * controller.value),
+        painter: _MoonPainter(
+          phase: widget.phase == null
+              ? 0.58 + 0.09 * controller.value
+              : (widget.phase! - 0.02 + 0.04 * controller.value).clamp(0.0, 1.0),
+        ),
       ),
     );
   }
@@ -156,11 +181,11 @@ class _MoonPainter extends CustomPainter {
       Paint()
         ..shader = RadialGradient(
           colors: const [
-            Color(0xFFF4F1FB),
-            Color(0xFFDCD9EE),
-            Color(0xFFB2B7D6),
-            Color(0xFF7D86AF),
-            Color(0xFF4E5883),
+            Color(0xFFF3F3F3),
+            Color(0xFFDDDDDD),
+            Color(0xFFB8B8B8),
+            Color(0xFF888888),
+            Color(0xFF595959),
           ],
           stops: const [0.0, 0.28, 0.55, 0.78, 1.0],
         ).createShader(Rect.fromCircle(center: sub, radius: r * 1.42)),
@@ -174,7 +199,7 @@ class _MoonPainter extends CustomPainter {
       canvas.drawOval(
         Rect.fromCenter(center: p.center, width: m.r * r * 2 * p.squash, height: m.r * r * 2),
         Paint()
-          ..color = const Color(0xFF39406B).withValues(alpha: m.depth)
+          ..color = const Color(0xFF434343).withValues(alpha: m.depth)
           ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * 0.07),
       );
     }
@@ -201,8 +226,8 @@ class _MoonPainter extends CustomPainter {
         Paint()
           ..shader = RadialGradient(
             colors: [
-              const Color(0xFF333A63).withValues(alpha: 0.88 * k.depth),
-              const Color(0xFF262C51).withValues(alpha: 0.52 * k.depth),
+              const Color(0xFF3C3C3C).withValues(alpha: 0.88 * k.depth),
+              const Color(0xFF2E2E2E).withValues(alpha: 0.52 * k.depth),
             ],
           ).createShader(rect)
           ..maskFilter = MaskFilter.blur(BlurStyle.normal, h * 0.15),
@@ -216,9 +241,9 @@ class _MoonPainter extends CustomPainter {
 
       final lightAngle = math.atan2(_lightV, _lightU) - p.angle;
       canvas.drawArc(rect, lightAngle - 1.15, 2.30,
-          false, rim..color = const Color(0xFFFFFDFF).withValues(alpha: 0.78 * k.depth));
+          false, rim..color = const Color(0xFFFFFFFF).withValues(alpha: 0.78 * k.depth));
       canvas.drawArc(rect, lightAngle + math.pi - 1.15, 2.30,
-          false, rim..color = const Color(0xFF1E2340).withValues(alpha: 0.72 * k.depth));
+          false, rim..color = const Color(0xFF252525).withValues(alpha: 0.72 * k.depth));
 
       canvas.restore();
     }
@@ -236,9 +261,9 @@ class _MoonPainter extends CustomPainter {
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
           colors: [
-            const Color(0xFF0A1024).withValues(alpha: 0.88),
-            const Color(0xFF141C3C).withValues(alpha: 0.80),
-            const Color(0xFF1E2750).withValues(alpha: 0.62),
+            const Color(0xFF0F0F0F).withValues(alpha: 0.88),
+            const Color(0xFF1C1C1C).withValues(alpha: 0.80),
+            const Color(0xFF282828).withValues(alpha: 0.62),
           ],
         ).createShader(Rect.fromCircle(center: c, radius: r)),
     );
@@ -249,7 +274,7 @@ class _MoonPainter extends CustomPainter {
     canvas.drawPath(
       path,
       Paint()
-        ..color = const Color(0xFF10182F).withValues(alpha: 0.5)
+        ..color = const Color(0xFF161616).withValues(alpha: 0.5)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * 0.028),
     );
     canvas.restore();
@@ -259,8 +284,10 @@ class _MoonPainter extends CustomPainter {
   /// unlit limb. Semi-axis [r * phaseWidth] horizontally, [r] vertically.
   Path _terminatorPath(Offset c, double r) {
     // How far the terminator bulges past the centre line, signed: positive
-    // sweeps the shadow toward the lit limb, thinning the crescent.
-    final bulge = r * (phase.clamp(0.0, 1.0) * 1.05 - 0.14);
+    // sweeps the shadow toward the lit limb, thinning the crescent. The full
+    // range is used: 0 leaves a sliver of night at the limb (a moon a day
+    // from full), 1 a sliver of light (a moon a day from new).
+    final bulge = r * (phase.clamp(0.0, 1.0) * 1.9 - 0.95);
     final path = Path()..moveTo(c.dx, c.dy - r);
 
     const steps = 72;
@@ -287,15 +314,15 @@ class _MoonPainter extends CustomPainter {
           colors: [
             Colors.transparent,
             Colors.transparent,
-            const Color(0xFF0B1226).withValues(alpha: 0.30),
-            const Color(0xFF080D1C).withValues(alpha: 0.60),
+            const Color(0xFF111111).withValues(alpha: 0.30),
+            const Color(0xFF0D0D0D).withValues(alpha: 0.60),
           ],
           stops: const [0.0, 0.66, 0.88, 1.0],
         ).createShader(Rect.fromCircle(center: c, radius: r)),
     );
   }
 
-  /// A cool rim light plus a breath of atmosphere just outside the disc, which
+  /// A white rim light plus a breath of atmosphere just outside the disc, which
   /// is what sells "sphere in space" rather than "circle on a screen".
   void _paintRim(Canvas canvas, Offset c, double r) {
     canvas.drawCircle(
@@ -304,7 +331,7 @@ class _MoonPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = math.max(0.7, r * 0.030)
-        ..color = const Color(0xFFCFE3FF).withValues(alpha: 0.34)
+        ..color = const Color(0xFFE6E6E6).withValues(alpha: 0.34)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * 0.055),
     );
     canvas.drawCircle(
@@ -313,7 +340,7 @@ class _MoonPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = math.max(1.0, r * 0.05)
-        ..color = const Color(0xFF7B6CFF).withValues(alpha: 0.16)
+        ..color = QColors.ink.withValues(alpha: 0.10)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * 0.09),
     );
   }

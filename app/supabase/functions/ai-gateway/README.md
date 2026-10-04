@@ -5,7 +5,7 @@ this decides whether the question may be answered at all, gathers evidence,
 calls the model, and records what happened.
 
 ```
-POST /ai-gateway/chat/reply     { message, lang }
+POST /ai-gateway/chat/reply     { message, lang, imageBase64?, imageMediaType? }   # a photo (a menu) is metered as a photo
 POST /ai-gateway/meal/analyze   { inputType, text?, mediaPath?, lang? }
 POST /ai-gateway/plan/generate  { date?, lang? }
 ```
@@ -27,6 +27,44 @@ Then point the app at it:
 ```bash
 flutter run --dart-define=AI_GATEWAY_URL=https://<ref>.supabase.co/functions/v1/ai-gateway
 ```
+
+## The night plan, and the night sentence
+
+At 22:00 Cairo the gateway writes tomorrow's plan for every Qamar+ member who
+does not have one yet, then for every free-tier account that logged today, and
+with each plan **one sentence about tomorrow** (`night_notes`, migration
+`0048`): tomorrow against today, no dish named. The phone shows the sentence
+next morning; a member taps through to the plan, the free tier finds the plan
+locked — the blueprint's "tomorrow as the wall". `/plan/generate` refuses a
+future date to a free account (403, `reason: tomorrow_locked`), and the
+`meal_plans` policy in `0048` hides future rows from them the same way.
+
+`POST /plan/nightly` is called by pg_cron (migration `0044_nightly_plan_cron.sql`)
+with a shared secret, not a user token, and does nothing outside the
+22:00–23:59 Cairo window unless the body says `{"force": true}` for a manual
+run. It never spends anyone's own plan bucket; members come first, and anyone
+who already has tomorrow's plan is skipped (but still gets the sentence if it
+is missing).
+
+Three secrets, once:
+
+```bash
+supabase secrets set QAMAR_CRON_SECRET=<long random>
+```
+
+and in SQL (Vault, so nothing sits in a migration):
+
+```sql
+select vault.create_secret('https://<ref>.supabase.co/functions/v1/ai-gateway', 'qamar_gateway_url');
+select vault.create_secret('<anon key>',    'qamar_anon_key');
+select vault.create_secret('<long random>', 'qamar_cron_secret');  -- the same value as above
+```
+
+Until all three exist the job logs a notice and does nothing. The run
+returns a report (`plus`, `lite`, `written`, `noted`, `skipped`, `failed`,
+`remaining`, and each failure's reason); `remaining > 0` means the second cron slot an hour later
+picks up the rest, or the user base has outgrown one slot and
+`0044` needs more.
 
 ## The three rules this enforces
 
